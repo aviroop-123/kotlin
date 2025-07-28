@@ -9417,6 +9417,18 @@ public class PhasedJvmDiagnosticPsiTestGenerated extends AbstractPhasedJvmDiagno
       }
 
       @Test
+      @TestMetadata("inheritanceChainIgnorability.kt")
+      public void testInheritanceChainIgnorability() {
+        runTest("compiler/testData/diagnostics/tests/crv/inheritanceChainIgnorability.kt");
+      }
+
+      @Test
+      @TestMetadata("javaAnnotationsOverride.kt")
+      public void testJavaAnnotationsOverride() {
+        runTest("compiler/testData/diagnostics/tests/crv/javaAnnotationsOverride.kt");
+      }
+
+      @Test
       @TestMetadata("lambdas.kt")
       public void testLambdas() {
         runTest("compiler/testData/diagnostics/tests/crv/lambdas.kt");
@@ -9498,6 +9510,18 @@ public class PhasedJvmDiagnosticPsiTestGenerated extends AbstractPhasedJvmDiagno
       public void testHalfEnabled() {
         runTest("compiler/testData/diagnostics/tests/crvDifferent/halfEnabled.kt");
       }
+
+      @Test
+      @TestMetadata("overrideDisabledWithFull.kt")
+      public void testOverrideDisabledWithFull() {
+        runTest("compiler/testData/diagnostics/tests/crvDifferent/overrideDisabledWithFull.kt");
+      }
+
+      @Test
+      @TestMetadata("overrideFullWithChecker.kt")
+      public void testOverrideFullWithChecker() {
+        runTest("compiler/testData/diagnostics/tests/crvDifferent/overrideFullWithChecker.kt");
+      }
     }
 
     @Nested
@@ -9537,6 +9561,12 @@ public class PhasedJvmDiagnosticPsiTestGenerated extends AbstractPhasedJvmDiagno
       @TestMetadata("jInterop.kt")
       public void testJInterop() {
         runTest("compiler/testData/diagnostics/tests/crvFull/jInterop.kt");
+      }
+
+      @Test
+      @TestMetadata("localOverrides.kt")
+      public void testLocalOverrides() {
+        runTest("compiler/testData/diagnostics/tests/crvFull/localOverrides.kt");
       }
 
       @Test
@@ -34372,6 +34402,12 @@ public class PhasedJvmDiagnosticPsiTestGenerated extends AbstractPhasedJvmDiagno
       }
 
       @Test
+      @TestMetadata("LocalDeclarations.kt")
+      public void testLocalDeclarations() {
+        runTest("compiler/testData/diagnostics/tests/redeclarations/LocalDeclarations.kt");
+      }
+
+      @Test
       @TestMetadata("MultiFilePackageRedeclaration.kt")
       public void testMultiFilePackageRedeclaration() {
         runTest("compiler/testData/diagnostics/tests/redeclarations/MultiFilePackageRedeclaration.kt");
@@ -57170,6 +57206,12 @@ public class PhasedJvmDiagnosticPsiTestGenerated extends AbstractPhasedJvmDiagno
       @TestMetadata("kmp.kt")
       public void testKmp() {
         runTest("compiler/fir/analysis-tests/testData/resolve/nestedTypeAliases/kmp.kt");
+      }
+
+      @Test
+      @TestMetadata("localTypeAliases.kt")
+      public void testLocalTypeAliases() {
+        runTest("compiler/fir/analysis-tests/testData/resolve/nestedTypeAliases/localTypeAliases.kt");
       }
 
       @Test

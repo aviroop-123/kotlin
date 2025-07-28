@@ -9653,6 +9653,18 @@ public class FirLightTreeOldFrontendDiagnosticsWithLatestLanguageVersionTestGene
       }
 
       @Test
+      @TestMetadata("inheritanceChainIgnorability.kt")
+      public void testInheritanceChainIgnorability() {
+        runTest("compiler/testData/diagnostics/tests/crv/inheritanceChainIgnorability.kt");
+      }
+
+      @Test
+      @TestMetadata("javaAnnotationsOverride.kt")
+      public void testJavaAnnotationsOverride() {
+        runTest("compiler/testData/diagnostics/tests/crv/javaAnnotationsOverride.kt");
+      }
+
+      @Test
       @TestMetadata("lambdas.kt")
       public void testLambdas() {
         runTest("compiler/testData/diagnostics/tests/crv/lambdas.kt");
@@ -9739,6 +9751,18 @@ public class FirLightTreeOldFrontendDiagnosticsWithLatestLanguageVersionTestGene
       public void testHalfEnabled() {
         runTest("compiler/testData/diagnostics/tests/crvDifferent/halfEnabled.kt");
       }
+
+      @Test
+      @TestMetadata("overrideDisabledWithFull.kt")
+      public void testOverrideDisabledWithFull() {
+        runTest("compiler/testData/diagnostics/tests/crvDifferent/overrideDisabledWithFull.kt");
+      }
+
+      @Test
+      @TestMetadata("overrideFullWithChecker.kt")
+      public void testOverrideFullWithChecker() {
+        runTest("compiler/testData/diagnostics/tests/crvDifferent/overrideFullWithChecker.kt");
+      }
     }
 
     @Nested
@@ -9788,6 +9812,12 @@ public class FirLightTreeOldFrontendDiagnosticsWithLatestLanguageVersionTestGene
       @TestMetadata("jInterop.kt")
       public void testJInterop() {
         runTest("compiler/testData/diagnostics/tests/crvFull/jInterop.kt");
+      }
+
+      @Test
+      @TestMetadata("localOverrides.kt")
+      public void testLocalOverrides() {
+        runTest("compiler/testData/diagnostics/tests/crvFull/localOverrides.kt");
       }
 
       @Test
@@ -32728,6 +32758,12 @@ public class FirLightTreeOldFrontendDiagnosticsWithLatestLanguageVersionTestGene
       @TestMetadata("kt470.kt")
       public void testKt470() {
         runTest("compiler/testData/diagnostics/tests/redeclarations/kt470.kt");
+      }
+
+      @Test
+      @TestMetadata("LocalDeclarations.kt")
+      public void testLocalDeclarations() {
+        runTest("compiler/testData/diagnostics/tests/redeclarations/LocalDeclarations.kt");
       }
 
       @Test

@@ -56141,6 +56141,12 @@ public class FirBlackBoxCodegenTestWithInlineScopesGenerated extends AbstractFir
       }
 
       @Test
+      @TestMetadata("functionTypes.kt")
+      public void testFunctionTypes() {
+        runTest("compiler/testData/codegen/box/reflection/types/functionTypes.kt");
+      }
+
+      @Test
       @TestMetadata("innerGenericArguments.kt")
       public void testInnerGenericArguments() {
         runTest("compiler/testData/codegen/box/reflection/types/innerGenericArguments.kt");
@@ -61463,6 +61469,12 @@ public class FirBlackBoxCodegenTestWithInlineScopesGenerated extends AbstractFir
     @TestMetadata("kt45308.kt")
     public void testKt45308() {
       runTest("compiler/testData/codegen/box/typealias/kt45308.kt");
+    }
+
+    @Test
+    @TestMetadata("localTypeAliases.kt")
+    public void testLocalTypeAliases() {
+      runTest("compiler/testData/codegen/box/typealias/localTypeAliases.kt");
     }
 
     @Test
