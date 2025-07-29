@@ -29056,6 +29056,12 @@ public class JvmAbiConsistencyTestBoxGenerated extends AbstractJvmAbiConsistency
     }
 
     @Test
+    @TestMetadata("kt79547_inlineLambdaWithUnderlyingArrayOfObject.kt")
+    public void testKt79547_inlineLambdaWithUnderlyingArrayOfObject() {
+      runTest("compiler/testData/codegen/box/inlineClasses/kt79547_inlineLambdaWithUnderlyingArrayOfObject.kt");
+    }
+
+    @Test
     @TestMetadata("mangledDefaultParameterFunction.kt")
     public void testMangledDefaultParameterFunction() {
       runTest("compiler/testData/codegen/box/inlineClasses/mangledDefaultParameterFunction.kt", TransformersFunctions.getReplaceOptionalJvmInlineAnnotationWithReal());
@@ -50959,6 +50965,18 @@ public class JvmAbiConsistencyTestBoxGenerated extends AbstractJvmAbiConsistency
       }
 
       @Test
+      @TestMetadata("contextParameters.kt")
+      public void testContextParameters() {
+        runTest("compiler/testData/codegen/box/reflection/call/contextParameters.kt");
+      }
+
+      @Test
+      @TestMetadata("contextParametersSuspend.kt")
+      public void testContextParametersSuspend() {
+        runTest("compiler/testData/codegen/box/reflection/call/contextParametersSuspend.kt");
+      }
+
+      @Test
       @TestMetadata("disallowNullValueForNotNullField.kt")
       public void testDisallowNullValueForNotNullField() {
         runTest("compiler/testData/codegen/box/reflection/call/disallowNullValueForNotNullField.kt");
@@ -51584,6 +51602,18 @@ public class JvmAbiConsistencyTestBoxGenerated extends AbstractJvmAbiConsistency
       @TestMetadata("companionObject.kt")
       public void testCompanionObject() {
         runTest("compiler/testData/codegen/box/reflection/callBy/companionObject.kt");
+      }
+
+      @Test
+      @TestMetadata("contextParameters.kt")
+      public void testContextParameters() {
+        runTest("compiler/testData/codegen/box/reflection/callBy/contextParameters.kt");
+      }
+
+      @Test
+      @TestMetadata("contextParametersSuspend.kt")
+      public void testContextParametersSuspend() {
+        runTest("compiler/testData/codegen/box/reflection/callBy/contextParametersSuspend.kt");
       }
 
       @Test
@@ -53796,6 +53826,12 @@ public class JvmAbiConsistencyTestBoxGenerated extends AbstractJvmAbiConsistency
       @TestMetadata("callPrivatePropertyFromGetProperties.kt")
       public void testCallPrivatePropertyFromGetProperties() {
         runTest("compiler/testData/codegen/box/reflection/properties/callPrivatePropertyFromGetProperties.kt");
+      }
+
+      @Test
+      @TestMetadata("contextParametersGet.kt")
+      public void testContextParametersGet() {
+        runTest("compiler/testData/codegen/box/reflection/properties/contextParametersGet.kt");
       }
 
       @Test
