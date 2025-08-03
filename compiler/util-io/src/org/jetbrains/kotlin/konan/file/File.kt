@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.konan.file
 
 import org.jetbrains.kotlin.util.removeSuffixIfPresent
+import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -172,7 +173,7 @@ data class File constructor(internal val javaPath: Path) {
 
     // TODO: Consider removeing these after konanazing java.util.Properties.
     fun bufferedReader() = Files.newBufferedReader(javaPath)
-    fun outputStream() = Files.newOutputStream(javaPath)
+    fun outputStream() = BufferedOutputStream(Files.newOutputStream(javaPath))
     fun printWriter() = javaPath.toFile().printWriter()
 
     companion object {

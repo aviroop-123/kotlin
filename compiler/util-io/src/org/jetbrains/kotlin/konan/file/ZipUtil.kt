@@ -10,9 +10,10 @@ import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.nio.file.spi.FileSystemProvider
-import java.util.zip.ZipEntry
+import java.util.zip.Deflater
 import java.util.zip.ZipException
-import java.util.zip.ZipOutputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.outputStream
 import kotlin.io.path.relativeTo
@@ -53,8 +54,8 @@ private fun zipDirAs(dirPath: Path, zipFilePath: Path) {
     val dirPathWithExpandedSymlinks: Path = dirPath.expandSymlinks()
 
     zipFilePath.outputStream().use { outputStream ->
-        ZipOutputStream(outputStream).use { zipOutputStream ->
-            zipOutputStream.setLevel(5) // Set the medium compression level.
+        ZipArchiveOutputStream(outputStream).use { zipOutputStream ->
+            zipOutputStream.setLevel(Deflater.BEST_SPEED) // Set the medium compression level.
 
             Files.walk(dirPathWithExpandedSymlinks).forEach { path: Path ->
                 val pathWithExpandedSymlinks: Path = path.expandSymlinks()
@@ -85,16 +86,16 @@ private fun zipDirAs(dirPath: Path, zipFilePath: Path) {
 
 private val DEFAULT_ZIP_ENTRY_TIME = FileTime.fromMillis(0)
 
-private inline fun ZipOutputStream.newEntry(relativePath: String, isDir: Boolean, block: (ZipEntry) -> Unit = {}) {
+private inline fun ZipArchiveOutputStream.newEntry(relativePath: String, isDir: Boolean, block: (ZipArchiveEntry) -> Unit = {}) {
     val entry = if (isDir) {
-        ZipEntry("$relativePath/").also {
-            it.setMethod(ZipOutputStream.STORED)
+        ZipArchiveEntry("$relativePath/").also {
+            it.setMethod(ZipArchiveEntry.STORED)
             it.size = 0
             it.crc = 0
         }
     } else {
-        ZipEntry(relativePath).also {
-            it.setMethod(ZipOutputStream.DEFLATED) // Default method.
+        ZipArchiveEntry(relativePath).also {
+            it.setMethod(ZipArchiveEntry.DEFLATED) // Default method.
         }
     }
 
@@ -104,12 +105,12 @@ private inline fun ZipOutputStream.newEntry(relativePath: String, isDir: Boolean
     entry.lastAccessTime = DEFAULT_ZIP_ENTRY_TIME
     entry.extra = null
 
-    putNextEntry(entry)
+    putArchiveEntry(entry)
 
     // Customize the entry.
     block(entry)
 
-    closeEntry()
+    closeArchiveEntry()
 }
 
 private fun Path.expandSymlinks(): Path {
