@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.konan.file
 
+import com.github.luben.zstd.ZstdInputStream
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
@@ -13,6 +14,9 @@ import java.nio.file.spi.FileSystemProvider
 import java.util.zip.ZipEntry
 import java.util.zip.ZipException
 import java.util.zip.ZipOutputStream
+import com.github.luben.zstd.ZstdOutputStream
+import org.apache.commons.compress.archivers.tar.*
+import java.io.FileInputStream
 import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.outputStream
 import kotlin.io.path.relativeTo
@@ -53,30 +57,33 @@ private fun zipDirAs(dirPath: Path, zipFilePath: Path) {
     val dirPathWithExpandedSymlinks: Path = dirPath.expandSymlinks()
 
     zipFilePath.outputStream().use { outputStream ->
-        ZipOutputStream(outputStream).use { zipOutputStream ->
-            zipOutputStream.setLevel(5) // Set the medium compression level.
+        ZstdOutputStream(outputStream).use { zstdOutputStream ->
+            TarArchiveOutputStream(zstdOutputStream).use { zipOutputStream ->
+//                zipOutputStream.setLevel(5) // Set the medium compression level.
 
-            Files.walk(dirPathWithExpandedSymlinks).forEach { path: Path ->
-                val pathWithExpandedSymlinks: Path = path.expandSymlinks()
+                Files.walk(dirPathWithExpandedSymlinks).forEach { path: Path ->
+                    val pathWithExpandedSymlinks: Path = path.expandSymlinks()
 
-                if (!pathWithExpandedSymlinks.startsWith(dirPathWithExpandedSymlinks)) {
-                    throw ZipException("An attempt to escape the source directory $dirPath in symlink $path")
-                } else if (pathWithExpandedSymlinks == dirPathWithExpandedSymlinks) {
-                    // Don't need to keep the root "/" directory in the archive.
-                    return@forEach
-                }
-
-                val relativePath: String = path.relativeTo(dirPathWithExpandedSymlinks).invariantSeparatorsPathString
-
-                val attributes = Files.readAttributes(pathWithExpandedSymlinks, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-                when {
-                    attributes.isRegularFile -> zipOutputStream.newEntry(relativePath, isDir = false) {
-                        Files.copy(pathWithExpandedSymlinks, zipOutputStream)
+                    if (!pathWithExpandedSymlinks.startsWith(dirPathWithExpandedSymlinks)) {
+                        throw ZipException("An attempt to escape the source directory $dirPath in symlink $path")
+                    } else if (pathWithExpandedSymlinks == dirPathWithExpandedSymlinks) {
+                        // Don't need to keep the root "/" directory in the archive.
+                        return@forEach
                     }
 
-                    attributes.isDirectory -> zipOutputStream.newEntry(relativePath, isDir = true)
+                    val relativePath: String = path.relativeTo(dirPathWithExpandedSymlinks).invariantSeparatorsPathString
 
-                    else -> error("Unsupported file type encountered: $path")
+                    val attributes =
+                        Files.readAttributes(pathWithExpandedSymlinks, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+                    when {
+                        attributes.isRegularFile -> zipOutputStream.newEntry(relativePath, isDir = false, attributes) {
+                            Files.copy(pathWithExpandedSymlinks, zipOutputStream)
+                        }
+
+                        attributes.isDirectory -> zipOutputStream.newEntry(relativePath, isDir = true, attributes)
+
+                        else -> error("Unsupported file type encountered: $path")
+                    }
                 }
             }
         }
@@ -85,16 +92,14 @@ private fun zipDirAs(dirPath: Path, zipFilePath: Path) {
 
 private val DEFAULT_ZIP_ENTRY_TIME = FileTime.fromMillis(0)
 
-private inline fun ZipOutputStream.newEntry(relativePath: String, isDir: Boolean, block: (ZipEntry) -> Unit = {}) {
+private inline fun TarArchiveOutputStream.newEntry(relativePath: String, isDir: Boolean, attributes: BasicFileAttributes, block: (TarArchiveEntry) -> Unit = {}) {
     val entry = if (isDir) {
-        ZipEntry("$relativePath/").also {
-            it.setMethod(ZipOutputStream.STORED)
+        TarArchiveEntry("$relativePath/").also {
             it.size = 0
-            it.crc = 0
         }
     } else {
-        ZipEntry(relativePath).also {
-            it.setMethod(ZipOutputStream.DEFLATED) // Default method.
+        TarArchiveEntry(relativePath).also {
+            it.size = attributes.size()
         }
     }
 
@@ -102,14 +107,13 @@ private inline fun ZipOutputStream.newEntry(relativePath: String, isDir: Boolean
     entry.creationTime = DEFAULT_ZIP_ENTRY_TIME
     entry.lastModifiedTime = DEFAULT_ZIP_ENTRY_TIME
     entry.lastAccessTime = DEFAULT_ZIP_ENTRY_TIME
-    entry.extra = null
 
-    putNextEntry(entry)
+    putArchiveEntry(entry)
 
     // Customize the entry.
     block(entry)
 
-    closeEntry()
+    closeArchiveEntry()
 }
 
 private fun Path.expandSymlinks(): Path {
@@ -164,6 +168,7 @@ private fun File.recursiveCopyTo(destination: File, resetTimeAttributes: Boolean
     val normalizedDestPath = destPath.normalize()
     Files.walk(sourcePath).forEach next@{ oldPath ->
 
+        val inputStream = ZstdInputStream(FileInputStream(oldPath.toFile()))
         val relative = sourcePath.relativize(oldPath)
 
         // We are copying files between file systems,
@@ -180,7 +185,7 @@ private fun File.recursiveCopyTo(destination: File, resetTimeAttributes: Boolean
         if (Files.isDirectory(newPath)) {
             Files.createDirectories(newPath)
         } else {
-            Files.copy(oldPath, newPath, StandardCopyOption.REPLACE_EXISTING)
+            Files.copy(inputStream, newPath, StandardCopyOption.REPLACE_EXISTING)
         }
         if (resetTimeAttributes) {
             val zero = FileTime.fromMillis(0)
