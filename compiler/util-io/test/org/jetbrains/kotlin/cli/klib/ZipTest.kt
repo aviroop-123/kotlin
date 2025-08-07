@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.cli.klib
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.jetbrains.kotlin.cli.klib.Entry.Directory
 import org.jetbrains.kotlin.cli.klib.Entry.File
 import org.jetbrains.kotlin.konan.file.File as KFile
@@ -24,6 +25,7 @@ import java.util.TreeMap
 import java.util.zip.ZipEntry
 import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
 import kotlin.random.Random
 import kotlin.test.Ignore
 import kotlin.test.assertEquals
@@ -196,8 +198,8 @@ class ZipTest {
         }
 
         Files.newInputStream(compressed.javaPath).use { inputStream ->
-            ZipInputStream(inputStream).use { zipInputStream ->
-                var entry: ZipEntry? = zipInputStream.nextEntry
+            ZipArchiveInputStream(inputStream).use { zipInputStream ->
+                var entry: ZipArchiveEntry? = zipInputStream.nextEntry
                 while (entry != null) {
                     assertTime(entry.creationTime)
                     assertTime(entry.lastModifiedTime)
@@ -207,7 +209,7 @@ class ZipTest {
                         assertTrue(entry.method > 0, "Compression rate is not set for ${entry.name} in $compressed.")
                     }
 
-                    zipInputStream.closeEntry()
+                    zipInputStream.close()
                     entry = zipInputStream.nextEntry
                 }
             }
