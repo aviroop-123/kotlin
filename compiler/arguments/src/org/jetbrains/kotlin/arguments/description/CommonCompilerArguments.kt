@@ -1024,4 +1024,20 @@ default: 'first-only-warn' in language version 2.2+, 'first-only' in version 2.1
             introducedVersion = KotlinReleaseVersion.v2_2_20
         )
     }
+
+    compilerArgument {
+        name = "Xheader-mode"
+        description = """
+                Enable header compilation mode.
+                In this mode, the compiler produces class files that only contain the 'skeleton' of the classes to be
+                compiled but the method bodies of all the implementations are empty.  This is used to speed up parallel compilation
+                build systems where header libraries can be used to replace downstream dependencies for which we only need to
+                see the type names and method signatures required to compile a given translation unit.
+                """.trimIndent().asReleaseDependent()
+        valueType = BooleanType.defaultFalse
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0
+        )
+    }
 }
