@@ -63,7 +63,6 @@ class LightTreeRawFirExpressionBuilder(
     tree: FlyweightCapableTreeStructure<LighterASTNode>,
     private val declarationBuilder: LightTreeRawFirDeclarationBuilder,
     context: Context<LighterASTNode> = Context(),
-    headerCompilationMode: Boolean,
 ) : AbstractLightTreeRawFirBuilder(session, tree, context) {
 
     internal inline fun <reified R : FirExpression> getAsFirExpression(
@@ -129,7 +128,7 @@ class LightTreeRawFirExpressionBuilder(
     }
 
     /*****    EXPRESSIONS    *****/
-    fun convertExpression(expression: LighterASTNode, errorReason: String): FirElement {
+    fun convertExpression(expression: LighterASTNode, errorReason: String): FirElement? {
         return when (expression.tokenType) {
             LAMBDA_EXPRESSION -> convertLambdaExpression(expression)
             BINARY_EXPRESSION -> convertBinaryExpression(expression)
