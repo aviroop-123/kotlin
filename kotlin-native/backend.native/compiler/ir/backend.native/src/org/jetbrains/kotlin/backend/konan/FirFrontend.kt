@@ -75,7 +75,7 @@ internal inline fun <F> PhaseContext.firFrontend(
         }
     }
 
-    outputs.runPlatformCheckers(diagnosticsReporter)
+    outputs.runPlatformCheckers(diagnosticsReporter, configuration.headerCompilation)
 
     FirDiagnosticsCompilerResultsReporter.reportToMessageCollector(diagnosticsReporter, messageCollector, renderDiagnosticNames)
     return if (syntaxErrors || diagnosticsReporter.hasErrors) {

@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.fir.DependencyListForCliModule
 import org.jetbrains.kotlin.fir.extensions.FirAnalysisHandlerExtension
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 import org.jetbrains.kotlin.fir.pipeline.*
+import org.jetbrains.kotlin.fir.render
 import org.jetbrains.kotlin.fir.session.*
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope
 import org.jetbrains.kotlin.modules.Module
@@ -266,9 +267,14 @@ object JvmFrontendPipelinePhase : PipelinePhase<ConfigurationPipelineArtifact, J
                 true -> session.buildFirViaLightTree(sources, diagnosticsCollector, configuration.headerCompilation, countFilesAndLines)
                 else -> session.buildFirFromKtFiles(sources.asKtFilesList())
             }
+//            resolveAndCheckFir(session, rawFirFiles, diagnosticsCollector, configuration.headerCompilation).also {
+//                if (true) {
+//                    it.fir.forEach { file -> println(file.render()) }
+//                }
+//            }
             resolveAndCheckFir(session, rawFirFiles, diagnosticsCollector, configuration.headerCompilation)
         }
-        outputs.runPlatformCheckers(diagnosticsCollector)
+        outputs.runPlatformCheckers(diagnosticsCollector, configuration.headerCompilation)
 
         val kotlinPackageUsageIsFine = when (configuration.useLightTree) {
             true -> outputs.all { checkKotlinPackageUsageForLightTree(configuration, it.fir) }

@@ -129,6 +129,7 @@ object WebFrontendPipelinePhase : PipelinePhase<ConfigurationPipelineArtifact, W
                 incrementalDataProvider = configuration.incrementalDataProvider,
                 lookupTracker = lookupTracker,
                 useWasmPlatform = isWasm,
+                configuration.headerCompilation
             )
         }
 
@@ -152,6 +153,7 @@ object WebFrontendPipelinePhase : PipelinePhase<ConfigurationPipelineArtifact, W
         incrementalDataProvider: IncrementalDataProvider?,
         lookupTracker: LookupTracker?,
         useWasmPlatform: Boolean,
+        headerCompilation: Boolean,
     ): AnalyzedFirWithPsiOutput {
         for (ktFile in ktFiles) {
             AnalyzerWithCompilerReport.reportSyntaxErrors(ktFile, diagnosticsReporter)
@@ -170,7 +172,7 @@ object WebFrontendPipelinePhase : PipelinePhase<ConfigurationPipelineArtifact, W
             },
             useWasmPlatform = useWasmPlatform,
         )
-        output.runPlatformCheckers(diagnosticsReporter)
+        output.runPlatformCheckers(diagnosticsReporter, headerCompilation)
         return AnalyzedFirWithPsiOutput(output, ktFiles)
     }
 
@@ -197,11 +199,16 @@ object WebFrontendPipelinePhase : PipelinePhase<ConfigurationPipelineArtifact, W
             isCommonSource = { groupedSources.isCommonSourceForLt(it) },
             fileBelongsToModule = { file, it -> groupedSources.fileBelongsToModuleForLt(file, it) },
             buildResolveAndCheckFir = { session, files ->
-                buildResolveAndCheckFirViaLightTree(session, files, diagnosticsReporter, headerCompilationMode, performanceManager?.let { it::addSourcesStats })
+                buildResolveAndCheckFirViaLightTree(
+                    session,
+                    files,
+                    diagnosticsReporter,
+                    headerCompilationMode,
+                    performanceManager?.let { it::addSourcesStats })
             },
             useWasmPlatform = useWasmPlatform,
         )
-        output.runPlatformCheckers(diagnosticsReporter)
+        output.runPlatformCheckers(diagnosticsReporter, headerCompilationMode)
         return AnalyzedFirOutput(output)
     }
 

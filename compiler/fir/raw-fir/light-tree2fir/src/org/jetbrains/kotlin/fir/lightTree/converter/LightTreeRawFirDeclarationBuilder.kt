@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.fir.declarations.utils.addDeclarations
 import org.jetbrains.kotlin.fir.declarations.utils.addDefaultBoundIfNecessary
 import org.jetbrains.kotlin.fir.declarations.utils.danglingTypeConstraints
 import org.jetbrains.kotlin.fir.declarations.utils.isScriptTopLevelDeclaration
+import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.diagnostics.*
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.builder.*
@@ -97,15 +98,27 @@ class LightTreeRawFirDeclarationBuilder(
                     packageDirective = convertPackageDirective(child).also { context.packageFqName = it.packageFqName }
                 }
                 IMPORT_LIST -> importList += convertImportDirectives(child)
-                CLASS -> firDeclarationList += convertClass(child)
+                CLASS -> {
+                    convertClass(child, headerCompilationMode)?.let {
+                        firDeclarationList += it
+                    }
+                }
                 FUN -> {
                     convertFunctionDeclaration(child, headerCompilationMode)?.let{
                         firDeclarationList += it as FirDeclaration
                     }
                 }
-                KtNodeTypes.PROPERTY -> firDeclarationList += convertPropertyDeclaration(child)
+                KtNodeTypes.PROPERTY -> {
+                    convertPropertyDeclaration(child, generateHeaders = headerCompilationMode)?.let {
+                        firDeclarationList += it
+                    }
+                }
                 TYPEALIAS -> firDeclarationList += convertTypeAlias(child)
-                OBJECT_DECLARATION -> firDeclarationList += convertClass(child)
+                OBJECT_DECLARATION -> {
+                    convertClass(child, headerCompilationMode)?.let {
+                        firDeclarationList += it
+                    }
+                }
                 DESTRUCTURING_DECLARATION -> {
                     val initializer = buildFirDestructuringDeclarationInitializer(child)
                     firDeclarationList += buildErrorNonLocalDestructuringDeclaration(child.toFirSourceElement(), initializer)
@@ -147,7 +160,7 @@ class LightTreeRawFirDeclarationBuilder(
     fun convertBlockExpressionWithoutBuilding(block: LighterASTNode, kind: KtFakeSourceElementKind? = null): FirBlockBuilder {
         val firStatements = block.forEachChildrenReturnList { node, container ->
             when (node.tokenType) {
-                CLASS, OBJECT_DECLARATION -> container += convertClass(node) as FirStatement
+                CLASS, OBJECT_DECLARATION -> container += convertClass(node, false) as FirStatement
                 FUN -> {
                     convertFunctionDeclaration(node)?.let{
                         container += it
@@ -467,7 +480,7 @@ class LightTreeRawFirDeclarationBuilder(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseClassOrObject
      */
-    private fun convertClass(classNode: LighterASTNode): FirDeclaration {
+    private fun convertClass(classNode: LighterASTNode, generateHeaders: Boolean): FirDeclaration? {
         var modifiers: ModifierList? = null
         var classKind: ClassKind = ClassKind.CLASS
         var identifier: String? = null
@@ -477,6 +490,7 @@ class LightTreeRawFirDeclarationBuilder(
         var classBody: LighterASTNode? = null
         var superTypeList: LighterASTNode? = null
         var typeParameterList: LighterASTNode? = null
+        var headerMode = generateHeaders
         classNode.forEachChildren {
             when (it.tokenType) {
                 MODIFIER_LIST -> modifiers = convertModifierList(it, isInClass = true)
@@ -485,6 +499,16 @@ class LightTreeRawFirDeclarationBuilder(
         }
 
         val calculatedModifiers = modifiers ?: ModifierList()
+        // We can remove private classes
+        if (headerMode) {
+            when(calculatedModifiers.getVisibility()) {
+                Visibilities.Private -> return null
+                Visibilities.Internal -> return null
+            }
+        }
+        if (calculatedModifiers.isInlineClass()) {
+            headerMode = false
+        }
         val className = identifier.nameAsSafeName(if (calculatedModifiers.isCompanion()) "Companion" else "")
         val isLocalWithinParent = classNode.getParent()?.elementType != CLASS_BODY && isClassLocal(classNode) { getParent() }
         val classIsExpect = calculatedModifiers.hasExpect() || context.containerIsExpect
@@ -618,6 +642,7 @@ class LightTreeRawFirDeclarationBuilder(
                             containingClassIsExpectClass = status.isExpect,
                             isImplicitlyActual = isImplicitlyActual(status, classKind),
                             isKotlinAny = classIsKotlinAny,
+                            generateHeaders = headerMode,
                         )
                         val firPrimaryConstructor = primaryConstructorWrapper?.firConstructor
                         firPrimaryConstructor?.let { declarations += it }
@@ -643,7 +668,7 @@ class LightTreeRawFirDeclarationBuilder(
 
                         //parse declarations
                         classBody?.let {
-                            addDeclarations(convertClassBody(it, classWrapper))
+                            addDeclarations(convertClassBody(it, classWrapper, headerMode))
                         }
 
                         //parse data class
@@ -786,7 +811,8 @@ class LightTreeRawFirDeclarationBuilder(
                         delegatedSelfType.source,
                         classWrapper,
                         delegatedConstructorSource,
-                        containingClassIsExpectClass = false
+                        containingClassIsExpectClass = false,
+                        generateHeaders = false
                     )?.let { this.declarations += it.firConstructor }
                     delegateFields?.let { this.declarations += it }
 
@@ -804,7 +830,7 @@ class LightTreeRawFirDeclarationBuilder(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseEnumEntry
      */
-    private fun convertEnumEntry(enumEntry: LighterASTNode, classWrapper: ClassWrapper): FirEnumEntry {
+    private fun convertEnumEntry(enumEntry: LighterASTNode, classWrapper: ClassWrapper, generateHeaders: Boolean): FirEnumEntry {
         var modifiers: ModifierList? = null
         lateinit var identifier: String
         val enumSuperTypeCallEntry = mutableListOf<FirExpression>()
@@ -830,7 +856,7 @@ class LightTreeRawFirDeclarationBuilder(
                                 superTypeCallEntry = superTypeCall
                             }
                         }
-                        CLASS_BODY -> classBodyNode = it
+                        CLASS_BODY -> classBodyNode = if(generateHeaders) null else it
                     }
                 }
 
@@ -892,12 +918,13 @@ class LightTreeRawFirDeclarationBuilder(
                                 enumClassWrapper,
                                 superTypeCallEntry?.toFirSourceElement(),
                                 isEnumEntry = true,
-                                containingClassIsExpectClass = containingClassIsExpectClass
+                                containingClassIsExpectClass = containingClassIsExpectClass,
+                                generateHeaders = generateHeaders,
                             )?.let { declarations += it.firConstructor }
                             classBodyNode?.also {
                                 // Use ANONYMOUS_OBJECT_NAME for the owner class id of enum entry declarations
                                 withChildClassName(SpecialNames.ANONYMOUS, forceLocalContext = true, isExpect = false) {
-                                    declarations += convertClassBody(it, enumClassWrapper)
+                                    declarations += convertClassBody(it, enumClassWrapper, generateHeaders)
                                 }
                             }
                         }
@@ -929,10 +956,10 @@ class LightTreeRawFirDeclarationBuilder(
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseClassBody
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseEnumClassBody
      */
-    private fun convertClassBody(classBody: LighterASTNode, classWrapper: ClassWrapper?): List<FirDeclaration> {
+    private fun convertClassBody(classBody: LighterASTNode, classWrapper: ClassWrapper?, generateHeaders: Boolean = false): List<FirDeclaration> {
         val modifierLists = mutableListOf<LighterASTNode>()
         val firDeclarations = classBody.forEachChildrenReturnList { node, container ->
-            convertDeclarationFromClassBody(node, container, classWrapper, modifierLists)
+            convertDeclarationFromClassBody(node, container, classWrapper, modifierLists, generateHeaders)
         }
 
         convertDanglingModifierListsInClassBody(modifierLists, firDeclarations)
@@ -944,20 +971,37 @@ class LightTreeRawFirDeclarationBuilder(
         container: MutableList<FirDeclaration>,
         classWrapper: ClassWrapper?,
         modifierLists: MutableList<LighterASTNode>,
+        generateHeaders: Boolean,
     ) {
         when (node.tokenType) {
-            ENUM_ENTRY -> container += convertEnumEntry(node, classWrapper!!)
-            CLASS -> container += convertClass(node)
+            ENUM_ENTRY -> container += convertEnumEntry(node, classWrapper!!, generateHeaders)
+            CLASS -> {
+                convertClass(node, generateHeaders)?.let {
+                    container += it
+                }
+            }
             FUN -> {
-                convertFunctionDeclaration(node)?.let{
+                convertFunctionDeclaration(node, generateHeaders)?.let{
                     container += it as FirDeclaration
                 }
             }
-            KtNodeTypes.PROPERTY -> container += convertPropertyDeclaration(node, classWrapper)
+            KtNodeTypes.PROPERTY -> {
+                convertPropertyDeclaration(node, classWrapper, generateHeaders)?.let {
+                    container += it
+                }
+            }
             TYPEALIAS -> container += convertTypeAlias(node)
-            OBJECT_DECLARATION -> container += convertClass(node)
+            OBJECT_DECLARATION -> {
+                convertClass(node, generateHeaders)?.let {
+                    container += it
+                }
+            }
             CLASS_INITIALIZER -> container += convertAnonymousInitializer(node, classWrapper!!.classBuilder.ownerRegularOrAnonymousObjectSymbol) //anonymousInitializer
-            SECONDARY_CONSTRUCTOR -> container += convertSecondaryConstructor(node, classWrapper!!)
+            SECONDARY_CONSTRUCTOR -> {
+                convertSecondaryConstructor(node, classWrapper!!, generateHeaders)?.let {
+                    container += it
+                }
+            }
             MODIFIER_LIST -> modifierLists += node
             DESTRUCTURING_DECLARATION -> {
                 val initializer = buildFirDestructuringDeclarationInitializer(node)
@@ -1014,6 +1058,7 @@ class LightTreeRawFirDeclarationBuilder(
         containingClassIsExpectClass: Boolean,
         isImplicitlyActual: Boolean = false,
         isKotlinAny: Boolean = false,
+        generateHeaders: Boolean,
     ): PrimaryConstructor? {
         val shouldGenerateImplicitConstructor =
             (classWrapper.isEnumEntry() || !classWrapper.hasSecondaryConstructor) &&
@@ -1042,8 +1087,11 @@ class LightTreeRawFirDeclarationBuilder(
             }
 
             val modifiers = modifiersIfPresent ?: ModifierList()
+            if (generateHeaders && !modifiers.getVisibility().isPublicAPI) {
+                return null
+            }
 
-            val generateDelegatedSuperCall = shouldGenerateDelegatedSuperCall(
+            val generateDelegatedSuperCall = !generateHeaders && shouldGenerateDelegatedSuperCall(
                 isAnySuperCall = isKotlinAny,
                 isExpectClass = containingClassIsExpectClass,
                 isEnumEntry = isEnumEntry,
@@ -1104,7 +1152,10 @@ class LightTreeRawFirDeclarationBuilder(
                 isInner = classWrapper.isInner()
                 isFromSealedClass = classWrapper.isSealed() && explicitVisibility !== Visibilities.Private
                 isFromEnumClass = classWrapper.isEnum()
+                isExternal = generateHeaders
             }
+
+            if (!status.visibility.isPublicAPI && generateHeaders) return null
 
             val builder = when {
                 isErrorConstructor -> createErrorConstructorBuilder(ConeNoConstructorError)
@@ -1197,7 +1248,7 @@ class LightTreeRawFirDeclarationBuilder(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseSecondaryConstructor
      */
-    private fun convertSecondaryConstructor(secondaryConstructor: LighterASTNode, classWrapper: ClassWrapper): FirConstructor {
+    private fun convertSecondaryConstructor(secondaryConstructor: LighterASTNode, classWrapper: ClassWrapper, generateHeaders: Boolean): FirConstructor? {
         var modifiers: ModifierList? = null
         val firValueParameters = mutableListOf<ValueParameter>()
         var constructorDelegationCall: FirDelegatedConstructorCall? = null
@@ -1225,7 +1276,7 @@ class LightTreeRawFirDeclarationBuilder(
             val calculatedModifiers = modifiers ?: ModifierList()
             val isExpect = calculatedModifiers.hasExpect() || context.containerIsExpect
             if (delegatedConstructorNode != null) {
-                constructorDelegationCall = convertConstructorDelegationCall(delegatedConstructorNode, classWrapper, isExpect)
+                constructorDelegationCall = convertConstructorDelegationCall(delegatedConstructorNode, classWrapper, isExpect, generateHeaders)
             }
 
             val explicitVisibility = calculatedModifiers.getVisibility().takeUnless { it == Visibilities.Unknown }
@@ -1235,7 +1286,9 @@ class LightTreeRawFirDeclarationBuilder(
                 isInner = classWrapper.isInner()
                 isFromSealedClass = classWrapper.isSealed() && explicitVisibility !== Visibilities.Private
                 isFromEnumClass = classWrapper.isEnum()
+                isExternal = generateHeaders
             }
+            if (!status.visibility.isPublicAPI && generateHeaders) return null
 
             val target = FirFunctionTarget(labelName = null, isLambda = false)
             return buildConstructor {
@@ -1253,7 +1306,7 @@ class LightTreeRawFirDeclarationBuilder(
                 typeParameters += constructorTypeParametersFromConstructedClass(classWrapper.classBuilder.typeParameters)
                 valueParameters += firValueParameters.map { it.firValueParameter }
                 val (body, contractDescription) = withForcedLocalContext {
-                    convertFunctionBody(block, null, allowLegacyContractDescription = true)
+                    convertFunctionBody(block, null, allowLegacyContractDescription = true, generateHeaders)
                 }
                 this.body = body
                 contractDescription?.let { this.contractDescription = it }
@@ -1277,7 +1330,11 @@ class LightTreeRawFirDeclarationBuilder(
         constructorDelegationCall: LighterASTNode,
         classWrapper: ClassWrapper,
         isExpect: Boolean,
+        generateHeaders: Boolean = false
     ): FirDelegatedConstructorCall? {
+        if(generateHeaders) {
+            return null
+        }
         var thisKeywordPresent = false
         val firValueArguments = mutableListOf<FirExpression>()
         constructorDelegationCall.forEachChildren {
@@ -1386,7 +1443,7 @@ class LightTreeRawFirDeclarationBuilder(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseProperty
      */
-    fun convertPropertyDeclaration(property: LighterASTNode, classWrapper: ClassWrapper? = null): FirDeclaration {
+    fun convertPropertyDeclaration(property: LighterASTNode, classWrapper: ClassWrapper? = null, generateHeaders: Boolean = false): FirDeclaration? {
         var modifiers: ModifierList? = null
         var identifier: String? = null
         val firTypeParameters = mutableListOf<FirTypeParameter>()
@@ -1435,7 +1492,7 @@ class LightTreeRawFirDeclarationBuilder(
                     BACKING_FIELD -> fieldDeclaration = it
                     else -> if (it.isExpression()) {
                         context.calleeNamesForLambda += null
-                        propertyInitializer = withForcedLocalContext {
+                        propertyInitializer = if (generateHeaders) null else withForcedLocalContext {
                             expressionConverter.getAsFirExpression(it, "Should have initializer")
                         }
                         context.calleeNamesForLambda.removeLast()
@@ -1444,6 +1501,7 @@ class LightTreeRawFirDeclarationBuilder(
             }
 
             val calculatedModifiers = modifiers ?: ModifierList()
+            if (generateHeaders && calculatedModifiers.getVisibility() != Visibilities.Public) return null
             val propertyAnnotations = calculatedModifiers.convertAnnotations()
 
             return buildProperty {
@@ -1516,7 +1574,7 @@ class LightTreeRawFirDeclarationBuilder(
                             }
 
                         val convertedAccessors = accessors.map {
-                            convertGetterOrSetter(it, returnType, propertyVisibility, symbol, calculatedModifiers, propertyAnnotations)
+                            convertGetterOrSetter(it, returnType, propertyVisibility, symbol, calculatedModifiers, propertyAnnotations, generateHeaders)
                         }
                         this.getter = convertedAccessors.find { it.isGetter }
                             ?: FirDefaultPropertyGetter(
@@ -1678,6 +1736,7 @@ class LightTreeRawFirDeclarationBuilder(
         propertySymbol: FirPropertySymbol,
         propertyModifiers: ModifierList,
         propertyAnnotations: List<FirAnnotationCall>,
+        generateHeaders: Boolean
     ): FirPropertyAccessor {
         var modifiers: ModifierList? = null
         var isGetter = true
@@ -1715,7 +1774,9 @@ class LightTreeRawFirDeclarationBuilder(
                     }
                 }
                 CONTRACT_EFFECT_LIST -> outerContractDescription = obtainContractDescription(it)
-                BLOCK -> block = it
+                BLOCK -> {
+                    block = if (generateHeaders) null else it
+                }
                 else -> if (it.isExpression()) expression = it
             }
         }
@@ -1990,6 +2051,9 @@ class LightTreeRawFirDeclarationBuilder(
                 // We need to disable header mode for inline functions.
                 headerMode = false
             }
+            if(calculatedModifiers.hasOverride() && headerMode) {
+                return null
+            }
 
             if (returnType == null) {
                 returnType =
@@ -2055,7 +2119,7 @@ class LightTreeRawFirDeclarationBuilder(
                         isInfix = calculatedModifiers.hasInfix()
                         isInline = calculatedModifiers.hasInline()
                         isTailRec = calculatedModifiers.hasTailrec()
-                        isExternal = calculatedModifiers.hasExternal() || headerMode
+                        isExternal = calculatedModifiers.hasExternal()
                         isSuspend = calculatedModifiers.hasSuspend()
                     }
 
@@ -2102,8 +2166,11 @@ class LightTreeRawFirDeclarationBuilder(
                     }
 
                     // Private functions can be removed in header mode.
-                    if (calculatedModifiers.getVisibility() == Visibilities.Private && headerMode) {
-                        return null
+                    if (headerMode) {
+                        when (calculatedModifiers.getVisibility()) {
+                            Visibilities.Private -> return null
+                            Visibilities.Internal -> return null
+                        }
                     }
                 }
                 context.firFunctionTargets.removeLast()
@@ -2910,7 +2977,7 @@ class LightTreeRawFirDeclarationBuilder(
                         }
 
                         else -> {
-                            convertDeclarationFromClassBody(declarationSource, declarations, classWrapper = null, modifierLists)
+                            convertDeclarationFromClassBody(declarationSource, declarations, classWrapper = null, modifierLists, false)
                             declarations.lastOrNull()?.isScriptTopLevelDeclaration = true
                         }
                     }

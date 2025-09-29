@@ -41,7 +41,7 @@ internal class ObjectClassLowering(val context: JvmBackendContext) : ClassLoweri
         val privateInstanceField = context.cachedDeclarations.getPrivateFieldForObjectInstance(irClass)
 
         val constructor = irClass.constructors.find { it.isPrimary }
-            ?: throw AssertionError("Object should have a primary constructor: ${irClass.name}")
+            ?: return
 
         if (privateInstanceField != publicInstanceField) {
             with(context.createIrBuilder(privateInstanceField.symbol)) {

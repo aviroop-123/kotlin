@@ -194,15 +194,17 @@ class Fir2IrVisitor(
             // `irParentEnumClass` definitely is not a lazy class
             @OptIn(UnsafeDuringIrConstructionAPI::class)
             val constructor = irParentEnumClass.defaultConstructor
-                ?: error("Assuming that default constructor should exist and be converted at this point: ${enumEntry.render()}")
-            enumEntry.convertWithOffsets { startOffset, endOffset ->
-                irEnumEntry.initializerExpression = IrFactoryImpl.createExpressionBody(
-                    IrEnumConstructorCallImpl(
-                        startOffset, endOffset, irType, constructor.symbol,
-                        typeArgumentsCount = constructor.typeParameters.size
+//                ?: error("Assuming that default constructor should exist and be converted at this point: ${enumEntry.render()}")
+            constructor?.let {
+                enumEntry.convertWithOffsets { startOffset, endOffset ->
+                    irEnumEntry.initializerExpression = IrFactoryImpl.createExpressionBody(
+                        IrEnumConstructorCallImpl(
+                            startOffset, endOffset, irType, constructor.symbol,
+                            typeArgumentsCount = constructor.typeParameters.size
+                        )
                     )
-                )
-                irEnumEntry
+                    irEnumEntry
+                }
             }
         }
         cleaner.cleanEnumEntry(enumEntry)
