@@ -140,25 +140,27 @@ class LightTreeRawFirDeclarationBuilder(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseBlockExpression
      */
-    fun convertBlockExpression(block: LighterASTNode): FirBlock {
-        return convertBlockExpressionWithoutBuilding(block).build()
+    fun convertBlockExpression(block: LighterASTNode, generateHeaders: Boolean = false): FirBlock {
+        return convertBlockExpressionWithoutBuilding(block, generateHeaders = generateHeaders).build()
     }
 
-    fun convertBlockExpressionWithoutBuilding(block: LighterASTNode, kind: KtFakeSourceElementKind? = null): FirBlockBuilder {
+    fun convertBlockExpressionWithoutBuilding(block: LighterASTNode, kind: KtFakeSourceElementKind? = null, generateHeaders: Boolean = false): FirBlockBuilder {
         val firStatements = block.forEachChildrenReturnList { node, container ->
-            when (node.tokenType) {
-                CLASS, OBJECT_DECLARATION -> container += convertClass(node) as FirStatement
-                FUN -> {
-                    convertFunctionDeclaration(node)?.let{
-                        container += it
+            if (!generateHeaders || container.isEmpty()) {
+                when (node.tokenType) {
+                    CLASS, OBJECT_DECLARATION -> container += convertClass(node) as FirStatement
+                    FUN -> {
+                        convertFunctionDeclaration(node, generateHeaders)?.let{
+                            container += it
+                        }
                     }
+                    KtNodeTypes.PROPERTY -> container += convertPropertyDeclaration(node) as FirStatement
+                    DESTRUCTURING_DECLARATION -> container +=
+                        convertDestructingDeclaration(node).toFirDestructingDeclaration(this, baseModuleData)
+                    TYPEALIAS -> container += convertTypeAlias(node) as FirStatement
+                    CLASS_INITIALIZER -> shouldNotBeCalled("CLASS_INITIALIZER expected to be processed during class body conversion")
+                    else -> if (node.isExpression()) container += expressionConverter.getAsFirStatement(node)
                 }
-                KtNodeTypes.PROPERTY -> container += convertPropertyDeclaration(node) as FirStatement
-                DESTRUCTURING_DECLARATION -> container +=
-                    convertDestructingDeclaration(node).toFirDestructingDeclaration(this, baseModuleData)
-                TYPEALIAS -> container += convertTypeAlias(node) as FirStatement
-                CLASS_INITIALIZER -> shouldNotBeCalled("CLASS_INITIALIZER expected to be processed during class body conversion")
-                else -> if (node.isExpression()) container += expressionConverter.getAsFirStatement(node)
             }
         }
         return FirBlockBuilder().apply {
@@ -2107,7 +2109,7 @@ class LightTreeRawFirDeclarationBuilder(
     ): Pair<FirBlock?, FirContractDescription?> {
         return when {
             blockNode != null -> {
-                val block = convertBlock(blockNode) // We might be able to process only the contract statement in the body.
+                val block = convertBlock(blockNode, generateHeaders) // We might be able to process only the contract statement in the body.
                 val contractDescription = runIf(allowLegacyContractDescription) {
                     val blockSource = block.source
                     val diagnostic = when {
@@ -2143,7 +2145,7 @@ class LightTreeRawFirDeclarationBuilder(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseBlock
      */
-    fun convertBlock(block: LighterASTNode?): FirBlock {
+    fun convertBlock(block: LighterASTNode?, generateHeaders: Boolean = false): FirBlock {
         if (block == null) return buildEmptyExpressionBlock()
         if (block.tokenType != BLOCK) {
             return FirSingleExpressionBlock(
@@ -2151,7 +2153,7 @@ class LightTreeRawFirDeclarationBuilder(
             )
         }
 
-        return convertBlockExpression(block)
+        return convertBlockExpression(block, generateHeaders)
     }
 
     /**
