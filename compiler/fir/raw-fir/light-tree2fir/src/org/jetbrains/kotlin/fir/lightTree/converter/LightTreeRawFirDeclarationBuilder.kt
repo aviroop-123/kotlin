@@ -951,7 +951,7 @@ class LightTreeRawFirDeclarationBuilder(
         when (node.tokenType) {
             ENUM_ENTRY -> container += convertEnumEntry(node, classWrapper!!)
             CLASS -> container += convertClass(node, generateHeaders)
-            FUN -> container += convertFunctionDeclaration(node, generateHeaders) as FirDeclaration
+            FUN -> container += convertFunctionDeclaration(node, generateHeaders, classWrapper!!) as FirDeclaration
             KtNodeTypes.PROPERTY -> container += convertPropertyDeclaration(node, classWrapper)
             TYPEALIAS -> container += convertTypeAlias(node)
             OBJECT_DECLARATION -> container += convertClass(node, generateHeaders)
@@ -1935,7 +1935,11 @@ class LightTreeRawFirDeclarationBuilder(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseFunction
      */
-    fun convertFunctionDeclaration(functionDeclaration: LighterASTNode, generateHeaders: Boolean = false): FirStatement {
+    fun convertFunctionDeclaration(
+        functionDeclaration: LighterASTNode,
+        generateHeaders: Boolean = false,
+        classWrapper: ClassWrapper? = null,
+    ): FirStatement {
         var modifiers: ModifierList? = null
         var identifier: String? = null
         var valueParametersList: LighterASTNode? = null
@@ -2088,6 +2092,14 @@ class LightTreeRawFirDeclarationBuilder(
                         convertFunctionBody(block, expression, allowLegacyContractDescription, headerMode)
                     }
                     this.body = bodyWithContractDescription.first
+                    if(headerMode) {
+                        this.body = null
+                        if (bodyWithContractDescription.first != null && classWrapper?.isInterface() == true) { // The body wasn't empty
+                            this.status = this.status.copy(
+                                isExpect = true
+                            )
+                        }
+                    }
                     val contractDescription = outerContractDescription ?: bodyWithContractDescription.second
                     contractDescription?.let {
                         if (this is FirSimpleFunctionBuilder) {
@@ -2137,11 +2149,7 @@ class LightTreeRawFirDeclarationBuilder(
                     }
                     processLegacyContractDescription(block, diagnostic)
                 }
-                if (generateHeaders) {
-                    null to contractDescription // We want to preserve the contract info when processing as headers.
-                } else {
-                    block to contractDescription
-                }
+                block to contractDescription
             }
             expression != null -> FirSingleExpressionBlock(
                 expressionConverter.getAsFirExpression<FirExpression>(expression, "Function has no body (but should)").toReturn()
