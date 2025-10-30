@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.fir.declarations.utils.hasExplicitBackingField
 import org.jetbrains.kotlin.fir.declarations.utils.isConst
 import org.jetbrains.kotlin.fir.declarations.utils.isInline
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
+import org.jetbrains.kotlin.fir.declarations.utils.isNonLocal
 import org.jetbrains.kotlin.fir.declarations.utils.isScriptTopLevelDeclaration
 import org.jetbrains.kotlin.fir.diagnostics.ConeSimpleDiagnostic
 import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
@@ -1039,7 +1040,7 @@ open class FirDeclarationsResolveTransformer(
                 }
             result.transformReturnTypeRef(transformer, ResolutionMode.UpdateImplicitTypeRef(returnTypeRef))
         }
-        if (session.languageVersionSettings.getFlag(AnalysisFlags.headerMode) && !function.isInline) {
+        if (session.languageVersionSettings.getFlag(AnalysisFlags.headerMode) && !function.isInline && function.isNonLocal) {
             // Header mode: once the return type for non-inline function is known, the body can be removed.
             result.replaceBody(null)
         }

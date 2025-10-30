@@ -2058,7 +2058,8 @@ class LightTreeRawFirDeclarationBuilder(
                     }
 
                     val allowLegacyContractDescription = outerContractDescription == null
-                    val bodyWithContractDescription = withForcedLocalContext {
+                    val forceKeepingTheBodyInHeaderMode = context.forceKeepingTheBodyInHeaderMode || functionBuilder.status.isInline
+                    val bodyWithContractDescription = withForcedLocalContext(forceKeepingTheBodyInHeaderMode) {
                         convertFunctionBody(block, expression, allowLegacyContractDescription)
                     }
                     this.body = bodyWithContractDescription.first
