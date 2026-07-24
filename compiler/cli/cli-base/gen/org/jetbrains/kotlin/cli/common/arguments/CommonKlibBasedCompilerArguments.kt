@@ -128,4 +128,14 @@ If you would like to adjust the compile-time log level for partial linkage, use 
             field = value
         }
 
+    @Argument(
+        value = "-Xuse-fast-klib-file-system",
+        description = "Use fast memory-mapped file system for reading KLIB archives.",
+    )
+    var useFastKlibFileSystem: Boolean = true
+        set(value) {
+            checkFrozen()
+            field = value
+        }
+
 }

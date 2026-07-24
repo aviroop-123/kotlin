@@ -63,4 +63,11 @@ sealed class ReadByteBufferProvider {
             return buffer
         }
     }
+
+    /**
+     * Allows zero-copy direct buffer reading from memory-mapped [ByteBuffer] slices.
+     */
+    class DirectMemoryBuffer(private val buffer: ByteBuffer) : ReadByteBufferProvider() {
+        override fun ensureBuffer(): ByteBuffer = buffer.duplicate()
+    }
 }

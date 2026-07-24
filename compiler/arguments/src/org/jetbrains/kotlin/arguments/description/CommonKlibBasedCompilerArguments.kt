@@ -191,4 +191,16 @@ The only observable effect is that a custom ABI version is written to KLIB manif
         )
         restrictedToCompilerPhase = KotlinCompilerPhase.KLIB_COMPILATION
     }
+
+    compilerArgument {
+        name = "Xuse-fast-klib-file-system"
+        compilerName = "useFastKlibFileSystem"
+        description = "Use fast memory-mapped file system for reading KLIB archives.".asReleaseDependent()
+        valueType = BooleanType.defaultTrue
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_4_0,
+        )
+        restrictedToCompilerPhase = KotlinCompilerPhase.KLIB_COMPILATION
+    }
 }

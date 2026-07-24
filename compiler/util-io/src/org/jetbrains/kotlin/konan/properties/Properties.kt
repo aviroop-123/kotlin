@@ -21,6 +21,14 @@ fun File.loadProperties(): Properties {
     return properties
 }
 
+fun ByteArray.loadProperties(): Properties {
+    val properties = java.util.Properties()
+    java.io.ByteArrayInputStream(this).use { input ->
+        properties.load(input)
+    }
+    return properties
+}
+
 fun loadProperties(path: String): Properties = File(path).loadProperties()
 
 /**

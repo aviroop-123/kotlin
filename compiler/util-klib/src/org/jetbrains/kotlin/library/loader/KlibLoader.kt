@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.konan.file.ZipFileSystemInPlaceAccessor
 import org.jetbrains.kotlin.library.KotlinAbiVersion
 import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.library.hasAbi
+import org.jetbrains.kotlin.library.impl.FastZipKlibArchiveCache
 import org.jetbrains.kotlin.library.impl.KlibImpl
 import org.jetbrains.kotlin.library.isAnyPlatformStdlib
 import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.IncompatibleAbiVersion
@@ -48,6 +49,7 @@ class KlibLoader(init: KlibLoaderSpec.() -> Unit) {
     private var maxPermittedAbiVersion: KotlinAbiVersion? = null
     private var zipFileSystemAccessor: ZipFileSystemAccessor? = null
     private var manifestTransformer: KlibManifestTransformer? = null
+    private var fastZipArchiveCache: FastZipKlibArchiveCache? = null
 
     init {
         object : KlibLoaderSpec {
@@ -90,6 +92,10 @@ class KlibLoader(init: KlibLoaderSpec.() -> Unit) {
             override fun manifestTransformer(transformer: KlibManifestTransformer) {
                 manifestTransformer = transformer
             }
+
+            override fun fastZipArchiveCache(cache: FastZipKlibArchiveCache?) {
+                fastZipArchiveCache = cache
+            }
         }.init()
     }
 
@@ -105,7 +111,8 @@ class KlibLoader(init: KlibLoaderSpec.() -> Unit) {
             platformChecker = platformChecker,
             maxPermittedAbiVersion = maxPermittedAbiVersion,
             zipFileSystemAccessor = zipFileSystemAccessor ?: ZipFileSystemInPlaceAccessor,
-            manifestTransformer = manifestTransformer
+            manifestTransformer = manifestTransformer,
+            fastZipArchiveCache = fastZipArchiveCache,
         ).loadLibraries()
     }
 }
@@ -124,6 +131,7 @@ interface KlibLoaderSpec {
     fun zipFileSystemAccessor(accessor: ZipFileSystemAccessor)
 
     fun manifestTransformer(transformer: KlibManifestTransformer)
+    fun fastZipArchiveCache(cache: FastZipKlibArchiveCache?)
 }
 
 private class KlibLoaderImpl(
@@ -132,6 +140,7 @@ private class KlibLoaderImpl(
     private val maxPermittedAbiVersion: KotlinAbiVersion?,
     private val zipFileSystemAccessor: ZipFileSystemAccessor,
     private val manifestTransformer: KlibManifestTransformer?,
+    private val fastZipArchiveCache: FastZipKlibArchiveCache?,
 ) {
     /**
      * This is needed to avoid inspecting the same raw paths multiple times.
@@ -256,6 +265,7 @@ private class KlibLoaderImpl(
                 location = KFile(validPath),
                 zipFileSystemAccessor = zipFileSystemAccessor,
                 manifestTransformer = manifestTransformer,
+                fastZipArchiveCache = fastZipArchiveCache,
             )
         } catch (_: Exception) {
             return LibraryStatus.FailedToLoad(ProblematicLibrary(rawPath, InvalidLibraryFormat))

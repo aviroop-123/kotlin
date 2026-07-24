@@ -55,6 +55,7 @@ fun loadNativeKlibs(
     else
         KlibPlatformChecker.Native(nativeTarget.name)
 
+    val fastZipCache = if (configuration.useFastKlibFileSystem) org.jetbrains.kotlin.library.impl.FastZipKlibArchiveCache() else null
     val result = KlibLoader {
         libraryProviders(listOfNotNull(distributionLibrariesProvider))
         libraryPaths(configuration.konanLibraries)
@@ -62,6 +63,7 @@ fun loadNativeKlibs(
         maxPermittedAbiVersion(KotlinAbiVersion.CURRENT)
         configuration.zipFileSystemAccessor?.let { zipFileSystemAccessor(it) }
         manifestTransformer(KlibNativeManifestTransformer(nativeTarget))
+        fastZipArchiveCache(fastZipCache)
     }.load()
         .checkForUnknownIrProviders()
         .apply { reportLoadingProblemsIfAny(configuration, allAsErrors = configuration.testEnvironment) }

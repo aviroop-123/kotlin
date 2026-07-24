@@ -40,6 +40,7 @@ fun CompilerConfiguration.setupCommonKlibArguments(
     produceKlibSignaturesClashChecks = arguments.enableSignatureClashChecks
     renderDiagnosticInternalName = arguments.renderInternalDiagnosticNames
     skipLibrarySpecialCompatibilityChecks = arguments.skipLibrarySpecialCompatibilityChecks
+    useFastKlibFileSystem = arguments.useFastKlibFileSystem
 
     duplicatedUniqueNameStrategy = DuplicatedUniqueNameStrategy.parseOrDefault(
         arguments.duplicatedUniqueNameStrategy,
@@ -73,6 +74,7 @@ fun CompilerConfiguration.copyCommonKlibArgumentsFrom(source: CompilerConfigurat
     produceKlibSignaturesClashChecks = source.produceKlibSignaturesClashChecks
     renderDiagnosticInternalName = source.renderDiagnosticInternalName
     skipLibrarySpecialCompatibilityChecks = source.skipLibrarySpecialCompatibilityChecks
+    useFastKlibFileSystem = source.useFastKlibFileSystem
     source.duplicatedUniqueNameStrategy?.let { duplicatedUniqueNameStrategy = it }
 
     // Custom ABI version (the one that has no effect on the KLIB serialization, though will be written to manifest).

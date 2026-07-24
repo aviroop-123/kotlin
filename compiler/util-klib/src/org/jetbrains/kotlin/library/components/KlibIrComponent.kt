@@ -57,7 +57,7 @@ interface KlibIrComponent : KlibComponent {
         }
 
         override fun createComponentIfDataInKlibIsAvailable(layoutReader: KlibLayoutReader<KlibIrComponentLayout>): KlibIrComponent? =
-            if (layoutReader.readInPlaceOrFallback(false) { it.irDir.exists }) KlibIrComponentImpl(layoutReader) else null
+            if (layoutReader.existsOrFallback(false) { irDir }) KlibIrComponentImpl(layoutReader) else null
     }
 }
 

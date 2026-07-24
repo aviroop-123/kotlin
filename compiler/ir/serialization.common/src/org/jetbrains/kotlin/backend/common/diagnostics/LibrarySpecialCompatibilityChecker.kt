@@ -156,15 +156,15 @@ private class JarManifestComponent(
     private val layoutReader: KlibLayoutReader<JarManifestComponentLayout>
 ) : KlibComponent {
     val jarManifest: Manifest?
-        get() = layoutReader.readInPlaceOrFallback(null) {
-            ByteArrayInputStream(it.jarManifestFile.readBytes()).use(::Manifest)
+        get() = layoutReader.readBytesOrNull { jarManifestFile }?.let { bytes ->
+            ByteArrayInputStream(bytes).use(::Manifest)
         }
 
     object Kind : KlibComponent.Kind<JarManifestComponent, JarManifestComponentLayout> {
         override fun createLayout(root: KlibFile) = JarManifestComponentLayout(root)
 
         override fun createComponentIfDataInKlibIsAvailable(layoutReader: KlibLayoutReader<JarManifestComponentLayout>) =
-            if (layoutReader.readInPlaceOrFallback(false) { it.jarManifestFile.isFile }) JarManifestComponent(layoutReader) else null
+            if (layoutReader.isFileOrFallback(false) { jarManifestFile }) JarManifestComponent(layoutReader) else null
     }
 }
 

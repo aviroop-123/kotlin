@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -10,7 +10,9 @@ import org.jetbrains.kotlin.konan.file.ZipFileSystemAccessor
 import org.jetbrains.kotlin.konan.file.createTempDir
 import org.jetbrains.kotlin.konan.file.createTempFile
 import org.jetbrains.kotlin.konan.file.file
+import org.jetbrains.kotlin.konan.file.fastzip.FastZipArchiveReader
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.util.zip.ZipException
 
 /**
@@ -27,6 +29,32 @@ sealed class KlibLayoutReader<KCL : KlibComponentLayout> {
         }
 
     abstract fun readExtractingToTemp(readAction: (KCL) -> KlibFile): KlibFile
+
+    open fun readBytes(getFile: KCL.() -> KlibFile): ByteArray =
+        readInPlace { layout -> layout.getFile().readBytes() }
+
+    open fun <R> withDirectBuffer(getFile: KCL.() -> KlibFile, block: (ByteBuffer) -> R): R? = null
+
+    open fun exists(getFile: KCL.() -> KlibFile): Boolean =
+        readInPlace { layout -> layout.getFile().exists }
+
+    open fun isFile(getFile: KCL.() -> KlibFile): Boolean =
+        readInPlace { layout -> layout.getFile().isFile }
+
+    open fun isDirectory(getFile: KCL.() -> KlibFile): Boolean =
+        readInPlace { layout -> layout.getFile().isDirectory }
+
+    open fun listChildNames(getFile: KCL.() -> KlibFile): List<String> =
+        readInPlace { layout -> layout.getFile().listFiles.map { it.name } }
+
+    fun existsOrFallback(fallbackValue: Boolean, getFile: KCL.() -> KlibFile): Boolean =
+        try { exists(getFile) } catch (_: Exception) { fallbackValue }
+
+    fun isFileOrFallback(fallbackValue: Boolean, getFile: KCL.() -> KlibFile): Boolean =
+        try { isFile(getFile) } catch (_: Exception) { fallbackValue }
+
+    fun readBytesOrNull(getFile: KCL.() -> KlibFile): ByteArray? =
+        try { readBytes(getFile) } catch (_: Exception) { null }
 
     /**
      * Read from a directory on the file system.
@@ -88,6 +116,61 @@ sealed class KlibLayoutReader<KCL : KlibComponentLayout> {
             }
         }
     }
+
+    /**
+     * Read from a ZIP archive using the high-performance memory-mapped [FastZipArchiveReader] (VFS-free).
+     * Supports zero-copy reading from uncompressed (`STORED`) entries.
+     */
+    class FromFastZipArchive<KCL : KlibComponentLayout>(
+        private val klibArchive: KlibFile,
+        private val fastZipReader: FastZipArchiveReader,
+        private val layoutBuilder: (KlibFile) -> KCL
+    ) : KlibLayoutReader<KCL>() {
+        private val layout = layoutBuilder(klibArchive)
+        private val archiveBasePath = klibArchive.path
+
+        private fun getRelativePath(getFile: KCL.() -> KlibFile): String {
+            val fullPath = layout.getFile().path
+            val relative = fullPath.removePrefix(archiveBasePath).replace('\\', '/')
+            return relative.trimStart('/')
+        }
+
+        override fun <T> readInPlace(readAction: (KCL) -> T): T = readAction(layout)
+
+        override fun readBytes(getFile: KCL.() -> KlibFile): ByteArray {
+            return fastZipReader.readBytes(getRelativePath(getFile))
+        }
+
+        override fun <R> withDirectBuffer(getFile: KCL.() -> KlibFile, block: (ByteBuffer) -> R): R? {
+            return fastZipReader.withDirectBuffer(getRelativePath(getFile), block)
+        }
+
+        override fun exists(getFile: KCL.() -> KlibFile): Boolean {
+            return fastZipReader.exists(getRelativePath(getFile))
+        }
+
+        override fun isFile(getFile: KCL.() -> KlibFile): Boolean {
+            return fastZipReader.isFile(getRelativePath(getFile))
+        }
+
+        override fun isDirectory(getFile: KCL.() -> KlibFile): Boolean {
+            return fastZipReader.isDirectory(getRelativePath(getFile))
+        }
+
+        override fun listChildNames(getFile: KCL.() -> KlibFile): List<String> {
+            return fastZipReader.listChildren(getRelativePath(getFile))
+        }
+
+        override fun readExtractingToTemp(readAction: (KCL) -> KlibFile): KlibFile {
+            val relativePath = getRelativePath(readAction)
+            val bytes = fastZipReader.readBytes(relativePath)
+            val fileName = if (relativePath.contains('/')) relativePath.substringAfterLast('/') else relativePath
+            val tempFile = createTempFile(fileName)
+            tempFile.deleteOnExitRecursively()
+            tempFile.writeBytes(bytes)
+            return tempFile
+        }
+    }
 }
 
 /**
@@ -96,14 +179,25 @@ sealed class KlibLayoutReader<KCL : KlibComponentLayout> {
 class KlibLayoutReaderFactory(
     private val klibFile: KlibFile,
     private val zipFileSystemAccessor: ZipFileSystemAccessor,
+    private val fastZipReader: FastZipArchiveReader? = null,
 ) {
     fun <KCL : KlibComponentLayout> createLayoutReader(layoutBuilder: (KlibFile) -> KCL): KlibLayoutReader<KCL> {
         return when (KlibFormat.guessBy(klibFile)) {
-            KlibFormat.ZipArchive -> KlibLayoutReader.FromZipArchive(
-                klibArchive = klibFile,
-                zipFileSystemAccessor = zipFileSystemAccessor,
-                layoutBuilder = layoutBuilder
-            )
+            KlibFormat.ZipArchive -> {
+                if (fastZipReader != null) {
+                    KlibLayoutReader.FromFastZipArchive(
+                        klibArchive = klibFile,
+                        fastZipReader = fastZipReader,
+                        layoutBuilder = layoutBuilder
+                    )
+                } else {
+                    KlibLayoutReader.FromZipArchive(
+                        klibArchive = klibFile,
+                        zipFileSystemAccessor = zipFileSystemAccessor,
+                        layoutBuilder = layoutBuilder
+                    )
+                }
+            }
 
             KlibFormat.Directory -> KlibLayoutReader.FromDirectory(
                 klibDir = klibFile,
@@ -112,4 +206,3 @@ class KlibLayoutReaderFactory(
         }
     }
 }
-

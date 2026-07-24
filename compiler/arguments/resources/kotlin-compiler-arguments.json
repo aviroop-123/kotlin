@@ -10708,6 +10708,50 @@
                                         "valueInVersions": []
                                     }
                                 }
+                            },
+                            {
+                                "name": "Xuse-fast-klib-file-system",
+                                "shortName": null,
+                                "deprecatedName": null,
+                                "description": {
+                                    "current": "Use fast memory-mapped file system for reading KLIB archives.",
+                                    "valueInVersions": []
+                                },
+                                "delimiter": null,
+                                "affectsCompilationOutcome": true,
+                                "restrictedToCompilerPhase": "KLIB_COMPILATION",
+                                "valueType": {
+                                    "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                                    "isNullable": {
+                                        "current": false,
+                                        "valueInVersions": []
+                                    },
+                                    "defaultValue": {
+                                        "current": true,
+                                        "valueInVersions": []
+                                    }
+                                },
+                                "valueDescription": {
+                                    "current": null,
+                                    "valueInVersions": []
+                                },
+                                "releaseVersionsMetadata": {
+                                    "introducedVersion": "2.4.0",
+                                    "stabilizedVersion": null,
+                                    "deprecatedVersion": null,
+                                    "removedVersion": null
+                                },
+                                "argumentType": {
+                                    "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                                    "isNullable": {
+                                        "current": false,
+                                        "valueInVersions": []
+                                    },
+                                    "defaultValue": {
+                                        "current": true,
+                                        "valueInVersions": []
+                                    }
+                                }
                             }
                         ],
                         "nestedLevels": [

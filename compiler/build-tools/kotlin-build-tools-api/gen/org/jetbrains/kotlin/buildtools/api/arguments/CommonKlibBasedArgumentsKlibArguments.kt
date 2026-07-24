@@ -134,5 +134,15 @@ public interface CommonKlibBasedArgumentsKlibArguments : CommonKlibBasedArgument
     public val X_SKIP_LIBRARY_SPECIAL_COMPATIBILITY_CHECKS:
         CommonKlibBasedArgumentsKlibArgument<Boolean> =
         CommonKlibBasedArgumentsKlibArgument("X_SKIP_LIBRARY_SPECIAL_COMPATIBILITY_CHECKS", KotlinReleaseVersion(2, 4, 0))
+
+    /**
+     * Use fast memory-mapped file system for reading KLIB archives.
+     *
+     * WARNING: this option is EXPERIMENTAL and it may be changed in the future without notice or may be removed entirely.
+     */
+    @JvmField
+    @ExperimentalCompilerArgument
+    public val X_USE_FAST_KLIB_FILE_SYSTEM: CommonKlibBasedArgumentsKlibArgument<Boolean> =
+        CommonKlibBasedArgumentsKlibArgument("X_USE_FAST_KLIB_FILE_SYSTEM", KotlinReleaseVersion(2, 4, 0))
   }
 }

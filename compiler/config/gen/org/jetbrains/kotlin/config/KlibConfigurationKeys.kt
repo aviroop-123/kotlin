@@ -42,6 +42,9 @@ object KlibConfigurationKeys {
     @JvmField
     val SKIP_LIBRARY_SPECIAL_COMPATIBILITY_CHECKS = CompilerConfigurationKey.create<Boolean>("SKIP_LIBRARY_SPECIAL_COMPATIBILITY_CHECKS")
 
+    // Use fast memory-mapped file system for klib reading.
+    @JvmField
+    val USE_FAST_KLIB_FILE_SYSTEM = CompilerConfigurationKey.create<Boolean>("USE_FAST_KLIB_FILE_SYSTEM")
 }
 
 var CompilerConfiguration.klibRelativePathBases: List<String>
@@ -71,4 +74,8 @@ var CompilerConfiguration.zipFileSystemAccessor: ZipFileSystemAccessor?
 var CompilerConfiguration.skipLibrarySpecialCompatibilityChecks: Boolean
     get() = getBoolean(KlibConfigurationKeys.SKIP_LIBRARY_SPECIAL_COMPATIBILITY_CHECKS)
     set(value) { put(KlibConfigurationKeys.SKIP_LIBRARY_SPECIAL_COMPATIBILITY_CHECKS, value) }
+
+var CompilerConfiguration.useFastKlibFileSystem: Boolean
+    get() = getBoolean(KlibConfigurationKeys.USE_FAST_KLIB_FILE_SYSTEM)
+    set(value) { put(KlibConfigurationKeys.USE_FAST_KLIB_FILE_SYSTEM, value) }
 

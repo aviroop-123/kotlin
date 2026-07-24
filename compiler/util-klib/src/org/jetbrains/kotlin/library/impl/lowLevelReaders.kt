@@ -21,11 +21,27 @@ fun IrArrayReader(bytes: ByteArray): IrArrayReader = IrArrayReader(ReadByteBuffe
 /** On-demand read from a byte array that will be loaded on the first access. */
 fun IrArrayReader(loadBytes: () -> ByteArray): IrArrayReader = IrArrayReader(ReadByteBufferProvider.OnDemandMemoryBuffer(loadBytes))
 
-/** On-demand read from a file (potentially inside a KLIB archive file). */
-inline fun <KCL : KlibComponentLayout> IrArrayReader(
+fun <KCL : KlibComponentLayout> createReaderBufferProvider(
     layoutReader: KlibLayoutReader<KCL>,
-    crossinline getFile: KCL.() -> File,
-): IrArrayReader = IrArrayReader { layoutReader.readInPlace { it.getFile().readBytes() } }
+    getFile: KCL.() -> File,
+): ReadByteBufferProvider {
+    val directSlice = layoutReader.withDirectBuffer(getFile) { slice ->
+        val copy = ByteArray(slice.remaining())
+        slice.get(copy)
+        ByteBuffer.wrap(copy)
+    }
+    return if (directSlice != null) {
+        ReadByteBufferProvider.DirectMemoryBuffer(directSlice)
+    } else {
+        ReadByteBufferProvider.OnDemandMemoryBuffer { layoutReader.readBytes(getFile) }
+    }
+}
+
+/** On-demand read from a file (potentially inside a KLIB archive file). */
+fun <KCL : KlibComponentLayout> IrArrayReader(
+    layoutReader: KlibLayoutReader<KCL>,
+    getFile: KCL.() -> File,
+): IrArrayReader = IrArrayReader(createReaderBufferProvider(layoutReader, getFile))
 
 class IrArrayReader(private val buffer: ReadByteBufferProvider) {
     private val indexToOffset: IndexToOffset = buffer.use { it.readIndexToOffset(0) }
@@ -41,10 +57,10 @@ fun IrMultiArrayReader(bytes: ByteArray): IrMultiArrayReader = IrMultiArrayReade
 fun IrMultiArrayReader(loadBytes: () -> ByteArray): IrMultiArrayReader = IrMultiArrayReader(ReadByteBufferProvider.OnDemandMemoryBuffer(loadBytes))
 
 /** On-demand read from a file (potentially inside a KLIB archive file). */
-inline fun <KCL : KlibComponentLayout> IrMultiArrayReader(
+fun <KCL : KlibComponentLayout> IrMultiArrayReader(
     layoutReader: KlibLayoutReader<KCL>,
-    crossinline getFile: KCL.() -> File,
-): IrMultiArrayReader = IrMultiArrayReader { layoutReader.readInPlace { it.getFile().readBytes() } }
+    getFile: KCL.() -> File,
+): IrMultiArrayReader = IrMultiArrayReader(createReaderBufferProvider(layoutReader, getFile))
 
 class IrMultiArrayReader(private val buffer: ReadByteBufferProvider) {
     private val indexToOffset: IndexToOffset = buffer.use { it.readIndexToOffset(0) }
@@ -87,10 +103,10 @@ fun DeclarationIdMultiTableReader(loadBytes: () -> ByteArray): DeclarationIdMult
     DeclarationIdMultiTableReader(ReadByteBufferProvider.OnDemandMemoryBuffer(loadBytes))
 
 /** On-demand read from a file (potentially inside a KLIB archive file). */
-inline fun <KCL : KlibComponentLayout> DeclarationIdMultiTableReader(
+fun <KCL : KlibComponentLayout> DeclarationIdMultiTableReader(
     layoutReader: KlibLayoutReader<KCL>,
-    crossinline getFile: KCL.() -> File,
-): DeclarationIdMultiTableReader = DeclarationIdMultiTableReader { layoutReader.readInPlace { it.getFile().readBytes() } }
+    getFile: KCL.() -> File,
+): DeclarationIdMultiTableReader = DeclarationIdMultiTableReader(createReaderBufferProvider(layoutReader, getFile))
 
 class DeclarationIdMultiTableReader(private val buffer: ReadByteBufferProvider) {
     private val indexToOffset: IndexToOffset = buffer.use { it.readIndexToOffset(0) }

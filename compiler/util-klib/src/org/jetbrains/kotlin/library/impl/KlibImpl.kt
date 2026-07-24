@@ -28,20 +28,23 @@ internal class KlibImpl(
     override val location: KlibFile,
     zipFileSystemAccessor: ZipFileSystemAccessor,
     manifestTransformer: KlibManifestTransformer?,
+    fastZipArchiveCache: FastZipKlibArchiveCache? = null,
 ) : KotlinLibrary {
 
     private val components: KlibComponentsCache
     override val manifestProperties: Properties
 
     init {
+        val fastZipReader = fastZipArchiveCache?.getOrOpen(java.io.File(location.path))
         val layoutReaderFactory = KlibLayoutReaderFactory(
             klibFile = location,
-            zipFileSystemAccessor = zipFileSystemAccessor
+            zipFileSystemAccessor = zipFileSystemAccessor,
+            fastZipReader = fastZipReader,
         )
 
-        // Note: readInPlace() will fail in case there is no manifest file or the file is malformed.
         manifestProperties = layoutReaderFactory.createLayoutReader<KlibManifestComponentLayout>(::KlibManifestComponentLayout)
-            .readInPlace { layout -> layout.manifestFile.loadProperties() }
+            .readBytes { manifestFile }
+            .loadProperties()
             .let { properties -> manifestTransformer?.transform(properties) ?: properties }
 
         components = KlibComponentsCache(layoutReaderFactory)

@@ -17,23 +17,21 @@ internal class KlibMetadataComponentImpl(
     private val layoutReader: KlibLayoutReader<KlibMetadataComponentLayout>,
 ) : KlibMetadataComponent {
 
-    override val moduleHeaderData get() = layoutReader.readInPlace { it.moduleHeaderFile.readBytes() }
+    override val moduleHeaderData get() = layoutReader.readBytes { moduleHeaderFile }
 
-    override fun getPackageFragmentNames(packageFqName: String) = layoutReader.readInPlace { layout ->
-        val fileList: List<String> = layout.getPackageFragmentsDir(packageFqName).listFiles.mapNotNull { file ->
-            file.name
-                .substringBeforeLast(KLIB_METADATA_FILE_EXTENSION_WITH_DOT, missingDelimiterValue = "")
+    override fun getPackageFragmentNames(packageFqName: String): Set<String> {
+        val fileList: List<String> = layoutReader.listChildNames { getPackageFragmentsDir(packageFqName) }.mapNotNull { name ->
+            name.substringBeforeLast(KLIB_METADATA_FILE_EXTENSION_WITH_DOT, missingDelimiterValue = "")
                 .takeIf { it.isNotEmpty() }
         }
 
-        fileList.toSortedSet().also { fileSet ->
+        return fileList.toSortedSet().also { fileSet ->
             check(fileSet.size == fileList.size) {
                 "Duplicated names: ${fileList.groupingBy { it }.eachCount().filter { (_, count) -> count > 1 }}"
             }
         }
     }
 
-    override fun getPackageFragment(packageFqName: String, fragmentName: String) = layoutReader.readInPlace {
-        it.getPackageFragmentFile(packageFqName, fragmentName).readBytes()
-    }
+    override fun getPackageFragment(packageFqName: String, fragmentName: String): ByteArray =
+        layoutReader.readBytes { getPackageFragmentFile(packageFqName, fragmentName) }
 }

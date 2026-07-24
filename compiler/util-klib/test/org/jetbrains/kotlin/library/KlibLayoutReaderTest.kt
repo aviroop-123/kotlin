@@ -103,6 +103,21 @@ class KlibLayoutReaderTest {
         assertEquals(null, klibDir.compress().toTestLib().optionalComponent)
     }
 
+    @Test
+    fun `Test reading data with fast zip archive reader`() {
+        val color = "cyan"
+        val furnitureItems = setOf("chair", "table")
+        val klibDir = generateNewPlainKlib(intValue = 99, stringValue = color, fileNames = furnitureItems)
+        val klibFile = klibDir.compress()
+
+        org.jetbrains.kotlin.library.impl.FastZipKlibArchiveCache().use { cache ->
+            val testLib = TestLib(klibFile, fastZipCache = cache)
+            assertEquals(99, testLib.mandatoryComponent.intValue)
+            val optionalComponent = testLib.optionalComponent ?: fail("Optional component should be present")
+            assertEquals(color, optionalComponent.stringValue)
+        }
+    }
+
     private fun generateNewPlainKlib(intValue: Int, stringValue: String, fileNames: Collection<String>): KlibFile {
         val klibDir = tmpDir.child(UUID.randomUUID().toString())
 
@@ -145,8 +160,15 @@ class KlibLayoutReaderTest {
     }
 }
 
-private class TestLib(val location: KlibFile) {
-    private val layoutReaderFactory = KlibLayoutReaderFactory(location, ZipFileSystemInPlaceAccessor)
+private class TestLib(
+    val location: KlibFile,
+    fastZipCache: org.jetbrains.kotlin.library.impl.FastZipKlibArchiveCache? = null,
+) {
+    private val layoutReaderFactory = KlibLayoutReaderFactory(
+        location,
+        ZipFileSystemInPlaceAccessor,
+        fastZipCache?.getOrOpen(java.io.File(location.path))
+    )
     private val components = KlibComponentsCache(layoutReaderFactory)
 
     val mandatoryComponent: TestMandatoryComponent
@@ -172,13 +194,13 @@ private interface TestOptionalComponent : KlibComponent {
         override fun createLayout(root: KlibFile) = TestOptionalComponentLayout(root)
 
         override fun createComponentIfDataInKlibIsAvailable(layoutReader: KlibLayoutReader<TestOptionalComponentLayout>) =
-            if (layoutReader.readInPlaceOrFallback(false) { it.baseDir.exists }) TestOptionalComponentImpl(layoutReader) else null
+            if (layoutReader.existsOrFallback(false) { baseDir }) TestOptionalComponentImpl(layoutReader) else null
     }
 }
 
 private class TestOptionalComponentImpl(private val layoutReader: KlibLayoutReader<TestOptionalComponentLayout>) : TestOptionalComponent {
     override val stringValue: String by lazy {
-        layoutReader.readInPlace { it.stringValueFile.readText() }
+        layoutReader.readBytes { stringValueFile }.toString(Charsets.UTF_8).trimEnd()
     }
 
     override val pathsOfExtractedFiles: Collection<String> by lazy {
@@ -211,7 +233,7 @@ private interface TestMandatoryComponent : KlibComponent {
 
 private class TestMandatoryComponentImpl(private val layoutReader: KlibLayoutReader<TestMandatoryComponentLayout>) : TestMandatoryComponent {
     override val intValue: Int by lazy {
-        layoutReader.readInPlace { it.intValueFile.readText().toInt() }
+        layoutReader.readBytes { intValueFile }.toString(Charsets.UTF_8).trimEnd().toInt()
     }
 }
 
