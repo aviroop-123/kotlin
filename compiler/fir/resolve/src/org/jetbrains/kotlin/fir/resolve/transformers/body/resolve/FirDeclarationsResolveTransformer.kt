@@ -301,7 +301,8 @@ open class FirDeclarationsResolveTransformer(
             if (session.languageVersionSettings.getFlag(AnalysisFlags.headerMode) &&
                 !property.isConst &&
                 property.returnTypeRef !is FirImplicitTypeRef &&
-                !property.hasAnonymousReturnType(session)
+                !property.hasAnonymousReturnType(session) &&
+                property.containingClassLookupTag()?.toClassSymbol(session)?.isAnnotationClass != true
             ) {
                 property.replaceInitializer(null)
             }
