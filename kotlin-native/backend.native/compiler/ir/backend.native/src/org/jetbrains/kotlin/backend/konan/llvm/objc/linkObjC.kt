@@ -18,7 +18,7 @@ import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 internal fun patchObjCRuntimeModule(generationState: NativeGenerationState): Pair<LLVMModuleRef, List<String>>? {
     val config = generationState.config
     if (config.produce == CompilerOutputKind.FRAMEWORK && config.objcExportCacheEnabled && config.cachedLibraries.hasStaticCaches) return null
-    if (config.objcExportCacheEnabled && config.produce == CompilerOutputKind.STATIC_CACHE && !generationState.producedLlvmModuleContainsStdlib) return null
+    if (config.objcExportCacheEnabled && (config.produce == CompilerOutputKind.STATIC_CACHE || config.produce == CompilerOutputKind.HEADER_CACHE) && !generationState.producedLlvmModuleContainsStdlib) return null
     if (!((config.isFinalBinary || config.objcExportCacheEnabled) && config.target.family.isAppleFamily)) return null
 
     val patchBuilder = PatchBuilder(generationState.objCExport.namer)

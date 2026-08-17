@@ -425,7 +425,7 @@ internal fun <C : NativeBackendPhaseContext> PhaseEngine<C>.compileAndLink(
             )
         }
         when {
-            context.config.produce == CompilerOutputKind.STATIC_CACHE -> {
+            context.config.produce == CompilerOutputKind.STATIC_CACHE || context.config.produce == CompilerOutputKind.HEADER_CACHE -> {
                 compilationResult to ResolvedCacheBinaries(emptyList(), emptyList())
             }
             shouldPerformPreLink(context.config, resolvedCacheBinaries, linkerOutputKind) -> {

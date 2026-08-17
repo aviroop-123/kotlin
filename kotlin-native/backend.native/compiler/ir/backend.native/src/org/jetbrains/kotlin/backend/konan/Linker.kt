@@ -25,6 +25,7 @@ internal fun determineLinkerOutput(context: NativeBackendPhaseContext): LinkerOu
             CompilerOutputKind.DYNAMIC_CACHE,
             CompilerOutputKind.DYNAMIC -> LinkerOutputKind.DYNAMIC_LIBRARY
             CompilerOutputKind.STATIC_CACHE,
+            CompilerOutputKind.HEADER_CACHE,
             CompilerOutputKind.STATIC -> LinkerOutputKind.STATIC_LIBRARY
             CompilerOutputKind.PROGRAM -> run {
                 if (context.config.target.family == Family.ANDROID) {

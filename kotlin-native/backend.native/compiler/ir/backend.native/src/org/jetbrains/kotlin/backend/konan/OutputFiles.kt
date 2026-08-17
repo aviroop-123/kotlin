@@ -21,7 +21,7 @@ class OutputFiles(
         val produce: CompilerOutputKind,
         objcExportCacheEnabled: Boolean = false
 ) {
-    private val adjustedOutputName = if (objcExportCacheEnabled && produce == CompilerOutputKind.STATIC_CACHE) {
+    private val adjustedOutputName = if (objcExportCacheEnabled && (produce == CompilerOutputKind.STATIC_CACHE || produce == CompilerOutputKind.HEADER_CACHE)) {
         if (outputName.endsWith(".objc")) outputName else "$outputName.objc"
     } else {
         outputName

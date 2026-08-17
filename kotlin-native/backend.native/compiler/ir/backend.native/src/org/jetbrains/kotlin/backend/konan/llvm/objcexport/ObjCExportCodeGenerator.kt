@@ -480,7 +480,7 @@ internal class ObjCExportCodeGenerator(
             generateTypeAdapters(spec)
         }
 
-        if (earlyNaming && generationState.config.produce == CompilerOutputKind.STATIC_CACHE) {
+        if (earlyNaming && (generationState.config.produce == CompilerOutputKind.STATIC_CACHE || generationState.config.produce == CompilerOutputKind.HEADER_CACHE)) {
             dataGenerator.exportClass(namer.kotlinAnyName.binaryName)
             return
         }

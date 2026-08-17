@@ -42,7 +42,7 @@ internal fun produceObjCExportInterface(
     val config = context.config
     require(config.target.family.isAppleFamily)
     val objcExportCacheEnabled = config.configuration.get(BinaryOptions.objcExportCache) == true
-    require(config.produce == CompilerOutputKind.FRAMEWORK || (config.produce == CompilerOutputKind.STATIC_CACHE && objcExportCacheEnabled))
+    require(config.produce == CompilerOutputKind.FRAMEWORK || ((config.produce == CompilerOutputKind.STATIC_CACHE || config.produce == CompilerOutputKind.HEADER_CACHE) && objcExportCacheEnabled))
 
     val topLevelNamePrefix = context.objCExportTopLevelNamePrefix
 
@@ -55,7 +55,7 @@ internal fun produceObjCExportInterface(
         moduleDescriptor.allDependencyModules.singleOrNull { module -> module.konanLibrary == klib }
                 ?: error("Expected a single module for library to cache ${klib.libraryFile.absolutePath}, but found none or multiple")
     }
-    val moduleDescriptors = if (objcExportCacheEnabled && config.produce == CompilerOutputKind.STATIC_CACHE) {
+    val moduleDescriptors = if (objcExportCacheEnabled && (config.produce == CompilerOutputKind.STATIC_CACHE || config.produce == CompilerOutputKind.HEADER_CACHE)) {
         listOfNotNull(libraryToCacheModule)
     } else {
         listOf(moduleDescriptor) + moduleDescriptor.getExportedDependencies(config)
