@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.konan.library.isExplicitlySpecifiedByUserInCLIArgume
 import org.jetbrains.kotlin.konan.properties.loadProperties
 import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.library.KotlinLibrary
+import org.jetbrains.kotlin.library.metadata.isCInteropLibrary
 import org.jetbrains.kotlin.native.resolve.KonanLibrariesResolveSupport
 import org.jetbrains.kotlin.utils.KotlinNativePaths
 import java.nio.file.Files
@@ -290,7 +291,7 @@ class NativeSecondStageCompilationConfig(
     }
 
     val objcExportCacheEnabled: Boolean by lazy {
-        configuration.get(BinaryOptions.objcExportCache) ?: false
+        (configuration.get(BinaryOptions.objcExportCache) ?: false) && libraryToCache?.klib?.isCInteropLibrary() != true
     }
 
     val objcEntryPoints: ObjCEntryPoints by lazy {

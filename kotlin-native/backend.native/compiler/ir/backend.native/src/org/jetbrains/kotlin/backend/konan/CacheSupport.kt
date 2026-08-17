@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.library.KotlinLibrary
+import org.jetbrains.kotlin.library.metadata.isCInteropLibrary
 import org.jetbrains.kotlin.library.components.irOrFail
 import org.jetbrains.kotlin.library.metadata.resolver.KotlinLibraryResolveResult
 import org.jetbrains.kotlin.protobuf.ExtensionRegistryLite
@@ -146,7 +147,7 @@ class CacheSupport(
         val libraryToAddToCacheFile = File(it)
         val libraryToAddToCache = getLibrary(libraryToAddToCacheFile)
         val libraryCache = cachedLibraries.getLibraryCache(libraryToAddToCache, allowIncomplete = true)
-        val objcExportCacheEnabled = configuration.get(BinaryOptions.objcExportCache) == true
+        val objcExportCacheEnabled = configuration.get(BinaryOptions.objcExportCache) == true && !libraryToAddToCache.isCInteropLibrary()
         val alreadyCached = if (objcExportCacheEnabled) {
             libraryCache?.objcCachePath != null
         } else {
@@ -192,7 +193,7 @@ class CacheSupport(
         }
 
         // Ensure not making cache for libraries that are already cached:
-        val objcExportCacheEnabled = configuration.get(BinaryOptions.objcExportCache) == true
+        val objcExportCacheEnabled = configuration.get(BinaryOptions.objcExportCache) == true && libraryToCache?.klib?.isCInteropLibrary() != true
         if (!objcExportCacheEnabled) {
             libraryToCache?.klib?.let {
                 val cache = cachedLibraries.getLibraryCache(it)

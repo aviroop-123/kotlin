@@ -87,7 +87,7 @@ internal val CreateTestBundlePhase = createSimpleNamedCompilerPhase<NativeBacken
             config.outputPath,
             config.target,
             config.produce,
-            objcExportCacheEnabled = config.configuration.get(BinaryOptions.objcExportCache) == true
+            objcExportCacheEnabled = config.objcExportCacheEnabled
     ).mainFile
     createTestBundle(config, input.moduleDescriptor, output)
 }

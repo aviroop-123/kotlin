@@ -105,7 +105,7 @@ internal fun LinkKlibsContext.linkKlibs(
 
     val stdlibIsCached = stdlibModule.konanLibrary?.let { config.cachedLibraries.isLibraryCached(it) } == true
     val stdlibIsBeingCached = libraryToCacheModule == stdlibModule
-    val objcExportCacheEnabled = config.configuration.get(BinaryOptions.objcExportCache) == true
+    val objcExportCacheEnabled = config.objcExportCacheEnabled
     if (!objcExportCacheEnabled) {
         require(!(stdlibIsCached && stdlibIsBeingCached)) { "The cache for stdlib is already built" }
     }

@@ -87,7 +87,7 @@ internal fun <C : NativeBackendPhaseContext> PhaseEngine<C>.runBackend(backendCo
                     outputPath,
                     config.target,
                     config.produce,
-                    objcExportCacheEnabled = config.configuration.get(BinaryOptions.objcExportCache) == true
+                    objcExportCacheEnabled = config.objcExportCacheEnabled
             )
             val generationState = NativeGenerationState(context.config, backendContext,
                     fragment.cacheDeserializationStrategy, fragment.dependenciesTracker, fragment.llvmModuleSpecification, outputFiles,
@@ -289,7 +289,7 @@ internal fun <C : NativeBackendPhaseContext> PhaseEngine<C>.runBitcodeBackend(
                 outputPath,
                 context.config.target,
                 context.config.produce,
-                objcExportCacheEnabled = context.config.configuration.get(BinaryOptions.objcExportCache) == true
+                objcExportCacheEnabled = context.config.objcExportCacheEnabled
         )
         bitcodeEngine.runBitcodePostProcessing()
         runAndMeasurePhase(WriteBitcodeFilePhase, WriteBitcodeFileInput(context.llvm.module, bitcodeFile))
@@ -414,7 +414,7 @@ internal fun <C : NativeBackendPhaseContext> PhaseEngine<C>.compileAndLink(
     val compilationResult = temporaryFiles.create(File(outputFiles.nativeBinaryFile).name, ".o").javaFile()
     runAndMeasurePhase(ObjectFilesPhase, ObjectFilesPhaseInput(moduleCompilationOutput.bitcodeFile, compilationResult))
     val linkerOutputKind = determineLinkerOutput(context)
-    val objcExportCacheEnabled = context.config.configuration.get(BinaryOptions.objcExportCache) == true
+    val objcExportCacheEnabled = context.config.objcExportCacheEnabled
     val [linkerInput, cacheBinaries] = run {
         val resolvedCacheBinaries by lazy {
             resolveCacheBinaries(

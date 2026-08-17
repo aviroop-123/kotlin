@@ -45,7 +45,7 @@ internal val CreateObjCFrameworkPhase = createSimpleNamedCompilerPhase<NativeBac
             config.outputPath,
             config.target,
             config.produce,
-            objcExportCacheEnabled = config.configuration.get(BinaryOptions.objcExportCache) == true
+            objcExportCacheEnabled = config.objcExportCacheEnabled
     )
     createObjCFramework(config, input.moduleDescriptor, input.exportedInterface, outputFiles.mainFile)
 }
