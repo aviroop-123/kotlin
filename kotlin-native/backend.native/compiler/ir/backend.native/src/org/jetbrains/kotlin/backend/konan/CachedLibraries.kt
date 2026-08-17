@@ -60,7 +60,7 @@ class CachedLibraries(
         val serializedTrivialGetters by lazy { computeSerializedTrivialGetters() }
 
         val objcCachePath: String? by lazy {
-            if (kind == Kind.STATIC) {
+            if (kind == Kind.STATIC || kind == Kind.HEADER) {
                 val file = File(path)
                 if (file.name.endsWith(".objc.a")) {
                     file.absolutePath
@@ -77,7 +77,7 @@ class CachedLibraries(
         }
 
         val objcCsvPath: String? by lazy {
-            if (kind == Kind.STATIC) {
+            if (kind == Kind.STATIC || kind == Kind.HEADER) {
                 val file = File(path)
                 if (file.name.endsWith(".objc.a")) {
                     val csvFileName = file.name.substringBeforeLast(".objc.a") + ".objc.csv"

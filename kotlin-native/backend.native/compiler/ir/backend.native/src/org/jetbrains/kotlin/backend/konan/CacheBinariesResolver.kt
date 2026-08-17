@@ -47,27 +47,31 @@ internal fun resolveCacheBinaries(
                 // Maybe turn it into a warning and continue linkage without caches?
                 ?: error("Library $library is expected to be cached")
 
-        val list = when (cache.kind) {
-            CachedLibraries.Kind.DYNAMIC -> dynamicCaches
-            CachedLibraries.Kind.STATIC -> staticCaches
-            CachedLibraries.Kind.HEADER -> error("Header cache ${cache.path} cannot be used for linking")
-        }
-
-        val binaries = if (dependency.kind is DependenciesTracker.DependencyKind.CertainFiles && cache is CachedLibraries.Cache.PerFile)
-            dependency.kind.files.map { cache.getFileBinaryPath(it.name) }
-        else cache.binariesPaths
-
-        list += binaries
-        if (objcExportCacheEnabled && cache.kind == CachedLibraries.Kind.STATIC) {
-            val objcPath = cache.objcCachePath
-            objcPath?.let { list += it }
+        when (cache.kind) {
+            CachedLibraries.Kind.DYNAMIC -> {
+                dynamicCaches += cache.binariesPaths
+            }
+            CachedLibraries.Kind.STATIC -> {
+                val binaries = if (dependency.kind is DependenciesTracker.DependencyKind.CertainFiles && cache is CachedLibraries.Cache.PerFile)
+                    dependency.kind.files.map { cache.getFileBinaryPath(it.name) }
+                else cache.binariesPaths
+                staticCaches += binaries
+                if (objcExportCacheEnabled) {
+                    cache.objcCachePath?.let { staticCaches += it }
+                }
+            }
+            CachedLibraries.Kind.HEADER -> {
+                if (objcExportCacheEnabled) {
+                    cache.objcCachePath?.let { staticCaches += it }
+                }
+            }
         }
     }
 
     if (objcExportCacheEnabled) {
         allLibraries.forEach { library ->
             val cache = cachedLibraries.getLibraryCache(library)
-            if (cache != null && cache.kind == CachedLibraries.Kind.STATIC) {
+            if (cache != null && (cache.kind == CachedLibraries.Kind.STATIC || cache.kind == CachedLibraries.Kind.HEADER)) {
                 val objcPath = cache.objcCachePath
                 objcPath?.let {
                     if (!staticCaches.contains(it)) {
