@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 // FULL_JDK
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -88,7 +87,7 @@ abstract class BaseCase3{
 * NOTE: abstract class implements kotlin interface
 */
 
-<!ABSTRACT_CLASS_MEMBER_NOT_IMPLEMENTED!>class Case4<!>(a: String) : BaseCase4(a) {}
+<!ABSTRACT_MEMBER_NOT_IMPLEMENTED!>class Case4<!>(a: String) : BaseCase4(a) {}
 
 interface InterfaceCase4 {
     fun foo(): String
@@ -105,7 +104,7 @@ abstract class BaseCase4(val a: String) : InterfaceCase4 {}
 * NOTE: abstract class implements java interface
 */
 
-<!ABSTRACT_CLASS_MEMBER_NOT_IMPLEMENTED!>class Case5<!>(a: String) : BaseCase5(a) {}
+<!ABSTRACT_MEMBER_NOT_IMPLEMENTED!>class Case5<!>(a: String) : BaseCase5(a) {}
 
 abstract class BaseCase5(val a: String) : java.util.Deque<String> {}
 
@@ -117,4 +116,3 @@ abstract class BaseCase5(val a: String) : java.util.Deque<String> {}
 <!ABSTRACT_CLASS_MEMBER_NOT_IMPLEMENTED!>class Case6<!>(a: String) : BaseCase6(a) {}
 
 abstract class BaseCase6(val a: String) : java.util.AbstractCollection<String>() {}
-

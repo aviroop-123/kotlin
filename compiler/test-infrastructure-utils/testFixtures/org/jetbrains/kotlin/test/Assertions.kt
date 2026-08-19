@@ -7,10 +7,11 @@ package org.jetbrains.kotlin.test
 
 import java.io.File
 import java.nio.file.Path
+import kotlin.time.Duration
+
+val isTeamCityBuild: Boolean = System.getenv("TEAMCITY_VERSION") != null
 
 abstract class Assertions {
-    val isTeamCityBuild: Boolean = System.getenv("TEAMCITY_VERSION") != null
-
     fun assertEqualsToFile(expectedFile: File, actual: String, sanitizer: (String) -> String = { it }) {
         assertEqualsToFile(expectedFile, actual, sanitizer) { "Actual data differs from file content" }
     }
@@ -65,9 +66,30 @@ abstract class Assertions {
     abstract fun failAll(exceptions: List<Throwable>)
     abstract fun assertAll(conditions: List<() -> Unit>)
 
+    /**
+     * This method is used to unfold an exception in case the exception represents
+     * a group of failed exceptions thrown by [assertAll].
+     */
+    open fun unfoldException(e: Throwable): List<Throwable> = listOf(e)
+
     fun assertAll(vararg conditions: () -> Unit) {
         assertAll(conditions.toList())
     }
 
     abstract fun fail(message: () -> String): Nothing
+
+    // The default implementation exists only for compatibility with IDEA
+    open fun assumeFalse(value: Boolean, message: () -> String) {
+        assertFalse(value, message)
+    }
+
+    /**
+     * Asserts that the given [action] does not take longer than the given [timeout].
+     *
+     * The action is executed in a new thread so that its elapsed time can be tracked and monitored. If the action takes longer, the thread
+     * is aborted preemptively.
+     *
+     * Not supported in JUnit 4.
+     */
+    abstract fun assertTimeoutPreemptively(timeout: Duration, message: () -> String, action: () -> Unit)
 }

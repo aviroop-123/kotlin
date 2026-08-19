@@ -20,7 +20,7 @@ import org.jetbrains.kotlin.psi.psiUtil.containingClass
  * Adds filtering to the result of [org.jetbrains.kotlin.fir.declarations.FirTowerDataElement.getAvailableScopes]
  * based on the [position] the context is gathered for.
  */
-fun FirTowerDataElement.getAvailableScopesForPosition(
+internal fun FirTowerDataElement.getAvailableScopesForPosition(
     position: KtElement,
     processTypeScope: FirTypeScope.(ConeKotlinType) -> FirTypeScope = { this },
 ): List<FirScope> {
@@ -30,7 +30,7 @@ fun FirTowerDataElement.getAvailableScopesForPosition(
     return availableScopes.map { scope ->
         val implicitReceiver = implicitReceiver?.boundSymbol
         if ((implicitReceiver as? FirClassSymbol<*>)?.isCompanion == true &&
-            implicitReceiver.classId.parentClassId != position.containingClass()?.getClassId() &&
+            implicitReceiver.classId.outerClassId != position.containingClass()?.getClassId() &&
             scope is FirContainingNamesAwareScope
         ) {
             FirNoClassifiersScope(scope)

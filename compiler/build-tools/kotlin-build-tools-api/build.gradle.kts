@@ -3,7 +3,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("org.jetbrains.kotlinx.binary-compatibility-validator")
     id("project-tests-convention")
 }
@@ -12,13 +11,14 @@ configureKotlinCompileTasksGradleCompatibility()
 
 dependencies {
     val coreDepsVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation.get()
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:$coreDepsVersion")
+    compileOnly(kotlin("stdlib", coreDepsVersion))
     compileOnly(project(":compiler:build-tools:kotlin-build-tools-jdk-utils"))
     embedded(project(":compiler:build-tools:kotlin-build-tools-jdk-utils"))
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
-    testImplementation(kotlinStdlib())
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(kotlin("stdlib", coreDepsVersion))
     testImplementation(project(":compiler:build-tools:kotlin-build-tools-jdk-utils"))
 }
 
@@ -47,16 +47,16 @@ projectTests {
 }
 
 generatedSourcesTask(
-    taskName = "generateBtaArguments",
-    generatorProject = ":compiler:build-tools:kotlin-build-tools-options-generator",
-    generatorRoot = "compiler/build-tools/kotlin-build-tools-options-generator/src",
-    generatorMainClass = "org.jetbrains.kotlin.buildtools.options.generator.MainKt",
+    taskName = "generateBtaSources",
+    generatorProject = ":compiler:build-tools:kotlin-build-tools-generator",
+    generatorRoot = "compiler/build-tools/kotlin-build-tools-generator/src",
+    generatorMainClass = "org.jetbrains.kotlin.buildtools.generator.MainKt",
     argsProvider = { generationRoot ->
         listOf(
             generationRoot.toString(),
             version.toString(),
             "api",
-            "jvmCompilerArguments",
+            "jvmCompilerArguments,wasmArguments,jsArguments,metadataArguments",
         )
     }
 )

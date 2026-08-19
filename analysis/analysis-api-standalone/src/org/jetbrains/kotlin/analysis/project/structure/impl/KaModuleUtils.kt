@@ -71,8 +71,10 @@ internal fun collectSourceFilePaths(root: Path): List<Path> {
     // With [Files#walkFileTree] with a custom visitor, we can take control of exception handling.
     val result = mutableListOf<Path>()
     Files.walkFileTree(
-        root,
-        object : SimpleFileVisitor<Path>() {
+        /* start = */ root,
+        /* options = */ setOf(FileVisitOption.FOLLOW_LINKS),
+        /* maxDepth = */ Int.MAX_VALUE,
+        /* visitor = */ object : SimpleFileVisitor<Path>() {
             override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                 return if (Files.isReadable(dir))
                     FileVisitResult.CONTINUE
@@ -135,7 +137,7 @@ internal fun buildKtModuleProviderByCompilerConfiguration(
     compilerConfig: CompilerConfiguration,
     ktFiles: List<KtFile>,
 ): KotlinStaticProjectStructureProvider = buildProjectStructureProvider(coreApplicationEnvironment, project) {
-    val (scriptFiles, _) = ktFiles.partition { it.isScript() }
+    val [scriptFiles, _] = ktFiles.partition { it.isScript() }
     val platform = JvmPlatforms.defaultJvmPlatform
 
     fun KtModuleBuilder.addModuleDependencies(moduleName: String) {

@@ -4,8 +4,11 @@ KaLocalVariableSymbol:
   compilerVisibility: Local
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isLateInit: false
   isVal: true
   location: LOCAL
@@ -22,6 +25,7 @@ KaLocalVariableSymbol:
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -33,6 +37,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -60,6 +65,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -91,6 +98,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: null
 
 KaTypeAliasSymbol:
   annotations: []
@@ -102,6 +110,7 @@ KaTypeAliasSymbol:
     type: kotlin/String
   isActual: false
   isExpect: false
+  isExternal: false
   location: LOCAL
   modality: FINAL
   name: LocalTypealias
@@ -111,6 +120,7 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: KaFileSymbol(localDeclarationsInsidePropertyGetter.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -120,8 +130,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -138,6 +152,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: LocalDeclarationsInsidePropertyGetterKt
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: /x
   compilerVisibility: Public
   contextParameters: []
@@ -149,8 +164,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: true
     isOverride: false
@@ -168,13 +185,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: LocalDeclarationsInsidePropertyGetterKt
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaConstantInitializerValue(5)
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -199,8 +218,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: LocalDeclarationsInsidePropertyGetterKt
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getX
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: x

@@ -7,8 +7,10 @@ Resolved constructor:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isPrimary: false
     location: CLASS
     modality: FINAL
@@ -25,6 +27,7 @@ Resolved constructor:
     getContainingJvmClassName: null
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: test.MyTypeAlias
 
 Original constructor if type aliased:
   KaConstructorSymbol:
@@ -35,8 +38,10 @@ Original constructor if type aliased:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isPrimary: true
     location: CLASS
     modality: FINAL
@@ -53,3 +58,4 @@ Original constructor if type aliased:
     getContainingJvmClassName: test.MyClass
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: test.MyClass

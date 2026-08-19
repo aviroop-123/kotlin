@@ -1,3 +1,0 @@
-KtNameReferenceExpression(93,96): 'bar'
-  KtSimpleNameReference:
-    package foo.bar

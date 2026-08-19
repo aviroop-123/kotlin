@@ -1,162 +1,56 @@
 /*
- * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.code
 
 import com.intellij.openapi.util.io.FileUtil
-import junit.framework.TestCase
-import org.jetbrains.kotlin.config.LanguageFeature
+import org.jetbrains.kotlin.repoTestFixtures.isGitIgnored
+import org.junit.jupiter.api.Test
+import kotlin.test.fail
 import java.io.File
 import java.util.regex.Pattern
 
-class CodeConformanceTest : TestCase() {
+class CodeConformanceTest {
     companion object {
         private val JAVA_FILE_PATTERN = Pattern.compile(".+\\.java")
         private val KOTLIN_FILE_PATTERN = Pattern.compile(".+\\.kt")
         private val SOURCES_FILE_PATTERN = Pattern.compile(".+\\.(java|kt|js)")
 
-        @Suppress("SpellCheckingInspection")
         private val nonSourcesMatcher = FileMatcher(
             File("."),
             listOf(
-                ".git",
                 ".idea",
-                "build/js",
-                "build/tmp",
-                "compiler/build",
                 "compiler/fir/lightTree/testData",
-                "compiler/testData/psi/kdoc",
-                "compiler/util/src/org/jetbrains/kotlin/config/MavenComparableVersion.java",
+                "compiler/psi/psi-impl/testData/psi/kdoc/TwoTags.kt",
+                "core/language.version-settings/src/org/jetbrains/kotlin/config/MavenComparableVersion.java",
                 "dependencies",
-                "dependencies/protobuf/protobuf-relocated/build",
-                "dist",
                 "idea/testData/codeInsight/renderingKDoc",
-                "intellij",
-                "js/js.tests/.gradle",
-                "js/js.tests/build",
-                "js/js.translator/testData/node_modules",
-                "local",
-                "libraries/kotlin.test/js/it/.gradle",
-                "libraries/kotlin.test/js/it/node_modules",
                 "libraries/reflect/api/src/java9/java/kotlin/reflect/jvm/internal/impl",
-                "libraries/reflect/build",
                 "libraries/stdlib/jdk8/moduleTest/NonExportedPackagesTest.kt",
-                "libraries/stdlib/js-ir/.gradle",
-                "libraries/stdlib/js-ir/build",
-                "libraries/stdlib/js-ir-minimal-for-test/.gradle",
-                "libraries/stdlib/js-ir-minimal-for-test/build",
-                "libraries/stdlib/js-v1/.gradle",
-                "libraries/stdlib/js-v1/build",
                 "libraries/tools/binary-compatibility-validator/src/main/kotlin/org.jetbrains.kotlin.tools",
-                "libraries/tools/kotlin-gradle-plugin-core/gradle_api_jar/build/tmp",
-                "libraries/tools/kotlin-gradle-plugin-integration-tests/build",
-                "libraries/tools/kotlin-gradle-plugin-integration-tests/out",
                 "libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/native/NativeDownloadAndPlatformLibsIT.kt",
                 "libraries/tools/kotlin-js-tests/src/test/web/qunit.js",
                 "libraries/tools/kotlin-maven-plugin/target",
-                "libraries/tools/kotlin-source-map-loader/.gradle",
-                "libraries/tools/kotlin-test-nodejs-runner/.gradle",
-                "libraries/tools/kotlin-test-nodejs-runner/node_modules",
                 "libraries/tools/kotlinp/src",
-                "libraries/tools/new-project-wizard/new-project-wizard-cli/build",
-                "out",
                 "repo/codebase-tests/tests/org/jetbrains/kotlin/code/CodeConformanceTest.kt",
-                "kotlin-native/build",
                 "kotlin-native/performance",
                 "kotlin-native/samples",
-                "wasm/wasm.debug.browsers/node_modules",
-                "wasm/wasm.debug.browsers/.gradle",
             )
         )
 
-        @Suppress("SpellCheckingInspection")
         private val COPYRIGHT_EXCLUDED_FILES_AND_DIRS_MATCHER = FileMatcher(
             File("."),
             listOf(
-                "build",
-                "compiler/ir/serialization.js/build/fullRuntime",
-                "compiler/ir/serialization.js/build/reducedRuntime/src/libraries/stdlib/js-ir/runtime/boxedLong.kt",
                 "dependencies",
-                "dependencies/android-sdk/build",
-                "dependencies/protobuf/protobuf-relocated/build",
-                "dist",
-                "idea/idea-jvm/src/org/jetbrains/kotlin/idea/copyright",
-                "intellij",
-                "js/js.tests/.gradle",
-                "js/js.tests/build",
-                "js/js.translator/testData/node_modules",
-                "libraries/examples/browser-example/target",
-                "libraries/examples/browser-example-with-library/target",
-                "libraries/examples/js-example/target",
-                "libraries/kotlin.test/js/it/.gradle",
-                "libraries/kotlin.test/js/it/build",
-                "libraries/kotlin.test/js/it/node_modules",
-                "libraries/kotlin.test/js-ir/it/.gradle",
-                "libraries/kotlin.test/js-ir/it/build",
-                "libraries/kotlin.test/js-ir/it/node_modules",
-                "libraries/stdlib/build",
-                "libraries/stdlib/common/build",
-                "libraries/stdlib/js-ir/.gradle",
-                "libraries/stdlib/js-ir/build",
-                "libraries/stdlib/js-ir/build/",
-                "libraries/stdlib/js-ir/runtime/boxedLong.kt",
-                "libraries/stdlib/js-ir-minimal-for-test/.gradle",
-                "libraries/stdlib/js-ir-minimal-for-test/build",
-                "libraries/stdlib/js-v1/.gradle",
-                "libraries/stdlib/js-v1/build",
-                "libraries/stdlib/js-v1/node_modules",
-                "libraries/stdlib/jvm/build",
-                "libraries/stdlib/jvm-minimal-for-test/build",
-                "libraries/stdlib/wasm/build",
-                "libraries/tools/atomicfu/build",
-                "libraries/tools/gradle/android-test-fixes/build",
-                "libraries/tools/gradle/gradle-warnings-detector/build",
-                "libraries/tools/gradle/kotlin-compiler-args-properties/build",
-                "libraries/tools/gradle/documentation/build",
-                "libraries/tools/kotlin-allopen/build",
-                "libraries/tools/kotlin-assignment/build",
-                "libraries/tools/kotlin-gradle-build-metrics/build",
-                "libraries/tools/kotlin-gradle-plugin/build",
-                "libraries/tools/kotlin-gradle-plugin-api/build",
-                "libraries/tools/kotlin-gradle-plugin-integration-tests/build",
-                "libraries/tools/kotlin-gradle-plugin-integration-tests/.testKitDir",
-                "libraries/tools/kotlin-gradle-plugin-integration-tests/out",
-                "libraries/tools/kotlin-gradle-statistics/build",
-                "libraries/tools/kotlin-lombok/build",
-                "libraries/tools/kotlin-maven-plugin-test/target",
-                "libraries/tools/kotlin-noarg/build",
-                "libraries/tools/kotlin-test-nodejs-runner/.gradle",
-                "libraries/tools/kotlin-test-nodejs-runner/node_modules",
-                "libraries/tools/kotlin-sam-with-receiver/build",
-                "libraries/tools/kotlin-serialization/build",
-                "libraries/tools/kotlin-source-map-loader/.gradle",
                 "kotlin-native", "libraries/stdlib/native-wasm", // Have a separate licences manager
-                "out",
                 "repo/codebase-tests/tests/org/jetbrains/kotlin/code/CodeConformanceTest.kt",
-                "repo/gradle-settings-conventions/kotlin-bootstrap/build/generated-sources",
-                "repo/gradle-settings-conventions/cache-redirector/build/generated-sources",
-                "repo/gradle-settings-conventions/jvm-toolchain-provisioning/build/generated-sources",
-                "repo/gradle-settings-conventions/develocity/build/generated-sources",
-                "repo/gradle-settings-conventions/kotlin-daemon-config/build/generated-sources",
-                "repo/gradle-build-conventions/buildsrc-compat/build/generated-sources",
-                "repo/gradle-build-conventions/generators/build/generated-sources",
-                "repo/gradle-build-conventions/project-tests-convention/build/generated-sources",
-                "repo/gradle-build-conventions/android-sdk-provisioner/build/generated-sources",
-                "repo/gradle-build-conventions/asm-deprecating-transformer/build/generated-sources",
-                "repo/gradle-build-conventions/binaryen-configuration/build/generated-sources",
-                "repo/gradle-build-conventions/d8-configuration/build/generated-sources",
-                "repo/gradle-build-conventions/nodejs-configuration/build/generated-sources",
-                "repo/gradle-build-conventions/gradle-plugins-common/build/generated-sources",
-                "repo/gradle-build-conventions/gradle-plugins-documentation/build/generated-sources",
-                "wasm/wasm.debug.browsers/node_modules",
-                "wasm/wasm.debug.browsers/.gradle",
-                ".gradle/expanded",
             )
         )
     }
 
+    @Test
     fun testNotUsingCanonicalFileApi() {
         val canonicalPattern = Pattern.compile("\\.canonical(Path|File)", Pattern.MULTILINE)
 
@@ -194,6 +88,31 @@ class CodeConformanceTest : TestCase() {
         }
     }
 
+    @Test
+    fun testNoDirectPathToStringConversion() {
+        val absolutePathStringPattern = Pattern.compile("\\.absolutePathString\\(\\)", Pattern.MULTILINE)
+
+        val targetDirs = listOf(
+            "compiler/build-tools/kotlin-build-tools-api/src",
+            "compiler/build-tools/kotlin-build-tools-api/gen",
+            "compiler/build-tools/kotlin-build-tools-impl/src",
+            "compiler/build-tools/kotlin-build-tools-impl/gen",
+            "compiler/build-tools/kotlin-build-tools-compat/src",
+            "compiler/build-tools/kotlin-build-tools-compat/gen",
+            "compiler/build-tools/kotlin-build-tools-cri-impl/src",
+        )
+
+        targetDirs.map {
+            FileUtil.findFilesByMask(KOTLIN_FILE_PATTERN, File(it))
+        }.flatten().forEach { sourceFile ->
+            val matcher = absolutePathStringPattern.matcher(sourceFile.readText())
+            if (matcher.find()) {
+                fail("KT-83715 absolutePathString should not be used as it loses information about FileSystem: ${matcher.group()}\nin file: $sourceFile")
+            }
+        }
+    }
+
+    @Test
     fun testParserCode() {
         val pattern = Pattern.compile("assert.*?\\b[^_]at.*?$", Pattern.MULTILINE)
 
@@ -205,6 +124,7 @@ class CodeConformanceTest : TestCase() {
         }
     }
 
+    @Test
     fun testNoBadSubstringsInProjectCode() {
         class FileTestCase(val message: String, allowedFiles: List<String> = emptyList(), val filter: (File, String) -> Boolean) {
             val allowedMatcher = FileMatcher(File("."), allowedFiles)
@@ -284,7 +204,7 @@ class CodeConformanceTest : TestCase() {
 
         val failureStr = buildString {
             for (test in tests) {
-                val (allowed, notAllowed) = (testCaseToMatchedFiles[test] ?: error("Should be added during initialization")).partition {
+                val [allowed, notAllowed] = (testCaseToMatchedFiles[test] ?: error("Should be added during initialization")).partition {
                     test.allowedMatcher.matchWithContains(it)
                 }
 
@@ -313,6 +233,7 @@ class CodeConformanceTest : TestCase() {
         }
     }
 
+    @Test
     fun testThirdPartyCopyrights() {
         val filesWithUnlistedCopyrights = mutableListOf<String>()
         val knownThirdPartyCode = loadKnownThirdPartyCodeList()
@@ -370,13 +291,14 @@ class CodeConformanceTest : TestCase() {
     private fun FileMatcher.excludeWalkTopDown(filePattern: Pattern): Sequence<File> {
         return root.walkTopDown()
             .onEnter { dir ->
-                !matchExact(dir) // Don't enter to ignored dirs
+                !matchExact(dir) && !dir.toPath().isGitIgnored() // Don't enter to ignored dirs
             }
             .filter { file -> !matchExact(file) } // filter ignored files
             .filter { file -> filePattern.matcher(file.name).matches() }
             .filter { file -> file.isFile }
     }
 
+    @Test
     fun testRepositoriesAbuse() {
         class RepoAllowList(val repo: String, root: File, allowList: Set<String>, val exclude: String? = null) {
             val matcher = FileMatcher(root, allowList)
@@ -428,7 +350,7 @@ class CodeConformanceTest : TestCase() {
                 }
             }
             .groupBy { it.repo }
-            .map { (repo, occurrences) -> RepoOccurrences(repo, occurrences.mapTo(HashSet()) { it.file }) }
+            .map { [repo, occurrences] -> RepoOccurrences(repo, occurrences.mapTo(HashSet()) { it.file }) }
 
         if (repoOccurrences.isNotEmpty()) {
             val repoOccurrencesStableOrder = repoOccurrences
@@ -458,19 +380,68 @@ class CodeConformanceTest : TestCase() {
         }
     }
 
-    fun testLanguageFeatureOrder() {
-        val values = enumValues<LanguageFeature>()
-        val enabledFeatures = values.filter { it.sinceVersion != null }
+    /**
+     * Verify that no hardcoded File.pathSeparator is used in SSoT
+     * Valid patterns:
+     * - \${File.pathSeparator} in regular strings
+     * - ${File.pathSeparator} in raw string literals ($$"...")
+     * Invalid:
+     * - ${File.pathSeparator} in regular strings (without \ or $$ prefix)
+     */
+    @Test
+    fun testNoHardcodedPathSeparatorInSSOT() {
+        val pattern = Pattern.compile("""(?<![\\$])\$\{File\.pathSeparator\}""")
+        val targetDirs = listOf(
+            "compiler/arguments/src/org/jetbrains/kotlin/arguments/dsl/types"
+        )
 
-        if (enabledFeatures.sortedBy { it.sinceVersion!! } != enabledFeatures) {
-            val (a, b) = enabledFeatures.zipWithNext().first { (a, b) -> a.sinceVersion!! > b.sinceVersion!! }
-            fail(
-                "Please make sure LanguageFeature entries are sorted by sinceVersion to improve readability & reduce confusion.\n" +
-                        "The feature $b is out of order; its sinceVersion is ${b.sinceVersion}, yet it comes after $a, whose " +
-                        "sinceVersion is ${a.sinceVersion}.\n"
-            )
+        targetDirs.flatMap {
+            FileUtil.findFilesByMask(KOTLIN_FILE_PATTERN, File(it))
+        }.forEach { sourceFile ->
+            val content = sourceFile.readText()
+            val matcher = pattern.matcher(content)
+
+            while (matcher.find()) {
+                val matchPos = matcher.start()
+                val beforeMatch = content.substring(0, matchPos)
+                val quoteIdx = findPrecedingUnescapedQuote(beforeMatch)
+
+                if (isInsideRawStringLiteral(beforeMatch, quoteIdx)) {
+                    continue
+                }
+
+                fail(
+                    "[KT-84449] Platform-specific File.pathSeparator must be escaped for runtime evaluation. " +
+                            "Use \\${'$'}{File.pathSeparator} or raw string literals.\nin file: $sourceFile"
+                )
+            }
         }
     }
+}
+
+private fun findPrecedingUnescapedQuote(text: String): Int {
+    var i = text.length - 1
+    while (i >= 0) {
+        if (text[i] == '"') {
+            // Count preceding backslashes
+            var backslashCount = 0
+            var j = i - 1
+            while (j >= 0 && text[j] == '\\') {
+                backslashCount++
+                j--
+            }
+            // Quote is unescaped if even number of backslashes before it
+            if (backslashCount % 2 == 0) {
+                return i
+            }
+        }
+        i--
+    }
+    return -1
+}
+
+private fun isInsideRawStringLiteral(text: String, quoteIndex: Int): Boolean {
+    return quoteIndex >= 2 && text.substring(quoteIndex - 2, quoteIndex) == "$$" + ""
 }
 
 private fun String.ensureFileOrEndsWithSlash() =

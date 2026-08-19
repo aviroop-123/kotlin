@@ -9,8 +9,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -27,6 +31,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: one.LibKt
     getContainingModule: KaLibraryModule "Library lib"
     deprecationStatus: null
+    importableFqName: null
   callableId: one/topLevelPropertyWithAnnotations
   compilerVisibility: Public
   contextParameters: []
@@ -41,8 +46,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -60,13 +67,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: one.LibKt
     getContainingModule: KaLibraryModule "Library lib"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: null
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -91,8 +100,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: one.LibKt
   getContainingModule: KaLibraryModule "Library lib"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getTopLevelPropertyWithAnnotations
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: one.topLevelPropertyWithAnnotations

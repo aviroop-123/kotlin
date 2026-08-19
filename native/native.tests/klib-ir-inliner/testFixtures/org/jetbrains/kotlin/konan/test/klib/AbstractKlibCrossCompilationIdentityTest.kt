@@ -8,46 +8,43 @@ package org.jetbrains.kotlin.konan.test.klib
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.KonanTarget
-import org.jetbrains.kotlin.konan.test.Fir2IrNativeResultsConverter
-import org.jetbrains.kotlin.konan.test.NativeKlibSerializerFacade
+import org.jetbrains.kotlin.konan.test.Fir2IrCliNativeFacade
+import org.jetbrains.kotlin.konan.test.FirCliNativeFacade
+import org.jetbrains.kotlin.konan.test.KlibSerializerNativeCliFacade
+import org.jetbrains.kotlin.konan.test.NativePreSerializationLoweringCliFacade
 import org.jetbrains.kotlin.konan.test.blackbox.support.RegularKotlinNativeClassLoader
 import org.jetbrains.kotlin.konan.test.blackbox.support.copyNativeHomeProperty
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.dumpIr
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.dumpMetadata
-import org.jetbrains.kotlin.konan.test.converters.NativePreSerializationLoweringFacade
-import org.jetbrains.kotlin.konan.test.klib.ManifestWritingTest.Companion.readManifestAndSanitize
 import org.jetbrains.kotlin.platform.konan.NativePlatforms
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.BlackBoxCodegenSuppressor
 import org.jetbrains.kotlin.test.backend.handlers.KlibArtifactHandler
-import org.jetbrains.kotlin.test.backend.handlers.NoIrCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
 import org.jetbrains.kotlin.test.backend.ir.IrDiagnosticsHandler
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.builders.firHandlersStep
-import org.jetbrains.kotlin.test.builders.irHandlersStep
-import org.jetbrains.kotlin.test.builders.klibArtifactsHandlersStep
-import org.jetbrains.kotlin.test.builders.loweredIrHandlersStep
+import org.jetbrains.kotlin.test.builders.*
+import org.jetbrains.kotlin.test.configuration.commonIrHandlersForCodegenTest
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE
 import org.jetbrains.kotlin.test.directives.NativeEnvironmentConfigurationDirectives
-import org.jetbrains.kotlin.test.frontend.fir.FirFrontendFacade
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
 import org.jetbrains.kotlin.test.model.*
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
 import org.jetbrains.kotlin.test.services.LibraryProvider
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
-import org.jetbrains.kotlin.test.services.configuration.NativeEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.NativeFirstStageEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.independentSourceDirectoryPathsTransitive
 import org.jetbrains.kotlin.test.services.moduleStructure
 import org.jetbrains.kotlin.test.utils.MultiModuleInfoDumper
 import org.jetbrains.kotlin.utils.bind
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import java.io.File
+import java.nio.file.Paths
 
 /**
  * This test works in the following way:
@@ -104,39 +101,38 @@ open class AbstractFirKlibCrossCompilationIdentityTestBase(val irFileSuffix: Str
             DiagnosticsDirectives.DIAGNOSTICS with "-warnings"
 
             LANGUAGE with listOf(
-                "-${LanguageFeature.IrIntraModuleInlinerBeforeKlibSerialization.name}",
                 "-${LanguageFeature.IrCrossModuleInlinerBeforeKlibSerialization.name}"
             )
         }
 
-        useAfterAnalysisCheckers(::BlackBoxCodegenSuppressor)
+        useFailureSuppressors(::BlackBoxCodegenSuppressor)
         enableMetaInfoHandler()
         useConfigurators(
             ::CommonEnvironmentConfigurator,
-            ::NativeEnvironmentConfigurator,
+            ::NativeFirstStageEnvironmentConfigurator,
         )
         useAdditionalService(::LibraryProvider)
 
-        facadeStep(::FirFrontendFacade)
+        facadeStep(::FirCliNativeFacade)
         firHandlersStep {
             useHandlers(::NoFirCompilationErrorsHandler)
             useHandlers(::FirDiagnosticsHandler)
         }
-        facadeStep(::Fir2IrNativeResultsConverter)
+        facadeStep(::Fir2IrCliNativeFacade)
         irHandlersStep {
+            commonIrHandlersForCodegenTest()
             useHandlers(
                 ::IrDiagnosticsHandler,
-                ::NoIrCompilationErrorsHandler,
             )
         }
-        facadeStep(::NativePreSerializationLoweringFacade)
+        facadeStep(::NativePreSerializationLoweringCliFacade)
         loweredIrHandlersStep{
+            commonIrHandlersForCodegenTest()
             useHandlers(
                 ::IrDiagnosticsHandler,
-                ::NoIrCompilationErrorsHandler,
             )
         }
-        facadeStep(::NativeKlibSerializerFacade)
+        facadeStep(::KlibSerializerNativeCliFacade)
         klibArtifactsHandlersStep {
             useHandlers(::NativeKlibCrossCompilationIdentityHandler.bind(irFileSuffix))
         }
@@ -170,12 +166,15 @@ private class NativeKlibCrossCompilationIdentityHandler(testServices: TestServic
         val klibFile = info.outputFile
 
         metadataDumper[module] += klibFile.dumpMetadata(kotlinNativeClassLoader, printSignatures = false, signatureVersion = null)
-        irDumper[module] += klibFile.dumpIr(kotlinNativeClassLoader)
+        irDumper[module] += klibFile.dumpIrAndSanitizePathsInFileEntries(
+            kotlinNativeClassLoader,
+            module.independentSourceDirectoryPathsTransitive(testServices)
+        )
         manifestDumper[module] += readManifestAndSanitize(klibFile, singleTargetInManifestToBeReplacedByTheAlias = null)
     }
 
     override fun processAfterAllModules(someAssertionWasFailed: Boolean) {
-        val (testDataDir: File, baseName: String) = testServices
+        val [testDataDir: File, baseName: String] = testServices
             .moduleStructure
             .originalTestDataFiles
             .first()
@@ -192,7 +191,7 @@ private class NativeKlibCrossCompilationIdentityHandler(testServices: TestServic
             listOf(
                 metadataDumper.checkGoldenData(goldenDataFileExtension = "metadata.txt"),
                 irDumper.checkGoldenData(goldenDataFileExtension = "ir$irFileSuffix.txt"),
-                manifestDumper.checkGoldenData(goldenDataFileExtension = "manifest")
+                manifestDumper.checkGoldenData(goldenDataFileExtension = "manifest$irFileSuffix")
             )
         )
     }
@@ -213,3 +212,29 @@ private class NativeKlibCrossCompilationIdentityHandler(testServices: TestServic
     }
 }
 
+private fun File.dumpIrAndSanitizePathsInFileEntries(
+    kotlinNativeClassLoader: ClassLoader,
+    absolutePathPrefixes: List<String>,
+): String {
+    val rawIrDump = dumpIr(kotlinNativeClassLoader, absolutePathPrefixes)
+
+    // There can be absolute paths in IR file entries in `IrInlinedFunctionBlock`s coming from dependency libraries (stdlib, kotlin-test).
+    // Let's truncate them to the last 5 path segments to make tests more stable.
+    val sanitizedIrDump = rawIrDump.lineSequence().map { line ->
+        val prefixStartIndex = line.indexOf(INLINED_FUNCTION_BLOCK_FILE_ENTRY_PREFIX)
+        if (prefixStartIndex < 0) return@map line
+
+        val prefixEndIndex = prefixStartIndex + INLINED_FUNCTION_BLOCK_FILE_ENTRY_PREFIX.length
+
+        val prefix = line.substring(0, prefixEndIndex)
+        val maybeAbsolutePath = line.substring(prefixEndIndex)
+
+        val relativePath = Paths.get(maybeAbsolutePath).toList().takeLast(5).joinToString(File.separator)
+
+        prefix + relativePath
+    }.joinToString("\n")
+
+    return sanitizedIrDump
+}
+
+private const val INLINED_FUNCTION_BLOCK_FILE_ENTRY_PREFIX = "inlinedFunctionFileEntry: FILE_ENTRY path:"

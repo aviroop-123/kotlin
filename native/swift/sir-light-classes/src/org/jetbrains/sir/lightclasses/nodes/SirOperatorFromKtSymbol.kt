@@ -14,10 +14,10 @@ import org.jetbrains.kotlin.sir.SirFunction
 import org.jetbrains.kotlin.sir.SirFunctionBody
 import org.jetbrains.kotlin.sir.SirGetter
 import org.jetbrains.kotlin.sir.SirModality
-import org.jetbrains.kotlin.sir.SirNamedDeclaration
 import org.jetbrains.kotlin.sir.SirNominalType
 import org.jetbrains.kotlin.sir.SirOrigin
 import org.jetbrains.kotlin.sir.SirParameter
+import org.jetbrains.kotlin.sir.SirScopeDefiningDeclaration
 import org.jetbrains.kotlin.sir.SirSetter
 import org.jetbrains.kotlin.sir.SirSubscript
 import org.jetbrains.kotlin.sir.SirType
@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.sir.builder.buildSetter
 import org.jetbrains.kotlin.sir.providers.SirSession
 import org.jetbrains.kotlin.sir.util.SirSwiftModule
 import org.jetbrains.kotlin.sir.util.allParameters
+import org.jetbrains.kotlin.sir.util.isUnavailable
 import org.jetbrains.kotlin.sir.util.name
 import kotlin.getValue
 
@@ -55,9 +56,10 @@ internal abstract class SirClassOperatorTrampolineFunction(
     override val isInstance: Boolean get() = false
     override val modality: SirModality get() = SirModality.FINAL
     override val attributes: List<SirAttribute> get() = source.attributes
+    override val contextParameter: SirParameter? get() = source.contextParameter
     override val extensionReceiverParameter: SirParameter? get() = source.extensionReceiverParameter
     override val errorType: SirType get() = source.errorType
-
+    override val isAsync: Boolean get() = source.isAsync
     override val parameters: List<SirParameter>
         get() = listOf(
             SirParameter(argumentName = "this", type = selfType)
@@ -69,11 +71,14 @@ internal abstract class SirClassOperatorTrampolineFunction(
     override val bridges: List<SirBridge> get() = emptyList()
 
     override var body: SirFunctionBody?
-        get() = SirFunctionBody(
-            listOf(
-                "this.${source.name}(${this.allParameters.drop(1).joinToString { it.forward ?: error("unreachable") }})"
-            )
-        )
+        get() = SirFunctionBody(buildList {
+            if (isUnavailable) {
+                add("fatalError()")
+            } else {
+                val args = this@SirClassOperatorTrampolineFunction.allParameters.drop(1)
+                add("this.${source.name}(${args.joinToString { it.forward ?: error("unreachable") }})")
+            }
+        })
         set(_) = Unit
 }
 
@@ -121,13 +126,13 @@ internal class SirSubscriptTrampoline(
     override val origin: SirOrigin get() = SirOrigin.Trampoline(getterFunction)
 
     override val visibility: SirVisibility get() = SirVisibility.PUBLIC
-    override val documentation: String? = getterFunction.documentation
-    override val attributes: List<SirAttribute> = getterFunction.attributes
+    override val documentation: String? get() = getterFunction.documentation
+    override val attributes: List<SirAttribute> get() = getterFunction.attributes
     override val isOverride: Boolean = false
     override val isInstance: Boolean = true
     override val modality: SirModality = SirModality.FINAL
-    override val parameters: List<SirParameter> = getterFunction.parameters
-    override val returnType: SirType = getterFunction.returnType
+    override val parameters: List<SirParameter> get() = getterFunction.parameters
+    override val returnType: SirType get() = getterFunction.returnType
 
     override val getter: SirGetter by lazy {
         buildGetter {
@@ -160,6 +165,6 @@ private val SirParameter.forward: String? get() = this.name?.let { name -> this.
 
 private val SirFunction.selfType: SirType get() {
         return this.extensionReceiverParameter?.type
-            ?: (this.parent as? SirNamedDeclaration)?.let { SirNominalType(it) }
+            ?: (this.parent as? SirScopeDefiningDeclaration)?.let { SirNominalType(it) }
             ?: error("No receiver type available for ${this.name}")
 }

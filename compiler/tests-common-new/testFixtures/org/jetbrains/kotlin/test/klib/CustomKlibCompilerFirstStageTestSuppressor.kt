@@ -1,0 +1,138 @@
+/*
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ */
+
+package org.jetbrains.kotlin.test.klib
+
+import org.jetbrains.kotlin.cli.common.ExitCode
+import org.jetbrains.kotlin.config.LanguageVersion
+import org.jetbrains.kotlin.test.WrappedException
+import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
+import org.jetbrains.kotlin.test.directives.JsEnvironmentConfigurationDirectives
+import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
+import org.jetbrains.kotlin.test.directives.model.StringDirective
+import org.jetbrains.kotlin.test.klib.CustomKlibCompilerTestDirectives.IGNORE_KLIB_BACKEND_ERRORS_WITH_CUSTOM_FIRST_STAGE
+import org.jetbrains.kotlin.test.klib.CustomKlibCompilerTestDirectives.IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE
+import org.jetbrains.kotlin.test.model.BinaryArtifactHandler
+import org.jetbrains.kotlin.test.model.TestFailureSuppressor
+import org.jetbrains.kotlin.test.services.TestServices
+import org.jetbrains.kotlin.test.services.assertions
+import org.jetbrains.kotlin.test.services.moduleStructure
+import org.junit.jupiter.api.Assumptions
+
+/**
+ * Mute (ignore) tests where:
+ * - The custom compiler failed to compile test data in the first (frontend) stage.
+ * - The custom compiler successfully produced a KLIB artifact, which is known to have
+ *   a problem that cause the second stage (backend) to crash. It's only allowed to mute
+ *   such tests for a specific version of the custom compiler specified in
+ *   [IGNORE_KLIB_BACKEND_ERRORS_WITH_CUSTOM_FIRST_STAGE], or
+ *   [IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE] directives.
+ */
+class CustomKlibCompilerFirstStageTestSuppressor(
+    testServices: TestServices,
+    private val defaultLanguageVersion: LanguageVersion,
+) : TestFailureSuppressor(testServices) {
+    override val directiveContainers: List<DirectivesContainer>
+        get() = listOf(CustomKlibCompilerTestDirectives)
+
+    override fun suppressIfNeeded(failedAssertions: List<WrappedException>): List<WrappedException> {
+        val newFailedAssertions = failedAssertions.asSequence().flatMap { wrappedException ->
+            if (wrappedException is WrappedException.FromFacade) {
+                if (wrappedException.facade is CustomKlibCompilerFirstStageFacade) {
+                    // The test failed on the first stage.
+                    processFirstStageException(wrappedException)
+                } else {
+                    // The test failed not on the first stage.
+                    processNonFirstStageException(wrappedException, IGNORE_KLIB_BACKEND_ERRORS_WITH_CUSTOM_FIRST_STAGE)
+                }
+            } else if (wrappedException is WrappedException.FromHandler) {
+                // The test failed on a handler.
+                when (wrappedException.handler) {
+                    is NoFirCompilationErrorsHandler -> processFirstStageException(wrappedException)
+                    is BinaryArtifactHandler -> processNonFirstStageException(wrappedException, IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE)
+                    else -> listOf(wrappedException)
+                }
+            } else {
+                listOf(wrappedException)
+            }
+        }.toList()
+
+        if (newFailedAssertions.isEmpty()) {
+            // Explicitly mark the test as "ignored".
+            throw Assumptions.abort<Nothing>()
+        } else {
+            return newFailedAssertions
+        }
+    }
+
+    private fun processFirstStageException(wrappedException: WrappedException): List<WrappedException> {
+        val (exitCode, compilerOutput) = wrappedException.cause as? CustomKlibCompilerException
+            ?: return listOf(wrappedException)
+
+        return when (exitCode) {
+            ExitCode.COMPILATION_ERROR -> {
+                // Make sure that the compilation failure really looks like a frontend error. Otherwise, fail the test.
+                if (!FRONTEND_ERROR_MESSAGE_REGEX.containsMatchIn(compilerOutput)) {
+                    listOf(
+                        wrappedException,
+                        AssertionError(
+                            """
+                                        Custom KLIB compiler failed to compile test data on the first (frontend) stage, but the failure does not look like a frontend error.
+                                        Please check the compiler output and update the test accordingly.
+                                        Compiler output: $compilerOutput
+                                    """.trimIndent()
+                        ).wrap()
+                    )
+                } else {
+                    emptyList()
+                }
+            }
+            ExitCode.INTERNAL_ERROR -> {
+                // Make sure that the compilation failure really looks like an exception in the compiler. Otherwise, fail the test.
+                if (!COMPILER_EXCEPTION_MESSAGE_REGEX.containsMatchIn(compilerOutput)) {
+                    listOf(
+                        wrappedException,
+                        AssertionError(
+                            """
+                                        Custom KLIB compiler failed to compile test data on the first (frontend) stage, but the failure does not look like a compiler exception.
+                                        Please check the compiler output and update the test accordingly.
+                                        Compiler output: $compilerOutput
+                                    """.trimIndent()
+                        ).wrap()
+                    )
+                } else {
+                    emptyList()
+                }
+            }
+            else -> listOf(wrappedException)
+        }
+    }
+
+    private fun processNonFirstStageException(wrappedException: WrappedException, ignoreDirective: StringDirective): List<WrappedException> {
+        if (testServices.versionAndTargetAreIgnored(ignoreDirective, defaultLanguageVersion))
+            return emptyList()
+
+        if (testServices.moduleStructure.modules.any {
+                it.files.any { file -> JsEnvironmentConfigurationDirectives.RECOMPILE in file.directives }
+            }) {
+            // Backward compatibility is not provided for incremental caches, so these tests may fail during backward compatibility testing
+            return emptyList()
+        }
+
+        return listOf(wrappedException)
+    }
+
+    override fun checkIfTestShouldBeUnmuted() {
+        testServices.assertions.assertAll(
+            { testServices.throwUnmutingErrorIfNeeded(IGNORE_KLIB_BACKEND_ERRORS_WITH_CUSTOM_FIRST_STAGE, defaultLanguageVersion) },
+            { testServices.throwUnmutingErrorIfNeeded(IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE, defaultLanguageVersion) },
+        )
+    }
+
+    companion object {
+        private val FRONTEND_ERROR_MESSAGE_REGEX = Regex("\\S+.kt:\\d+:\\d+: error: .*")
+        private val COMPILER_EXCEPTION_MESSAGE_REGEX = Regex("exception: (org\\.jetbrains\\.kotlin\\..*|java\\..*Exception):")
+    }
+}

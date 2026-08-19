@@ -1,7 +1,7 @@
 // WITH_STDLIB
 // DIAGNOSTICS: -ERROR_SUPPRESSION
-// FIR_IDENTICAL
 // RENDER_ALL_DIAGNOSTICS_FULL_TEXT
+// RUN_PIPELINE_TILL: BACKEND
 
 // MODULE: lib
 package com.example.klib.serialization.diagnostics

@@ -1,5 +1,6 @@
 // TARGET_BACKEND: WASM
 // USE_NEW_EXCEPTION_HANDLING_PROPOSAL
+// WASM_IGNORE_FOR: mode=single-module
 // TODO: remove the test when KT-66906 will be resolved
 // WITH_STDLIB
 // KJS_WITH_FULL_RUNTIME

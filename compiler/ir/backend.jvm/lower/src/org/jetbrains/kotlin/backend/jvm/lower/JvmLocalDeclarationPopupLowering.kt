@@ -7,9 +7,7 @@ package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.ScopeWithIr
 import org.jetbrains.kotlin.backend.common.lower.LocalDeclarationPopupLowering
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
-import org.jetbrains.kotlin.backend.jvm.ir.findInlineLambdas
 import org.jetbrains.kotlin.backend.jvm.ir.findRichInlineLambdas
 import org.jetbrains.kotlin.backend.jvm.isEnclosedInConstructor
 import org.jetbrains.kotlin.ir.declarations.*
@@ -17,15 +15,10 @@ import org.jetbrains.kotlin.ir.declarations.*
 /**
  * Moves local classes from field initializers and anonymous init blocks into the containing class.
  */
-@PhaseDescription(name = "JvmLocalClassExtraction")
 internal class JvmLocalDeclarationPopupLowering(context: JvmBackendContext) : LocalDeclarationPopupLowering(context) {
     private val inlineLambdaToScope = mutableMapOf<IrFunction, IrDeclaration>()
 
     override fun lower(irFile: IrFile) {
-        // TODO remove after KT-78719
-        irFile.findInlineLambdas(context as JvmBackendContext) { argument, _, _, scope ->
-            inlineLambdaToScope[argument.symbol.owner] = scope
-        }
         irFile.findRichInlineLambdas(context as JvmBackendContext) { argument, _, _, scope ->
             inlineLambdaToScope[argument.invokeFunction] = scope
         }
@@ -40,7 +33,7 @@ internal class JvmLocalDeclarationPopupLowering(context: JvmBackendContext) : Lo
     // to the primary constructor.
     override fun shouldPopUp(declaration: IrDeclaration, currentScope: ScopeWithIr?): Boolean {
         if (declaration is IrClass) {
-            // On JVM, lambdas have package-private visibility after LocalDeclarationsLowering; see `forClass` in `localDeclarationsPhase`.
+            // On JVM, lambdas have non-local visibility after LocalDeclarationsLowering; see `forClass` in `localDeclarationsPhase`.
             if (!super.shouldPopUp(declaration, currentScope) && !declaration.isGeneratedLambdaClass) return false
 
             var parent = currentScope?.irElement

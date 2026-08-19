@@ -1,0 +1,7 @@
+KtNameReferenceExpression(45,56): 'testPackage'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      testPackage
+    ]

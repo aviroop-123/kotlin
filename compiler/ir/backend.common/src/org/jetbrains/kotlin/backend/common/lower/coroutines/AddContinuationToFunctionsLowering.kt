@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.memoryOptimizedPlus
+import kotlin.collections.plusAssign
 
 /**
  * Replaces suspend functions with regular non-suspend functions with additional
@@ -62,14 +63,13 @@ class AddContinuationToLocalSuspendFunctionsLowering(val context: CommonBackendC
     }
 }
 
-
 private fun transformSuspendFunction(context: CommonBackendContext, function: IrSimpleFunction): IrSimpleFunction {
     val newFunctionWithContinuation = function.getOrCreateFunctionWithContinuationStub(context)
     // Using custom mapping because number of parameters doesn't match
     val parameterMapping : Map<IrValueParameter, IrValueParameter> =
         function.parameters.zip(newFunctionWithContinuation.parameters).toMap()
     val newBody = function.moveBodyTo(newFunctionWithContinuation, parameterMapping)
-    for ((old, new) in parameterMapping.entries) {
+    for ([old, new] in parameterMapping.entries) {
         new.defaultValue = old.defaultValue?.transform(VariableRemapper(parameterMapping), null)
     }
 

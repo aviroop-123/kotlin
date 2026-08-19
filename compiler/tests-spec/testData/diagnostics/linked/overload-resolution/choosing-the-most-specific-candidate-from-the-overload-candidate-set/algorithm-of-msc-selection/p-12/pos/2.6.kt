@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -29,7 +28,7 @@ class Case1{
         //to (1.1)
         1.<!DEBUG_INFO_CALL("fqName: Case1.boo; typeCall: infix extension function")!>boo(1)<!>
         //(1.1) return type is String
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>1.boo(1)<!>
+        1.boo(1)
     }
 }
 
@@ -51,4 +50,3 @@ fun case1(case: Case1) {
 
 
 }
-

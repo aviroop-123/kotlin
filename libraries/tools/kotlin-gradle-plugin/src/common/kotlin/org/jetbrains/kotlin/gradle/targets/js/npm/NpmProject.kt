@@ -9,7 +9,6 @@ import org.gradle.api.Project
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Provider
-import org.gradle.process.ExecSpec
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.disambiguateName
 import org.jetbrains.kotlin.gradle.plugin.mpp.fileExtension
@@ -19,14 +18,28 @@ import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin.Companion.kotl
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin.Companion.kotlinNodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinPackageJsonTask
 import org.jetbrains.kotlin.gradle.targets.js.webTargetVariant
+import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension
+import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootPlugin
+import org.jetbrains.kotlin.gradle.targets.web.nodejs.nodeJsRoot
+import org.jetbrains.kotlin.gradle.utils.directoryProperty
 import org.jetbrains.kotlin.gradle.utils.getFile
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
+import java.io.File
 import java.io.Serializable
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsPlugin.Companion.kotlinNodeJsEnvSpec as wasmKotlinNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootPlugin.Companion.kotlinNodeJsRootExtension as wasmKotlinNodeJsRootExtension
 
 val KotlinJsIrCompilation.npmProject: NpmProject
     get() = NpmProject(this)
+
+internal val KotlinJsIrCompilation.npmToolingDir: Provider<File>
+    get() = webTargetVariant(
+        jsVariant = { npmProject.dir.map { it.asFile } },
+        wasmVariant = {
+            val rootExtension = WasmNodeJsRootPlugin.apply(project.rootProject)
+            rootExtension.npmTooling.map { it.dir }
+        },
+    )
 
 @Deprecated("Use npmProject for KotlinJsIrCompilation. Scheduled for removal in Kotlin 2.3.", level = DeprecationLevel.ERROR)
 val KotlinJsCompilation.npmProject: NpmProject
@@ -118,28 +131,6 @@ open class NpmProject(@Transient val compilation: KotlinJsIrCompilation) : Seria
 
     internal val nodeExecutable by lazy {
         nodeJs.executable.get()
-    }
-
-    @Deprecated("Internal KGP utility. Scheduled for removal in Kotlin 2.4.")
-    fun useTool(
-        exec: ExecSpec,
-        tool: String,
-        nodeArgs: List<String> = listOf(),
-        args: List<String>,
-    ) {
-        exec.workingDir(dir)
-        exec.executable(nodeExecutable)
-        @Suppress("DEPRECATION")
-        exec.args = nodeArgs + require(tool) + args
-    }
-
-    /**
-     * Require [request] nodejs module and return canonical path to it's main js file.
-     */
-    @Deprecated("Internal KGP utility. Scheduled for removal in Kotlin 2.4.")
-    fun require(request: String): String {
-//        nodeJs.npmResolutionManager.requireAlreadyInstalled(project)
-        return modules.require(request)
     }
 
     override fun toString() = "NpmProject(${name.get()})"

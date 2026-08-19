@@ -4,8 +4,11 @@ KaLocalVariableSymbol:
   compilerVisibility: Local
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isLateInit: false
   isVal: false
   location: LOCAL
@@ -13,7 +16,7 @@ KaLocalVariableSymbol:
   name: something1
   origin: SOURCE
   receiverParameter: null
-  returnType: KaClassErrorType:
+  returnType: KaErrorType:
     annotations: []
     type: ERROR_TYPE
   visibility: LOCAL
@@ -21,3 +24,4 @@ KaLocalVariableSymbol:
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

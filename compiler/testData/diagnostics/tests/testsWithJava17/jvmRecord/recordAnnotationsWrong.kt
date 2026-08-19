@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +JvmRecordSupport +AnnotationAllUseSiteTarget +PropertyParamAnnotationDefaultTargetMode
-// SKIP_TXT
+// LANGUAGE: +AnnotationAllUseSiteTarget +PropertyParamAnnotationDefaultTargetMode
 // JVM_TARGET: 17
 // ENABLE_JVM_PREVIEW
 // DIAGNOSTICS: -DEPRECATED_JAVA_ANNOTATION
@@ -50,13 +49,13 @@ data class Some(
 
 @JvmRecord
 data class Else(
-    <!UNSUPPORTED_FEATURE!>@all:NoTargets<!> val a: Int,
-    <!UNSUPPORTED_FEATURE!>@all:ComponentOnly<!> val b: Int,
-    <!UNSUPPORTED_FEATURE!>@all:TargetsOnlyInJava<!> val c: Int,
-    <!UNSUPPORTED_FEATURE!>@all:JavaParamComponent<!> val d: Int,
-    <!UNSUPPORTED_FEATURE!>@all:JavaMethodComponent<!> val e: Int,
+    <!WRONG_ANNOTATION_TARGET_WITH_USE_SITE_TARGET!>@all:NoTargets<!> val a: Int,
+    <!WRONG_ANNOTATION_TARGET_WITH_USE_SITE_TARGET!>@all:ComponentOnly<!> val b: Int,
+    <!WRONG_ANNOTATION_TARGET_WITH_USE_SITE_TARGET!>@all:TargetsOnlyInJava<!> val c: Int,
+    @all:JavaParamComponent val d: Int,
+    @all:JavaMethodComponent val e: Int,
 ) {
-    <!UNSUPPORTED_FEATURE!>@all:JavaParamComponent<!>
+    <!WRONG_ANNOTATION_TARGET_WITH_USE_SITE_TARGET!>@all:JavaParamComponent<!>
     val f get() = a + b
 }
 

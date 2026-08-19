@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.jvm.compiler.AbstractKotlinCompilerIntegrationTest
 import org.jetbrains.kotlin.test.JavaCompilationError
-import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.TestDataAssertions
 import org.jetbrains.kotlin.test.compileJavaFiles
 import org.jetbrains.kotlin.test.util.KtTestUtil
 import java.io.File
@@ -29,7 +29,7 @@ abstract class AbstractJavaModulesIntegrationTest(
         get() = KtTestUtil.getJdk11Home()
 
     override val testDataPath: String
-        get() = "compiler/testData/javaModules/"
+        get() = ForTestCompileRuntime.transformTestDataPath("compiler/tests-integration/testData/javaModules/").absolutePath
 
     private fun module(
         name: String,
@@ -77,7 +77,7 @@ abstract class AbstractJavaModulesIntegrationTest(
     private fun checkKotlinOutput(moduleName: String): (String) -> Unit {
         val expectedFirFile = File(testDataDirectory, "$moduleName.fir.txt")
         return { actual ->
-            KotlinTestUtils.assertEqualsToFile(
+            TestDataAssertions.assertEqualsToFile(
                 if (languageVersion.usesK2 && expectedFirFile.exists()) expectedFirFile else File(testDataDirectory, "$moduleName.txt"),
                 getNormalizedCompilerOutput(actual, null, testDataPath, tmpdir.absolutePath)
             )
@@ -160,12 +160,12 @@ abstract class AbstractJavaModulesIntegrationTest(
         val d = module("moduleD", listOf(a, b, c))
 
         // validate the run-time behavior of Java-compiled code for the sake of comparison
-        val (javaStdout, javaStderr) = runModule("moduleD/d.JavaMain", listOf(d, c, b, a))
+        (val javaStdout = stdout, val javaStderr = stderr) = runModule("moduleD/d.JavaMain", listOf(d, c, b, a))
         assertEquals("", javaStderr)
         assertEquals("OK", javaStdout)
 
         // test the run-time behavior of Kotlin-compiled code
-        val (kotlinStdout, kotlinStderr) = runModule("moduleD/d.KotlinMainKt", listOf(d, c, b, a))
+        (val kotlinStdout = stdout, val kotlinStderr = stderr) = runModule("moduleD/d.KotlinMainKt", listOf(d, c, b, a))
         assertEquals("", kotlinStderr)
         assertEquals("OK", kotlinStdout)
     }
@@ -267,7 +267,7 @@ abstract class AbstractJavaModulesIntegrationTest(
         // the "'-d' option is ignored" warning in this test is an artifact of the test infrastructure and is not a part of the test.
         val buildFile = AbstractCliTest.replacePathsInBuildXml(
             "-Xbuild-file=${File(testDataDirectory, "build.xml").path}",
-            testDataDirectory.absolutePath,
+            testDataDirectory,
             tmpdir.absolutePath
         )
         module("usage", additionalKotlinArguments = listOf("-no-stdlib", buildFile))

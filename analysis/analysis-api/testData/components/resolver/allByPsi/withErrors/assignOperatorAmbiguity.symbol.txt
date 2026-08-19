@@ -1,0 +1,1230 @@
+KtFile: 'assignOperatorAmbiguity.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtClass(0,10): 'class Test'
+  null
+
+KtNamedFunction(12,55): 'operator fun Test.plus(i: Int): Test = this'
+  null
+
+KtDeclarationModifierList(12,20): 'operator'
+  null
+
+KtTypeReference(25,29): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(25,29): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(25,29): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(34,42): '(i: Int)'
+  null
+
+KtParameter(35,41): 'i: Int'
+  null
+
+KtTypeReference(38,41): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(38,41): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(38,41): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(44,48): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(44,48): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(44,48): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtThisExpression(51,55): 'this'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/plus)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(51,55): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/plus)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNamedFunction(56,101): 'operator fun Test.plusAssign(i: Int): Unit {}'
+  null
+
+KtDeclarationModifierList(56,64): 'operator'
+  null
+
+KtTypeReference(69,73): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(69,73): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(69,73): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(84,92): '(i: Int)'
+  null
+
+KtParameter(85,91): 'i: Int'
+  null
+
+KtTypeReference(88,91): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(88,91): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(88,91): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(94,98): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(94,98): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(94,98): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(99,101): '{}'
+  null
+
+KtNamedFunction(103,147): 'operator fun Test.minus(i: Int): Test = this'
+  null
+
+KtDeclarationModifierList(103,111): 'operator'
+  null
+
+KtTypeReference(116,120): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(116,120): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(116,120): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(126,134): '(i: Int)'
+  null
+
+KtParameter(127,133): 'i: Int'
+  null
+
+KtTypeReference(130,133): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(130,133): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(130,133): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(136,140): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(136,140): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(136,140): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtThisExpression(143,147): 'this'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/minus)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(143,147): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/minus)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNamedFunction(148,194): 'operator fun Test.minusAssign(i: Int): Unit {}'
+  null
+
+KtDeclarationModifierList(148,156): 'operator'
+  null
+
+KtTypeReference(161,165): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(161,165): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(161,165): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(177,185): '(i: Int)'
+  null
+
+KtParameter(178,184): 'i: Int'
+  null
+
+KtTypeReference(181,184): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(181,184): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(181,184): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(187,191): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(187,191): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(187,191): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(192,194): '{}'
+  null
+
+KtNamedFunction(196,238): 'operator fun Test.div(i: Int): Test = this'
+  null
+
+KtDeclarationModifierList(196,204): 'operator'
+  null
+
+KtTypeReference(209,213): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(209,213): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(209,213): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(217,225): '(i: Int)'
+  null
+
+KtParameter(218,224): 'i: Int'
+  null
+
+KtTypeReference(221,224): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(221,224): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(221,224): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(227,231): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(227,231): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(227,231): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtThisExpression(234,238): 'this'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/div)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(234,238): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/div)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNamedFunction(239,283): 'operator fun Test.divAssign(i: Int): Unit {}'
+  null
+
+KtDeclarationModifierList(239,247): 'operator'
+  null
+
+KtTypeReference(252,256): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(252,256): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(252,256): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(266,274): '(i: Int)'
+  null
+
+KtParameter(267,273): 'i: Int'
+  null
+
+KtTypeReference(270,273): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(270,273): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(270,273): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(276,280): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(276,280): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(276,280): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(281,283): '{}'
+  null
+
+KtNamedFunction(285,329): 'operator fun Test.times(i: Int): Test = this'
+  null
+
+KtDeclarationModifierList(285,293): 'operator'
+  null
+
+KtTypeReference(298,302): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(298,302): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(298,302): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(308,316): '(i: Int)'
+  null
+
+KtParameter(309,315): 'i: Int'
+  null
+
+KtTypeReference(312,315): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(312,315): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(312,315): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(318,322): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(318,322): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(318,322): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtThisExpression(325,329): 'this'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/times)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(325,329): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/times)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNamedFunction(330,376): 'operator fun Test.timesAssign(i: Int): Unit {}'
+  null
+
+KtDeclarationModifierList(330,338): 'operator'
+  null
+
+KtTypeReference(343,347): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(343,347): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(343,347): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(359,367): '(i: Int)'
+  null
+
+KtParameter(360,366): 'i: Int'
+  null
+
+KtTypeReference(363,366): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(363,366): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(363,366): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(369,373): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(369,373): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(369,373): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(374,376): '{}'
+  null
+
+KtNamedFunction(378,420): 'operator fun Test.rem(i: Int): Test = this'
+  null
+
+KtDeclarationModifierList(378,386): 'operator'
+  null
+
+KtTypeReference(391,395): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(391,395): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(391,395): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(399,407): '(i: Int)'
+  null
+
+KtParameter(400,406): 'i: Int'
+  null
+
+KtTypeReference(403,406): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(403,406): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(403,406): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(409,413): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(409,413): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(409,413): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtThisExpression(416,420): 'this'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/rem)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(416,420): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/rem)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: Test
+        visibility: PUBLIC
+    ]
+
+KtNamedFunction(421,465): 'operator fun Test.remAssign(i: Int): Unit {}'
+  null
+
+KtDeclarationModifierList(421,429): 'operator'
+  null
+
+KtTypeReference(434,438): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtUserType(434,438): 'Test'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtNameReferenceExpression(434,438): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtParameterList(448,456): '(i: Int)'
+  null
+
+KtParameter(449,455): 'i: Int'
+  null
+
+KtTypeReference(452,455): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(452,455): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(452,455): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtTypeReference(458,462): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(458,462): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(458,462): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(463,465): '{}'
+  null
+
+KtNamedFunction(467,567): 'fun test() {'
+  null
+
+KtParameterList(475,477): '()'
+  null
+
+KtBlockExpression(478,567): '{'
+  null
+
+KtProperty(484,500): 'var foo = Test()'
+  null
+
+KtCallExpression(494,500): 'Test()'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): Test
+    ]
+
+KtNameReferenceExpression(494,498): 'Test'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Test
+    ]
+
+KtValueArgumentList(498,500): '()'
+  null
+
+KtBinaryExpression(505,513): 'foo += 1'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /plus(<extension receiver>: Test, i: kotlin.Int): Test,
+      /plusAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.plus(i: Int): Test
+    fun Test.plusAssign(i: Int): Unit>
+
+KtNameReferenceExpression(505,508): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var foo: Test
+    ]
+
+KtOperationReferenceExpression(509,511): '+='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /plus(<extension receiver>: Test, i: kotlin.Int): Test,
+      /plusAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.plus(i: Int): Test
+    fun Test.plusAssign(i: Int): Unit>
+
+KtConstantExpression(512,513): '1'
+  null
+
+KtBinaryExpression(518,526): 'foo -= 1'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /minus(<extension receiver>: Test, i: kotlin.Int): Test,
+      /minusAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.minus(i: Int): Test
+    fun Test.minusAssign(i: Int): Unit>
+
+KtNameReferenceExpression(518,521): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var foo: Test
+    ]
+
+KtOperationReferenceExpression(522,524): '-='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /minus(<extension receiver>: Test, i: kotlin.Int): Test,
+      /minusAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.minus(i: Int): Test
+    fun Test.minusAssign(i: Int): Unit>
+
+KtConstantExpression(525,526): '1'
+  null
+
+KtBinaryExpression(531,539): 'foo /= 1'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /div(<extension receiver>: Test, i: kotlin.Int): Test,
+      /divAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.div(i: Int): Test
+    fun Test.divAssign(i: Int): Unit>
+
+KtNameReferenceExpression(531,534): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var foo: Test
+    ]
+
+KtOperationReferenceExpression(535,537): '/='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /div(<extension receiver>: Test, i: kotlin.Int): Test,
+      /divAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.div(i: Int): Test
+    fun Test.divAssign(i: Int): Unit>
+
+KtConstantExpression(538,539): '1'
+  null
+
+KtBinaryExpression(544,552): 'foo *= 1'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /times(<extension receiver>: Test, i: kotlin.Int): Test,
+      /timesAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.times(i: Int): Test
+    fun Test.timesAssign(i: Int): Unit>
+
+KtNameReferenceExpression(544,547): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var foo: Test
+    ]
+
+KtOperationReferenceExpression(548,550): '*='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /times(<extension receiver>: Test, i: kotlin.Int): Test,
+      /timesAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.times(i: Int): Test
+    fun Test.timesAssign(i: Int): Unit>
+
+KtConstantExpression(551,552): '1'
+  null
+
+KtBinaryExpression(557,565): 'foo %= 1'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /rem(<extension receiver>: Test, i: kotlin.Int): Test,
+      /remAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.rem(i: Int): Test
+    fun Test.remAssign(i: Int): Unit>
+
+KtNameReferenceExpression(557,560): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var foo: Test
+    ]
+
+KtOperationReferenceExpression(561,563): '%='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /rem(<extension receiver>: Test, i: kotlin.Int): Test,
+      /remAssign(<extension receiver>: Test, i: kotlin.Int): kotlin.Unit
+    ]
+    diagnostic = ERROR<ASSIGN_OPERATOR_AMBIGUITY: Ambiguity between assign operator candidates:
+    fun Test.rem(i: Int): Test
+    fun Test.remAssign(i: Int): Unit>
+
+KtConstantExpression(564,565): '1'
+  null

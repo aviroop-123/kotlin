@@ -1,13 +1,21 @@
 /*
- * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package generators
 
+import generators.test.AllEqualSampleGenerator
+import generators.test.AllEqualTestGenerator
+import generators.test.IsSortedSampleGenerator
+import generators.test.IsSortedTestGenerator
 import generators.test.MinMaxTestGenerator
 
 
 fun main() {
     MinMaxTestGenerator.generate()
+    IsSortedSampleGenerator.generate()
+    IsSortedTestGenerator.generate()
+    AllEqualSampleGenerator.generate()
+    AllEqualTestGenerator.generate()
 }

@@ -315,7 +315,7 @@ internal class ClassLayoutBuilder(val irClass: IrClass, val context: Context) {
         val superVtableEntries = if (irClass.isSpecialClassWithNoSupertypes()) {
             emptyList()
         } else {
-            val superClass = irClass.getSuperClassNotAny() ?: context.symbols.any.owner
+            val superClass = irClass.getSuperClassNotAny() ?: context.irBuiltIns.anyClass.owner
             context.getLayoutBuilder(superClass).vtableEntries
         }
 
@@ -454,6 +454,8 @@ internal class ClassLayoutBuilder(val irClass: IrClass, val context: Context) {
 
     private var fields: List<FieldInfo>? = null
 
+    // Synchronization is needed due to potential deserialization invocation while building fields for the super classes.
+    @Synchronized
     private fun getFieldsInternal(llvm: CodegenLlvmHelpers): List<FieldInfo> {
         fields?.let { return it }
 
@@ -477,7 +479,7 @@ internal class ClassLayoutBuilder(val irClass: IrClass, val context: Context) {
         irClass.annotations.forEach {
             val irFile = irClass.fileOrNull
 
-            val annotationClass = it.symbol.owner.constructedClass
+            val annotationClass = it.classSymbol.owner
 
             if (annotationClass.hasAnnotation(RuntimeNames.associatedObjectKey)) {
                 val argument = it.arguments[0]

@@ -34,7 +34,7 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.protobuf.MessageLite
 import org.jetbrains.kotlin.types.AbstractTypeApproximator
 import org.jetbrains.kotlin.types.TypeApproximatorConfiguration
-import org.jetbrains.kotlin.util.jvmMetadataVersion
+import org.jetbrains.kotlin.util.metadataVersion
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.Method
 
@@ -99,10 +99,9 @@ fun makeLocalFirMetadataSerializerForMetadataSource(
         configuration.getBoolean(JVMConfigurationKeys.DISABLE_PARAM_ASSERTIONS),
         session.languageVersionSettings.apiVersion >= ApiVersion.KOTLIN_1_4 &&
                 !configuration.getBoolean(JVMConfigurationKeys.NO_UNIFIED_NULL_CHECKS),
-        configuration.jvmMetadataVersion(session.languageVersionSettings.languageVersion),
+        configuration.metadataVersion(session.languageVersionSettings.languageVersion),
         session.languageVersionSettings.jvmDefaultMode,
         stringTable,
-        constValueProvider = null,
         additionalMetadataProvider = null
     )
     return FirMetadataSerializer(
@@ -307,6 +306,7 @@ internal fun FirProperty.copyToFreeProperty(approximator: AbstractTypeApproximat
         setter = property.setter?.copyToFreeAccessor(approximator, newPropertySymbol)
         isVar = property.isVar
         status = property.status
+        isLocal = property.isLocal
         dispatchReceiverType = property.dispatchReceiverType
         attributes = property.attributes.copy()
         annotations += property.annotations

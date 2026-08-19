@@ -1,0 +1,26 @@
+// RUN_PIPELINE_TILL: BACKEND
+// DIAGNOSTICS: -NOTHING_TO_INLINE -UNUSED_PARAMETER
+// IGNORE_FIR_DIAGNOSTICS
+
+interface SomeInterface
+
+fun someFun(i: SomeInterface) {}
+
+private fun foo1() = object {}
+
+private inline fun foo2() = object {}
+
+private inline fun foo3() {
+    someFun(object : SomeInterface {})
+}
+
+private inline fun foo4() { foo2() }
+
+internal inline fun bar() {
+    <!LESS_VISIBLE_TYPE_IN_INLINE_ACCESSED_SIGNATURE_ERROR!>foo1<!>()
+    foo2()
+    foo3()
+    foo4()
+}
+
+/* GENERATED_FIR_TAGS: anonymousObjectExpression, functionDeclaration, inline, interfaceDeclaration */

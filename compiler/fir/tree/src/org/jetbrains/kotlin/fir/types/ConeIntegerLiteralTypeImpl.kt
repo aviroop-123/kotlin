@@ -124,11 +124,12 @@ class ConeIntegerConstantOperatorTypeImpl(
  * If it returns null then CST will be found by regular rules using real supertypes
  *   of integer literal types
  */
-fun ConeIntegerLiteralType.Companion.findCommonSuperType(types: Collection<RigidTypeMarker>): RigidTypeMarker? {
+fun ConeIntegerLiteralType.Companion.findCommonSuperType(types: Collection<ConeRigidType>): ConeRigidType? {
     return ConeIntegerLiteralTypeExtensions.findCommonSuperType(types)
 }
 
 fun ConeKotlinType.approximateIntegerLiteralType(expectedType: ConeKotlinType? = null): ConeKotlinType {
+    @Suppress("SuspiciousWhenOverConeKotlinType")
     return when (this) {
         is ConeIntegerLiteralType -> getApproximatedType(expectedType)
         is ConeFlexibleType -> approximateIntegerLiteralBounds(expectedType)
@@ -166,13 +167,12 @@ private object ConeIntegerLiteralTypeExtensions {
     }
 
 
-    fun findCommonSuperType(types: Collection<RigidTypeMarker>): RigidTypeMarker? {
+    fun findCommonSuperType(types: Collection<ConeRigidType>): ConeRigidType? {
         if (types.isEmpty()) return null
-        @Suppress("UNCHECKED_CAST")
-        return types.reduce { left: RigidTypeMarker?, right: RigidTypeMarker? -> commonSuperType(left, right) }
+        return types.reduce { left: ConeRigidType?, right: ConeRigidType? -> commonSuperType(left, right) }
     }
 
-    private fun commonSuperType(left: RigidTypeMarker?, right: RigidTypeMarker?): RigidTypeMarker? {
+    private fun commonSuperType(left: ConeRigidType?, right: ConeRigidType?): ConeRigidType? {
         if (left == null || right == null) return null
 
         return when {
@@ -196,8 +196,8 @@ private object ConeIntegerLiteralTypeExtensions {
 
     private fun commonSuperTypeBetweenIntegerTypeAndRegularType(
         integerLiteralType: ConeIntegerLiteralType,
-        regularType: RigidTypeMarker
-    ): RigidTypeMarker? {
+        regularType: ConeRigidType
+    ): ConeRigidType? {
         return when (regularType) {
             in integerLiteralType.possibleTypes -> regularType
             else -> null

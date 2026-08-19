@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.gradle.testbase
 
 import org.jetbrains.kotlin.gradle.KOTLIN_VERSION
+
 import org.jetbrains.kotlin.gradle.util.assertProcessRunResult
 import org.jetbrains.kotlin.gradle.util.runProcess
 import java.nio.file.Path
@@ -31,6 +32,7 @@ internal fun TestProject.buildXcodeProject(
     testRunEnvironment: Map<String, String> = emptyMap(),
     buildSettingOverrides: Map<String, String> = emptyMap(),
     appendToProperties: () -> String = { "" },
+    derivedDataPath: Path? = projectPath.resolve("xcodeDerivedData"),
     expectedExitCode: Int = 0,
 ) {
     prepareForXcodebuild(appendToProperties)
@@ -44,6 +46,7 @@ internal fun TestProject.buildXcodeProject(
         action = action,
         buildSettingOverrides = buildSettingOverrides,
         testRunEnvironment = testRunEnvironment,
+        derivedDataPath = derivedDataPath,
         expectedExitCode = expectedExitCode,
     )
 }
@@ -152,7 +155,7 @@ private fun TestProject.xcodebuild(
         },
         workingDir = workingDir.toFile(),
     )
-    assertProcessRunResult(xcodebuildResult) {
+    xcodebuildResult.assertProcessRunResult {
         assertEquals(expectedExitCode, exitCode, "Exit code mismatch for `xcodebuild`.")
     }
 }

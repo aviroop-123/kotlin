@@ -5,12 +5,13 @@
 
 package org.jetbrains.kotlin.ir.backend.js.transformers.irToJs
 
-import org.jetbrains.kotlin.ir.backend.js.utils.JsMainFunctionDetector
 import org.jetbrains.kotlin.ir.backend.js.utils.emptyScope
 import org.jetbrains.kotlin.js.backend.ast.*
-import org.jetbrains.kotlin.serialization.js.ModuleKind
+import org.jetbrains.kotlin.js.config.ModuleKind
 import org.jetbrains.kotlin.utils.DFS
+import org.jetbrains.kotlin.utils.MainFunctionCandidate
 import org.jetbrains.kotlin.utils.addToStdlib.partitionIsInstance
+import org.jetbrains.kotlin.utils.pickMainFunctionFromCandidates
 
 class Merger(
     private val moduleName: String,
@@ -36,7 +37,7 @@ class Merger(
                 rename(f.declarations)
                 rename(f.exports)
 
-                f.imports.entries.forEach { (declaration, importStatement) ->
+                f.imports.entries.forEach { [declaration, importStatement] ->
                     val importName = nameMap[declaration]
 
                     if (importName == null && !isEsModules) {
@@ -49,8 +50,8 @@ class Merger(
                 val classModels = (mutableMapOf<JsName, JsIrIcClassModel>() + f.classes)
                     .also { f.classes.clear() }
 
-                classModels.entries.forEach { (name, model) ->
-                    f.classes[rename(name)] = JsIrIcClassModel(model.superClasses.map { rename(it) }).also {
+                classModels.entries.forEach { [name, model] ->
+                    f.classes[rename(name)] = JsIrIcClassModel(model.dependsOnClasses.map { rename(it) }).also {
                         it.preDeclarationBlock.statements += model.preDeclarationBlock.statements
                         it.postDeclarationBlock.statements += model.postDeclarationBlock.statements
                         rename(it.preDeclarationBlock)
@@ -63,7 +64,7 @@ class Merger(
             }
         }
 
-        for ((tag, crossModuleJsImport) in crossModuleReferences.jsImports) {
+        for ([tag, crossModuleJsImport] in crossModuleReferences.jsImports) {
             val importName = nameMap[tag] ?: error("Missing name for declaration '$tag'")
             importStatements.putIfAbsent(tag, crossModuleJsImport.renameImportedSymbolInternalName(importName))
         }
@@ -74,7 +75,7 @@ class Merger(
             val internalModuleName = ReservedJsNames.makeInternalModuleName()
 
             if (isEsModules) {
-                val exportedElements = crossModuleReferences.exports.entries.map { (tag, hash) ->
+                val exportedElements = crossModuleReferences.exports.entries.map { [tag, hash] ->
                     val internalName = nameMap[tag] ?: error("Missing name for declaration '$tag'")
                     JsExport.Element(internalName.makeRef(), JsName(hash, false))
                 }
@@ -87,7 +88,7 @@ class Merger(
                 ).makeStmt()
                 additionalExports += createExportBlock
 
-                crossModuleReferences.exports.entries.forEach { (tag, hash) ->
+                crossModuleReferences.exports.entries.forEach { [tag, hash] ->
                     val internalName = nameMap[tag] ?: error("Missing name for declaration '$tag'")
                     val crossModuleRef = ReservedJsNames.makeCrossModuleNameRef(ReservedJsNames.makeInternalModuleName())
                     additionalExports += jsAssignment(JsNameRef(hash, crossModuleRef), JsNameRef(internalName)).makeStmt()
@@ -106,7 +107,7 @@ class Merger(
             }
         }
 
-        this.nameBindings.entries.forEach { (tag, name) ->
+        this.nameBindings.entries.forEach { [tag, name] ->
             val existingName = nameMap.getOrPut(tag) { name }
             if (existingName !== name) {
                 result[name] = existingName
@@ -144,17 +145,17 @@ class Merger(
     private fun declareAndCallJsExporter(): List<JsStatement> {
         if (isEsModules) {
             val allExportRelatedStatements = fragments.flatMap { it.exports.statements }
-            val (allExportStatements, restStatements) = allExportRelatedStatements.partitionIsInstance<JsStatement, JsExport>()
-            val (currentModuleExportStatements, restExportStatements) = allExportStatements.partition { it.fromModule == null }
-            val exportedElements = currentModuleExportStatements.takeIf { it.isNotEmpty() }
+            val [allExportStatements, restStatements] = allExportRelatedStatements.partitionIsInstance<JsStatement, JsExport>()
+            val [currentModuleNamedExportStatements, restExportStatements] = allExportStatements.partition { it.subject is JsExport.Subject.Elements }
+            val exportedElements = currentModuleNamedExportStatements.takeIf { it.isNotEmpty() }
                 ?.asSequence()
                 ?.flatMap { (it.subject as JsExport.Subject.Elements).elements }
                 ?.distinctBy { it.alias?.ident ?: it.name.ident }
                 ?.toList()
 
-            val oneLargeExportStatement = exportedElements?.let { JsExport(JsExport.Subject.Elements(it)) }
+            val oneLargeNamedExportStatement = exportedElements?.let { JsExport(JsExport.Subject.Elements(it)) }
 
-            return restStatements + listOfNotNull(oneLargeExportStatement) + restExportStatements
+            return restStatements + restExportStatements + listOfNotNull(oneLargeNamedExportStatement)
         } else {
             val exportBody = JsBlock(fragments.flatMap { it.exports.statements })
             if (exportBody.isEmpty) {
@@ -235,8 +236,8 @@ class Merger(
             moduleBody.endRegion()
         }
 
-        val fragmentWithMainFunction = JsMainFunctionDetector.pickMainFunctionFromCandidates(fragments) {
-            JsMainFunctionDetector.MainFunctionCandidate(it.packageFqn, it.mainFunctionTag)
+        val fragmentWithMainFunction = pickMainFunctionFromCandidates(fragments) {
+            MainFunctionCandidate(it.packageFqn, it.mainFunctionTag)
         }
 
         val exportStatements = declareAndCallJsExporter() + additionalExports + transitiveJsExport()
@@ -299,7 +300,7 @@ class Merger(
 
         DFS.dfs(
             classModelMap.keys,
-            { classModelMap[it]?.superClasses ?: emptyList() },
+            { classModelMap[it]?.dependsOnClasses ?: emptyList() },
             declarationHandler
         )
     }
@@ -334,7 +335,7 @@ class Merger(
         if (name == null) return this
 
         return when (this) {
-            is JsVars -> JsVars(JsVars.JsVar(name, vars.single().initExpression))
+            is JsVars -> JsVars(JsVars.Variant.Var, JsVars.JsVar(name, vars.single().initExpression))
             is JsImport -> JsImport(
                 module,
                 when (target) {

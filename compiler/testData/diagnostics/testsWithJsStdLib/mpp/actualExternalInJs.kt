@@ -1,6 +1,4 @@
-// RUN_PIPELINE_TILL: KLIB
-// IGNORE_REVERSED_RESOLVE
-// IGNORE_NON_REVERSED_RESOLVE
+// RUN_PIPELINE_TILL: BACKEND
 // IGNORE_PARTIAL_BODY_ANALYSIS
 // LANGUAGE: +MultiPlatformProjects
 
@@ -14,6 +12,6 @@ external class ExternalClass: Dummy.ExternalInterface
 
 // MODULE: main-js()()(common)
 
-actual external interface Dummy {
+actual external interface <!JS_ACTUAL_EXTERNAL_INTERFACE_WHILE_EXPECT_WITHOUT_JS_NO_RUNTIME!>Dummy<!> {
     actual interface ExternalInterface
 }

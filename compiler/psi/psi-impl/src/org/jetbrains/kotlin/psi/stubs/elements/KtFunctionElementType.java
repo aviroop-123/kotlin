@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.psi.stubs.elements;
 
+import com.intellij.lang.ASTNode;
 import com.intellij.psi.stubs.IndexSink;
 import com.intellij.psi.stubs.StubElement;
 import com.intellij.psi.stubs.StubInputStream;
@@ -12,15 +13,19 @@ import com.intellij.psi.stubs.StubOutputStream;
 import com.intellij.util.io.StringRef;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.kotlin.contracts.description.KtContractDescriptionElement;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.psi.KtNamedFunction;
 import org.jetbrains.kotlin.psi.psiUtil.KtPsiUtilKt;
 import org.jetbrains.kotlin.psi.stubs.KotlinFunctionStub;
+import org.jetbrains.kotlin.psi.stubs.StubUtils;
 import org.jetbrains.kotlin.psi.stubs.impl.KotlinFunctionStubImpl;
 import org.jetbrains.kotlin.psi.stubs.impl.KotlinStubOrigin;
+import org.jetbrains.kotlin.psi.stubs.impl.KotlinTypeBean;
 
 import java.io.IOException;
+import java.util.List;
 
 public class KtFunctionElementType extends KtStubElementType<KotlinFunctionStubImpl, KtNamedFunction> {
 
@@ -28,6 +33,14 @@ public class KtFunctionElementType extends KtStubElementType<KotlinFunctionStubI
 
     public KtFunctionElementType(@NotNull @NonNls String debugName) {
         super(debugName, KtNamedFunction.class, KotlinFunctionStub.class);
+    }
+
+    /**
+     * Functions always stubbed since we want to index even local ones
+     */
+    @Override
+    public boolean shouldCreateStub(ASTNode node) {
+        return true;
     }
 
     @NotNull
@@ -42,6 +55,7 @@ public class KtFunctionElementType extends KtStubElementType<KotlinFunctionStubI
                 (StubElement<?>) parentStub, StringRef.fromString(psi.getName()), isTopLevel, fqName,
                 isExtension, hasNoExpressionBody, hasBody, psi.hasTypeParameterListBeforeFunctionName(),
                 psi.mayHaveContract(),
+                /* kdocText = */ null,
                 /* contract = */ null,
                 /* origin = */ null
         );
@@ -63,8 +77,10 @@ public class KtFunctionElementType extends KtStubElementType<KotlinFunctionStubI
         dataStream.writeBoolean(haveContract);
 
         if (haveContract) {
-            stub.serializeContract(dataStream);
+            StubUtils.writeContract$org_jetbrains_kotlin_psi_impl(dataStream, stub.getContract());
         }
+
+        StubUtils.serializeKdocText(dataStream, stub.getKdocText());
 
         KotlinStubOrigin.serialize(stub.getOrigin(), dataStream);
     }
@@ -83,10 +99,16 @@ public class KtFunctionElementType extends KtStubElementType<KotlinFunctionStubI
         boolean hasBody = dataStream.readBoolean();
         boolean hasTypeParameterListBeforeFunctionName = dataStream.readBoolean();
         boolean mayHaveContract = dataStream.readBoolean();
+
+        @SuppressWarnings("rawtypes")
+        List<KtContractDescriptionElement> contract = mayHaveContract ? StubUtils.readContract$org_jetbrains_kotlin_psi_impl(dataStream) : null;
+
+        String kdocText = StubUtils.deserializeKdocText(dataStream);
         return new KotlinFunctionStubImpl(
                 (StubElement<?>) parentStub, name, isTopLevel, fqName, isExtension, hasNoExpressionBody, hasBody,
                 hasTypeParameterListBeforeFunctionName, mayHaveContract,
-                mayHaveContract ? KotlinFunctionStubImpl.Companion.deserializeContract(dataStream) : null,
+                kdocText,
+                contract,
                 KotlinStubOrigin.deserialize(dataStream)
         );
     }

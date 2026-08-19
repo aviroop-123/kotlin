@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 // FULL_JDK
 
 /*
@@ -52,13 +51,13 @@ abstract class AbstractClassCase1() {
 
 fun case1(){
     val a = Case1()
-    a.<!INVISIBLE_MEMBER!>priv<!>()
-    a.<!INVISIBLE_MEMBER!>prot<!>()
+    a.<!INVISIBLE_REFERENCE!>priv<!>()
+    a.<!INVISIBLE_REFERENCE!>prot<!>()
     a.int()
     a.pub()
 
-    a.<!INVISIBLE_MEMBER!>priv1<!>
-    a.<!INVISIBLE_MEMBER!>prot1<!>
+    a.<!INVISIBLE_REFERENCE!>priv1<!>
+    a.<!INVISIBLE_REFERENCE!>prot1<!>
     a.int1
     a.pub1
 }
@@ -71,13 +70,13 @@ import base.*
 // TESTCASE NUMBER: 2
 fun case2() {
     val a = Case1()
-    a.<!INVISIBLE_MEMBER!>priv<!>()
-    a.<!INVISIBLE_MEMBER!>prot<!>()
-    a.<!INVISIBLE_MEMBER!>int<!>()
+    a.<!INVISIBLE_REFERENCE!>priv<!>()
+    a.<!INVISIBLE_REFERENCE!>prot<!>()
+    a.<!INVISIBLE_REFERENCE!>int<!>()
     a.pub()
 
-    a.<!INVISIBLE_MEMBER!>priv1<!>
-    a.<!INVISIBLE_MEMBER!>prot1<!>
-    a.<!INVISIBLE_MEMBER!>int1<!>
+    a.<!INVISIBLE_REFERENCE!>priv1<!>
+    a.<!INVISIBLE_REFERENCE!>prot1<!>
+    a.<!INVISIBLE_REFERENCE!>int1<!>
     a.pub1
 }

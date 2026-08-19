@@ -5,9 +5,11 @@
 
 package org.jetbrains.kotlin.backend.konan.tests
 
-import org.jetbrains.kotlin.backend.konan.testUtils.*
+import org.jetbrains.kotlin.backend.konan.testUtils.HeaderGenerator
+import org.jetbrains.kotlin.backend.konan.testUtils.TodoAnalysisApi
+import org.jetbrains.kotlin.backend.konan.testUtils.dependenciesDir
 import org.jetbrains.kotlin.konan.test.*
-import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.TestDataAssertions
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.fail
@@ -123,6 +125,15 @@ class ObjCExportDependenciesHeaderGeneratorTest(
     }
 
     @Test
+    fun `test - multiple klibs in library with atomicfu`() {
+        doTest(
+            dependenciesDir.resolve("multipleKlibsInLibraryWithAtomicfu"), configuration = HeaderGenerator.Configuration(
+                dependencies = listOf(testLibraryAtomicFu)
+            )
+        )
+    }
+
+    @Test
     fun `test - propertyAnnotation`() {
         doTest(
             dependenciesDir.resolve("propertyAnnotation"), configuration = HeaderGenerator.Configuration(
@@ -146,7 +157,7 @@ class ObjCExportDependenciesHeaderGeneratorTest(
             dependenciesDir.resolve("notExportedDependency"), configuration = HeaderGenerator.Configuration(
                 frameworkName = "MyApp",
                 withObjCBaseDeclarationStubs = true,
-                dependencies = listOf(testLibraryAKlibFile, testLibraryBKlibFile),
+                dependencies = listOf(testLibraryA, testLibraryB),
             )
         )
     }
@@ -166,8 +177,8 @@ class ObjCExportDependenciesHeaderGeneratorTest(
             dependenciesDir.resolve("exportedAndNotExportedDependency"), configuration = HeaderGenerator.Configuration(
                 frameworkName = "MyApp",
                 withObjCBaseDeclarationStubs = true,
-                dependencies = listOf(testLibraryAKlibFile, testLibraryBKlibFile),
-                exportedDependencies = setOf(testLibraryAKlibFile)
+                dependencies = listOf(testLibraryA, testLibraryB),
+                exportedDependencies = setOf(testLibraryA)
             )
         )
     }
@@ -185,8 +196,8 @@ class ObjCExportDependenciesHeaderGeneratorTest(
     fun `test - testInternalLibrary`() {
         doTest(
             dependenciesDir.resolve("testInternalLibrary"), configuration = HeaderGenerator.Configuration(
-                dependencies = listOfNotNull(testInternalKlibFile),
-                exportedDependencies = setOf(testInternalKlibFile)
+                dependencies = listOfNotNull(testInternalLibrary),
+                exportedDependencies = setOf(testInternalLibrary)
             )
         )
     }
@@ -195,8 +206,8 @@ class ObjCExportDependenciesHeaderGeneratorTest(
     fun `test - extensions library`() {
         doTest(
             dependenciesDir.resolve("extensionsLibrary"), configuration = HeaderGenerator.Configuration(
-                dependencies = listOfNotNull(testExtensionsKlibFile),
-                exportedDependencies = setOf(testExtensionsKlibFile)
+                dependencies = listOfNotNull(testExtensionsLibrary),
+                exportedDependencies = setOf(testExtensionsLibrary)
             )
         )
     }
@@ -233,7 +244,7 @@ class ObjCExportDependenciesHeaderGeneratorTest(
     fun `test - top level function and extension with the same dependency doesn't generate duplicate`() {
         doTest(
             dependenciesDir.resolve("topLevelFunctionAndExtensionWithDependency"), configuration = HeaderGenerator.Configuration(
-                dependencies = listOfNotNull(testExtensionsKlibFile)
+                dependencies = listOfNotNull(testExtensionsLibrary)
             )
         )
     }
@@ -243,8 +254,8 @@ class ObjCExportDependenciesHeaderGeneratorTest(
         doTest(
             dependenciesDir.resolve("oneTypeExtensionsFromMultipleFilesMergedIntoTheSameCategory"),
             configuration = HeaderGenerator.Configuration(
-                dependencies = listOfNotNull(testExtensionsKlibFile),
-                exportedDependencies = setOf(testExtensionsKlibFile)
+                dependencies = listOfNotNull(testExtensionsLibrary),
+                exportedDependencies = setOf(testExtensionsLibrary)
             )
         )
     }
@@ -268,8 +279,8 @@ class ObjCExportDependenciesHeaderGeneratorTest(
     fun `test - class name mangling`() {
         doTest(
             dependenciesDir.resolve("classNameMangling"), configuration = HeaderGenerator.Configuration(
-                dependencies = listOf(testLibraryCKlibFile),
-                exportedDependencies = setOf(testLibraryCKlibFile),
+                dependencies = listOf(testLibraryC),
+                exportedDependencies = setOf(testLibraryC),
             )
         )
     }
@@ -285,6 +296,6 @@ class ObjCExportDependenciesHeaderGeneratorTest(
     private fun doTest(root: File, configuration: HeaderGenerator.Configuration = HeaderGenerator.Configuration()) {
         if (!root.isDirectory) fail("Expected ${root.absolutePath} to be directory")
         val generatedHeaders = generator.generateHeaders(root, configuration).toString()
-        KotlinTestUtils.assertEqualsToFile(root.resolve("!${root.nameWithoutExtension}.h"), generatedHeaders)
+        TestDataAssertions.assertEqualsToFile(root.resolve("!${root.nameWithoutExtension}.h"), generatedHeaders)
     }
 }

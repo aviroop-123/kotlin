@@ -34,7 +34,12 @@ abstract class FirCallableReferenceAccess : FirQualifiedAccessExpression() {
     abstract override val source: KtSourceElement?
     abstract override val nonFatalDiagnostics: List<ConeDiagnostic>
     abstract override val calleeReference: FirNamedReference
-    abstract val hasQuestionMarkAtLHS: Boolean
+    abstract val hasQuestionMarkAtLhs: Boolean
+    /**
+     * The erroneous argument list that may be present after the callable reference.
+     * This syntax is invalid (`::foo(args)`).
+     */
+    abstract val errorArgumentList: FirArgumentList?
 
     override fun <R, D> accept(visitor: FirVisitor<R, D>, data: D): R =
         visitor.visitCallableReferenceAccess(this, data)
@@ -66,13 +71,19 @@ abstract class FirCallableReferenceAccess : FirQualifiedAccessExpression() {
 
     abstract override fun replaceCalleeReference(newCalleeReference: FirReference)
 
-    abstract fun replaceHasQuestionMarkAtLHS(newHasQuestionMarkAtLHS: Boolean)
+    abstract fun replaceHasQuestionMarkAtLhs(newHasQuestionMarkAtLhs: Boolean)
+
+    abstract fun replaceErrorArgumentList(newErrorArgumentList: FirArgumentList?)
 
     abstract override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirCallableReferenceAccess
+
+    abstract override fun <D> transformContextArguments(transformer: FirTransformer<D>, data: D): FirCallableReferenceAccess
 
     abstract override fun <D> transformTypeArguments(transformer: FirTransformer<D>, data: D): FirCallableReferenceAccess
 
     abstract override fun <D> transformExplicitReceiver(transformer: FirTransformer<D>, data: D): FirCallableReferenceAccess
 
     abstract override fun <D> transformCalleeReference(transformer: FirTransformer<D>, data: D): FirCallableReferenceAccess
+
+    abstract fun <D> transformErrorArgumentList(transformer: FirTransformer<D>, data: D): FirCallableReferenceAccess
 }

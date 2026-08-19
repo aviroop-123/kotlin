@@ -1,0 +1,8 @@
+$TESTDATA_DIR$/simple.kt
+-produce
+library
+-o
+$TEMP_DIR$/exportKlibToOlderAbiVersionUnsupportedLanguageVersion
+-language-version
+2.2
+-XXLanguage\:+ExportKlibToOlderAbiVersion

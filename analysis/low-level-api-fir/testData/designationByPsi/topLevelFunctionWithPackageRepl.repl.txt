@@ -1,0 +1,4 @@
+KT element: KtNamedFunction
+Resolve target: topLevelFunctionWithPackageRepl.repl.kts -> <snippet-topLevelFunctionWithPackageRepl.repl.kts> -> TopLevelFunctionWithPackageRepl_repl -> topLevel
+FIR:
+  public? final? fun topLevel(): R|kotlin/Unit| { LAZY_BLOCK }

@@ -8,11 +8,13 @@ package org.jetbrains.kotlin.backend.konan
 import org.jetbrains.kotlin.backend.common.serialization.FingerprintHash
 import org.jetbrains.kotlin.backend.common.serialization.Hash128Bits
 import org.jetbrains.kotlin.backend.common.serialization.SerializedKlibFingerprint
+import org.jetbrains.kotlin.backend.konan.CacheSupport.Companion.cacheFileId
 import org.jetbrains.kotlin.backend.konan.serialization.*
-import org.jetbrains.kotlin.backend.konan.serialization.ClassFieldsSerializer
-import org.jetbrains.kotlin.backend.konan.serialization.InlineFunctionBodyReferenceSerializer
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.cli.CliDiagnostics
+import org.jetbrains.kotlin.cli.report
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.ir.util.IdSignature
+import org.jetbrains.kotlin.konan.config.filesToCache
 import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.konan.target.KonanTarget
@@ -44,7 +46,8 @@ class CachedLibraries(
         explicitCaches: Map<KotlinLibrary, String>,
         implicitCacheDirectories: List<File>,
         autoCacheDirectory: File,
-        autoCacheableFrom: List<File>
+        autoCacheableFrom: List<File>,
+        private val libraryToCache: KotlinLibrary?,
 ) {
     enum class Kind { DYNAMIC, STATIC, HEADER }
 
@@ -54,12 +57,50 @@ class CachedLibraries(
         val serializedInlineFunctionBodies by lazy { computeSerializedInlineFunctionBodies() }
         val serializedClassFields by lazy { computeSerializedClassFields() }
         val serializedEagerInitializedFiles by lazy { computeSerializedEagerInitializedFiles() }
+        val serializedTrivialGetters by lazy { computeSerializedTrivialGetters() }
+
+        val objcCachePath: String? by lazy {
+            if (kind == Kind.STATIC || kind == Kind.HEADER) {
+                val file = File(path)
+                if (file.name.endsWith(".objc.a")) {
+                    file.absolutePath
+                } else {
+                    val parent = file.parentFile
+                    val grandParent = parent.parentFile
+                    val objcGrandParent = File(grandParent.absolutePath + ".objc")
+                    val objcParent = objcGrandParent.child(parent.name)
+                    val objcFileName = file.name.substringBeforeLast(".") + ".objc.a"
+                    val objcFile = objcParent.child(objcFileName)
+                    if (objcFile.exists) objcFile.absolutePath else null
+                }
+            } else null
+        }
+
+        val objcCsvPath: String? by lazy {
+            if (kind == Kind.STATIC || kind == Kind.HEADER) {
+                val file = File(path)
+                if (file.name.endsWith(".objc.a")) {
+                    val csvFileName = file.name.substringBeforeLast(".objc.a") + ".objc.csv"
+                    val csvFile = file.parentFile.child(csvFileName)
+                    if (csvFile.exists) csvFile.absolutePath else null
+                } else {
+                    val parent = file.parentFile
+                    val grandParent = parent.parentFile
+                    val objcGrandParent = File(grandParent.absolutePath + ".objc")
+                    val objcParent = objcGrandParent.child(parent.name)
+                    val csvFileName = file.name.substringBeforeLast(".") + ".objc.csv"
+                    val csvFile = objcParent.child(csvFileName)
+                    if (csvFile.exists) csvFile.absolutePath else null
+                }
+            } else null
+        }
 
         protected abstract fun computeBitcodeDependencies(): List<DependenciesTracker.UnresolvedDependency>
         protected abstract fun computeBinariesPaths(): List<String>
         protected abstract fun computeSerializedInlineFunctionBodies(): List<SerializedInlineFunctionReference>
         protected abstract fun computeSerializedClassFields(): List<SerializedClassFields>
         protected abstract fun computeSerializedEagerInitializedFiles(): List<SerializedEagerInitializedFile>
+        protected abstract fun computeSerializedTrivialGetters(): List<SerializedTrivialGetter>
 
         protected fun Kind.toCompilerOutputKind(): CompilerOutputKind = when (this) {
             Kind.DYNAMIC -> CompilerOutputKind.DYNAMIC_CACHE
@@ -70,6 +111,15 @@ class CachedLibraries(
         class Monolithic(target: KonanTarget, kind: Kind, path: String)
             : Cache(target, kind, path, File(path).parentFile.parentFile.absolutePath)
         {
+            private val irDirectory: File by lazy {
+                val dir = File(path).absoluteFile.parentFile.parentFile
+                if (!dir.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).exists && dir.name.endsWith(".objc")) {
+                    File(dir.absolutePath.substringBeforeLast(".objc"))
+                } else {
+                    dir
+                }
+            }
+
             override fun computeBitcodeDependencies(): List<DependenciesTracker.UnresolvedDependency> {
                 val directory = File(path).absoluteFile.parentFile
                 val data = directory.child(BITCODE_DEPENDENCIES_FILE_NAME).readStrings()
@@ -79,21 +129,24 @@ class CachedLibraries(
             override fun computeBinariesPaths() = listOf(path)
 
             override fun computeSerializedInlineFunctionBodies() = mutableListOf<SerializedInlineFunctionReference>().also {
-                val directory = File(path).absoluteFile.parentFile.parentFile
-                val data = directory.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(INLINE_FUNCTION_BODIES_FILE_NAME).readBytes()
+                val data = irDirectory.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(INLINE_FUNCTION_BODIES_FILE_NAME).readBytes()
                 InlineFunctionBodyReferenceSerializer.deserializeTo(data, it)
             }
 
             override fun computeSerializedClassFields() = mutableListOf<SerializedClassFields>().also {
-                val directory = File(path).absoluteFile.parentFile.parentFile
-                val data = directory.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(CLASS_FIELDS_FILE_NAME).readBytes()
+                val data = irDirectory.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(CLASS_FIELDS_FILE_NAME).readBytes()
                 ClassFieldsSerializer.deserializeTo(data, it)
             }
 
             override fun computeSerializedEagerInitializedFiles() = mutableListOf<SerializedEagerInitializedFile>().also {
-                val directory = File(path).absoluteFile.parentFile.parentFile
-                val data = directory.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(EAGER_INITIALIZED_PROPERTIES_FILE_NAME).readBytes()
+                val data = irDirectory.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(EAGER_INITIALIZED_PROPERTIES_FILE_NAME).readBytes()
                 EagerInitializedPropertySerializer.deserializeTo(data, it)
+            }
+
+            override fun computeSerializedTrivialGetters() = mutableListOf<SerializedTrivialGetter>().also {
+                val directory = File(path).absoluteFile.parentFile.parentFile
+                val data = directory.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(TRIVIAL_GETTERS_FILE_NAME).readBytes()
+                TrivialGettersSerializer.deserializeTo(data, it)
             }
         }
 
@@ -148,6 +201,13 @@ class CachedLibraries(
                     EagerInitializedPropertySerializer.deserializeTo(data, it)
                 }
             }
+
+            override fun computeSerializedTrivialGetters() = mutableListOf<SerializedTrivialGetter>().also {
+                existingFileDirs.forEach { fileDir ->
+                    val data = fileDir.child(PER_FILE_CACHE_IR_LEVEL_DIR_NAME).child(TRIVIAL_GETTERS_FILE_NAME).readBytes()
+                    TrivialGettersSerializer.deserializeTo(data, it)
+                }
+            }
         }
     }
 
@@ -160,20 +220,32 @@ class CachedLibraries(
         val baseName = getCachedLibraryName(library)
         val dynamicFile = cacheBinaryPartDir.child(getArtifactName(target, baseName, CompilerOutputKind.DYNAMIC_CACHE))
         val staticFile = cacheBinaryPartDir.child(getArtifactName(target, baseName, CompilerOutputKind.STATIC_CACHE))
+        val objcStaticFile = cacheBinaryPartDir.child(getArtifactName(target, "$baseName.objc", CompilerOutputKind.STATIC_CACHE))
         val headerFile = cacheBinaryPartDir.child(getArtifactName(target, baseName, CompilerOutputKind.HEADER_CACHE))
 
         if (dynamicFile.absolutePath in cacheBinaryPartDirContents && staticFile.absolutePath in cacheBinaryPartDirContents)
             error("Both dynamic and static caches files cannot be in the same directory." +
-                    " Library: ${library.libraryName}, path to cache: $absolutePath")
+                    " Library: ${library.location}, path to cache: $absolutePath")
         return when {
             dynamicFile.absolutePath in cacheBinaryPartDirContents -> Cache.Monolithic(target, Kind.DYNAMIC, dynamicFile.absolutePath)
             staticFile.absolutePath in cacheBinaryPartDirContents -> Cache.Monolithic(target, Kind.STATIC, staticFile.absolutePath)
+            objcStaticFile.absolutePath in cacheBinaryPartDirContents -> Cache.Monolithic(target, Kind.STATIC, objcStaticFile.absolutePath)
             headerFile.absolutePath in cacheBinaryPartDirContents -> Cache.Monolithic(target, Kind.HEADER, headerFile.absolutePath)
             else -> {
-                val libraryFileDirs = library.getFilesWithFqNames().map {
-                    child(CacheSupport.cacheFileId(it.fqName, it.filePath))
+                // When the per-file cache of a library is being rebuilt in parallel (one fragment per dirty file),
+                // FinalizeCachePhase renames each file dir atomically over the old one, producing a brief window
+                // during which the main dir does not exist. A sibling fragment iterating existingFileDirs to read
+                // ir/{class_fields,inline_bodies,eager_init} would then throw NoSuchFileException. The cached data
+                // for those files is stale anyway (the dirty file is loaded as IR), so skip them entirely.
+                val filesToCache = configuration.filesToCache
+                val fileIdsToCache = libraryToCache?.takeIf { it == library }?.getFileFqNames(filesToCache)?.let { fqNames ->
+                    filesToCache.zip(fqNames) { filePath, fqName -> cacheFileId(fqName, filePath) }.toSet()
+                } ?: emptySet()
+                val libraryFileDirs = library.getFilesWithFqNames().map { (filePath, fqName) ->
+                    child(cacheFileId(fqName, filePath))
                 }
-                Cache.PerFile(target, Kind.STATIC, absolutePath, libraryFileDirs,
+                Cache.PerFile(target, Kind.STATIC, absolutePath,
+                        libraryFileDirs.filterNot { it.name in fileIdsToCache },
                         complete = cacheDirContents.containsAll(libraryFileDirs.map { it.absolutePath }))
             }
         }
@@ -188,6 +260,7 @@ class CachedLibraries(
 
     private fun KotlinLibrary.trySelectCacheAt(dirBuilder: (String) -> File?) =
             sequenceOf(getPerFileCachedLibraryName(this), getCachedLibraryName(this))
+                    .flatMap { sequenceOf(it, "$it.objc") }
                     .map(dirBuilder)
                     .mapNotNull { it?.trySelectCacheFor(this) }
                     .firstOrNull()
@@ -197,7 +270,7 @@ class CachedLibraries(
 
         val cache = if (explicitPath != null) {
             File(explicitPath).trySelectCacheFor(library)
-                    ?: error("No cache found for library ${library.libraryName} at $explicitPath")
+                    ?: error("No cache found for library ${library.location} at $explicitPath")
         } else {
             val libraryPath = library.libraryFile.canonicalPath
             library.trySelectCacheAt { cacheNameToImplicitDirMapping[it] }
@@ -212,7 +285,7 @@ class CachedLibraries(
             // A safety measure. We don't expect the compiler to produce non-stdlib caches on MinGW.
             // However, if it does, we are going to be aware without breaking the compilation.
             if (target == KonanTarget.MINGW_X64 && !library.isNativeStdlib) {
-                configuration.report(CompilerMessageSeverity.WARNING,
+                configuration.report(CliDiagnostics.KONAN_ARGUMENT_WARNING,
                         "MinGW target does not support caches for libraries except for stdlib. Found cache at ${cache.path}"
                 )
                 null
@@ -222,8 +295,8 @@ class CachedLibraries(
         }
     }.toMap()
 
-    fun isLibraryCached(library: KotlinLibrary): Boolean =
-            getLibraryCache(library) != null
+    fun isLibraryCached(library: KotlinLibrary, allowIncomplete: Boolean = false): Boolean =
+            getLibraryCache(library, allowIncomplete) != null
 
     fun getLibraryCache(library: KotlinLibrary, allowIncomplete: Boolean = false): Cache? =
             allCaches[library]?.takeIf { allowIncomplete || (it as? Cache.PerFile)?.complete != false }
@@ -279,5 +352,6 @@ class CachedLibraries(
         const val INLINE_FUNCTION_BODIES_FILE_NAME = "inline_bodies"
         const val CLASS_FIELDS_FILE_NAME = "class_fields"
         const val EAGER_INITIALIZED_PROPERTIES_FILE_NAME = "eager_init"
+        const val TRIVIAL_GETTERS_FILE_NAME = "trivial_getters"
     }
 }

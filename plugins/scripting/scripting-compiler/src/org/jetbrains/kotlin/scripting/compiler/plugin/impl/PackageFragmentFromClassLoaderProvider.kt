@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.scripting.compiler.plugin.impl
 
 import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.analyzer.ModuleInfo
-import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
@@ -27,7 +26,7 @@ import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.jvm.JavaDescriptorResolver
 import org.jetbrains.kotlin.resolve.jvm.extensions.PackageFragmentProviderExtension
 import org.jetbrains.kotlin.storage.StorageManager
-import org.jetbrains.kotlin.util.toJvmMetadataVersion
+import org.jetbrains.kotlin.util.toMetadataVersion
 import kotlin.script.experimental.api.ScriptCompilationConfiguration
 import kotlin.script.experimental.jvm.ClassLoaderByConfiguration
 
@@ -56,7 +55,7 @@ class PackageFragmentFromClassLoaderProviderExtension(
             PackagePartFromClassLoaderProvider(
                 classLoader,
                 languageVersionSettings,
-                compilerConfiguration.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+                compilerConfiguration
             )
 
         val lazyJavaPackageFragmentProvider =
@@ -71,7 +70,7 @@ class PackageFragmentFromClassLoaderProviderExtension(
             makeDeserializationComponentsForJava(
                 module, storageManager, notFoundClasses, lazyJavaPackageFragmentProvider,
                 reflectKotlinClassFinder, deserializedDescriptorResolver, RuntimeErrorReporter,
-                languageVersionSettings.languageVersion.toJvmMetadataVersion()
+                languageVersionSettings.languageVersion.toMetadataVersion()
             )
 
         deserializedDescriptorResolver.setComponents(deserializationComponentsForJava)

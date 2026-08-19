@@ -36,6 +36,7 @@ import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
+import org.jetbrains.kotlin.name.JvmStandardClassIds
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.Printer
@@ -43,7 +44,7 @@ import java.util.*
 
 fun IrElement.dumpSrc(useFir: Boolean = false): String {
     val sb = StringBuilder()
-    accept(IrSourcePrinterVisitor(sb, "%tab%", useFir), null)
+    accept(IrSourcePrinterVisitor(sb, "%tab%"), null)
     return sb
         .toString()
         // replace tabs at beginning of line with white space
@@ -67,7 +68,6 @@ class Scope(
 class IrSourcePrinterVisitor(
     out: Appendable,
     indentUnit: String = "  ",
-    private val useFir: Boolean = false,
 ) : IrVisitorVoid() {
     private val printer = Printer(out, indentUnit)
     private var currentScope: Scope = Scope()
@@ -261,7 +261,8 @@ class IrSourcePrinterVisitor(
                         when (fn.name.asString()) {
                             "equals",
                             "EQEQ",
-                            "EQEQEQ" -> {
+                            "EQEQEQ",
+                                -> {
                                 val prevIsInNotCall = isInNotCall
                                 isInNotCall = true
                                 arg.print()
@@ -302,7 +303,8 @@ class IrSourcePrinterVisitor(
                 // no names for
                 "invoke", "get", "set" -> ""
                 "iterator", "hasNext", "next", "getValue", "setValue",
-                "noWhenBranchMatchedException" -> name
+                "noWhenBranchMatchedException",
+                    -> name
                 "CHECK_NOT_NULL" -> "!!"
                 "THROW_ISE" -> "throw IllegalStateException()"
                 else -> {
@@ -314,7 +316,8 @@ class IrSourcePrinterVisitor(
             val printBinary = when (name) {
                 "equals",
                 "EQEQ",
-                "EQEQEQ" -> {
+                "EQEQEQ",
+                    -> {
                     expression.argumentForKind(IrParameterKind.DispatchReceiver)?.type?.isInt() == true ||
                             expression.argumentForKind(IrParameterKind.ExtensionReceiver)?.type?.isInt() == true ||
                             function.namedParameters.let {
@@ -374,7 +377,8 @@ class IrSourcePrinterVisitor(
                 }
                 // builtin static operators
                 "greater", "less", "lessOrEqual", "greaterOrEqual", "EQEQ", "EQEQEQ",
-                "ieee754equals" -> {
+                "ieee754equals",
+                    -> {
                     expression.arguments[0]?.print()
                     print(" $opSymbol ")
                     expression.arguments[1]?.print()
@@ -424,6 +428,9 @@ class IrSourcePrinterVisitor(
         val prop = function.correspondingPropertySymbol?.owner
 
         if (prop != null && !function.hasComposableAnnotation()) {
+            if (prop.backingField?.hasAnnotation(JvmStandardClassIds.Annotations.JvmField) == true) {
+                print("${prop.parent.kotlinFqName}.")
+            }
             val propName = prop.name.asString()
             print(propName)
             if (function == prop.setter) {
@@ -527,7 +534,7 @@ class IrSourcePrinterVisitor(
                 // if we are using parameter names, we go on multiple lines
                 println()
                 indented {
-                    arguments.zip(paramNames).forEachIndexed { i, (arg, name) ->
+                    arguments.zip(paramNames).forEachIndexed { i, [arg, name] ->
                         print(name)
                         print(" = ")
                         arg.print()
@@ -536,7 +543,7 @@ class IrSourcePrinterVisitor(
                 }
                 println()
             } else {
-                arguments.zip(paramNames).forEachIndexed { i, (arg, name) ->
+                arguments.zip(paramNames).forEachIndexed { i, [arg, name] ->
                     if (useParameterNames) {
                         print(name)
                         print(" = ")
@@ -833,7 +840,7 @@ class IrSourcePrinterVisitor(
         // or a delegated property setter. The latter have a superfluous "return" in K1.
         val returnTarget = expression.returnTargetSymbol.owner
         if (returnTarget !is IrFunction ||
-            (!returnTarget.isLambda && (useFir || !returnTarget.isDelegatedPropertySetter)) ||
+            !returnTarget.isLambda ||
             !expression.isLastStatementIn(returnTarget)
         ) {
             val suffix = returnTargetToCall[returnTarget.symbol]?.let {
@@ -970,19 +977,39 @@ class IrSourcePrinterVisitor(
         val receiver = expression.receiver
         val owner = expression.symbol.owner
         val parent = owner.parent
-        if (receiver != null) {
-            expression.receiver?.print()
-        } else if (owner.isStatic && parent is IrClass) {
-            print(parent.name)
+        val propertyCorrespondingToScope = (currentScope.owner as? IrSimpleFunction)?.correspondingPropertySymbol
+
+        if (propertyCorrespondingToScope != null &&
+            propertyCorrespondingToScope == owner.correspondingPropertySymbol
+        ) {
+            // `currentScope.owner` is a getter or setter that acts on the backing field accessed by
+            // `expression`.
+            print("field")
+        } else {
+            if (receiver != null) {
+                expression.receiver?.print()
+            } else if (owner.isStatic && parent is IrClass) {
+                print(parent.name)
+            }
+            print(".")
+            print(owner.name)
         }
-        print(".")
-        print(owner.name)
     }
 
     override fun visitSetField(expression: IrSetField) {
-        expression.receiver?.print()
-        print(".")
-        print(expression.symbol.owner.name)
+        val owner = expression.symbol.owner
+        val propertyCorrespondingToScope = (currentScope.owner as? IrSimpleFunction)?.correspondingPropertySymbol
+
+        if (propertyCorrespondingToScope != null &&
+            propertyCorrespondingToScope == owner.correspondingPropertySymbol
+        ) {
+            // `currentScope.owner` is a setter for the backing field that `expression` modifies.
+            print("field")
+        } else {
+            expression.receiver?.print()
+            print(".")
+            print(owner.name)
+        }
         print(" = ")
         expression.value.printWithExplicitBlock()
     }
@@ -1259,7 +1286,7 @@ class IrSourcePrinterVisitor(
     }
 
     override fun visitCatch(aCatch: IrCatch) {
-        print("<<CATCH>>")
+        aCatch.result.print()
     }
 
     override fun visitContainerExpression(expression: IrContainerExpression) {
@@ -1374,7 +1401,9 @@ class IrSourcePrinterVisitor(
         println()
         if (aTry.catches.isNotEmpty()) {
             aTry.catches.forEach {
-                println("} catch() {")
+                print("} catch (")
+                print("${it.catchParameter.normalizedName}: ${printType(it.catchParameter.type)}")
+                println(") {")
                 indented {
                     it.print()
                 }
@@ -1556,8 +1585,6 @@ class IrSourcePrinterVisitor(
             origin == IrDeclarationOrigin.FOR_LOOP_ITERATOR -> "<iterator>"
             // $anonymous$parameter$x vs $unused$var$x
             origin == IrDeclarationOrigin.UNDERSCORE_PARAMETER -> "<unused var>"
-            !useFir && name.asString().endsWith("_elvis_lhs") -> "<elvis>"
-            !useFir && name.asString() == "\$this\$null" -> "<this>"
             else -> name.asString()
         }
 

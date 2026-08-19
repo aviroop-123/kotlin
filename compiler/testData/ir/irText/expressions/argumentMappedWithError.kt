@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 
 fun <R : Number> Number.convert(): R = TODO()
 

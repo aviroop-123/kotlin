@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.fir.dump
 
 import kotlinx.html.*
 import kotlinx.html.stream.appendHTML
-import org.apache.commons.lang.StringEscapeUtils
+import org.apache.commons.text.StringEscapeUtils
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
@@ -33,6 +33,7 @@ import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
 import org.jetbrains.kotlin.fir.types.*
@@ -91,13 +92,13 @@ private class ModuleInfo(val name: String, outputRoot: File) {
         it.mkdirs()
     }
     val errors: Map<FqName, Int> by lazy {
-        packages.mapValues { (_, packageInfo) -> packageInfo.errors.values.sum() }.withDefault { 0 }
+        packages.mapValues { [_, packageInfo] -> packageInfo.errors.values.sum() }.withDefault { 0 }
     }
     val implicits: Map<FqName, Int> by lazy {
-        packages.mapValues { (_, packageInfo) -> packageInfo.implicits.values.sum() }.withDefault { 0 }
+        packages.mapValues { [_, packageInfo] -> packageInfo.implicits.values.sum() }.withDefault { 0 }
     }
     val unresolved: Map<FqName, Int> by lazy {
-        packages.mapValues { (_, packageInfo) -> packageInfo.unresolved.values.sum() }.withDefault { 0 }
+        packages.mapValues { [_, packageInfo] -> packageInfo.unresolved.values.sum() }.withDefault { 0 }
     }
 }
 
@@ -392,9 +393,9 @@ class MultiModuleHtmlFirDump(private val outputRoot: File) {
                     visitElement(valueParameter)
                 }
 
-                override fun visitSimpleFunction(simpleFunction: FirSimpleFunction) {
-                    indexDeclaration(simpleFunction)
-                    visitElement(simpleFunction)
+                override fun visitNamedFunction(namedFunction: FirNamedFunction) {
+                    indexDeclaration(namedFunction)
+                    visitElement(namedFunction)
                 }
 
                 override fun visitTypeParameter(typeParameter: FirTypeParameter) {
@@ -665,6 +666,7 @@ class HtmlFirDump internal constructor(private var linkResolver: FirLinkResolver
 
         val type = typeAlias.expandedConeType
         if (type != null) {
+            // The upcast is safe here
             generate(type as ConeKotlinType)
         } else {
             +"<error expanded type>"
@@ -924,8 +926,8 @@ class HtmlFirDump internal constructor(private var linkResolver: FirLinkResolver
         when (memberDeclaration) {
             is FirEnumEntry -> generate(memberDeclaration)
             is FirRegularClass -> generate(memberDeclaration)
-            is FirSimpleFunction -> generate(memberDeclaration)
-            is FirProperty -> if (memberDeclaration.isLocal) generate(memberDeclaration as FirVariable) else generate(memberDeclaration)
+            is FirNamedFunction -> generate(memberDeclaration)
+            is FirProperty -> if (memberDeclaration.symbol is FirLocalPropertySymbol) generate(memberDeclaration as FirVariable) else generate(memberDeclaration)
             is FirConstructor -> generate(memberDeclaration)
             is FirTypeAlias -> generate(memberDeclaration)
             else -> unsupported(memberDeclaration)
@@ -1046,7 +1048,7 @@ class HtmlFirDump internal constructor(private var linkResolver: FirLinkResolver
 
     private fun FlowContent.generate(statement: FirStatement) {
         when (statement) {
-            is FirSimpleFunction -> generate(statement)
+            is FirNamedFunction -> generate(statement)
             is FirAnonymousObject -> generate(statement, isStatement = true)
             is FirAnonymousFunction -> generate(statement, isStatement = true)
             is FirWhileLoop -> generate(statement)
@@ -1179,7 +1181,7 @@ class HtmlFirDump internal constructor(private var linkResolver: FirLinkResolver
                 }
             is FirCallableSymbol<*> -> {
                 when (val fir = symbol.fir) {
-                    is FirSimpleFunction -> {
+                    is FirNamedFunction -> {
                         declarationStatus(fir.status)
                         keyword("fun ")
                         describeVerbose(symbol, fir)
@@ -1215,7 +1217,7 @@ class HtmlFirDump internal constructor(private var linkResolver: FirLinkResolver
     }
 
     private fun FlowContent.symbolRef(symbol: FirBasedSymbol<*>?, body: FlowContent.() -> Unit) {
-        val (link, classes) = when (symbol) {
+        val [link, classes] = when (symbol) {
             null -> null to setOf()
             is FirClassLikeSymbol<*> -> linkResolver.classLocation(symbol.classId) to setOf("class-fqn")
             else -> linkResolver.nearSymbolLocation(symbol) to setOf("symbol")
@@ -1251,17 +1253,16 @@ class HtmlFirDump internal constructor(private var linkResolver: FirLinkResolver
                         is NewConstraintError -> {
                             ident()
 
-                            generate(callDiagnostic.lowerType as ConeKotlinType)
+                            generate(callDiagnostic.lowerType.asCone())
 
                             ws
                             span(classes = "subtype-error") { +"<:" }
                             ws
-                            generate(callDiagnostic.upperType as ConeKotlinType)
+                            generate(callDiagnostic.upperType.asCone())
                         }
                         else -> {
                             ident()
                             callDiagnostic::class.qualifiedName?.let { +it }
-                            Unit
                         }
                     }
                     br
@@ -1722,7 +1723,7 @@ class HtmlFirDump internal constructor(private var linkResolver: FirLinkResolver
         }
     }
 
-    private fun FlowContent.generate(function: FirSimpleFunction) {
+    private fun FlowContent.generate(function: FirNamedFunction) {
         generateMultiLineExpression(isStatement = true) {
             iline {
                 declarationStatus(function.status)

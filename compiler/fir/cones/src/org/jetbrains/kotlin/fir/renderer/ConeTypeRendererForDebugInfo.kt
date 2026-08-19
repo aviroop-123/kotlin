@@ -16,7 +16,7 @@ open class ConeTypeRendererForDebugInfo protected constructor(
 ) : ConeTypeRenderer(coneAttributeRendererForReadability, renderCapturedDetails) {
     constructor(builder: StringBuilder, renderCapturedDetails: Boolean = false) : this(renderCapturedDetails) {
         this.builder = builder
-        idRenderer = ConeIdRendererForDiagnostics()
+        idRenderer = ConeFullyQualifiedIdRenderer()
         idRenderer.builder = builder
     }
 
@@ -37,7 +37,7 @@ open class ConeTypeRendererForDebugInfo protected constructor(
     }
 
     override fun render(type: ConeIntersectionType) {
-        for ((index, intersected) in type.intersectedTypes.withIndex()) {
+        for ([index, intersected] in type.intersectedTypes.withIndex()) {
             if (index > 0) {
                 builder.append(" & ")
             }

@@ -8,7 +8,7 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.low.level.api.fir.services.FirRenderingOptions
 import org.jetbrains.kotlin.analysis.low.level.api.fir.services.firRenderingOptions
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionCache
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCache
 import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.AnalysisApiFirLibraryBinaryDecompiledTestConfigurator
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.FirDeclarationForCompiledElementSearcher
 import org.jetbrains.kotlin.analysis.test.framework.base.AbstractAnalysisApiBasedTest
@@ -25,7 +25,7 @@ import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 import org.jetbrains.kotlin.test.services.*
 
 abstract class AbstractLibraryGetOrBuildFirTest : AbstractAnalysisApiBasedTest() {
-    override val configurator get() = AnalysisApiFirLibraryBinaryDecompiledTestConfigurator
+    override val configurator = AnalysisApiFirLibraryBinaryDecompiledTestConfigurator()
 
     override fun configureTest(builder: TestConfigurationBuilder) {
         val renderingOptionsBuilder = FirRenderingOptions.Builder().apply { renderKtText = true }

@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -15,7 +14,7 @@
 
 fun case1() {
     var b: Case1? = Case1()
-    <!UNSAFE_CALL!>--<!>b?.a
+    --b?.a
 }
 
 
@@ -36,7 +35,7 @@ class A() {
 
 fun case2() {
     var b= Case2()
-    --<!VAL_REASSIGNMENT!>b.a<!>
+    --b.<!VAL_REASSIGNMENT!>a<!>
 }
 
 class Case2() {

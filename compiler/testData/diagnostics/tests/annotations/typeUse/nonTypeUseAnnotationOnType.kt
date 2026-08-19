@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// LANGUAGE: +ProperCheckAnnotationsTargetInTypeUsePositions
 // ISSUE: KT-28449
 
 @Target(AnnotationTarget.PROPERTY_GETTER)

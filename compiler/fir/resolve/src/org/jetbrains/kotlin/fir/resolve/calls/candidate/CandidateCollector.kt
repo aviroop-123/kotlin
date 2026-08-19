@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,13 +7,12 @@ package org.jetbrains.kotlin.fir.resolve.calls.candidate
 
 import org.jetbrains.kotlin.fir.resolve.BodyResolveComponents
 import org.jetbrains.kotlin.fir.resolve.calls.ResolutionContext
+import org.jetbrains.kotlin.fir.resolve.calls.ResolutionDiagnostic
 import org.jetbrains.kotlin.fir.resolve.calls.ResolutionResultOverridesOtherToPreserveCompatibility
 import org.jetbrains.kotlin.fir.resolve.calls.stages.ResolutionStageRunner
 import org.jetbrains.kotlin.fir.resolve.calls.tower.TowerGroup
 import org.jetbrains.kotlin.resolve.calls.tower.ApplicabilityDetail
 import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability
-import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability.INAPPLICABLE_ARGUMENTS_MAPPING_ERROR
-import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability.INAPPLICABLE_WRONG_RECEIVER
 import org.jetbrains.kotlin.resolve.calls.tower.isSuccess
 import org.jetbrains.kotlin.resolve.calls.tower.shouldStopResolve
 
@@ -29,22 +28,41 @@ open class CandidateCollector(
 
     private var bestGroup = TowerGroup.Last
 
+    /**
+     * It's not expected to affect resolution semantics in any sense.
+     * Currently, it's only used for checking if context-sensitive overload might be successfully resolved.
+     */
+    var metInapplicableCandidate: Boolean = false
+        private set
+
+    /**
+     * Diagnostics that should not be bound to specific candidates but should be put to the resulting call.
+     * For instance, a case when declaration order affects resolution (see KT-76240).
+     */
+    private val forwardedDiagnostics: MutableList<ResolutionDiagnostic> = mutableListOf()
+
     fun newDataSet() {
         groupNumbers.clear()
         candidates.clear()
         currentApplicability = CandidateApplicability.HIDDEN
         bestGroup = TowerGroup.Last
+        forwardedDiagnostics.clear()
+        metInapplicableCandidate = false
     }
 
     open fun consumeCandidate(group: TowerGroup, candidate: Candidate, context: ResolutionContext): CandidateApplicability {
         val applicability = resolutionStageRunner.processCandidate(candidate, context)
+
+        if (applicability == CandidateApplicability.INAPPLICABLE) {
+            metInapplicableCandidate = true
+        }
 
         if (applicability > currentApplicability || (applicability == currentApplicability && group < bestGroup)) {
             // Only throw away previous candidates if the new one is successful. If we don't find a successful candidate, we keep all
             // unsuccessful ones so that we can run all stages and pick the one with the least bad applicability.
             // See FirCallResolver.reduceCandidates.
             if (applicability >= CandidateApplicability.RESOLVED_LOW_PRIORITY) {
-                candidates.clear()
+                dropOldCandidates()
             }
 
             if (currentApplicability == CandidateApplicability.RESOLVED_NEED_PRESERVE_COMPATIBILITY &&
@@ -64,20 +82,28 @@ open class CandidateCollector(
          *   to fix the KT-65218, which provoked by different stdlib declarations order in CLI compilation mode and AA mode (see
          *   the issue for more details)
          */
-        if (
-            (applicability == currentApplicability && group == bestGroup) ||
-            (currentApplicability == INAPPLICABLE_ARGUMENTS_MAPPING_ERROR && applicability == INAPPLICABLE_WRONG_RECEIVER)
-        ) {
+        @OptIn(ApplicabilityDetail::class)
+        if ((applicability == currentApplicability && group == bestGroup) || currentApplicability < CandidateApplicability.RESOLVED_LOW_PRIORITY) {
             candidates.add(candidate)
         }
 
         return applicability
     }
 
-    fun bestCandidates(): List<Candidate> = candidates
+    fun addForwardedDiagnostic(diagnostic: ResolutionDiagnostic) {
+        forwardedDiagnostics.add(diagnostic)
+    }
+
+    fun forwardedDiagnostics(): List<ResolutionDiagnostic> = forwardedDiagnostics
+
+    open fun bestCandidates(): List<Candidate> = candidates
 
     open fun shouldStopAtTheGroup(group: TowerGroup): Boolean =
         shouldStopResolve && bestGroup < group
+
+    open fun dropOldCandidates() {
+        candidates.clear()
+    }
 
     val shouldStopResolve: Boolean
         get() = currentApplicability.shouldStopResolve

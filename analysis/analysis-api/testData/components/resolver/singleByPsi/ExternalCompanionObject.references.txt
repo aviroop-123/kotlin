@@ -1,3 +1,0 @@
-KtNameReferenceExpression(48,57): 'Companion'
-  KtSimpleNameReference:
-    (in dependency.C) companion object

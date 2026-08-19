@@ -19,13 +19,9 @@ sourceSets {
     }
 }
 
-testsJar {}
-
 projectTests {
-    val testTags = findProperty("kotlin.native.tests.tags")?.toString()
     nativeTestTask(
         "test",
-        testTags,
         allowParallelExecution = false, // Driver tests run Native compiler from CLI. This is resource-intensive and should be done isolated.
     )
 }

@@ -17,7 +17,6 @@
 package org.jetbrains.kotlin.psi.psiUtil
 
 import com.intellij.lang.ASTNode
-import com.intellij.lang.LighterASTNode
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.tree.LazyParseablePsiElement
@@ -27,16 +26,12 @@ import com.intellij.psi.search.SearchScope
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementType
-import com.intellij.util.diff.FlyweightCapableTreeStructure
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.KtNodeTypes.*
-import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.diagnostics.PsiDiagnosticUtils
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.lexer.KtTokens.PLUS
-import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.util.getChildren
 import java.util.*
 import kotlin.collections.ArrayDeque
 import kotlin.contracts.ExperimentalContracts
@@ -341,34 +336,12 @@ fun PsiElement.getAssignmentLhsIfUnwrappable(): PsiElement? =
         it?.elementType in UNWRAPPABLE_TOKEN_TYPES
     }
 
-/**
- * This function should only be called for a source element corresponding to
- * an assignment/assignment operator call/increment or a decrement operator.
- */
-fun LighterASTNode.getAssignmentLhsIfUnwrappable(tree: FlyweightCapableTreeStructure<LighterASTNode>): LighterASTNode? =
+fun PsiElement.getExplicitReceiverOfDotQualified(): PsiElement? =
     when {
-        // In `++(x)` the LHS source `(x)` is the last child
-        tokenType == PREFIX_EXPRESSION -> getChildren(tree).lastOrNull()
-        // In `(x)++` or `(x) = ...` the LHS source is the first child
-        else -> getChildren(tree).firstOrNull()
-    }.takeIf {
-        it?.tokenType in UNWRAPPABLE_TOKEN_TYPES
+        elementType == DOT_QUALIFIED_EXPRESSION -> children.firstOrNull()
+        else -> null
     }
 
-/**
- * This function should only be called for a source element corresponding to
- * an assignment/assignment operator call/increment or a decrement operator.
- */
-fun KtSourceElement?.hasUnwrappableAsAssignmentLhs(): Boolean {
-    if (this == null) {
-        return false
-    }
-
-    val node = psi?.getAssignmentLhsIfUnwrappable()
-        ?: lighterASTNode.getAssignmentLhsIfUnwrappable(treeStructure)
-
-    return node != null
-}
 
 // -------------------- Recursive tree visiting --------------------------------------------------------------------------------------------
 
@@ -570,27 +543,16 @@ fun PsiElement.getElementTextWithContext(): String = org.jetbrains.kotlin.utils.
 
 fun PsiElement.getTextWithLocation(): String = "'${this.text}' at ${PsiDiagnosticUtils.atLocation(this)}"
 
+@Deprecated(
+    "Use file.replaceFileAnnotationList(annotationList) instead",
+    ReplaceWith(
+        "file.replaceFileAnnotationList(annotationList)",
+        "org.jetbrains.kotlin.idea.base.psi.replaceFileAnnotationList",
+    ),
+)
+@OptIn(KtNonPublicApi::class)
 fun replaceFileAnnotationList(file: KtFile, annotationList: KtFileAnnotationList): KtFileAnnotationList {
-    if (file.fileAnnotationList != null) {
-        return file.fileAnnotationList!!.replace(annotationList) as KtFileAnnotationList
-    }
-
-    val beforeAnchor: PsiElement? = when {
-        file.packageDirective?.packageKeyword != null -> file.packageDirective!!
-        file.importList != null -> file.importList!!
-        file.declarations.firstOrNull() != null -> file.declarations.first()
-        else -> null
-    }
-
-    if (beforeAnchor != null) {
-        return file.addBefore(annotationList, beforeAnchor) as KtFileAnnotationList
-    }
-
-    if (file.lastChild == null) {
-        return file.add(annotationList) as KtFileAnnotationList
-    }
-
-    return file.addAfter(annotationList, file.lastChild) as KtFileAnnotationList
+    return KtPsiMutationService.getInstance().replaceFileAnnotationList(file, annotationList)
 }
 
 // -----------------------------------------------------------------------------------------------------------------------------------------
@@ -623,6 +585,11 @@ fun KtModifierList.hasFunModifier() = hasModifier(KtTokens.FUN_KEYWORD)
 fun KtModifierList.hasValueModifier() = hasModifier(KtTokens.VALUE_KEYWORD)
 
 fun KtModifierListOwner.hasInnerModifier() = hasModifier(KtTokens.INNER_KEYWORD)
+
+/**
+ * Checks whether this [KtModifierListOwner] has the `external` modifier.
+ */
+fun KtModifierListOwner.hasExternalModifier(): Boolean = hasModifier(KtTokens.EXTERNAL_KEYWORD)
 
 fun ASTNode.children() = generateSequence(firstChildNode) { node -> node.treeNext }
 fun ASTNode.parents() = generateSequence(treeParent) { node -> node.treeParent }

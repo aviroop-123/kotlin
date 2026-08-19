@@ -34,7 +34,7 @@ object JvmAnalysisFlags {
     val outputBuiltinsMetadata by AnalysisFlag.Delegates.Boolean
 
     @JvmStatic
-    val expectBuiltinsAsPartOfStdlib by AnalysisFlag.Delegates.Boolean
+    val implicitJvmExposeBoxed by AnalysisFlag.Delegates.Boolean
 
     private object Delegates {
         object JavaTypeEnhancementStateNullByDefault {

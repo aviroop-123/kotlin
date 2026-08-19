@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -33,7 +33,7 @@ fun matchIrFileWithTestFile(irModuleFragment: IrModuleFragment, module: TestModu
     }
 
     @Suppress("UNCHECKED_CAST")
-    return irFileWithTestFile.filterNot { (_, testFile) -> testFile == null || testFile.isAdditional } as List<Pair<IrFile, TestFile>>
+    return irFileWithTestFile.filterNot { [_, testFile] -> testFile == null || testFile.isAdditional } as List<Pair<IrFile, TestFile>>
 }
 
 open class IrInterpreterBackendHandler(testServices: TestServices) : AbstractIrHandler(testServices) {
@@ -43,11 +43,11 @@ open class IrInterpreterBackendHandler(testServices: TestServices) : AbstractIrH
 
     override fun processModule(module: TestModule, info: IrBackendInput) {
         val evaluator = Evaluator(
-            IrInterpreter(info.irPluginContext.irBuiltIns),
+            IrInterpreter(info.irBuiltIns),
             globalMetadataInfoHandler,
             module.languageVersionSettings.languageVersion.usesK2,
         )
-        for ((irFile, testFile) in matchIrFileWithTestFile(info.irModuleFragment, module, testServices)) {
+        for ([irFile, testFile] in matchIrFileWithTestFile(info.irModuleFragment, module, testServices)) {
             evaluator.evaluate(irFile, testFile)
         }
     }
@@ -84,7 +84,7 @@ private class Evaluator(
                 // used in `sourceLocation` test
                 expression.symbol.owner.parameters
                     .zip(expression.arguments)
-                    .forEach { (parameter, argument) ->
+                    .forEach { [parameter, argument] ->
                         if (argument != null || !expression.symbol.owner.isInline) return@forEach
                         val default = parameter.defaultValue?.expression as? IrCall ?: return@forEach
                         val callWithNewOffsets = IrCallImpl(

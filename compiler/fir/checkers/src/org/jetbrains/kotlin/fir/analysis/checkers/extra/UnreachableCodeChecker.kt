@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.fir.analysis.checkers.extra
 
+import com.intellij.psi.TokenType
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.analysis.checkers.cfa.FirControlFlowChecker
@@ -21,7 +22,7 @@ object UnreachableCodeChecker : FirControlFlowChecker(MppCheckerKind.Common) {
     context(reporter: DiagnosticReporter, context: CheckerContext)
     override fun analyze(graph: ControlFlowGraph) {
         val nodes = graph.allNodes()
-        val (unreachableNodes, reachableNodes) = nodes.filterNot { it.skipNode() }.partition { it.isDead }
+        val [unreachableNodes, reachableNodes] = nodes.filterNot { it.skipNode() }.partition { it.isDead }
         if (unreachableNodes.isEmpty()) return
         val unreachableSources = unreachableNodes.mapNotNull { it.fir.source }.toSet()
         val reachableSources = reachableNodes.mapNotNull { it.fir.source }.toSet()
@@ -66,7 +67,10 @@ object UnreachableCodeChecker : FirControlFlowChecker(MppCheckerKind.Common) {
         val allowType = this is LoopEnterNode ||
                 this is LoopBlockEnterNode ||
                 this is TryExpressionEnterNode
-        return !allowType && (skipType || sourceKindsToSkip.contains(this.fir.source?.kind))
+        return !allowType &&
+                (skipType ||
+                        sourceKindsToSkip.contains(this.fir.source?.kind) ||
+                        this.fir.source?.elementType == TokenType.ERROR_ELEMENT)
     }
 
 

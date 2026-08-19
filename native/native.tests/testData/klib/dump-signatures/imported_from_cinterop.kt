@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 
 package imported_from_cinterop.main
 

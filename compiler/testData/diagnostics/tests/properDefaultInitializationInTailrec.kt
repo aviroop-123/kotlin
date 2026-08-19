@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// LANGUAGE: +ProperComputationOrderOfTailrecDefaultParameters
 import kotlin.reflect.KClass
 
 fun withEffects(): String = "OK"

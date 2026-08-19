@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.library
 import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.konan.properties.Properties
 import org.jetbrains.kotlin.konan.properties.propertyList
+import org.jetbrains.kotlin.library.components.ir
 import org.jetbrains.kotlin.library.impl.BuiltInsPlatform
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
 import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
@@ -39,6 +40,7 @@ const val KLIB_PROPERTY_SHORT_NAME = "short_name"
 const val KLIB_PROPERTY_DEPENDS = "depends"
 const val KLIB_PROPERTY_PACKAGE = "package"
 const val KLIB_PROPERTY_BUILTINS_PLATFORM = "builtins_platform"
+const val KLIB_PROPERTY_NEW_COMPANION_INITIALIZATION = "new_companion_initialization"
 
 // Native-specific:
 const val KLIB_PROPERTY_INTEROP = "interop"
@@ -83,52 +85,12 @@ const val KLIB_PROPERTY_MANUALLY_ENABLED_POISONING_LANGUAGE_FEATURES = "poisonin
  */
 
 interface BaseKotlinLibrary {
-    val libraryName: String
+    /** This is the obsolete but still supported way to get the library "location". Please use [Klib.location] instead. */
     val libraryFile: File
-    val componentList: List<String>
+
     val versions: KotlinLibraryVersioning
 
-    // Whether this library is default (provided by distribution)?
-    val isDefault: Boolean
     val manifestProperties: Properties
-}
-
-interface MetadataLibrary {
-    val moduleHeaderData: ByteArray
-    fun packageMetadataParts(fqName: String): Set<String>
-    fun packageMetadata(fqName: String, partName: String): ByteArray
-}
-
-interface IrLibrary {
-    val hasIr: Boolean
-    val hasFileEntriesTable: Boolean
-    fun irDeclaration(index: Int, fileIndex: Int): ByteArray
-    fun type(index: Int, fileIndex: Int): ByteArray
-    fun signature(index: Int, fileIndex: Int): ByteArray
-    fun string(index: Int, fileIndex: Int): ByteArray
-    fun body(index: Int, fileIndex: Int): ByteArray
-    fun debugInfo(index: Int, fileIndex: Int): ByteArray?
-    fun fileEntry(index: Int, fileIndex: Int): ByteArray?
-    fun file(index: Int): ByteArray
-    fun fileCount(): Int
-
-    fun types(fileIndex: Int): ByteArray
-    fun signatures(fileIndex: Int): ByteArray
-    fun strings(fileIndex: Int): ByteArray
-    fun declarations(fileIndex: Int): ByteArray
-    fun bodies(fileIndex: Int): ByteArray
-    fun fileEntries(fileIndex: Int): ByteArray?
-
-    // Those duplicated structures store prepared copies of inlinable functions, see KT-75794.
-    val hasIrOfInlineableFuns: Boolean
-    fun irFileOfInlineableFuns(): ByteArray
-    fun irDeclarationOfInlineableFuns(index: Int): ByteArray
-    fun typeOfInlineableFuns(index: Int): ByteArray
-    fun signatureOfInlineableFuns(index: Int): ByteArray
-    fun stringOfInlineableFuns(index: Int): ByteArray
-    fun bodyOfInlineableFuns(index: Int): ByteArray
-    fun debugInfoOfInlineableFuns(index: Int): ByteArray?
-    fun fileEntryOfInlineableFuns(index: Int): ByteArray
 }
 
 /** Whether [this] is a Kotlin/Native stdlib. */
@@ -143,9 +105,13 @@ val BaseKotlinLibrary.isJsStdlib: Boolean
 val BaseKotlinLibrary.isWasmStdlib: Boolean
     get() = uniqueName == KOTLIN_WASM_STDLIB_NAME && builtInsPlatform == BuiltInsPlatform.WASM
 
-/** Whether [this] is either Kotlin/Native, Kotlin/JS or Kotlin/Wasm stdlib. */
+/** Whether [this] is the jklib stdlib. */
+val BaseKotlinLibrary.isJklibStdlib: Boolean
+    get() = uniqueName == KOTLIN_JKLIB_STDLIB_NAME && builtInsPlatform == BuiltInsPlatform.JKLIB
+
+/** Whether [this] is either Kotlin/Native, Kotlin/JS, Kotlin/Wasm or jklib stdlib. */
 val BaseKotlinLibrary.isAnyPlatformStdlib: Boolean
-    get() = isNativeStdlib || isJsStdlib || isWasmStdlib
+    get() = isNativeStdlib || isJsStdlib || isWasmStdlib || isJklibStdlib
 
 /** Whether [this] is a Kotlin/JS kotlin-test. */
 val BaseKotlinLibrary.isJsKotlinTest: Boolean
@@ -171,7 +137,7 @@ fun BaseKotlinLibrary.unresolvedDependencies(lenient: Boolean = false): List<Unr
 val BaseKotlinLibrary.hasDependencies: Boolean
     get() = !manifestProperties.getProperty(KLIB_PROPERTY_DEPENDS).isNullOrBlank()
 
-interface KotlinLibrary : BaseKotlinLibrary, MetadataLibrary, IrLibrary
+interface KotlinLibrary : Klib, BaseKotlinLibrary
 
 val BaseKotlinLibrary.interopFlag: String?
     get() = manifestProperties.getProperty(KLIB_PROPERTY_INTEROP)
@@ -203,6 +169,9 @@ val BaseKotlinLibrary.commonizerTarget: String?
 val BaseKotlinLibrary.builtInsPlatform: BuiltInsPlatform?
     get() = manifestProperties.getProperty(KLIB_PROPERTY_BUILTINS_PLATFORM)?.let(BuiltInsPlatform::parseFromString)
 
+val BaseKotlinLibrary.newCompanionInitializationEnabled: Boolean
+    get() = manifestProperties.getProperty(KLIB_PROPERTY_NEW_COMPANION_INITIALIZATION)?.toBoolean() == true
+
 val BaseKotlinLibrary.commonizerNativeTargets: List<String>?
     get() = if (manifestProperties.containsKey(KLIB_PROPERTY_COMMONIZER_NATIVE_TARGETS))
         manifestProperties.propertyList(KLIB_PROPERTY_COMMONIZER_NATIVE_TARGETS, escapeInQuotes = true)
@@ -218,4 +187,4 @@ val KotlinLibrary.metadataVersion: MetadataVersion?
     }
 
 val KotlinLibrary.hasAbi: Boolean
-    get() = hasIr || irProviderName != null
+    get() = ir != null || irProviderName != null

@@ -1,5 +1,5 @@
-// FIR_IDENTICAL
-// IGNORE_BACKEND_K1: JS_IR
+// LANGUAGE: -IrIntraModuleInlinerBeforeKlibSerialization -IrCrossModuleInlinerBeforeKlibSerialization
+// RUN_PIPELINE_TILL: BACKEND
 
 const val VALUE = 123
 

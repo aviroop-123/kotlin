@@ -5,12 +5,9 @@
 
 package org.jetbrains.kotlin.ir.backend.js.ic
 
-import org.jetbrains.kotlin.backend.common.linkage.partial.PartialLinkageConfig
+import org.jetbrains.kotlin.backend.common.linkage.partial.PARTIAL_LINKAGE_CONFIGURATION
 import org.jetbrains.kotlin.backend.common.serialization.Hash128Bits
-import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.CompilerConfigurationKey
-import org.jetbrains.kotlin.config.KotlinCompilerVersion
-import org.jetbrains.kotlin.config.languageVersionSettings
+import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.CrossModuleReferences
@@ -19,10 +16,11 @@ import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.util.DumpIrTreeVisitor
 import org.jetbrains.kotlin.ir.util.isInterface
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
+import org.jetbrains.kotlin.js.config.ModuleKind
+import org.jetbrains.kotlin.js.config.WebArtifactConfiguration
 import org.jetbrains.kotlin.library.impl.buffer
 import org.jetbrains.kotlin.protobuf.CodedInputStream
 import org.jetbrains.kotlin.protobuf.CodedOutputStream
-import org.jetbrains.kotlin.serialization.js.ModuleKind
 import java.security.MessageDigest
 
 internal fun Hash128Bits.toProtoStream(out: CodedOutputStream) {
@@ -133,7 +131,7 @@ private class HashCalculatorForIC(private val checkForClassStructuralChanges: Bo
         collection.forEach { f(it) }
     }
 
-    fun <T> updateConfigKeys(config: CompilerConfiguration, keys: List<CompilerConfigurationKey<out T>>, valueUpdater: (T) -> Unit) {
+    fun <T : Any> updateConfigKeys(config: CompilerConfiguration, keys: List<CompilerConfigurationKey<T>>, valueUpdater: (T) -> Unit) {
         updateForEach(keys) { key ->
             update(key.toString())
             val value = config.get(key)
@@ -158,12 +156,11 @@ private class HashCalculatorForIC(private val checkForClassStructuralChanges: Bo
 internal class ICHasher(checkForClassStructuralChanges: Boolean = false) {
     private val hashCalculator = HashCalculatorForIC(checkForClassStructuralChanges)
 
-    fun calculateConfigHash(config: CompilerConfiguration): ICHash {
+    fun calculateConfigHash(config: CompilerConfiguration, artifactConfiguration: WebArtifactConfiguration): ICHash {
         hashCalculator.update(KotlinCompilerVersion.VERSION)
 
         val booleanKeys = listOf(
             JSConfigurationKeys.SOURCE_MAP,
-            JSConfigurationKeys.META_INFO,
             JSConfigurationKeys.DEVELOPER_MODE,
             JSConfigurationKeys.USE_ES6_CLASSES,
             JSConfigurationKeys.GENERATE_POLYFILLS,
@@ -181,12 +178,13 @@ internal class ICHasher(checkForClassStructuralChanges: Boolean = false) {
         val enumKeys = listOf(
             JSConfigurationKeys.SOURCE_MAP_EMBED_SOURCES,
             JSConfigurationKeys.SOURCEMAP_NAMES_POLICY,
-            JSConfigurationKeys.MODULE_KIND,
-            JSConfigurationKeys.GRANULARITY
         )
         hashCalculator.updateConfigKeys(config, enumKeys) { value: Enum<*> ->
             hashCalculator.update(value.ordinal)
         }
+
+        hashCalculator.update(artifactConfiguration.moduleKind.ordinal)
+        hashCalculator.update(artifactConfiguration.granularity.ordinal)
 
         hashCalculator.updateConfigKeys(
             config,
@@ -198,8 +196,7 @@ internal class ICHasher(checkForClassStructuralChanges: Boolean = false) {
             hashCalculator.update(value)
         }
 
-        hashCalculator.updateConfigKeys(config, listOf(PartialLinkageConfig.KEY)) { value: PartialLinkageConfig ->
-            hashCalculator.update(value.mode.ordinal)
+        hashCalculator.updateConfigKeys(config, listOf(PARTIAL_LINKAGE_CONFIGURATION)) { value: PartialLinkageConfig ->
             hashCalculator.update(value.logLevel.ordinal)
         }
 

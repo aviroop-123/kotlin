@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.analysis.api.fir.components
 
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.parentsOfType
 import com.intellij.util.SmartList
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtFakeSourceElementKind.DesugaredAugmentedAssign
@@ -19,16 +20,15 @@ import org.jetbrains.kotlin.analysis.api.impl.base.components.KaBaseImplicitRece
 import org.jetbrains.kotlin.analysis.api.impl.base.components.KaBaseSessionComponent
 import org.jetbrains.kotlin.analysis.api.impl.base.components.KaBaseSmartCastInfo
 import org.jetbrains.kotlin.analysis.api.impl.base.components.withPsiValidityAssertion
+import org.jetbrains.kotlin.analysis.api.impl.base.util.withKaModuleEntry
 import org.jetbrains.kotlin.analysis.api.types.KaType
-import org.jetbrains.kotlin.analysis.api.utils.errors.withKaModuleEntry
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFir
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirOfType
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirSafe
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.resolveToFirSymbol
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.collectUseSiteContainers
-import org.jetbrains.kotlin.analysis.utils.printer.parentsOfType
 import org.jetbrains.kotlin.fir.FirElement
-import org.jetbrains.kotlin.fir.analysis.checkers.declaration.isLocalMember
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.isLocalDeclaredInBlock
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression
@@ -67,7 +67,11 @@ internal class KaFirDataFlowProvider(
                     return null
                 }
 
-                return KaBaseSmartCastInfo(smartCastType, firSmartCastExpression.isStable)
+                return KaBaseSmartCastInfo(
+                    backingOriginalType = originalType,
+                    backingSmartCastType = smartCastType,
+                    backingIsStable = firSmartCastExpression.isStable
+                )
             }
         }
 
@@ -534,7 +538,7 @@ internal class KaFirDataFlowProvider(
 
         override fun visitAnonymousFunction(anonymousFunction: FirAnonymousFunction) = visitFunction(anonymousFunction)
         override fun visitPropertyAccessor(propertyAccessor: FirPropertyAccessor) = visitFunction(propertyAccessor)
-        override fun visitSimpleFunction(simpleFunction: FirSimpleFunction) = visitFunction(simpleFunction)
+        override fun visitNamedFunction(namedFunction: FirNamedFunction) = visitFunction(namedFunction)
         override fun visitErrorFunction(errorFunction: FirErrorFunction) = visitFunction(errorFunction)
         override fun visitConstructor(constructor: FirConstructor) = visitFunction(constructor)
         override fun visitErrorPrimaryConstructor(errorPrimaryConstructor: FirErrorPrimaryConstructor) =
@@ -578,7 +582,7 @@ internal class KaFirDataFlowProvider(
             val firVariableSymbol = variableAssignment.lValue.toResolvedCallableSymbol(analysisSession.firSession)
             val expression = variableAssignment.psi as? KtExpression
 
-            if (firVariableSymbol is FirVariableSymbol<*> && firVariableSymbol.fir.isLocalMember && expression != null) {
+            if (firVariableSymbol is FirVariableSymbol<*> && firVariableSymbol.fir.isLocalDeclaredInBlock && expression != null) {
                 val variableSymbol = analysisSession.firSymbolBuilder.variableBuilder.buildVariableSymbol(firVariableSymbol)
                 val reassignment = VariableReassignment(expression, variableSymbol, variableAssignment.isAugmented())
                 variableReassignments.add(reassignment)

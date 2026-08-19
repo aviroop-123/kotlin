@@ -5,7 +5,7 @@
 
 package org.jetbrains.kotlin.kapt.cli.test
 
-import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
+import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 
 fun main(args: Array<String>) {
     generateTestGroupSuiteWithJUnit5(args) {
@@ -14,9 +14,6 @@ fun main(args: Array<String>) {
                 model("argumentParsing", extension = "txt")
             }
             testClass<AbstractKaptToolIntegrationTest> {
-                model("integration-k1", recursive = false, extension = null)
-            }
-            testClass<AbstractFirKaptToolIntegrationTest> {
                 model("integration", recursive = false, extension = null)
             }
         }

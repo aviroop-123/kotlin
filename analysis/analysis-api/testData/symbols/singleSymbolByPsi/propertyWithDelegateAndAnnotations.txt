@@ -14,8 +14,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -32,6 +36,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: PropertyWithDelegateAndAnnotationsKt
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: /lazyProperty
   compilerVisibility: Public
   contextParameters: []
@@ -43,8 +48,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: true
     isOverride: false
@@ -62,13 +69,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: PropertyWithDelegateAndAnnotationsKt
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: false
   hasGetter: true
   hasSetter: false
   initializer: null
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: true
+  isDelegated: true
   isExpect: false
   isExtension: false
   isExternal: false
@@ -93,8 +102,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: PropertyWithDelegateAndAnnotationsKt
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getLazyProperty
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: lazyProperty

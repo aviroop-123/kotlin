@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +NestedClassesInAnnotations
 
 annotation class Foo {
     class Nested
@@ -17,10 +16,10 @@ annotation class Foo {
     }
 
 
-    <!ANNOTATION_CLASS_MEMBER!>constructor(s: Int) {}<!>
-    <!ANNOTATION_CLASS_MEMBER!>init {}<!>
-    <!ANNOTATION_CLASS_MEMBER!>fun function() {}<!>
-    <!ANNOTATION_CLASS_MEMBER!>val property get() = Unit<!>
+    <!ANNOTATION_CLASS_MEMBER!>constructor(s: Int)<!> {}
+    <!ANNOTATION_CLASS_MEMBER!>init<!> {}
+    <!ANNOTATION_CLASS_MEMBER!>fun function()<!> {}
+    <!ANNOTATION_CLASS_MEMBER!>val property<!> get() = Unit
 }
 
 /* GENERATED_FIR_TAGS: annotationDeclaration, classDeclaration, companionObject, const, enumDeclaration, enumEntry,

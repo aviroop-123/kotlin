@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.test.cli
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 
 object CliDirectives : SimpleDirectivesContainer() {
-    val KOTLINC_ARGS by stringDirective("Additional arguments to pass to kotlinc")
 
     val CHECK_COMPILER_OUTPUT by directive("Check compiler output (except diagnostics with location) against a golden file")
 

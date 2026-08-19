@@ -1,17 +1,17 @@
-KtNameReferenceExpression(135,138): 'foo'
-  KaApplicableCallCandidateInfo:
+KtNameReferenceExpression(133,136): 'foo'
+  KaApplicableCallCandidate:
     candidate = KaSimpleVariableAccessCall:
-      partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
-        contextArguments = []
-        dispatchReceiver = null
-        extensionReceiver = null
-        signature = KaVariableSignature:
-          name = foo
-          receiverType = null
-          returnType = kotlin.String
-          symbol = val foo: kotlin.String
-          contextParameters = []
-          callableId = /foo
-      simpleAccess = Read
+      contextArguments = []
+      dispatchReceiver = null
+      extensionReceiver = null
+      isContextSensitive = false
+      kind = Read
+      signature = KaVariableSignature:
+        name = foo
+        receiverType = null
+        returnType = kotlin.String
+        symbol = val foo: kotlin.String
+        contextParameters = []
+        callableId = /foo
       typeArgumentsMapping = {}
     isInBestCandidates = true

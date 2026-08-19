@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.classi
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.KaSpi
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.renderAnnotationsModifiersAndContextReceivers
 import org.jetbrains.kotlin.analysis.api.symbols.KaAnonymousObjectSymbol
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.lexer.KtTokens
 
+@KaSpi
 @KaExperimentalApi
 public interface KaNamedClassSymbolRenderer {
     public fun renderSymbol(
@@ -31,6 +33,7 @@ public interface KaNamedClassSymbolRenderer {
     @KaExperimentalApi
     public object AS_SOURCE_WITHOUT_PRIMARY_CONSTRUCTOR: AsSourceRenderer(false)
 
+    @KaSpi
     @KaExperimentalApi
     public open class AsSourceRenderer(private val withPrimaryConstructor: Boolean) : KaNamedClassSymbolRenderer {
         override fun renderSymbol(
@@ -62,7 +65,14 @@ public interface KaNamedClassSymbolRenderer {
                         declarationRenderer.typeParametersRenderer.renderTypeParameters(analysisSession, symbol, declarationRenderer, printer)
                         if (primaryConstructor != null) {
                             val annotationsPrinted = checkIfPrinted {
-                                renderAnnotationsModifiersAndContextReceivers(analysisSession, primaryConstructor, declarationRenderer, printer)
+                                withPrefix(" ") {
+                                    renderAnnotationsModifiersAndContextReceivers(
+                                        analysisSession,
+                                        primaryConstructor,
+                                        declarationRenderer,
+                                        printer
+                                    )
+                                }
                             }
                             if (annotationsPrinted) {
                                 withPrefix(" ") {

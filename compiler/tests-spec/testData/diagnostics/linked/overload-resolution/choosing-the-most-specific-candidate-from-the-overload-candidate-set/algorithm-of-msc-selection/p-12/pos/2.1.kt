@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -159,7 +158,7 @@ class Case10() {
 
 fun testcase10(case: Case10) {
     case.<!DEBUG_INFO_CALL("fqName: Case10.xoo; typeCall: function")!>xoo(1, 1)<!>
-    case.<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>xoo(1, 1)<!>
+    case.xoo(1, 1)
 }
 
 // TESTCASE NUMBER: 11

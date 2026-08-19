@@ -5,17 +5,27 @@
 
 package org.jetbrains.kotlin.gradle
 
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.logging.LogLevel
+import org.gradle.kotlin.dsl.getByType
 import org.gradle.util.GradleVersion
+import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
 import org.jetbrains.kotlin.gradle.testbase.*
+import org.jetbrains.kotlin.gradle.testbase.BuildOptions.ConfigurationCacheValue.ENABLED
+import org.jetbrains.kotlin.gradle.uklibs.applyMultiplatform
 import org.jetbrains.kotlin.test.TestMetadata
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.condition.DisabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
+import java.security.MessageDigest
+import kotlin.io.path.Path
 import kotlin.io.path.appendText
 import kotlin.io.path.createFile
 import kotlin.io.path.writeText
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @DisplayName("Compose compiler Gradle plugin")
 class ComposeIT : KGPBaseTest() {
@@ -56,12 +66,10 @@ class ComposeIT : KGPBaseTest() {
             )
 
             build("assembleDebug") {
-                assertOutputDoesNotContain("Detected Android Gradle Plugin compose compiler configuration")
-                assertOutputDoesNotContain(APPLY_COMPOSE_SUGGESTION)
                 assertCompilerArgument(
                     ":compileDebugKotlin",
-                    "plugin:androidx.compose.compiler.plugins.kotlin:sourceInformation=true," +
-                            "plugin:androidx.compose.compiler.plugins.kotlin:traceMarkersEnabled=true",
+                    "plugin:androidx.compose.compiler.plugins.kotlin:traceMarkersEnabled=true," +
+                            "plugin:androidx.compose.compiler.plugins.kotlin:sourceInformation=true",
                     LogLevel.INFO
                 )
             }
@@ -107,22 +115,12 @@ class ComposeIT : KGPBaseTest() {
             )
 
             buildAndFail("assembleDebug") {
-                when (agpVersion) {
-                    TestVersions.AgpCompatibilityMatrix.AGP_82.version,
-                    TestVersions.AgpCompatibilityMatrix.AGP_83.version,
-                    TestVersions.AgpCompatibilityMatrix.AGP_84.version,
-                        -> {
-                        assertOutputContains(APPLY_COMPOSE_SUGGESTION)
-                    }
-                    else -> {
-                        // This error should come from AGP side
-                        assertOutputContains(
-                            "Starting in Kotlin 2.0, the Compose Compiler Gradle plugin is required\n" +
-                                    "  when compose is enabled. See the following link for more information:\n" +
-                                    "  https://d.android.com/r/studio-ui/compose-compiler"
-                        )
-                    }
-                }
+                // This error should come from AGP side
+                assertOutputContains(
+                    "Starting in Kotlin 2.0, the Compose Compiler Gradle plugin is required\n" +
+                            "  when compose is enabled. See the following link for more information:\n" +
+                            "  https://d.android.com/r/studio-ui/compose-compiler"
+                )
             }
         }
     }
@@ -144,7 +142,6 @@ class ComposeIT : KGPBaseTest() {
         ) {
             build("assembleDebug") {
                 assertOutputContains("Detected Android Gradle Plugin compose compiler configuration")
-                assertOutputDoesNotContain(APPLY_COMPOSE_SUGGESTION)
             }
         }
     }
@@ -211,20 +208,8 @@ class ComposeIT : KGPBaseTest() {
             buildJdk = providedJdk.location,
             buildOptions = buildOptions,
         ) {
-            val agpVersion = TestVersions.AgpCompatibilityMatrix.fromVersion(agpVersion)
-            build(":composeApp:assembleDebug") {
-                // AGP autoconfigures compose in the presence of Kotlin Compose plugin
-                if (agpVersion <= TestVersions.AgpCompatibilityMatrix.AGP_85) {
-                    assertOutputDoesNotContain("Detected Android Gradle Plugin compose compiler configuration")
-                    assertOutputDoesNotContain(APPLY_COMPOSE_SUGGESTION)
-                }
-            }
-
-            build(":composeApp:desktopJar") {
-                if (agpVersion <= TestVersions.AgpCompatibilityMatrix.AGP_85) {
-                    assertOutputDoesNotContain(APPLY_COMPOSE_SUGGESTION)
-                }
-            }
+            build(":composeApp:assembleDebug")
+            build(":composeApp:desktopJar")
         }
     }
 
@@ -247,9 +232,7 @@ class ComposeIT : KGPBaseTest() {
                 it.replace("kotlin(\"plugin.compose\")", "")
             }
 
-            buildAndFail(":composeApp:assembleDebug") {
-                assertOutputDoesNotContain(APPLY_COMPOSE_SUGGESTION)
-            }
+            buildAndFail(":composeApp:assembleDebug")
         }
     }
 
@@ -283,7 +266,7 @@ class ComposeIT : KGPBaseTest() {
                 |composeCompiler {
                 |    metricsDestination.set(project.layout.buildDirectory.dir("metrics"))
                 |    reportsDestination.set(project.layout.buildDirectory.dir("reports"))
-                |    stabilityConfigurationFile.set(project.layout.projectDirectory.file("stability-configuration.conf"))
+                |    stabilityConfigurationFiles.set(listOf(project.layout.projectDirectory.file("stability-configuration.conf")))
                 |}
                 """.trimMargin()
             )
@@ -352,7 +335,7 @@ class ComposeIT : KGPBaseTest() {
         providedJdk: JdkVersions.ProvidedJdk
     ) {
         val composeSnapshotId = TestVersions.Compose.composeSnapshotId
-        val composeSnapshotVersion = TestVersions.Compose.composeSnapshotVersion
+        val composeSnapshotVersion = TestVersions.Compose.composeVersion
         project(
             projectName = "AndroidSimpleApp",
             gradleVersion = gradleVersion,
@@ -398,7 +381,7 @@ class ComposeIT : KGPBaseTest() {
 
     @DisplayName("Run test against older versions of open @Composable function")
     @GradleAndroidTest
-    @AndroidTestVersions(minVersion = TestVersions.AGP.MAX_SUPPORTED)
+    @AndroidTestVersions(minVersion = TestVersions.AGP.AGP_813, maxVersion = TestVersions.AGP.AGP_813)
     @GradleTestVersions(maxVersion = TestVersions.Gradle.G_8_14) // Kotlin 1.9.2x is not compatible with Gradle 9+
     @OtherGradlePluginTests
     @TestMetadata("composeMultiModule")
@@ -408,7 +391,7 @@ class ComposeIT : KGPBaseTest() {
         providedJdk: JdkVersions.ProvidedJdk
     ) {
         val composeSnapshotId = TestVersions.Compose.composeSnapshotId
-        val composeSnapshotVersion = TestVersions.Compose.composeSnapshotVersion
+        val composeSnapshotVersion = TestVersions.Compose.composeVersion
         project(
             projectName = "composeMultiModule/dep",
             gradleVersion = gradleVersion,
@@ -453,6 +436,7 @@ class ComposeIT : KGPBaseTest() {
                 assertTasksExecuted(":compileReleaseKotlin")
             }
         }
+        val runtimeTestUtilsClasspath = System.getProperty("composeCompilerRuntimeTestUtilsClasspath")
         project(
             projectName = "composeMultiModule",
             gradleVersion = gradleVersion,
@@ -468,7 +452,8 @@ class ComposeIT : KGPBaseTest() {
                 |
                 |dependencies {
                 |    implementation("androidx.compose.runtime:runtime:$composeSnapshotVersion")
-                |    implementation("androidx.compose.runtime:runtime-test-utils:$composeSnapshotVersion")
+                |    implementation(files("$runtimeTestUtilsClasspath"))
+                |    implementation(kotlin("test-junit"))
                 |    
                 |    implementation("com.example:dep:1.0")
                 |}
@@ -530,7 +515,7 @@ class ComposeIT : KGPBaseTest() {
 
     @DisplayName("Run source information test with older versions of Compose runtime")
     @GradleAndroidTest
-    @AndroidTestVersions(minVersion = TestVersions.AGP.MAX_SUPPORTED)
+    @AndroidTestVersions(minVersion = TestVersions.AGP.AGP_813, maxVersion = TestVersions.AGP.AGP_813)
     @OtherGradlePluginTests
     @TestMetadata("composeMultiModule")
     fun testComposeSourceInformationOldRuntime(
@@ -629,6 +614,313 @@ class ComposeIT : KGPBaseTest() {
         }
     }
 
+    @DisplayName("Minified app contains Compose mapping file")
+    @AndroidGradlePluginTests
+    @AndroidTestVersions(
+        additionalVersions = [TestVersions.AGP.AGP_91]
+    )
+    @GradleAndroidTest
+    @DisabledOnOs(
+        OS.WINDOWS, disabledReason = "AGP contains a bug that prevents test output files from being cleaned up on Windows. " +
+                "See: https://issuetracker.google.com/issues/445967244"
+    )
+    @TestMetadata("AndroidSimpleComposeApp")
+    fun testMinifyWithCompose(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        providedJdk: JdkVersions.ProvidedJdk
+    ) {
+        project(
+            projectName = "AndroidSimpleComposeApp",
+            gradleVersion = gradleVersion,
+            buildJdk = providedJdk.location,
+            buildOptions = defaultBuildOptions.copy(androidVersion = agpVersion, buildCacheEnabled = true, configurationCache = ENABLED)
+        ) {
+            buildScriptInjection {
+                val appExtension = project.extensions.getByType<ApplicationAndroidComponentsExtension>()
+                appExtension.beforeVariants {
+                    if (it.name == "release") {
+                        it.isMinifyEnabled = true
+                        it.shrinkResources = true
+                    }
+                }
+                // Known dependency that is compiled with JDK 25
+                // Tests for CMP-9459
+                dependencies.add(
+                    "implementation",
+                    "org.bouncycastle:bcprov-jdk18on:1.83"
+                )
+            }
+
+            build("assembleRelease") {
+                assertTasksExecuted(":produceReleaseComposeMapping")
+                assertOutputDoesNotContain("warning: Compose mapping: ")
+                val mappingDir = projectPath.resolve(Path("build/intermediates/compose_mapping/release/")).toFile()
+                assertFileExists(mappingDir.resolve("compose-mapping.txt"), "Expected Compose mapping file")
+                val errorsFile = mappingDir.resolve("compose-mapping-errors.txt")
+                assertFileExists(mappingDir.resolve("compose-mapping-errors.txt"), "Expected Compose mapping error file")
+                assertEquals("", errorsFile.readText())
+
+                assertTasksExecuted(":mergeReleaseComposeMapping")
+
+                // validate all mapping files are present
+                val expectedOutputFiles = listOf(
+                    "mapping.txt",
+                    "seeds.txt",
+                    "configuration.txt",
+                    "usage.txt",
+                    "resources.txt",
+                )
+                for (name in expectedOutputFiles) {
+                    val file = projectPath.resolve(Path("build/outputs/mapping/release/$name")).toFile()
+                    assertFileExists(file, "Missing $name from R8 outputs")
+                }
+                val outputMapping = projectPath.resolve(Path("build/outputs/mapping/release/mapping.txt")).toFile()
+                var hasComposeMapping = false
+                var hasAppFrames = false
+                outputMapping.useLines { lines ->
+                    for (line in lines) {
+                        if (line == $$"ComposeStackTrace -> \$$compose:") {
+                            hasComposeMapping = true
+                        }
+
+                        if (hasComposeMapping && line.contains("org.jetbrains.kotlin.android.example.MainActivityKt")) {
+                            hasAppFrames = true
+                            break
+                        }
+                    }
+                }
+                assertTrue(hasComposeMapping, "Expected compose mapping added to the mapping.txt")
+                assertTrue(hasAppFrames, "Expected app-specific mapping added to the mapping.txt")
+
+                // validate mapping hash recorded in the file
+                var recordedHash = ""
+                outputMapping.useLines { lines ->
+                    for (line in lines) {
+                        if (line.startsWith("# pg_map_hash: SHA-256")) {
+                            recordedHash = line.substringAfter("SHA-256 ")
+                            break
+                        }
+                    }
+                }
+
+                var calculatedHash = ""
+                outputMapping.useLines { lines ->
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    lines.dropWhile { it.startsWith("#") }.forEach { line ->
+                        digest.update(line.toByteArray())
+                        digest.update("\n".toByteArray())
+                    }
+                    calculatedHash = digest.digest().joinToString("") { "%02x".format(it) }
+                }
+
+                assertEquals(calculatedHash, recordedHash)
+            }
+        }
+    }
+
+    @DisplayName("Minified app with disabled mapping does not run Compose tasks.")
+    @AndroidGradlePluginTests
+    @GradleAndroidTest
+    @DisabledOnOs(
+        OS.WINDOWS, disabledReason = "AGP contains a bug that prevents test output files from being cleaned up on Windows. " +
+                "See: https://issuetracker.google.com/issues/445967244"
+    )
+    @TestMetadata("AndroidSimpleComposeApp")
+    fun testMinifyWithComposeDisabled(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        providedJdk: JdkVersions.ProvidedJdk
+    ) {
+        project(
+            projectName = "AndroidSimpleComposeApp",
+            gradleVersion = gradleVersion,
+            buildJdk = providedJdk.location,
+            buildOptions = defaultBuildOptions
+                .copy(androidVersion = agpVersion)
+        ) {
+            buildScriptInjection {
+                val appExtension = project.extensions.getByType<ApplicationAndroidComponentsExtension>()
+                appExtension.beforeVariants {
+                    if (it.name == "release") {
+                        it.isMinifyEnabled = true
+                    }
+                }
+                val composeExtension = project.extensions.getByType<ComposeCompilerGradlePluginExtension>()
+                composeExtension.includeComposeMappingFile.set(false)
+            }
+
+            build("assembleRelease") {
+                assertTasksAreNotInTaskGraph(
+                    ":produceReleaseComposeMapping",
+                    ":mergeReleaseComposeMapping"
+                )
+            }
+        }
+    }
+
+    @DisplayName("CMP-9167 verification")
+    @GradleTest
+    @OtherGradlePluginTests
+    fun testComposeDefaultValueParamStubs(
+        gradleVersion: GradleVersion,
+    ) {
+        project(
+            projectName = "empty",
+            gradleVersion = gradleVersion,
+            buildOptions = defaultBuildOptions.copy(
+                nativeOptions = super.defaultBuildOptions.nativeOptions.copy(
+                    version = TestVersions.Kotlin.CURRENT
+                ),
+                isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED
+            ),
+            dependencyManagement = DependencyManagement.DefaultDependencyManagement(setOf("https://redirector.kotlinlang.org/maven/compose-dev")),
+            enableGradleDaemonMemoryLimitInMb = 2048,
+            enableKotlinDaemonMemoryLimitInMb = 2048,
+        ) {
+            plugins {
+                id("org.jetbrains.kotlin.plugin.compose")
+            }
+            buildScriptInjection {
+                project.applyMultiplatform {
+                    listOf(
+                        iosArm64(),
+                        iosSimulatorArm64()
+                    ).forEach { iosTarget ->
+                        iosTarget.binaries.framework {
+                            baseName = "ComposeApp"
+                            isStatic = true
+                        }
+                    }
+                    jvm()
+
+                    @OptIn(ExperimentalWasmDsl::class)
+                    wasmJs {
+                        browser()
+                        binaries.library()
+                    }
+
+                    js {
+                        browser()
+                        binaries.library()
+                    }
+                    sourceSets.commonMain {
+                        compileSource(
+                            //language=kotlin
+                            """
+                            package com.example
+                            
+                            import androidx.compose.runtime.Composable
+                            import kotlin.jvm.JvmInline
+                            
+                            @JvmInline
+                            value class ImeAction private constructor(val value: Int) {
+                                companion object {
+                                    val Default = ImeAction(0)
+                                }
+                            }
+                            
+                            @Composable
+                            fun <T> TextCompose(genericText: (T) -> String, imeAction: ImeAction = ImeAction.Default) {}
+                            """.trimIndent()
+                        )
+                        dependencies {
+                            implementation("org.jetbrains.compose.runtime:runtime:1.9.1")
+                        }
+                    }
+                }
+            }
+
+            build(":compileKotlinIosSimulatorArm64") {
+                assertTasksExecuted(":compileKotlinIosSimulatorArm64")
+            }
+            build(":compileKotlinWasmJs") {
+                assertTasksExecuted(":compileKotlinWasmJs")
+            }
+            build(":compileKotlinJs") {
+                assertTasksExecuted(":compileKotlinJs")
+            }
+        }
+    }
+
+    @DisplayName($$"Ensure that older versions of the compiler can access the backing field of a $stable property")
+    @GradleAndroidTest
+    @AndroidTestVersions(minVersion = TestVersions.AGP.AGP_813, maxVersion = TestVersions.AGP.AGP_813)
+    @GradleTestVersions(minVersion = GRADLE_VERSION_FOR_STABLE_PROPERTY_TEST, maxVersion = GRADLE_VERSION_FOR_STABLE_PROPERTY_TEST)
+    @OtherGradlePluginTests
+    @TestMetadata("composeMultiModule")
+    fun testOlderCompilerCanAccessBackingFieldOfStableProperty(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        providedJdk: JdkVersions.ProvidedJdk,
+    ) {
+        val composeSnapshotId = TestVersions.Compose.composeSnapshotId
+        val composeSnapshotVersion = TestVersions.Compose.composeVersion
+        project(
+            projectName = "composeMultiModule/dep",
+            gradleVersion = gradleVersion,
+            buildJdk = providedJdk.location,
+            buildOptions = defaultBuildOptions.copy(androidVersion = agpVersion),
+            dependencyManagement = DependencyManagement.DefaultDependencyManagement(
+                setOf("https://androidx.dev/snapshots/builds/${composeSnapshotId}/artifacts/repository")
+            )
+        ) {
+            buildGradleKts.appendComposePlugin()
+
+            kotlinSourcesDir().source("com/example/dep/A.kt") {
+                //language=kotlin
+                """
+                |package com.example.dep
+                |
+                |class A(val value: Int)
+                """.trimMargin()
+            }
+
+            build("publishToMavenLocal") {
+                assertOutputContains("kotlin-compose-compiler-plugin-embeddable-$KOTLIN_VERSION.jar")
+                assertTasksExecuted(":compileReleaseKotlin")
+            }
+        }
+
+        project(
+            projectName = "composeMultiModule",
+            gradleVersion = gradleVersion,
+            buildJdk = providedJdk.location,
+            buildOptions = defaultBuildOptions.copy(androidVersion = agpVersion, kotlinVersion = "2.3.10"),
+            dependencyManagement = DependencyManagement.DefaultDependencyManagement(
+                additionalRepos = setOf("https://androidx.dev/snapshots/builds/${composeSnapshotId}/artifacts/repository")
+            )
+        ) {
+            buildGradleKts.appendComposePlugin()
+            buildScriptInjection {
+                dependencies.add("implementation", "com.example:dep:1.0")
+            }
+
+            projectPath.source("src/test/kotlin/com/example/ComposeTest.kt") {
+                //language=kotlin
+                """
+                |package com.example
+                |
+                |import org.junit.Test
+                |import com.example.dep.A
+                |
+                |class B(val a: A)
+                |
+                |class ComposeTest {
+                |    @Test
+                |    fun test() {
+                |       println(B(A(1)).a.value)
+                |    }
+                |}
+                """.trimMargin()
+            }
+
+            build("testReleaseUnitTest") {
+                assertTasksExecuted(":compileReleaseUnitTestKotlin")
+            }
+        }
+    }
+
     private fun Path.appendComposePlugin() {
         modify { originalBuildScript ->
             """
@@ -641,13 +933,11 @@ class ComposeIT : KGPBaseTest() {
     }
 
     companion object {
-        private const val APPLY_COMPOSE_SUGGESTION =
-            "The Compose compiler plugin is now a part of Kotlin.\n" +
-                    "Please apply the 'org.jetbrains.kotlin.plugin.compose' Gradle plugin to enable the Compose compiler plugin.\n" +
-                    "Learn more about this at https://kotl.in/compose-plugin"
-
         private const val LEGACY_OPEN_FUNCTION_WARNING =
             "Detected a @Composable function that overrides an open function compiled with older compiler that is known to crash " +
                     "at runtime."
+
+        // Gradle version known to be compatible with Kotlin 2.3.10
+        private const val GRADLE_VERSION_FOR_STABLE_PROPERTY_TEST = TestVersions.Gradle.G_9_3
     }
 }

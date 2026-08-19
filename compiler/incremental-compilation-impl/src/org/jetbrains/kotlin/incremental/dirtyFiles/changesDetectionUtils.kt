@@ -8,9 +8,7 @@ package org.jetbrains.kotlin.incremental.dirtyFiles
 import org.jetbrains.kotlin.build.report.BuildReporter
 import org.jetbrains.kotlin.build.report.ICReporter
 import org.jetbrains.kotlin.build.report.info
-import org.jetbrains.kotlin.build.report.metrics.BuildAttribute
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.*
 import org.jetbrains.kotlin.build.report.metrics.measure
 import org.jetbrains.kotlin.incremental.*
 import org.jetbrains.kotlin.incremental.ChangedFiles.DeterminableFiles
@@ -25,7 +23,7 @@ internal fun getClasspathChanges(
     changedFiles: DeterminableFiles.Known,
     lastBuildInfo: BuildInfo,
     modulesApiHistory: ModulesApiHistory,
-    reporter: BuildReporter<GradleBuildTime, GradleBuildPerformanceMetric>,
+    reporter: BuildReporter<BuildTimeMetric, BuildPerformanceMetric>,
     abiSnapshots: Map<String, AbiSnapshot>,
     withSnapshot: Boolean,
     caches: IncrementalCacheCommon,
@@ -55,7 +53,7 @@ internal fun getClasspathChanges(
             val symbols = HashSet<LookupSymbol>()
             val fqNames = HashSet<FqName>()
 
-            for ((module, abiSnapshot) in abiSnapshots) {
+            for ([module, abiSnapshot] in abiSnapshots) {
                 val actualAbiSnapshot = lastBuildInfo.dependencyToAbiSnapshot[module]
                 if (actualAbiSnapshot == null) {
 
@@ -69,7 +67,7 @@ internal fun getClasspathChanges(
             }
             return ChangesEither.Known(symbols, fqNames)
         }
-        return reporter.measure(GradleBuildTime.IC_ANALYZE_JAR_FILES) {
+        return reporter.measure(IC_ANALYZE_JAR_FILES) {
             analyzeJarFiles()
         }
     } else {
@@ -79,7 +77,7 @@ internal fun getClasspathChanges(
         val fqNames = HashSet<FqName>()
 
         val historyFilesEither =
-            reporter.measure(GradleBuildTime.IC_FIND_HISTORY_FILES) {
+            reporter.measure(IC_FIND_HISTORY_FILES) {
                 modulesApiHistory.historyFilesForChangedFiles(modifiedClasspath)
             }
 
@@ -99,7 +97,7 @@ internal fun getClasspathChanges(
                         ChangesEither.Unknown(BuildAttribute.DEP_CHANGE_HISTORY_CANNOT_BE_READ)
                     }
 
-                val (knownBuilds, newBuilds) = allBuilds.partition { it.ts <= lastBuildTS }
+                val [knownBuilds, newBuilds] = allBuilds.partition { it.ts <= lastBuildTS }
                 if (knownBuilds.isEmpty()) {
                     reporter.info { "No previously known builds for $historyFile" }
                     return ChangesEither.Unknown(BuildAttribute.DEP_CHANGE_HISTORY_NO_KNOWN_BUILDS)
@@ -121,7 +119,7 @@ internal fun getClasspathChanges(
             return ChangesEither.Known(symbols, fqNames)
         }
 
-        return reporter.measure(GradleBuildTime.IC_ANALYZE_HISTORY_FILES) {
+        return reporter.measure(IC_ANALYZE_HISTORY_FILES) {
             analyzeHistoryFiles()
         }
     }

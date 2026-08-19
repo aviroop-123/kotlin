@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.codegen.state
 
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
-import org.jetbrains.kotlin.util.jvmMetadataVersion
+import org.jetbrains.kotlin.util.metadataVersion
 
 class JvmBackendConfig(configuration: CompilerConfiguration) {
     val languageVersionSettings: LanguageVersionSettings = configuration.languageVersionSettings
@@ -87,13 +87,13 @@ class JvmBackendConfig(configuration: CompilerConfiguration) {
 
     val disableOptimization: Boolean = configuration.getBoolean(JVMConfigurationKeys.DISABLE_OPTIMIZATION)
 
-    val metadataVersion: BinaryVersion = configuration.jvmMetadataVersion()
+    val metadataVersion: BinaryVersion = configuration.metadataVersion()
 
     val abiStability: JvmAbiStability? = configuration.get(JVMConfigurationKeys.ABI_STABILITY)
 
     val noNewJavaAnnotationTargets: Boolean = configuration.getBoolean(JVMConfigurationKeys.NO_NEW_JAVA_ANNOTATION_TARGETS)
 
-    val supportMultiFieldValueClasses: Boolean = languageVersionSettings.supportsFeature(LanguageFeature.ValueClasses)
+    val supportJvmInlineMultiFieldValueClasses: Boolean = languageVersionSettings.supportsFeature(LanguageFeature.JvmInlineMultiFieldValueClasses)
 
     val enableDebugMode: Boolean = configuration.getBoolean(JVMConfigurationKeys.ENABLE_DEBUG_MODE)
 
@@ -109,10 +109,15 @@ class JvmBackendConfig(configuration: CompilerConfiguration) {
     val nullOutSpilledCoroutineLocalsUsingStdlibFunction: Boolean =
         languageVersionSettings.supportsFeature(LanguageFeature.JvmNullOutSpilledCoroutineLocals)
 
+    val wrapContinuationForTailCallFunctions: Boolean =
+        languageVersionSettings.supportsFeature(LanguageFeature.WrapContinuationForTailCallFunctions)
+
     val whenGenerationScheme: JvmWhenGenerationScheme =
         if (target.majorVersion >= JvmTarget.JVM_21.majorVersion)
-            configuration.get(JVMConfigurationKeys.WHEN_GENERATION_SCHEME, JvmWhenGenerationScheme.INLINE)
+            configuration.get(JVMConfigurationKeys.WHEN_GENERATION_SCHEME, JvmWhenGenerationScheme.INDY)
         else JvmWhenGenerationScheme.INLINE
 
     val generateDebugMetadataV2: Boolean = languageVersionSettings.apiVersion >= ApiVersion.KOTLIN_2_3
+
+    val implicitJvmExposeBoxed: Boolean = languageVersionSettings.getFlag(JvmAnalysisFlags.implicitJvmExposeBoxed)
 }

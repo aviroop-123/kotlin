@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
 var c = 1
 
 fun nullable(): Int? = null
@@ -10,7 +9,7 @@ fun foo(): Int {
         x = c++
     }
 
-    return <!DEBUG_INFO_SMARTCAST!>x<!>
+    return x
 }
 
 /* GENERATED_FIR_TAGS: assignment, equalityExpression, functionDeclaration, ifExpression, incrementDecrementExpression,

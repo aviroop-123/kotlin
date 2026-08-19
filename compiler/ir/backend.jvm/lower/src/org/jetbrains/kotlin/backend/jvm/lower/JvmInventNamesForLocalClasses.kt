@@ -6,7 +6,7 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.lower.InventNamesForLocalClasses
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.localClassType
 import org.jetbrains.kotlin.codegen.sanitizeNameIfNeeded
@@ -14,14 +14,15 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.MetadataSource
 import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.org.objectweb.asm.Type
 
-@PhaseDescription(
-    name = "InventNamesForLocalClasses",
+@PhasePrerequisites(
     // MainMethodGeneration introduces lambdas, needing names for their local classes.
-    prerequisite = [MainMethodGenerationLowering::class],
+    MainMethodGenerationLowering::class,
 )
 internal class JvmInventNamesForLocalClasses(private val context: JvmBackendContext) : InventNamesForLocalClasses() {
     override fun computeTopLevelClassName(clazz: IrClass): String {
@@ -45,6 +46,11 @@ internal class JvmInventNamesForLocalClasses(private val context: JvmBackendCont
     override fun putLocalClassName(declaration: IrElement, localClassName: String) {
         // We can visit the same class twice: before IR inlining and after. The name that was before is more preferable.
         if (declaration.localClassType != null) return
-        declaration.localClassType = Type.getObjectType(localClassName)
+        val localClassType = Type.getObjectType(localClassName)
+        declaration.localClassType = localClassType
+        if (declaration is IrClass) {
+            val localTypeFqName = FqName(localClassType.internalName.replace('/', '.'))
+            (declaration.metadata as? MetadataSource.Class)?.recordLocalClassType(localTypeFqName)
+        }
     }
 }

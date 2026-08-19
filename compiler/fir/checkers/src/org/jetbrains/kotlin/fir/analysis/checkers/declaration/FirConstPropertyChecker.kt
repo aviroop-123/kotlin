@@ -9,14 +9,19 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
-import org.jetbrains.kotlin.fir.analysis.checkers.*
+import org.jetbrains.kotlin.fir.FirEvaluatorResult
+import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
+import org.jetbrains.kotlin.fir.analysis.checkers.getModifier
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.FirProperty
+import org.jetbrains.kotlin.fir.declarations.utils.evaluatedInitializer
+import org.jetbrains.kotlin.fir.declarations.utils.hasExplicitBackingField
+import org.jetbrains.kotlin.fir.declarations.utils.isCompanionBlockMember
 import org.jetbrains.kotlin.fir.declarations.utils.isConst
-import org.jetbrains.kotlin.fir.expressions.ConstantArgumentKind
+import org.jetbrains.kotlin.fir.expressions.FirExpressionEvaluator
+import org.jetbrains.kotlin.fir.expressions.PrivateConstantEvaluatorAPI
 import org.jetbrains.kotlin.fir.expressions.canBeUsedForConstVal
-import org.jetbrains.kotlin.fir.expressions.computeConstantExpressionKind
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.types.ConeErrorType
@@ -36,7 +41,7 @@ object FirConstPropertyChecker : FirPropertyChecker(MppCheckerKind.Common) {
         }
 
         val classKind = (context.containingDeclarations.lastOrNull() as? FirRegularClassSymbol)?.classKind
-        if (classKind != ClassKind.OBJECT && context.containingDeclarations.size > 1) {
+        if (classKind != ClassKind.OBJECT && context.containingDeclarations.size > 1 && !declaration.isCompanionBlockMember) {
             reporter.reportOn(declaration.source, FirErrors.CONST_VAL_NOT_TOP_LEVEL_OR_OBJECT)
             return
         }
@@ -54,7 +59,11 @@ object FirConstPropertyChecker : FirPropertyChecker(MppCheckerKind.Common) {
 
         val initializer = declaration.initializer
         if (initializer == null) {
-            reporter.reportOn(declaration.source, FirErrors.CONST_VAL_WITHOUT_INITIALIZER)
+            val diagnostic = when {
+                declaration.hasExplicitBackingField -> FirErrors.CONST_VAL_WITH_EBF
+                else -> FirErrors.CONST_VAL_WITHOUT_INITIALIZER
+            }
+            reporter.reportOn(declaration.source, diagnostic)
             return
         }
 
@@ -64,9 +73,16 @@ object FirConstPropertyChecker : FirPropertyChecker(MppCheckerKind.Common) {
             return
         }
 
-        val errorKind = when (computeConstantExpressionKind(initializer, context.session, calledOnCheckerStage = true)) {
-            ConstantArgumentKind.VALID_CONST, ConstantArgumentKind.RESOLUTION_ERROR -> return
-            ConstantArgumentKind.NOT_CONST_VAL_IN_CONST_EXPRESSION -> FirErrors.NON_CONST_VAL_USED_IN_CONSTANT_EXPRESSION
+        @OptIn(PrivateConstantEvaluatorAPI::class)
+        val evaluationResult = FirExpressionEvaluator.evaluateExpression(initializer, context.session)
+        val errorKind = when (evaluationResult) {
+            is FirEvaluatorResult.Evaluated, is FirEvaluatorResult.ResolutionError -> return
+            is FirEvaluatorResult.DivisionByZero -> {
+                // Report an additional DIVISION_BY_ZERO warning
+                reporter.reportOn(initializer.source, FirErrors.DIVISION_BY_ZERO)
+                FirErrors.CONST_VAL_WITH_NON_CONST_INITIALIZER
+            }
+            FirEvaluatorResult.NotConstValInConstExpression -> FirErrors.NON_CONST_VAL_USED_IN_CONSTANT_EXPRESSION
             else -> FirErrors.CONST_VAL_WITH_NON_CONST_INITIALIZER
         }
         reporter.reportOn(initializer.source, errorKind)

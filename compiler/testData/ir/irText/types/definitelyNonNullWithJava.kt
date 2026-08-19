@@ -1,6 +1,7 @@
-// FIR_IDENTICAL
-// LANGUAGE: +DefinitelyNonNullableTypes
 // TARGET_BACKEND: JVM
+
+// K1 also sees "fun B<T1>.bar(T1!): T1!", in addition to "fun B<T1>.bar(T1 & Any): T1 & Any". New reflection sees only the latter, which seems more correct.
+// KOTLIN_REFLECT_DUMP_MISMATCH
 
 // FILE: A.java
 import org.jetbrains.annotations.*;

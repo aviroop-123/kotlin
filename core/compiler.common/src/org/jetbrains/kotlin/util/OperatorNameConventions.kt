@@ -1,23 +1,15 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.util
 
 import org.jetbrains.kotlin.name.Name
 
+/**
+ * Should be consistent with [org.jetbrains.kotlin.types.expressions.OperatorConventions]
+ */
 object OperatorNameConventions {
     @JvmField val GET_VALUE = Name.identifier("getValue")
     @JvmField val SET_VALUE = Name.identifier("setValue")
@@ -33,6 +25,7 @@ object OperatorNameConventions {
     @JvmField val SET = Name.identifier("set")
     @JvmField val NEXT = Name.identifier("next")
     @JvmField val HAS_NEXT = Name.identifier("hasNext")
+    @JvmField val OF = Name.identifier("of")
 
     @JvmField val TO_STRING = Name.identifier("toString")
 
@@ -75,6 +68,10 @@ object OperatorNameConventions {
     @JvmField val TO_CHAR = Name.identifier("toChar")
     @JvmField val TO_SHORT = Name.identifier("toShort")
     @JvmField val TO_BYTE = Name.identifier("toByte")
+    @JvmField val TO_ULONG = Name.identifier("toULong")
+    @JvmField val TO_UINT = Name.identifier("toUInt")
+    @JvmField val TO_USHORT = Name.identifier("toUShort")
+    @JvmField val TO_UBYTE = Name.identifier("toUByte")
 
     // If you add new unary, binary or assignment operators, add it to OperatorConventions as well
 
@@ -110,6 +107,9 @@ object OperatorNameConventions {
 
     @JvmField
     val NUMBER_CONVERSIONS = setOf(TO_DOUBLE, TO_FLOAT, TO_LONG, TO_INT, TO_SHORT, TO_BYTE, TO_CHAR)
+
+    @JvmField
+    val UNSIGNED_CONVERSIONS = setOf(TO_ULONG, TO_UINT, TO_USHORT, TO_UBYTE)
 
     val TOKENS_BY_OPERATOR_NAME = mapOf(
         INC to "++",

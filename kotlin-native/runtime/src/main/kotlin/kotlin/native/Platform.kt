@@ -52,6 +52,22 @@ public enum class MemoryModel {
 }
 
 /**
+ * Object allocation mode.
+ */
+@ExperimentalNativeApi
+internal enum class Allocator {
+    /**
+     * Objects are allocated in pages.
+     */
+    PAGED,
+
+    /**
+     * Each object is allocated separately.
+     */
+    PER_OBJECT,
+}
+
+/**
  * Object describing the current platform program executes upon.
  */
 @ExperimentalNativeApi
@@ -110,16 +126,14 @@ public object Platform {
         get() = Platform_getProgramName()
 
     /**
-     * If the memory leak checker is activated, by default `true` in debug mode, `false` in release.
-     * When memory leak checker is activated, and leak is detected during last Kotlin context
-     * deinitialization process - error message with leak information is printed and application
-     * execution is aborted.
+     * Memory leak checking is deprecated.
+     * With the new MM, this check only worked to catch `Worker`s.
      *
-     * @see isDebugBinary
+     * When needed, this check can be written as `check(Worker.activeWorkers.size <= 2)`
+     * at the end of `main()`. 2 here means: `Worker.current` and (possibly) finalizer thread.
      */
-    public var isMemoryLeakCheckerActive: Boolean
-        get() = Platform_getMemoryLeakChecker()
-        set(value) = Platform_setMemoryLeakChecker(value)
+    @Deprecated("Memory leak checking is deprecated")
+    public var isMemoryLeakCheckerActive: Boolean = false
 
     @Deprecated("Cleaners leak checking is deprecated and should not be relied upon anymore")
     public var isCleanersLeakCheckerActive: Boolean = false
@@ -145,6 +159,14 @@ public object Platform {
         return fromEnv.toIntOrNull()?.takeIf { it > 0 } ?:
             throw IllegalStateException("Available processors has incorrect environment override: $fromEnv")
     }
+
+    /**
+     * Object allocation mode the binary was compiled with.
+     *
+     * Controlled by `-Xbinary=pagedAllocator=true|false` option.
+     */
+    internal val allocator: Allocator
+        get() = Allocator.entries[Platform_getAllocator()]
 }
 
 @GCUnsafeCall("Konan_Platform_canAccessUnaligned")
@@ -166,18 +188,6 @@ private external fun Platform_isDebugBinary(): Boolean
 @Escapes.Nothing
 private external fun Platform_getProgramName(): String?
 
-@GCUnsafeCall("Konan_Platform_getMemoryLeakChecker")
-private external fun Platform_getMemoryLeakChecker(): Boolean
-
-@GCUnsafeCall("Konan_Platform_setMemoryLeakChecker")
-private external fun Platform_setMemoryLeakChecker(value: Boolean): Unit
-
-@GCUnsafeCall("Konan_Platform_getCleanersLeakChecker")
-private external fun Platform_getCleanersLeakChecker(): Boolean
-
-@GCUnsafeCall("Konan_Platform_setCleanersLeakChecker")
-private external fun Platform_setCleanersLeakChecker(value: Boolean): Unit
-
 @GCUnsafeCall("Konan_Platform_getAvailableProcessorsEnv")
 @Escapes.Nothing
 private external fun Platform_getAvailableProcessorsEnv(): String?
@@ -188,3 +198,6 @@ private external fun Platform_getAvailableProcessors(): Int
 @ExperimentalStdlibApi
 @Deprecated("This property always returns true, its usages can be safely removed.", ReplaceWith("true"))
 public fun isExperimentalMM(): Boolean = true
+
+@GCUnsafeCall("Konan_Platform_getAllocator")
+private external fun Platform_getAllocator(): Int

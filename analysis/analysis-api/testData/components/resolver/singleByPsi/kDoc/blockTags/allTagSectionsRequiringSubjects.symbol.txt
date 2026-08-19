@@ -1,0 +1,29 @@
+<caret_1>:
+  KDocName(12,15): 'foo'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        /foo(): kotlin.Unit
+      ]
+
+<caret_2>:
+  KDocName(26,29): 'foo'
+    null
+
+<caret_3>:
+  KDocName(43,46): 'foo'
+    null
+
+<caret_4>:
+  KDocName(58,61): 'foo'
+    null
+
+<caret_5>:
+  KDocName(73,76): 'foo'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        /foo(): kotlin.Unit
+      ]
+
+<caret_6>:
+  KDocName(91,94): 'foo'
+    null

@@ -1,15 +1,16 @@
 // RUN_PIPELINE_TILL: FRONTEND
+// LANGUAGE: +LocalTypeAliases
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER -TOPLEVEL_TYPEALIASES_ONLY
 
 fun <T> emptyList(): List<T> = null!!
 
 fun <T> foo() {
-    typealias LT = List<T>
+    typealias LT = <!TYPEALIAS_EXPANSION_CAPTURES_OUTER_TYPE_PARAMETERS!>List<T><!>
 
     val a: LT = emptyList()
 
     fun localFun(): LT {
-        typealias LLT = List<T>
+        typealias LLT = <!TYPEALIAS_EXPANSION_CAPTURES_OUTER_TYPE_PARAMETERS!>List<T><!>
 
         val b: LLT = a
 

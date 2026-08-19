@@ -1,0 +1,2 @@
+KDocName(57,60): 'foo'
+  NO_CANDIDATES

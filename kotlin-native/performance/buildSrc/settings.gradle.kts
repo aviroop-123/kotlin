@@ -1,5 +1,5 @@
-import java.io.File
 pluginManagement {
+    includeBuild("../../../repo/kotlin-build-helpers")
     includeBuild("../../../repo/gradle-settings-conventions")
 
     repositories {
@@ -10,6 +10,7 @@ pluginManagement {
 }
 
 plugins {
+    id("kotlin-build-helpers")
     id("kotlin-bootstrap")
     id("develocity")
     id("jvm-toolchain-provisioning")

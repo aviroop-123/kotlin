@@ -1,5 +1,4 @@
-// FIR_IDENTICAL
-// IGNORE_BACKEND_K1: ANY
+// RUN_PIPELINE_TILL: BACKEND
 // LANGUAGE: +BreakContinueInInlineLambdas +IrIntraModuleInlinerBeforeKlibSerialization +IrCrossModuleInlinerBeforeKlibSerialization
 // ISSUE: KT-68975
 // See same test for codegen: compiler/testData/codegen/box/js/inlinedReturnBreakContinue/inlineFunctionWithMultipleParameters.kt
@@ -11,9 +10,9 @@ inline fun foo(
     noinline block2: () -> Unit,
     block3: () -> Unit
 ) {
-    js(<!JS_CODE_CAPTURES_INLINABLE_FUNCTION_WARNING!>"block1()"<!>)
+    js(<!JS_CODE_CAPTURES_INLINABLE_FUNCTION_ERROR!>"block1()"<!>)
     js("block2()")
-    js(<!JS_CODE_CAPTURES_INLINABLE_FUNCTION_WARNING!>"block3()"<!>)
+    js(<!JS_CODE_CAPTURES_INLINABLE_FUNCTION_ERROR!>"block3()"<!>)
 }
 
 fun box(): String {

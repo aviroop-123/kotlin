@@ -9,9 +9,9 @@ import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
-import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirSimpleFunctionChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirNamedFunctionChecker
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.utils.isOverride
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.fir.types.isInt
@@ -19,9 +19,9 @@ import org.jetbrains.kotlin.fir.types.isUnit
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.name.ClassId
 
-class FirParcelizeFunctionChecker(private val parcelizeAnnotations: List<ClassId>) : FirSimpleFunctionChecker(MppCheckerKind.Platform) {
+class FirParcelizeFunctionChecker(private val parcelizeAnnotations: List<ClassId>) : FirNamedFunctionChecker(MppCheckerKind.Platform) {
     context(context: CheckerContext, reporter: DiagnosticReporter)
-    override fun check(declaration: FirSimpleFunction) {
+    override fun check(declaration: FirNamedFunction) {
         val containingClassSymbol = declaration.dispatchReceiverType?.toRegularClassSymbol()
         if (!containingClassSymbol.isParcelize(context.session, parcelizeAnnotations)) return
         if (declaration.origin != FirDeclarationOrigin.Source) return
@@ -30,7 +30,7 @@ class FirParcelizeFunctionChecker(private val parcelizeAnnotations: List<ClassId
         }
     }
 
-    private fun FirSimpleFunction.isWriteToParcel(): Boolean {
+    private fun FirNamedFunction.isWriteToParcel(): Boolean {
         return typeParameters.isEmpty() &&
                 valueParameters.size == 2 &&
                 valueParameters[1].returnTypeRef.coneType.isInt &&

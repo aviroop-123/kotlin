@@ -1,14 +1,8 @@
-/*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the LICENSE file.
- */
-// KT-66105: SyntaxError: Identifier 'box' has already been declared
-// IGNORE_BACKEND: WASM
 // WITH_STDLIB
 
 import kotlin.test.*
 
-fun box(s: String): String {
+fun foo(s: String): String {
     class Local {
         constructor(x: Int) {
             this.x = x
@@ -27,6 +21,6 @@ fun box(s: String): String {
 }
 
 fun box(): String {
-    assertEquals("OKOK", box("OK"))
+    assertEquals("OKOK", foo("OK"))
     return "OK"
 }

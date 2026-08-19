@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("gradle-plugin-compiler-dependency-configuration")
     id("project-tests-convention")
 }
@@ -14,6 +13,7 @@ kotlin {
 dependencies {
     compileOnly(kotlinStdlib())
 
+    implementation(project(":native:native.config"))
     implementation(project(":native:swift:sir"))
     implementation(project(":native:swift:sir-providers"))
     implementation(project(":native:swift:sir-light-classes"))
@@ -23,11 +23,14 @@ dependencies {
     implementation(project(":analysis:analysis-api-standalone"))
 
     implementation(project(":libraries:tools:analysis-api-based-klib-reader"))
+    compileOnly(project(":kotlin-util-klib-metadata"))
 }
 
 sourceSets {
     "main" { projectDefault() }
 }
+
+optInToK1Deprecation()
 
 publish()
 

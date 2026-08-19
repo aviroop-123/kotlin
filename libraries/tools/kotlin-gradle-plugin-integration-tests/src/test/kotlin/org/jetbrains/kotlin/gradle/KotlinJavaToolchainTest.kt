@@ -158,7 +158,6 @@ class KotlinJavaToolchainTest : KGPBaseTest() {
         project(
             projectName = "simpleWithKapt".fullProjectName,
             gradleVersion = gradleVersion,
-            buildOptions = defaultBuildOptions.copy(languageVersion = "1.9"),
         ) {
             useToolchainExtension(11)
 
@@ -182,7 +181,6 @@ class KotlinJavaToolchainTest : KGPBaseTest() {
         project(
             projectName = "simpleWithKapt".fullProjectName,
             gradleVersion = gradleVersion,
-            buildOptions = defaultBuildOptions.copy(languageVersion = "1.9"),
         ) {
             build("assemble") {
                 assertOutputContains("Using workers NONE isolation mode to run kapt")
@@ -200,7 +198,7 @@ class KotlinJavaToolchainTest : KGPBaseTest() {
             projectName = "simpleWithKapt".fullProjectName,
             gradleVersion = gradleVersion,
             projectPathAdditionalSuffix = "1/cache-test",
-            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true, languageVersion = "1.9")
+            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true)
         ) {
             enableLocalBuildCache(buildCache)
             useToolchainExtension(11)
@@ -212,7 +210,7 @@ class KotlinJavaToolchainTest : KGPBaseTest() {
             projectName = "simpleWithKapt".fullProjectName,
             gradleVersion = gradleVersion,
             projectPathAdditionalSuffix = "2/cache-test",
-            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true, languageVersion = "1.9"),
+            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true),
         ) {
             enableLocalBuildCache(buildCache)
             useToolchainExtension(11)
@@ -236,7 +234,7 @@ class KotlinJavaToolchainTest : KGPBaseTest() {
             projectName = "simpleWithKapt".fullProjectName,
             gradleVersion = gradleVersion,
             projectPathAdditionalSuffix = "1/cache-test",
-            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true, languageVersion = "1.9")
+            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true)
         ) {
             enableLocalBuildCache(buildCache)
 
@@ -247,7 +245,7 @@ class KotlinJavaToolchainTest : KGPBaseTest() {
             projectName = "simpleWithKapt".fullProjectName,
             gradleVersion = gradleVersion,
             projectPathAdditionalSuffix = "2/cache-test",
-            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true, languageVersion = "1.9"),
+            buildOptions = defaultBuildOptions.copy(buildCacheEnabled = true),
         ) {
             enableLocalBuildCache(buildCache)
             gradleProperties.append(
@@ -474,9 +472,9 @@ class KotlinJavaToolchainTest : KGPBaseTest() {
                 """.trimIndent()
             )
 
-            build("build", buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
+            build("build", buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG), forwardBuildOutput = true) {
                 val compilerArgs = output.lineSequence()
-                    .filter { it.contains(":compileKotlin Kotlin compiler args:") }
+                    .filter { it.contains("Kotlin compiler args:") }
                     .first()
                 assert(compilerArgs.contains("-jvm-target 11")) {
                     "Kotlin compilation jvm-target argument is ${output.substringAfter("-jvm-target ").substringBefore(" ")}"

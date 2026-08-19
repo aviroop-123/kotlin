@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.backend.common.linkage.partial
 
 import org.jetbrains.kotlin.backend.common.linkage.partial.ClassifierExplorer.Companion.classifierLinkageStatusCache
+import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.expressions.IrCall
@@ -37,35 +38,37 @@ val IrClass.partialLinkageStatus: ClassifierPartialLinkageStatus?
 interface PartialLinkageSupportForLowerings {
     val isEnabled: Boolean
 
-    fun prepareLinkageError(
-        doNotLog: Boolean,
+    fun renderAndLogLinkageError(
         partialLinkageCase: PartialLinkageCase,
         element: IrElement,
         file: PLFile,
+        significance: PartialLinkageIssueSignificance = PartialLinkageIssueSignificance.MAJOR,
     ): String
 
+    context(irBuiltIns: IrBuiltIns)
     fun throwLinkageError(
         partialLinkageCase: PartialLinkageCase,
         element: IrElement,
         file: PLFile,
-        doNotLog: Boolean = false
+        significance: PartialLinkageIssueSignificance = PartialLinkageIssueSignificance.MAJOR,
     ): IrCall
 
     companion object {
         val DISABLED = object : PartialLinkageSupportForLowerings {
             override val isEnabled get() = false
-            override fun prepareLinkageError(
-                doNotLog: Boolean,
+            override fun renderAndLogLinkageError(
                 partialLinkageCase: PartialLinkageCase,
                 element: IrElement,
-                file: PLFile
+                file: PLFile,
+                significance: PartialLinkageIssueSignificance,
             ): String = error("Should not be called")
 
+            context(irBuiltIns: IrBuiltIns)
             override fun throwLinkageError(
                 partialLinkageCase: PartialLinkageCase,
                 element: IrElement,
                 file: PLFile,
-                doNotLog: Boolean
+                significance: PartialLinkageIssueSignificance,
             ): IrCall = error("Should not be called")
         }
     }

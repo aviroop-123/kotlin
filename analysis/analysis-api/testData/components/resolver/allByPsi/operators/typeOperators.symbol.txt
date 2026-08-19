@@ -1,0 +1,184 @@
+KtFile: 'typeOperators.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtNamedFunction(0,173): 'fun test(a: Any) {'
+  null
+
+KtParameterList(8,16): '(a: Any)'
+  null
+
+KtParameter(9,15): 'a: Any'
+  null
+
+KtTypeReference(12,15): 'Any'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtUserType(12,15): 'Any'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtNameReferenceExpression(12,15): 'Any'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtBlockExpression(17,173): '{'
+  null
+
+KtIsExpression(59,70): 'a is String'
+  null
+
+KtNameReferenceExpression(59,60): 'a'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      a: kotlin.Any
+    ]
+
+KtOperationReferenceExpression(61,63): 'is'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  null
+
+KtTypeReference(64,70): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(64,70): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(64,70): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtIsExpression(75,87): 'a !is String'
+  null
+
+KtNameReferenceExpression(75,76): 'a'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      a: kotlin.Any
+    ]
+
+KtOperationReferenceExpression(77,80): '!is'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  null
+
+KtTypeReference(81,87): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(81,87): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(81,87): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtBinaryExpressionWithTypeRHS(143,154): 'a as String'
+  null
+
+KtNameReferenceExpression(143,144): 'a'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      a: kotlin.Any
+    ]
+
+KtOperationReferenceExpression(145,147): 'as'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  null
+
+KtTypeReference(148,154): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(148,154): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(148,154): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtBinaryExpressionWithTypeRHS(159,171): 'a as? String'
+  null
+
+KtNameReferenceExpression(159,160): 'a'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      a: kotlin.Any
+    ]
+
+KtOperationReferenceExpression(161,164): 'as?'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  null
+
+KtTypeReference(165,171): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(165,171): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(165,171): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]

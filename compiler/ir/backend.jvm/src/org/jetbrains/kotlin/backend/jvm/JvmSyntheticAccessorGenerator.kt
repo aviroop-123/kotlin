@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.backend.jvm
 import org.jetbrains.kotlin.backend.common.ScopeWithIr
 import org.jetbrains.kotlin.backend.common.descriptors.synthesizedString
 import org.jetbrains.kotlin.backend.common.lower.inline.SyntheticAccessorGenerator
+import org.jetbrains.kotlin.backend.jvm.ir.isNonExposedConstructorOfOrdinaryClass
 import org.jetbrains.kotlin.backend.jvm.ir.isJvmInterface
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
@@ -17,6 +18,8 @@ import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildConstructor
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.makeNullable
@@ -138,6 +141,9 @@ class JvmSyntheticAccessorGenerator(context: JvmBackendContext) :
         contributeFieldAccessorSuffix(field, superQualifierSymbol)
     }
 
+    override fun createAccessorMarkerArgument(): IrConst =
+        IrConstImpl.constNull(UNDEFINED_OFFSET, UNDEFINED_OFFSET, context.symbols.defaultConstructorMarker.defaultType.makeNullable())
+
     /**
      * For both _reading_ and _writing_ field accessors, the suffix that includes some of [field]'s important properties.
      */
@@ -189,8 +195,9 @@ class JvmSyntheticAccessorGenerator(context: JvmBackendContext) :
         if (constructor.hiddenConstructorMangledParams != null) return true
         return constructor.isOrShouldBeHiddenDueToOrigin &&
                 !DescriptorVisibilities.isPrivate(constructor.visibility) &&
-                !constructor.constructedClass.isValue &&
-                (constructor.originalConstructorOfThisMfvcConstructorReplacement ?: constructor).hasMangledParameters() &&
+                !constructor.constructedClass.isBasicValueClass &&
+                ((constructor.originalConstructorOfThisMfvcConstructorReplacement ?: constructor).hasMangledParameters() ||
+                        constructor.isNonExposedConstructorOfOrdinaryClass()) &&
                 !constructor.constructedClass.isAnonymousObject
     }
 

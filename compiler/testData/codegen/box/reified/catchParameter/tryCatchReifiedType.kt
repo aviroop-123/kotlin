@@ -1,6 +1,6 @@
 // LANGUAGE: +AllowReifiedTypeInCatchClause
-// IGNORE_BACKEND_K1: ANY
 
+// FILE: lib.kt
 inline fun <reified E : Throwable> catch(block: () -> Nothing) {
     try {
         block()
@@ -20,6 +20,7 @@ inline fun <reified T : Throwable> evalCatch(block: () -> Nothing): String {
     }
 }
 
+// FILE: main.kt
 fun box(): String {
     var log = ""
 

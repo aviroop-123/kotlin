@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -13,6 +13,19 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.psi.stubs.KotlinObjectStub
 
+/**
+ * Represents an object declaration, including companion objects and named objects.
+ *
+ * ### Example:
+ *
+ * ```kotlin
+ *    object Singleton {
+ *        val x = 1
+ *    }
+ * // ^________________^
+ * // The entire object
+ * ```
+ */
 class KtObjectDeclaration : KtClassOrObject {
     constructor(node: ASTNode) : super(node)
     constructor(stub: KotlinObjectStub) : super(stub, KtStubBasedElementTypes.OBJECT_DECLARATION)
@@ -31,17 +44,8 @@ class KtObjectDeclaration : KtClassOrObject {
         return null
     }
 
-    override fun setName(@NonNls name: String): PsiElement {
-        return if (nameIdentifier == null) {
-            val psiFactory = KtPsiFactory(project)
-            val result = addAfter(psiFactory.createIdentifier(name), getObjectKeyword()!!)
-            addAfter(psiFactory.createWhiteSpace(), getObjectKeyword()!!)
-
-            result
-        } else {
-            super.setName(name)
-        }
-    }
+    @OptIn(KtNonPublicApi::class)
+    override fun setName(@NonNls name: String): PsiElement = KtPsiMutationService.getInstance().setObjectDeclarationName(this, name)
 
     fun isCompanion(): Boolean = hasModifier(KtTokens.COMPANION_KEYWORD)
 

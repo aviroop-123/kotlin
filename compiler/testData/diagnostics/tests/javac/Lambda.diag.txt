@@ -1,11 +1,47 @@
-// -- Module: <m1> --
+/Call.kt:84:9: error: Cannot access class 'com.result.A'. Check your module classpath for missing or conflicting dependencies.
 
-// -- Module: <m2> --
+/Call.kt:84:9: error: Cannot access class 'com.result.B'. Check your module classpath for missing or conflicting dependencies.
 
-// -- Module: <m3> --
+/Call.kt:84:9: error: Cannot access class 'com.result.C'. Check your module classpath for missing or conflicting dependencies.
 
-// -- Module: <m4> --
-/Call.kt:90:19: error: unresolved reference: result
-fun simple(b: com.result.B<*>) {}
-                  ^^^^^^
+/Call.kt:84:21: error: Cannot access class 'com.result.A'. Check your module classpath for missing or conflicting dependencies.
 
+/Call.kt:84:21: error: Cannot access class 'com.result.B'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:84:21: error: Cannot access class 'com.result.C'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:84:30: error: Cannot access class 'com.result.B'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:85:9: error: Cannot access class 'com.result.A'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:85:9: error: Cannot access class 'com.result.B'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:85:9: error: Cannot access class 'com.result.C'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:85:21: error: Cannot access class 'com.result.A'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:85:21: error: Cannot access class 'com.result.B'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:85:21: error: Cannot access class 'com.result.C'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:85:32: error: Cannot access class 'com.result.B'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:9: error: Cannot access class 'com.result.A'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:9: error: Cannot access class 'com.result.C'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:9: error: Cannot access class 'com.result.Owner.Nested'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:9: error: Cannot access class 'com.result.Owner.Nested.VeryNested'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:30: error: Cannot access class 'com.result.A'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:30: error: Cannot access class 'com.result.C'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:30: error: Cannot access class 'com.result.Owner.Nested'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:30: error: Cannot access class 'com.result.Owner.Nested.VeryNested'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:86:39: error: Cannot access class 'com.result.Owner.Nested.VeryNested'. Check your module classpath for missing or conflicting dependencies.
+
+/Call.kt:90:19: error: Unresolved reference 'result'.

@@ -18,6 +18,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.openapi.vfs.VirtualFileSystem
 import com.intellij.psi.FileContextProvider
+import com.intellij.psi.JavaModuleGraphHelper
 import com.intellij.psi.augment.PsiAugmentProvider
 import com.intellij.psi.codeStyle.JavaFileCodeStyleFacadeFactory
 import com.intellij.psi.impl.smartPointers.SmartPointerAnchorProvider
@@ -45,6 +46,9 @@ class KotlinCoreApplicationEnvironment private constructor(
 
     init {
         registerApplicationService(JavaFileCodeStyleFacadeFactory::class.java, DummyJavaFileCodeStyleFacadeFactory())
+        if (application.getService(JavaModuleGraphHelper::class.java) == null) {
+            registerApplicationService(JavaModuleGraphHelper::class.java, DumbJavaModuleGraphHelper())
+        }
         registerFileType(JavaClassFileType.INSTANCE, "sig")
     }
 
@@ -98,6 +102,7 @@ class KotlinCoreApplicationEnvironment private constructor(
         @Deprecated(
             message = "The `unitTestMode` flag is deprecated in favor of `KotlinCoreApplicationEnvironmentMode` configuration.",
             replaceWith = ReplaceWith("create(parentDisposable, KotlinCoreApplicationEnvironmentMode.fromUnitTestModeFlag(unitTestMode))"),
+            level = DeprecationLevel.ERROR,
         )
         fun create(
             parentDisposable: Disposable,

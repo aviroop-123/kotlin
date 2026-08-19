@@ -1,7 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +MixedNamedArgumentsInTheirOwnPosition
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// SKIP_TXT
 
 fun foo(a: String, b: String) {}
 
@@ -14,8 +12,8 @@ fun reformat(
 ) {}
 
 fun main() {
-    foo(b = "first", a = "a", <!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>"second"<!>) // prints "a, second"
-    reformat(normalizeCase = "first",str = "",<!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>"second"<!>,<!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>false<!>,<!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>true<!>, <!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>'s'<!> )
+    foo(b = "first", a = "a", <!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>"second"<!>) // prints "a, second"
+    reformat(normalizeCase = "first",str = "",<!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>"second"<!>,<!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>false<!>,<!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>true<!>, <!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>'s'<!> )
 }
 
 /* GENERATED_FIR_TAGS: functionDeclaration, stringLiteral */

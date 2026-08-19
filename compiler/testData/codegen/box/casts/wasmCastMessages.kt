@@ -1,7 +1,10 @@
 // WITH_STDLIB
 // TARGET_BACKEND: WASM
+// IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_SECOND_STAGE: Wasm-JS:2.3,2.4
+// ^^^ KT-83159 is fixed in 2.4.20-Beta1
+//     Expected <Cannot cast instance of Function0 to kotlin.Function1: incompatible types> but actual <Cannot cast instance of box$lambda to kotlin.Function1: incompatible types>
 
-import kotlin.js.Promise
+// FILE: lib.kt
 import kotlin.reflect.KProperty1
 
 inline fun <reified T> tryCast(x: Any?, expected: String?): String? {
@@ -13,15 +16,17 @@ inline fun <reified T> tryCast(x: Any?, expected: String?): String? {
     return "Expected ClassCastException with message <$expected> but no exception was throwed"
 }
 
-fun tryCastToJsAny(x: Any?): String? {
-    try {
-        x as JsAny
-    } catch (cce: ClassCastException) {
-        return if (cce.message != null) "Expected null but actual <${cce.message}>" else null
-    }
-    return "Expected ClassCastException with message null but no exception was throwed"
-}
+inline fun <reified T : Any> nullAsT(): T = null as T
 
+inline fun <reified T> expectOk(x: Any?): String? =
+    try {
+        x as T
+        null
+    } catch (cce: ClassCastException) {
+        "Unexpected CCE: ${cce.message}"
+    }
+
+// FILE: main.kt
 fun tryCastToNothing(x: Any?, expected: String): String? {
     try {
         x as Nothing
@@ -89,16 +94,6 @@ fun tryCastGenericArray(): String? {
     return "Expected ClassCastException with message <$expected> but no exception was thrown"
 }
 
-inline fun <reified T : Any> nullAsT(): T = null as T
-
-inline fun <reified T> expectOk(x: Any?): String? =
-    try {
-        x as T
-        null
-    } catch (cce: ClassCastException) {
-        "Unexpected CCE: ${cce.message}"
-    }
-
 interface I
 open class Base: I
 class Derived: Base()
@@ -109,9 +104,6 @@ fun box(): String {
     tryCast<String>(null, "Cannot cast null to kotlin.String: target type is non-nullable")?.let { return it }
     tryCastToNNothing(42, "Expected null (Nothing?), got an instance of kotlin.Int")?.let { return it }
     tryCast<CharSequence>(42, "Cannot cast instance of kotlin.Int to kotlin.CharSequence: incompatible types")?.let { return it }
-    tryCast<String>(Promise.resolve(null), "Cannot cast instance of Promise to kotlin.String: incompatible types")?.let { return it }
-    tryCast<Promise<*>>(42, "Cannot cast instance of kotlin.Int to Promise: incompatible types")?.let { return it }
-    tryCastToJsAny(null)?.let { return it }
     tryCastToNothing(42, "Cannot cast instance of kotlin.Int to kotlin.Nothing: incompatible types")?.let { return it }
     tryCastToNothing(null, "Cannot cast null to kotlin.Nothing: target type is non-nullable")?.let { return it }
     tryCastGeneric()?.let { return it }
@@ -121,10 +113,10 @@ fun box(): String {
     tryCast<Int>(E.A, "Cannot cast instance of E to kotlin.Int: incompatible types")?.let { return it }
     tryCast<Unit>(42, "Cannot cast instance of kotlin.Int to kotlin.Unit: incompatible types")?.let { return it }
     val f = {}
-    tryCast<(String) -> Int>(f, "Cannot cast instance of box\$lambda to kotlin.Function1: incompatible types")?.let { return it }
+    tryCast<(String) -> Int>(f, "Cannot cast instance of Function0 to kotlin.Function1: incompatible types")?.let { return it }
     tryCast<Array<String>>(intArrayOf(1), "Cannot cast instance of kotlin.IntArray to kotlin.Array: incompatible types")?.let { return it }
     val sf: suspend () -> Unit = suspend { }
-    tryCast<(String) -> Int>(sf, "Cannot cast instance of box\$slambda to kotlin.Function1: incompatible types")?.let { return it }
+    tryCast<(String) -> Int>(sf, "Cannot cast instance of SuspendFunction0 to kotlin.Function1: incompatible types")?.let { return it }
     tryCast<IntArray>(arrayOf(1), "Cannot cast instance of kotlin.Array to kotlin.IntArray: incompatible types")?.let { return it }
     tryCast<Array<Int>>(intArrayOf(1), "Cannot cast instance of kotlin.IntArray to kotlin.Array: incompatible types")?.let { return it }
     val u: Any = 1u

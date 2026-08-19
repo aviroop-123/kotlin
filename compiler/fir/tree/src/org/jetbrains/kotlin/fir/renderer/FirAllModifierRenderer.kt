@@ -9,10 +9,13 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.*
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
 
-class FirAllModifierRenderer : FirModifierRenderer() {
+class FirAllModifierRenderer(private val staticPolicy: StaticPolicy) : FirModifierRenderer() {
     override fun renderModifiers(memberDeclaration: FirMemberDeclaration) {
-        if (memberDeclaration !is FirProperty || !memberDeclaration.isLocal && memberDeclaration.visibility != Visibilities.Local) {
+        if (memberDeclaration !is FirProperty ||
+            memberDeclaration.symbol !is FirLocalPropertySymbol && memberDeclaration.visibility != Visibilities.Local
+        ) {
             renderModifier(memberDeclaration.visibility.asString())
             renderModifier(memberDeclaration.modalityAsString())
         }
@@ -29,7 +32,7 @@ class FirAllModifierRenderer : FirModifierRenderer() {
             renderModifier("override")
         }
         if (memberDeclaration.isStatic) {
-            renderModifier("static")
+            renderModifier(staticPolicy.renderStatic(memberDeclaration))
         }
         if (memberDeclaration.isInner) {
             renderModifier("inner")
@@ -94,6 +97,10 @@ class FirAllModifierRenderer : FirModifierRenderer() {
 
     override fun renderModifiers(propertyAccessor: FirPropertyAccessor) {
         renderModifier(propertyAccessor.visibility.asString())
+
+        if (propertyAccessor.isStatic) {
+            renderModifier(staticPolicy.renderStatic(propertyAccessor))
+        }
         if (propertyAccessor.isInline) {
             renderModifier("inline")
         }

@@ -24,20 +24,40 @@ internal const val CtxReceiversDeprecated =
 public annotation class ExperimentalContextReceivers
 
 /**
- * Marks an API related to the experimental feature "annotations in metadata", enabled by the compiler flag `-Xannotations-in-metadata`
- * (https://youtrack.jetbrains.com/issue/KT-57919).
- *
- * kotlin-metadata-jvm clients are encouraged to update the code that reads and writes Kotlin metadata with the support of new annotations,
- * before annotations in metadata become enabled by default (https://youtrack.jetbrains.com/issue/KT-75736).
- *
- * Note that we have one-version forward compatibility policy on Kotlin/JVM, so kotlin-metadata-jvm 2.2 can read and write metadata of
- * version 2.3. In case annotations in metadata are enabled by default in 2.3, not handling them via kotlin-metadata-jvm of version 2.2
- * will likely produce incorrect results on class files compiled by Kotlin 2.3. Clients can use the Kotlin compiler flag
- * `-Xannotations-in-metadata` to check that annotations in metadata are read/written correctly.
+ * This annotation marked API related to the feature "annotations in metadata" (https://youtrack.jetbrains.com/issue/KT-57919),
+ * which was experimental before Kotlin 2.4.0.
  */
 @RequiresOptIn(
     "This API is related to the experimental feature \"annotations in metadata\" (see KT-57919).",
     RequiresOptIn.Level.WARNING,
 )
 @MustBeDocumented
+@Deprecated("Annotations in metadata are enabled by default since Kotlin 2.4. This annotation has no effect.")
 public annotation class ExperimentalAnnotationsInMetadata
+
+/**
+ * Marks an API related to the experimental feature "unused return value checker" [KT-12719](https://youtrack.jetbrains.com/issue/KT-12719),
+ * enabled by the compiler flag `-Xreturn-value-checker`.
+ *
+ * This feature uses kotlin metadata to store information whether the return value of a function should be checked for usage.
+ * See [KmFunction.returnValueStatus] and [ReturnValueStatus] for details.
+ */
+@RequiresOptIn(
+    "This API is related to the experimental feature \"unused return value checker\" (see KT-12719).",
+    RequiresOptIn.Level.WARNING,
+)
+@MustBeDocumented
+public annotation class ExperimentalMustUseStatus
+
+/**
+ * Marks an API related to the experimental feature "companion blocks and extensions" [KEEP-449](https://github.com/Kotlin/KEEP/blob/main/proposals/KEEP-0449-companions-block-extension.md).
+ *
+ * Functions and properties introduced in companion blocks and extensions are compiled as static on JVM,
+ * and have [KmFunction.isStatic] and [KmProperty.isStatic] attributes set to `true`.
+ */
+@RequiresOptIn(
+    "This API is related to the experimental feature \"companion blocks and extensions\" (see KEEP-449) and may be changed or removed in any future release.",
+    RequiresOptIn.Level.ERROR,
+)
+@MustBeDocumented
+public annotation class ExperimentalCompanionBlocksAndExtensions

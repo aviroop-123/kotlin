@@ -1,5 +1,7 @@
-// RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +UnitConversionsOnArbitraryExpressions +SuspendConversion
+// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
+// FIR_DUMP
+// LANGUAGE: +UnitConversionsOnArbitraryExpressions
 // DIAGNOSTICS: -UNUSED_PARAMETER -UNUSED_EXPRESSION
 
 fun interface SuspendRunnable {

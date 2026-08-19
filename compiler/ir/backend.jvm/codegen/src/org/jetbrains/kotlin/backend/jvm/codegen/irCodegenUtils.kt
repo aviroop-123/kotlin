@@ -7,9 +7,10 @@ package org.jetbrains.kotlin.backend.jvm.codegen
 
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
+import org.jetbrains.kotlin.backend.jvm.JvmSymbols
 import org.jetbrains.kotlin.backend.jvm.MultifileFacadeFileEntry
 import org.jetbrains.kotlin.backend.jvm.ir.*
-import org.jetbrains.kotlin.backend.jvm.localClassType
+import org.jetbrains.kotlin.backend.jvm.isPublicAbi
 import org.jetbrains.kotlin.backend.jvm.mapping.IrTypeMapper
 import org.jetbrains.kotlin.backend.jvm.mapping.mapClass
 import org.jetbrains.kotlin.backend.jvm.mapping.mapSupertype
@@ -21,12 +22,14 @@ import org.jetbrains.kotlin.codegen.SourceInfo
 import org.jetbrains.kotlin.codegen.inline.ReifiedTypeParametersUsages
 import org.jetbrains.kotlin.codegen.inline.SourceMapper
 import org.jetbrains.kotlin.codegen.signature.BothSignatureWriter
+import org.jetbrains.kotlin.codegen.state.JvmBackendConfig
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
+import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 import org.jetbrains.kotlin.ir.types.*
@@ -122,7 +125,7 @@ fun IrClass.calculateInnerClassAccessFlags(context: JvmBackendContext): Int {
 private fun IrClass.innerAccessFlagsForModalityAndKind(): Int {
     when (kind) {
         ClassKind.INTERFACE -> return Opcodes.ACC_ABSTRACT or Opcodes.ACC_INTERFACE
-        ClassKind.ENUM_CLASS -> return Opcodes.ACC_FINAL or Opcodes.ACC_ENUM
+        ClassKind.ENUM_CLASS -> return (if (modality == Modality.ABSTRACT) Opcodes.ACC_ABSTRACT else Opcodes.ACC_FINAL) or Opcodes.ACC_ENUM
         ClassKind.ANNOTATION_CLASS -> return Opcodes.ACC_ABSTRACT or Opcodes.ACC_ANNOTATION or Opcodes.ACC_INTERFACE
         else -> {
             if (modality === Modality.FINAL) {
@@ -279,11 +282,12 @@ fun IrClass.getVisibilityAccessFlagForClass(): Int {
     if (kind == ClassKind.ENUM_ENTRY) {
         return AsmUtil.NO_FLAG_PACKAGE_PRIVATE
     }
-    return if (visibility === DescriptorVisibilities.PUBLIC ||
+    return if (isPublicAbi ||
+        visibility === DescriptorVisibilities.PUBLIC ||
         visibility === DescriptorVisibilities.PROTECTED ||
+        visibility === DescriptorVisibilities.INTERNAL ||
         // TODO: should be package private, but for now Kotlin's reflection can't access members of such classes
-        visibility === DescriptorVisibilities.LOCAL ||
-        visibility === DescriptorVisibilities.INTERNAL
+        visibility === DescriptorVisibilities.LOCAL
     ) {
         Opcodes.ACC_PUBLIC
     } else AsmUtil.NO_FLAG_PACKAGE_PRIVATE
@@ -297,7 +301,7 @@ val IrDeclaration.isAnnotatedWithJavaLangDeprecated: Boolean
 
 internal fun IrDeclaration.isDeprecatedCallable(context: JvmBackendContext): Boolean =
     isAnnotatedWithDeprecated ||
-            annotations.any { it.symbol == context.symbols.javaLangDeprecatedConstructorWithDeprecatedFlag }
+            annotations.any { it.classSymbol == context.symbols.javaLangDeprecatedWithDeprecatedFlag }
 
 internal fun IrFunction.isDeprecatedFunction(context: JvmBackendContext): Boolean =
     origin == JvmLoweredDeclarationOrigin.SYNTHETIC_METHOD_FOR_PROPERTY_OR_TYPEALIAS_ANNOTATIONS ||
@@ -360,4 +364,18 @@ internal fun generateExternalEntriesForEnumTypeIfNeeded(type: IrType, containing
         Opcodes.GETSTATIC, containingCodegen.typeMapper.mapClass(field.parentAsClass).internalName,
         field.name.asString(), AsmTypes.ENUM_ENTRIES.descriptor
     )
+}
+
+internal fun IrFunction.isGeneratedCodeMarker(config: JvmBackendConfig, symbols: JvmSymbols): Boolean {
+    if (!config.enhancedCoroutinesDebugging) return false
+    if (!isInline) return false
+    return parentClassOrNull?.symbol == symbols.generatedCodeMarkersInCoroutinesClass
+}
+
+// returns true if both the caller and callee have exactly one type parameter, and the callee's type argument
+// matches the caller's type parameter
+internal fun IrFunctionAccessExpression.isGenericCallWithCallersSingleTypeParameter(caller: IrFunction): Boolean {
+    val calleeTypeArg = typeArguments.singleOrNull()?.classifierOrNull?.owner as? IrTypeParameter ?: return false
+    val callerTypeParam = caller.typeParameters.singleOrNull() ?: return false
+    return calleeTypeArg.name == callerTypeParam.name && calleeTypeArg.parent.kotlinFqName == callerTypeParam.parent.kotlinFqName
 }

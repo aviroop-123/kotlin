@@ -8,7 +8,7 @@ package org.jetbrains.kotlin.backend.konan.llvm
 import kotlinx.cinterop.*
 import llvm.*
 import org.jetbrains.kotlin.config.LoggingContext
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.ir.IrDiagnosticReporter
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 
 internal val LLVMValueRef.type: LLVMTypeRef
@@ -41,8 +41,6 @@ private class ConstGetElementPtr(llvm: CodegenLlvmHelpers, pointeeType: LLVMType
     override val llvm = LLVMConstInBoundsGEP2(pointeeType, pointer.llvm, cValuesOf(llvm.int32(0), llvm.int32(index)), 2)!!
     // TODO: squash multiple GEPs
 }
-
-internal fun ConstPointer.bitcast(toType: LLVMTypeRef) = constPointer(LLVMConstBitCast(this.llvm, toType)!!)
 
 internal class ConstArray(elementType: LLVMTypeRef?, val elements: List<ConstValue>) : ConstValue {
     init {
@@ -85,10 +83,6 @@ internal class Zero(val type: LLVMTypeRef) : ConstValue {
     override val llvm = LLVMConstNull(type)!!
 }
 
-internal class NullPointer(pointeeType: LLVMTypeRef): ConstPointer {
-    override val llvm = LLVMConstNull(pointerType(pointeeType))!!
-}
-
 internal fun constValue(value: LLVMValueRef) = object : ConstValue {
     init {
         assert (LLVMIsConstant(value) == 1)
@@ -101,28 +95,14 @@ internal val RuntimeAware.kTypeInfo: LLVMTypeRef
     get() = runtime.typeInfoType
 internal val RuntimeAware.kObjHeader: LLVMTypeRef
     get() = runtime.objHeaderType
-internal val RuntimeAware.kObjHeaderPtr: LLVMTypeRef
-    get() = runtime.objHeaderPtrType
 internal val RuntimeAware.kObjHeaderPtrReturnType: LlvmRetType
-    get() = LlvmRetType(kObjHeaderPtr, isObjectType = true)
-internal val RuntimeAware.kObjHeaderPtrPtr: LLVMTypeRef
-    get() = runtime.objHeaderPtrPtrType
+    get() = LlvmRetType(runtime.pointerType, isObjectType = true)
 internal val RuntimeAware.kArrayHeader: LLVMTypeRef
     get() = runtime.arrayHeaderType
-internal val RuntimeAware.kArrayHeaderPtr: LLVMTypeRef
-    get() = pointerType(kArrayHeader)
-internal val RuntimeAware.kTypeInfoPtr: LLVMTypeRef
-    get() = pointerType(kTypeInfo)
-internal val RuntimeAware.kNullObjHeaderPtr: LLVMValueRef
-    get() = LLVMConstNull(kObjHeaderPtr)!!
-internal val RuntimeAware.kNullObjHeaderPtrPtr: LLVMValueRef
-    get() = LLVMConstNull(kObjHeaderPtrPtr)!!
 
 // Nothing type has no values, but we do generate unreachable code and thus need some fake value:
 internal val RuntimeAware.kNothingFakeValue: LLVMValueRef
-    get() = LLVMGetUndef(kObjHeaderPtr)!!
-
-internal fun pointerType(pointeeType: LLVMTypeRef) = LLVMPointerType(pointeeType, 0)!!
+    get() = LLVMGetUndef(runtime.pointerType)!!
 
 fun extractConstUnsignedInt(value: LLVMValueRef): Long {
     assert(LLVMIsConstant(value) != 0)
@@ -287,7 +267,7 @@ fun getStructElements(type: LLVMTypeRef): List<LLVMTypeRef> {
 
 internal fun parseBitcodeFile(
         loggingContext: LoggingContext,
-        messageCollector: MessageCollector,
+        diagnosticReporter: IrDiagnosticReporter,
         llvmContext: LLVMContextRef,
         path: String,
 ): LLVMModuleRef = memScoped {
@@ -303,7 +283,7 @@ internal fun parseBitcodeFile(
     try {
 
         val moduleRef = alloc<LLVMModuleRefVar>()
-        val diagnosticHandler = DefaultLlvmDiagnosticHandler(loggingContext, messageCollector)
+        val diagnosticHandler = DefaultLlvmDiagnosticHandler(loggingContext, diagnosticReporter)
         val parseRes = withLlvmDiagnosticHandler(llvmContext, diagnosticHandler) {
             LLVMParseBitcodeInContext2(llvmContext, memoryBuffer, moduleRef.ptr)
         }

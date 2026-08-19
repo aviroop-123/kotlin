@@ -1,7 +1,5 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
 // WITH_STDLIB
-// SKIP_TXT
 
 fun test1() =
     buildBoxUnit {

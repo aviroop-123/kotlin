@@ -6,25 +6,28 @@
 package org.jetbrains.kotlin.test.runners
 
 import com.intellij.testFramework.TestDataFile
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.test.Constructor
 import org.jetbrains.kotlin.test.ExecutionListenerBasedDisposableProvider
+import org.jetbrains.kotlin.test.NonGroupingTestRunner
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
 import org.jetbrains.kotlin.test.backend.handlers.IrValidationErrorChecker
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.builders.testRunner
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilderBase
+import org.jetbrains.kotlin.test.builders.nonGroupingStageTestRunner
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives
 import org.jetbrains.kotlin.test.frontend.classic.handlers.ClassicUnstableAndK2LanguageFeaturesSkipConfigurator
 import org.jetbrains.kotlin.test.model.ResultingArtifact
-import org.jetbrains.kotlin.test.model.TestFile
+import org.jetbrains.kotlin.test.preprocessors.JvmInlineSourceTransformer
 import org.jetbrains.kotlin.test.preprocessors.MetaInfosCleanupPreprocessor
 import org.jetbrains.kotlin.test.services.*
 import org.jetbrains.kotlin.test.services.impl.TemporaryDirectoryManagerImpl
-import org.jetbrains.kotlin.test.utils.ReplacingSourceTransformer
 import org.jetbrains.kotlin.types.AbstractTypeChecker
 import org.jetbrains.kotlin.types.FlexibleTypeImpl
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInfo
+import org.jetbrains.kotlin.konan.test.blackbox.support.EnforcedHostTarget
 import kotlin.jvm.optionals.getOrNull
 
 abstract class AbstractKotlinCompilerTest {
@@ -35,7 +38,8 @@ abstract class AbstractKotlinCompilerTest {
         )
 
         val defaultPreprocessors: List<Constructor<SourceFilePreprocessor>> = listOf(
-            ::MetaInfosCleanupPreprocessor
+            ::MetaInfosCleanupPreprocessor,
+            ::JvmInlineSourceTransformer,
         )
 
         private fun configureDebugFlags() {
@@ -43,29 +47,37 @@ abstract class AbstractKotlinCompilerTest {
             FlexibleTypeImpl.RUN_SLOW_ASSERTIONS = true
         }
 
-        val defaultConfiguration: TestConfigurationBuilder.() -> Unit = {
+        val defaultConfiguration: TestConfigurationBuilderBase<*, *>.() -> Unit = {
             assertions = JUnit5Assertions
+            @OptIn(TestInfrastructureInternals::class)
+            useCustomCompilerConfigurationProvider(::CompilerConfigurationProviderImpl) // default provider initialization
             useAdditionalService<TemporaryDirectoryManager>(::TemporaryDirectoryManagerImpl)
             useAdditionalService<TargetPlatformProvider>(::TargetPlatformProviderForCompilerTests)
             useSourcePreprocessor(*defaultPreprocessors.toTypedArray())
             useDirectives(*defaultDirectiveContainers.toTypedArray())
-            useMetaTestConfigurators(::SystemPropertyTestDataRootConfigurator, ::ClassicUnstableAndK2LanguageFeaturesSkipConfigurator)
+            useMetaTestConfigurators(
+                ::SystemPropertyTestDataRootConfigurator,
+                ::ClassicUnstableAndK2LanguageFeaturesSkipConfigurator,
+                ::TargetBackendTestSkipper,
+            )
+            useFailureSuppressors(::IrValidationErrorChecker)
             configureDebugFlags()
-            startingArtifactFactory = { ResultingArtifact.Source() }
         }
     }
 
     protected val configuration: TestConfigurationBuilder.() -> Unit = {
         defaultConfiguration()
+        startingArtifactFactory = { ResultingArtifact.Source() }
         useAdditionalService { createApplicationDisposableProvider() }
         useAdditionalService { createKotlinStandardLibrariesPathProvider() }
         testInfo = this@AbstractKotlinCompilerTest.testInfo
         @OptIn(TestInfrastructureInternals::class)
         configureInternal(this)
-        useAfterAnalysisCheckers(::IrValidationErrorChecker)
     }
 
     private lateinit var testInfo: KotlinTestInfo
+    lateinit var testRunner: NonGroupingTestRunner
+        private set
 
     open fun createApplicationDisposableProvider(): ApplicationDisposableProvider {
         return ExecutionListenerBasedDisposableProvider()
@@ -108,28 +120,26 @@ abstract class AbstractKotlinCompilerTest {
     }
 
     open fun runTest(@TestDataFile filePath: String) {
-        testRunner(filePath, configuration).runTest(filePath)
+        initTestRunner(ForTestCompileRuntime.transformTestDataPath(filePath).path).runTest(filePath)
     }
 
-    open fun runTest(
-        @TestDataFile filePath: String,
-        contentModifier: ReplacingSourceTransformer,
-    ) {
-        class SourceTransformer(testServices: TestServices) : ReversibleSourceFilePreprocessor(testServices) {
-            override fun process(file: TestFile, content: String): String = contentModifier.invokeForTestFile(content)
-            override fun revert(file: TestFile, actualContent: String): String = contentModifier.revertForFile(actualContent)
+    fun initTestRunner(@TestDataFile filePath: String): NonGroupingTestRunner {
+        return nonGroupingStageTestRunner(filePath, configuration).also {
+            testRunner = it
         }
-        testRunner(filePath) {
-            configuration.invoke(this)
-            useSourcePreprocessor(::SourceTransformer)
-        }.runTest(filePath)
+    }
+
+    fun initTestRunnerAndCreateModuleStructure(@TestDataFile filePath: String) {
+        initTestRunner(filePath).prepareModuleStructure(filePath)
     }
 }
 
 fun TestInfo.toKotlinTestInfo(): KotlinTestInfo {
+    val testClass = this.testClass.getOrNull()
     return KotlinTestInfo(
-        className = this.testClass.getOrNull()?.name ?: "_undefined_",
+        className = testClass?.name ?: "_undefined_",
         methodName = this.testMethod.getOrNull()?.name ?: "_testUndefined_",
-        tags = this.tags
+        tags = this.tags,
+        enforcedHostTarget = testClass?.isAnnotationPresent(EnforcedHostTarget::class.java) ?: false,
     )
 }

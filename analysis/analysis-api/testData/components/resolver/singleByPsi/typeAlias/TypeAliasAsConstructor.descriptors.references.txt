@@ -1,6 +1,0 @@
-KtNameReferenceExpression(76,83): 'MyAlias'
-  KtSimpleNameReference:
-    (in test.MyClass) constructor()
-
-  SyntheticPropertyAccessorReference:
-    Nothing (Unresolved reference)

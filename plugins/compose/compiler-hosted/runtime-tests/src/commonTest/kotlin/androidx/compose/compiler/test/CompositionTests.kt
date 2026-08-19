@@ -25,10 +25,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.setMain
+import org.jetbrains.kotlin.testFederation.SmokeTest
 import org.junit.BeforeClass
+import org.junit.experimental.categories.Category
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+@Category(SmokeTest::class)
 class CompositionTests {
     companion object {
         @OptIn(ExperimentalCoroutinesApi::class)
@@ -426,6 +429,112 @@ class CompositionTests {
             Text("Not default")
         }
     }
+
+    // This test ensures that memoization is disabled in `try` expressions. It serves as a
+    // regression test against b/419049140.
+    @Test
+    fun testMemoizationIsDisabledInTryExpressions() = compositionTest {
+        fun foo(block: () -> Unit) {}
+
+        compose {
+            try {
+                if (true) {
+                    foo(block = {})
+                    throw IllegalArgumentException("")
+                }
+            } catch (ignored: Exception) {
+            }
+        }
+    }
+
+    // Regression test for b/479646393
+    @Test
+    fun testInlineSwitchRemembers() = compositionTest {
+        var clicked by mutableStateOf(true)
+
+        compose {
+            Modifier.thenIf(
+                condition = clicked,
+                ifTrue = {
+                    clickable { clicked = !clicked }
+                },
+                ifFalse = {
+                    remember { mutableStateOf(value = "Mock") }
+                    clickable { clicked = !clicked }
+                },
+            )
+        }
+
+        clicked = !clicked
+        advance()
+
+        clicked = !clicked
+        advance()
+    }
+
+    // This test ensures that code that tries to access `Any.$stable` is never generated.
+    @Test
+    fun testAnyIsUnstable() = compositionTest {
+        compose {
+            AnyParameter(Any())
+        }
+    }
+
+
+    // Regression test for b/509945632
+    @Test
+    fun testInlineFunctionWith2Lambdas() = compositionTest {
+        var elements by mutableStateOf(emptyList<String>())
+        var counter = 0
+        compose {
+            // if lambdas introduce a group, `ReceiveValueGroup` is removed after update
+            elements.associateBy({ it }, { it.length })
+            ReceiveValueGroup(counter)
+        }
+
+        elements = List(100) { "$it" }
+        counter += 10
+        advance()
+    }
+
+    // Regression test for b/509945632
+    @Test
+    fun testInlineFunctionWith2LambdasComposable() = compositionTest {
+        var elements by mutableStateOf(emptyList<String>())
+        var counter = 0
+        compose {
+            // if not wrapped with a group, `ReceiveValueGroup` is removed after update
+            elements.associateBy({
+                remember { it }
+            }, {
+                it.length
+            })
+            ReceiveValueGroup(counter)
+        }
+
+        elements = List(100) { "$it" }
+        counter += 10
+        advance()
+    }
+
+    /**
+     * This is a regression test against a bug that made it possible for a value of an unstable type
+     * to get passed into code that was generated to only expect to receive values of stable types.
+     * types. For more details, see https://issuetracker.google.com/issues/511102714.
+     */
+    @Test
+    fun subtypeStabilityNeglectedRegressionTest() = compositionTest {
+        val state = mutableStateOf<LoadingState<Unstable>>(LoadingState.Loading)
+        val result = mutableStateOf(false)
+
+        compose {
+            SubtypeStabilityNeglectedRegressionTestEntrypoint(state.value, result)
+        }
+
+        state.value = LoadingState.Content(Unstable())
+        advance()
+        assertEquals(true, result.value)
+    }
 }
 
 @Composable
@@ -437,6 +546,12 @@ fun getCondition() = remember { false }
 @NonRestartableComposable
 @Composable
 fun ReceiveValue(value: Int) {
+    val string = remember { "$value" }
+    assertEquals(1, string.length)
+}
+
+@Composable
+fun ReceiveValueGroup(value: Int) {
     val string = remember { "$value" }
     assertEquals(1, string.length)
 }
@@ -463,7 +578,7 @@ class CrossInlineState(content: @Composable () -> Unit = { }) {
 
 public inline fun inlineWithNoinlineDefault(
     noinline default: @Composable (() -> Unit)? = { Text("Default") },
-    content: (@Composable (() -> Unit)?) -> Unit
+    content: (@Composable (() -> Unit)?) -> Unit,
 ) {
     content(default)
 }
@@ -521,11 +636,12 @@ fun RestartableVararg(vararg states: State<Unit> = emptyArray(), invoke: () -> U
 }
 
 interface Presenter {
-    @Composable fun Content()
+    @Composable
+    fun Content()
 }
 
 class PresenterImpl(
-    private val onCompose: () -> Unit
+    private val onCompose: () -> Unit,
 ) : Presenter {
     @Composable
     override fun Content() {
@@ -550,10 +666,48 @@ fun TwoRemembers(): String {
 @Composable
 fun TwoLambdas(
     lambda1: () -> Unit,
-    lambda2: (Int) -> Unit
+    lambda2: (Int) -> Unit,
 ) {
     use(lambda1)
     use(lambda2)
 }
 
-private fun use(value: Any?) { }
+private fun use(value: Any?) {}
+
+private object Modifier
+
+private inline fun Modifier.thenIf(
+    condition: Boolean,
+    ifFalse: Modifier.() -> Modifier,
+    ifTrue: Modifier.() -> Modifier,
+) = if (condition) {
+    ifTrue()
+} else {
+    ifFalse()
+}
+
+private fun Modifier.clickable(f: () -> Unit): Modifier = this
+
+@Composable
+fun AnyParameter(any: Any = Any()) {
+    use(any)
+}
+
+internal class Unstable {
+    @Suppress("unused")
+    var x: Int = 0
+}
+
+internal sealed class LoadingState<T> {
+    data object Loading : LoadingState<Unstable>()
+    data class Content<T : Any>(var data: T) : LoadingState<T>()
+}
+
+@Composable
+internal fun <T> LoadingContent(state: LoadingState<T>, result: MutableState<Boolean>) {
+    LaunchedEffect(state) {
+        if (state is LoadingState.Content<*>) {
+            result.value = true
+        }
+    }
+}

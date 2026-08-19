@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseReturnsEffect +AllowContractsForNonOverridableMembers
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER -SENSELESS_COMPARISON
 
@@ -17,13 +16,13 @@ class Foo {
 
         fun badOuter() {
             contract {
-                returns() implies (<!ERROR_IN_CONTRACT_DESCRIPTION("only references to direct <this> are allowed")!>this@Foo<!> != null)
+                <!ERROR_IN_CONTRACT_DESCRIPTION("'this' can only be a qualified reference to the extension receiver of contract owner.")!>returns() implies (this@Foo != null)<!>
             }
         }
 
         fun badInner() {
             contract {
-                returns() implies (<!ERROR_IN_CONTRACT_DESCRIPTION("only references to parameters are allowed. Did you miss label on <this>?")!>this<!> != null)
+                <!ERROR_IN_CONTRACT_DESCRIPTION("'this' can only be a qualified reference to the extension receiver of contract owner.")!>returns() implies (this != null)<!>
             }
         }
 
@@ -35,7 +34,7 @@ class Foo {
 
         fun A?.badWithReceiver() {
             contract {
-                returns() implies (<!ERROR_IN_CONTRACT_DESCRIPTION("only references to direct <this> are allowed")!>this@Bar<!> != null)
+                <!ERROR_IN_CONTRACT_DESCRIPTION("'this' can only be a qualified reference to the extension receiver of contract owner.")!>returns() implies (this@Bar != null)<!>
             }
         }
     }

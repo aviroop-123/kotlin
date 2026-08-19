@@ -5,8 +5,8 @@
 
 package org.jetbrains.kotlin.swiftexport.standalone
 
-import org.jetbrains.kotlin.analysis.api.projectStructure.KaLibraryModule
-import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.analysis.api.klib.reader.createKaModulesForStandaloneAnalysis
+import org.jetbrains.kotlin.library.metadata.KlibInputModule
 import org.jetbrains.kotlin.sir.SirModule
 import org.jetbrains.kotlin.sir.builder.buildModule
 import org.jetbrains.kotlin.sir.providers.SirTypeProvider
@@ -14,20 +14,19 @@ import org.jetbrains.kotlin.sir.providers.impl.SirEnumGeneratorImpl
 import org.jetbrains.kotlin.sir.providers.utils.SilentUnsupportedDeclarationReporter
 import org.jetbrains.kotlin.sir.providers.utils.SimpleUnsupportedDeclarationReporter
 import org.jetbrains.kotlin.sir.providers.utils.UnsupportedDeclarationReporter
-import org.jetbrains.kotlin.swiftexport.standalone.builders.createKaModulesForStandaloneAnalysis
 import org.jetbrains.kotlin.swiftexport.standalone.config.SwiftExportConfig
 import org.jetbrains.kotlin.swiftexport.standalone.config.SwiftModuleConfig
 import org.jetbrains.kotlin.swiftexport.standalone.translation.TranslationResult
 import org.jetbrains.kotlin.swiftexport.standalone.translation.translateCrossReferencingModulesTransitively
 import org.jetbrains.kotlin.swiftexport.standalone.translation.translateModulePublicApi
-import org.jetbrains.kotlin.swiftexport.standalone.utils.logConfigIssues
+import org.jetbrains.kotlin.swiftexport.standalone.utils.patchConfigAndLogIssues
+import org.jetbrains.kotlin.swiftexport.standalone.writer.BridgeSources
 import org.jetbrains.kotlin.swiftexport.standalone.writer.dumpTextAtFile
 import org.jetbrains.kotlin.swiftexport.standalone.writer.dumpTextAtPath
+import org.jetbrains.kotlin.utils.addToStdlib.ifTrue
 import org.jetbrains.sir.printer.SirPrinter
 import java.io.Serializable
 import java.nio.file.Path
-import kotlin.collections.filter
-import kotlin.collections.plus
 import kotlin.io.path.div
 
 public enum class UnsupportedDeclarationReporterKind {
@@ -49,11 +48,7 @@ public enum class ErrorTypeStrategy {
     }
 }
 
-public class InputModule(
-    public val name: String,
-    public val path: Path,
-    public val config: SwiftModuleConfig,
-)
+public typealias InputModule = KlibInputModule<SwiftModuleConfig>
 
 public sealed class SwiftExportModule(
     public val name: String,
@@ -135,7 +130,7 @@ public fun runSwiftExport(
     modules: Set<InputModule>,
     config: SwiftExportConfig,
 ): Result<Set<SwiftExportModule>> = runCatching {
-    logConfigIssues(modules, config.logger)
+    val config = patchConfigAndLogIssues(modules, config)
     val allModules = translateModules(modules, config)
     val packagesModule = writeKotlinPackagesModule(
         sirModule = allModules.createModuleForPackages(config),
@@ -145,15 +140,31 @@ public fun runSwiftExport(
         config = config,
         outputPath = config.outputPath.parent / config.runtimeSupportModuleName / "${config.runtimeSupportModuleName}.swift",
     )
-    return@runCatching setOf(packagesModule, runtimeSupportModule) + allModules.map { it.writeModule(config) }
+    val coroutineSupportModule = writeCoroutineSupportModule(
+        config = config,
+        outputPath = config.outputPath.parent / config.coroutineSupportModuleName / "${config.coroutineSupportModuleName}.swift",
+    )
+
+    val predefinedModules = setOfNotNull(packagesModule, runtimeSupportModule, coroutineSupportModule)
+
+    return@runCatching predefinedModules + allModules.map { it.writeModule(config) }
 }
 
 private fun translateModules(
     inputModules: Set<InputModule>,
     config: SwiftExportConfig,
 ): List<TranslationResult> {
-    val allModules = inputModules + config.stdlibInputModule
-    val kaModules = createKaModulesForStandaloneAnalysis(allModules, config.targetPlatform, config.platformLibsInputModule)
+    val [cinteropReexportLibs, ordinaryInputs] = inputModules
+        .partition { it.config.moduleProvidedThroughCinterop }
+        .let { it.first.toSet() to it.second.toSet() }
+
+    val allModules = ordinaryInputs + config.stdlibInputModule
+    val kaModules = createKaModulesForStandaloneAnalysis(
+        inputs = allModules,
+        targetPlatform = config.targetPlatform,
+        platformLibraries = config.platformLibsInputModule,
+        cinteropReexportLibraries = cinteropReexportLibs,
+    )
     val explicitModulesTranslationResults = allModules
         .filter { it.config.shouldBeFullyExported }
         .map { translateModulePublicApi(it, kaModules, config) }
@@ -199,21 +210,69 @@ private fun writeKotlinPackagesModule(
 private fun writeRuntimeSupportModule(
     config: SwiftExportConfig,
     outputPath: Path,
-): SwiftExportModule.SwiftOnly {
+): SwiftExportModule.BridgesToKotlin = writeSupportModule(
+    name = config.runtimeSupportModuleName,
+    config = config,
+    outputPath = outputPath
+)
 
-    val runtimeSupportContent = config.javaClass.getResource("/swift/KotlinRuntimeSupport.swift")?.readText()
-        ?: error("Can't find runtime support module")
-    dumpTextAtFile(sequenceOf(runtimeSupportContent), outputPath.toFile())
+private fun writeCoroutineSupportModule(
+    config: SwiftExportConfig,
+    outputPath: Path,
+): SwiftExportModule.BridgesToKotlin? = config.enableCoroutinesSupport.ifTrue {
+    writeSupportModule(
+        name = config.coroutineSupportModuleName,
+        config = config,
+        outputPath = outputPath,
+        dependencies = listOf(SwiftExportModule.Reference(config.runtimeSupportModuleName))
+    )
+}
 
-    return SwiftExportModule.SwiftOnly(
-        swiftApi = outputPath,
-        name = config.runtimeSupportModuleName,
-        kind = SwiftExportModule.SwiftOnly.Kind.KotlinRuntimeSupport,
+private fun writeSupportModule(
+    name: String,
+    config: SwiftExportConfig,
+    outputPath: Path,
+    dependencies: List<SwiftExportModule.Reference> = emptyList(),
+): SwiftExportModule.BridgesToKotlin {
+    require(name.isNotBlank() && name.first().isLetter() && name.all { it.isLetterOrDigit() }) { "Invalid module name $name" }
+
+    val runtimeSupportContent = config.javaClass.getResource("/swift/$name.swift")?.readText()
+        ?: error("Can not find runtime support swift source")
+
+    val kotlinBridgeContent = config.javaClass.getResource("/swift/$name.kt")?.readText()
+        ?: error("Can not find runtime support kotlin source")
+
+    val cHeaderBridgeContent = config.javaClass.getResource("/swift/$name.h")?.readText()
+        ?: error("Can not find runtime support c header")
+
+    val modulePath = outputPath.parent / name
+    val outputFiles = SwiftExportFiles(
+        swiftApi = (modulePath / "$name.swift"),
+        kotlinBridges = (modulePath / "$name.kt"),
+        cHeaderBridges = (modulePath / "$name.h")
+    )
+
+    // arrayOf() used as workaround to target method from older kotlin-stlib due to https://github.com/gradle/gradle/issues/34442
+    dumpTextAtPath(
+        sequenceOf(*arrayOf(runtimeSupportContent)),
+        BridgeSources(
+            sequenceOf(*arrayOf(kotlinBridgeContent)),
+            sequenceOf(*arrayOf(cHeaderBridgeContent)),
+        ),
+        outputFiles
+    )
+
+    return SwiftExportModule.BridgesToKotlin(
+        name = name,
+        dependencies = dependencies,
+        bridgeName = "${name}Bridge",
+        files = outputFiles
     )
 }
 
 private fun TranslationResult.writeModule(config: SwiftExportConfig): SwiftExportModule {
-    val swiftSources = sequenceOf(swiftModuleSources) + moduleConfig.unsupportedDeclarationReporter.messages.map { "// $it" }
+    // arrayOf() used as workaround to target method from older kotlin-stlib due to https://github.com/gradle/gradle/issues/34442
+    val swiftSources = sequenceOf(*arrayOf(swiftModuleSources)) + moduleConfig.unsupportedDeclarationReporter.messages.map { "// $it" }
     val modulePath = config.outputPath / swiftModuleName
     val outputFiles = SwiftExportFiles(
         swiftApi = (modulePath / "$swiftModuleName.swift"),

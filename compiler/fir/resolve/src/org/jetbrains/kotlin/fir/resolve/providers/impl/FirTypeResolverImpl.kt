@@ -7,29 +7,39 @@ package org.jetbrains.kotlin.fir.resolve.providers.impl
 
 import org.jetbrains.kotlin.builtins.functions.FunctionTypeKind
 import org.jetbrains.kotlin.config.AnalysisFlags
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isEnumClass
 import org.jetbrains.kotlin.fir.declarations.utils.isInner
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.diagnostics.*
+import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
+import org.jetbrains.kotlin.fir.expressions.firstQualifierPart
 import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.diagnostics.*
 import org.jetbrains.kotlin.fir.resolve.providers.impl.FirTypeCandidateCollector.TypeResolutionResult
 import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
+import org.jetbrains.kotlin.fir.scopes.FirScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirDefaultStarImportingScope
+import org.jetbrains.kotlin.fir.scopes.impl.declaredMemberScope
+import org.jetbrains.kotlin.fir.scopes.processAllClassifiers
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability
 
 @ThreadSafeMutableState
 class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
     private val aliasedTypeExpansionGloballyDisabled: Boolean =
         !session.languageVersionSettings.getFlag(AnalysisFlags.expandTypeAliasesInTypeResolution)
+
+    private val useProperResolutionOfCallableReferenceLHSs: Boolean =
+        session.languageVersionSettings.supportsFeature(LanguageFeature.ProperSupportOfInnerClassesInCallableReferenceLHS)
 
     private fun resolveSymbol(
         symbol: FirBasedSymbol<*>,
@@ -96,38 +106,33 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
             return collector.getResult()
         }
 
-        for (scope in configuration.scopes) {
-            if (collector.applicability == CandidateApplicability.RESOLVED) break
-            val name = qualifier.first().name
-            val processor = { symbol: FirClassifierSymbol<*>, substitutorFromScope: ConeSubstitutor ->
-                val resolvedSymbol = resolveSymbol(symbol, qualifier.subList(1, qualifier.size), qualifierResolver)
+        val name = qualifier.first().name
+        val processor = { symbol: FirClassifierSymbol<*>, substitutorFromScope: ConeSubstitutor, scope: FirScope ->
+            val resolvedSymbol = resolveSymbol(symbol, qualifier.subList(1, qualifier.size), qualifierResolver)
 
-                if (resolvedSymbol != null) {
-                    collector.processCandidate(resolvedSymbol, substitutorFromScope, scope.toResolvedSymbolOrigin())
-                }
-            }
-
-            if (scope is FirDefaultStarImportingScope) {
-                scope.processClassifiersByNameWithSubstitutionFromBothLevelsConditionally(name) { symbol, substitutor ->
-                    processor(symbol, substitutor)
-                    collector.applicability == CandidateApplicability.RESOLVED
-                }
-            } else {
-                scope.processClassifiersByNameWithSubstitution(name, processor)
+            if (resolvedSymbol != null) {
+                collector.processCandidate(resolvedSymbol, substitutorFromScope, scope.toResolvedSymbolOrigin())
             }
         }
 
+        configuration.iterateScopesWithSubstitution(
+            name, processor,
+            stopIf = { collector.applicability == CandidateApplicability.RESOLVED },
+        )
+
         if (collector.applicability != CandidateApplicability.RESOLVED) {
-            val symbol = qualifierResolver.resolveFullyQualifiedSymbol(qualifier)
-            if (symbol != null) {
-                collector.processCandidate(symbol, null, resolvedSymbolOrigin = FirResolvedSymbolOrigin.Qualified)
+            qualifierResolver.resolveFullyQualifiedSymbol(qualifier)?.let { [symbol, resolvedSymbolOrigin] ->
+                collector.processCandidate(symbol, substitutor = null, resolvedSymbolOrigin)
             }
         }
 
         return collector.getResult()
     }
 
-    private fun resolveLocalClassChain(outermostClassLikeSymbol: FirClassLikeSymbol<*>, remainingQualifier: List<FirQualifierPart>): FirClassLikeSymbol<*>? {
+    private fun resolveLocalClassChain(
+        outermostClassLikeSymbol: FirClassLikeSymbol<*>,
+        remainingQualifier: List<FirQualifierPart>,
+    ): FirClassLikeSymbol<*>? {
         if (outermostClassLikeSymbol !is FirRegularClassSymbol || !outermostClassLikeSymbol.isLocal) {
             return null
         }
@@ -140,12 +145,15 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
             if (classLikeSymbol !is FirRegularClassSymbol) return null
 
             val qualifierName = remainingQualifier[qualifierIndex].name
-            for (declarationSymbol in classLikeSymbol.declarationSymbols) {
-                if (declarationSymbol is FirClassLikeSymbol<*>) {
-                    if (declarationSymbol.toLookupTag().name == qualifierName) {
-                        return resolveLocalClassChain(declarationSymbol, qualifierIndex + 1)
-                    }
+
+            var matchingNestedClassLike: FirClassLikeSymbol<*>? = null
+            classLikeSymbol.declaredMemberScope(session, memberRequiredPhase = null).processAllClassifiers {
+                if (it is FirClassLikeSymbol<*> && it.name == qualifierName) {
+                    matchingNestedClassLike = it
                 }
+            }
+            if (matchingNestedClassLike != null) {
+                return resolveLocalClassChain(matchingNestedClassLike, qualifierIndex + 1)
             }
 
             return null
@@ -182,7 +190,7 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
         topContainer: FirDeclaration?,
         isOperandOfIsOperator: Boolean
     ): ConeKotlinType {
-        val (symbol, substitutor) = when (result) {
+        val [symbol, substitutor] = when (result) {
             is TypeResolutionResult.Resolved -> {
                 result.typeCandidate.symbol to result.typeCandidate.substitutor
             }
@@ -190,14 +198,20 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
             TypeResolutionResult.Unresolved -> null to null
         }
 
-        val qualifier = typeRef.qualifier
-        val allTypeArguments =
-            qualifier.reversed().flatMap { it.typeArgumentList.typeArguments }.mapTo(mutableListOf()) { it.toConeTypeProjection() }
+        val allTypeArguments = buildList {
+            val qualifier = typeRef.qualifier
+            val isPossibleBareType = areBareTypesAllowed && qualifier.all { it.typeArgumentList.typeArguments.isEmpty() }
 
-        if (symbol is FirClassLikeSymbol<*> && !isPossibleBareType(areBareTypesAllowed, allTypeArguments)) {
-            matchQualifierPartsAndClasses(symbol, qualifier)?.let { return ConeErrorType(it) }
-            allTypeArguments.addImplicitTypeArgumentsOrReturnError(symbol, topContainer, substitutor)
-                ?.let { return ConeErrorType(it) }
+            if (symbol is FirClassLikeSymbol<*> && !isPossibleBareType) {
+                initExplicitTypeArguments(symbol, qualifier)?.let { return ConeErrorType(it) }
+                addImplicitTypeArguments(symbol, topContainer, substitutor)
+                    ?.let { return ConeErrorType(it) }
+            } else {
+                // In this case, type arguments are not allowed, but we would like to store them in the error type
+                qualifier.asReversed().forEach { part ->
+                    addAll(part.typeArgumentList.typeArguments.map { it.toConeTypeProjection() })
+                }
+            }
         }
 
         val resultingArguments = allTypeArguments.toTypedArray()
@@ -258,10 +272,10 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
         }
     }
 
-    private fun isPossibleBareType(areBareTypesAllowed: Boolean, allTypeArguments: List<ConeTypeProjection>): Boolean =
-        areBareTypesAllowed && allTypeArguments.isEmpty()
-
-    private fun matchQualifierPartsAndClasses(symbol: FirClassLikeSymbol<*>, qualifier: List<FirQualifierPart>): ConeDiagnostic? {
+    private fun MutableList<ConeTypeProjection>.initExplicitTypeArguments(
+        symbol: FirClassLikeSymbol<*>,
+        qualifier: List<FirQualifierPart>,
+    ): ConeDiagnostic? {
         var currentDeclaration: FirClassLikeDeclaration? = symbol.fir
         var areTypeArgumentsAllowed = true
 
@@ -270,10 +284,7 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
             val qualifierPartArgsCount = typeArgumentList.typeArguments.size
 
             if (currentDeclaration == null) {
-                // It's a package name
-                if (qualifierPartArgsCount > 0) {
-                    return ConeTypeArgumentsNotAllowedOnPackageError(typeArgumentList.source!!)
-                }
+                // it's a package name; type arguments in packages are reported in checker separately
                 break
             }
 
@@ -287,6 +298,8 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
                 return ConeTypeArgumentsForOuterClassWhenNestedReferencedError(typeArgumentList.source!!)
             }
 
+            addAll(typeArgumentList.typeArguments.map { it.toConeTypeProjection() })
+
             // Inner class can't contain non-inner class
             // No more arguments are allowed after first static/non-inner class
             areTypeArgumentsAllowed = currentDeclaration.isInner
@@ -296,7 +309,7 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
         return null
     }
 
-    private fun MutableList<ConeTypeProjection>.addImplicitTypeArgumentsOrReturnError(
+    private fun MutableList<ConeTypeProjection>.addImplicitTypeArguments(
         symbol: FirClassLikeSymbol<*>,
         topContainer: FirDeclaration?,
         substitutor: ConeSubstitutor?,
@@ -312,27 +325,34 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
         //    }
         //}
         val explicitTypeArgumentsNumber = size
-        for ((typeParameterIndex, typeParameter) in symbol.fir.typeParameters.withIndex()) {
-            if (typeParameterIndex < explicitTypeArgumentsNumber) {
-                // Ignore explicit type parameters since only outer type parameters are relevant
-                continue
-            }
+        var diagnostic: ConeDiagnostic? = null
 
+        fun addImplicitTypeArgument(typeParameter: FirTypeParameterRef) {
             if (typeParameter !is FirOuterClassTypeParameterRef
                 || isValidTypeParameterFromOuterDeclaration(typeParameter.symbol, topContainer, session)
             ) {
                 val substituted = substitutor?.substituteOrNull(typeParameter.symbol.defaultType)
-                if (substituted == null) {
-                    return ConeOuterClassArgumentsRequired(typeParameter.symbol.containingDeclarationSymbol as FirClassLikeSymbol<*>)
-                } else {
+                if (substituted != null) {
                     add(substituted)
+                    return
                 }
-            } else {
-                return ConeOuterClassArgumentsRequired(typeParameter.symbol.containingDeclarationSymbol as FirClassLikeSymbol<*>)
+            }
+
+            add(ConeStarProjection)
+            if (diagnostic == null) {
+                diagnostic = ConeOuterClassArgumentsRequired(typeParameter.symbol.containingDeclarationSymbol as FirClassLikeSymbol<*>)
             }
         }
 
-        return null
+        for ([typeParameterIndex, typeParameter] in symbol.fir.typeParameters.withIndex()) {
+            if (typeParameterIndex < explicitTypeArgumentsNumber) {
+                // Ignore explicit type parameters since only outer type parameters are relevant
+                continue
+            }
+            addImplicitTypeArgument(typeParameter)
+        }
+
+        return diagnostic
     }
 
     private fun createFunctionType(typeRef: FirFunctionTypeRef): FirTypeResolutionResult {
@@ -375,6 +395,131 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
                 attributes
             ),
             diagnostic
+        )
+    }
+
+    private fun FirTypeProjection.toConeTypeProjectionInLhs(): ConeTypeProjection = when (this) {
+        is FirTypeProjectionWithVariance -> typeRef.coneType.toTypeProjection(variance)
+
+        is FirPlaceholderProjection, // reported separately in the checker
+        is FirStarProjection,
+            -> ConeStarProjection
+    }
+
+    private fun MutableList<ConeTypeProjection>.addOwnTypeArguments(qualifier: FirResolvedQualifier) {
+        for (typeArgument in qualifier.ownTypeArguments) {
+            add(typeArgument.toConeTypeProjectionInLhs())
+        }
+    }
+
+    private fun matchQualifierPartsAndClassesForLhs(
+        qualifier: FirResolvedQualifier,
+        classSymbol: FirClassLikeSymbol<*>,
+    ): Pair<List<ConeTypeProjection>, ConeDiagnostic?> {
+        var diagnostic: ConeDiagnostic? = null
+        val arguments = buildList {
+            var currentQualifier = qualifier
+            var currentClass = classSymbol
+
+            while (true) {
+                if (currentQualifier.ownTypeArguments.size != currentClass.ownTypeParameterSymbols.size) {
+                    // in case of many mismatches, we will report the leftmost one
+                    diagnostic = ConeWrongNumberOfTypeArgumentsError(
+                        currentClass.ownTypeParameterSymbols.size,
+                        currentClass,
+                        currentQualifier.source!!,
+                        isDeprecationErrorForCallableReferenceLhs = true,
+                    )
+                }
+
+                addOwnTypeArguments(currentQualifier)
+
+                when (val nextClass = currentQualifier.explicitParent?.symbol) {
+                    is FirClassLikeSymbol if currentClass.isInner -> {
+                        currentClass = nextClass
+                        currentQualifier = currentQualifier.explicitParent!!
+                    }
+                    else -> break
+                }
+            }
+        }
+        return arguments to diagnostic
+    }
+
+    private fun computeSubstitutorForLhs(
+        qualifier: FirResolvedQualifier,
+        configuration: TypeResolutionConfiguration,
+    ): ConeSubstitutor? {
+        // if the first part is a package, a substitutor is never needed
+        val firstQualifierSymbol = qualifier.firstQualifierPart().symbol ?: return null
+        val name = firstQualifierSymbol.name
+
+        var result: ConeSubstitutor? = null
+
+        val processor: (FirClassifierSymbol<*>, ConeSubstitutor, FirScope) -> Unit = { symbolFromScope, substitutor, _ ->
+            if (symbolFromScope == firstQualifierSymbol) {
+                result = substitutor
+            }
+        }
+
+        configuration.iterateScopesWithSubstitution(name, processor, stopIf = { result != null })
+
+        return result
+    }
+
+    override fun resolveTypeOnDoubleColonLhs(
+        qualifier: FirResolvedQualifier,
+        configuration: TypeResolutionConfiguration,
+    ): CallableReferenceLhsAsType? {
+        val classSymbol = qualifier.symbol ?: return null
+
+        val allTypeArguments: MutableList<ConeTypeProjection> = mutableListOf()
+        var diagnostic: ConeDiagnostic? = null
+
+        if (!useProperResolutionOfCallableReferenceLHSs) {
+            val classTypeParametersSize = classSymbol.classTypeParameterSymbols.size
+            if (qualifier.typeArguments.size != classTypeParametersSize) {
+                diagnostic = ConeWrongNumberOfTypeArgumentsError(classTypeParametersSize, classSymbol, qualifier.source!!)
+            }
+
+            classSymbol.typeParameterSymbols.forEachIndexed { index, typeParameter ->
+                val typeArgumentOrNull = qualifier.typeArguments.getOrNull(index)
+                val coneTypeArgument = typeArgumentOrNull?.toConeTypeProjectionInLhs()
+                    ?: typeParameter.defaultType.takeIf {
+                        classSymbol.isLocal && typeParameter.containingDeclarationSymbol !is FirClassLikeSymbol
+                    }
+                    ?: ConeStarProjection
+                allTypeArguments.add(coneTypeArgument)
+            }
+
+            val [_, diagnosticFromMatching] = matchQualifierPartsAndClassesForLhs(qualifier, classSymbol)
+            if (diagnostic == null) diagnostic = diagnosticFromMatching
+        } else {
+            matchQualifierPartsAndClassesForLhs(qualifier, classSymbol).let { [arguments, diagnosticFromMatching] ->
+                allTypeArguments.addAll(arguments)
+                diagnostic = diagnosticFromMatching
+            }
+            if (allTypeArguments.size != classSymbol.typeParameterSymbols.size) {
+                val substitutor = computeSubstitutorForLhs(qualifier, configuration)
+                allTypeArguments.addImplicitTypeArguments(
+                    classSymbol,
+                    configuration.topContainer ?: configuration.containingClassDeclarations.lastOrNull(),
+                    substitutor,
+                )?.let {
+                    if (diagnostic == null) diagnostic = it
+                }
+            }
+        }
+
+        return CallableReferenceLhsAsType(
+            ConeClassLikeTypeImpl(
+                classSymbol.toLookupTag(),
+                allTypeArguments.take(classSymbol.typeParameterSymbols.size).toTypedArray(),
+                qualifier.isNullableLhsForCallableReference,
+            ),
+            diagnostic,
+            hasNullableMark = qualifier.isNullableLhsForCallableReference,
+            hasExplicitTypeArguments = qualifier.typeArguments.isNotEmpty(),
         )
     }
 
@@ -443,6 +588,26 @@ class FirTypeResolverImpl(private val session: FirSession) : FirTypeResolver() {
             else -> error(typeRef.render())
         }.also {
             session.lookupTracker?.recordTypeResolveAsLookup(it.type, typeRef.source, configuration.useSiteFile?.source)
+        }
+    }
+
+    private fun TypeResolutionConfiguration.iterateScopesWithSubstitution(
+        name: Name,
+        processor: (FirClassifierSymbol<*>, ConeSubstitutor, FirScope) -> Unit,
+        stopIf: () -> Boolean,
+    ) {
+        for (scope in scopes) {
+            if (stopIf()) break
+            if (scope is FirDefaultStarImportingScope) {
+                scope.processClassifiersByNameWithSubstitutionFromBothLevelsConditionally(name) { symbol, substitutor ->
+                    processor(symbol, substitutor, scope)
+                    stopIf()
+                }
+            } else {
+                scope.processClassifiersByNameWithSubstitution(name) { symbol, substitutor ->
+                    processor(symbol, substitutor, scope)
+                }
+            }
         }
     }
 }

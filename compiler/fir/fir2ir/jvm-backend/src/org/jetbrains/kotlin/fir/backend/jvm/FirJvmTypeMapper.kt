@@ -21,9 +21,6 @@ import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.diagnostics.ConeUnresolvedSymbolError
 import org.jetbrains.kotlin.fir.resolve.diagnostics.ConeUnresolvedTypeQualifierError
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
-import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
-import org.jetbrains.kotlin.fir.resolve.toSymbol
-import org.jetbrains.kotlin.fir.types.ConeClassifierLookupTag
 import org.jetbrains.kotlin.fir.symbols.ConeTypeParameterLookupTag
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
@@ -32,6 +29,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.ConeTypeParameterTypeImpl
 import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.types.AbstractTypeMapper
@@ -68,7 +66,14 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
     fun isPrimitiveBacked(type: ConeKotlinType): Boolean =
         AbstractTypeMapper.isPrimitiveBacked(defaultContext, type)
 
-    private val defaultContext = Context { null }
+    /**
+     * [FirJvmTypeMapper] is registered as a [FirSessionComponent], but [Context] depends on other session components, like the
+     * [typeContext] and symbol provider. To avoid ordering issues during session component registration, [defaultContext] is lazy.
+     */
+    private val defaultContext by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        Context { null }
+    }
+
     val typeContext: TypeSystemCommonBackendContext
         get() = defaultContext.typeContext
 
@@ -82,6 +87,8 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
         override fun getClassInternalName(typeConstructor: TypeConstructorMarker): String {
             require(typeConstructor is ConeClassLikeLookupTag)
             val classId = typeConstructor.classId
+
+            @OptIn(ClassIdBasedLocality::class)
             val name = if (classId.isLocal) safeShortClassName(classId) else classId.asString()
             return name.replace(".", "$")
         }
@@ -144,7 +151,7 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
         }
 
         private fun ConeClassLikeType.parentClassOrNull(): FirRegularClassSymbol? {
-            val parentClassId = classId?.outerClassId ?: return null
+            val parentClassId = classId.outerClassId ?: return null
             return session.symbolProvider.getClassLikeSymbolByClassId(parentClassId) as? FirRegularClassSymbol?
         }
 
@@ -197,7 +204,7 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
             with(KotlinTypeMapper) {
                 val parameters = parameterSymbols.map { ConeTypeParameterLookupTag(it) }
                 typeContext.writeGenericArguments(sw, arguments, parameters, mode) { type, sw, mode ->
-                    mapType(type as ConeKotlinType, mode, sw)
+                    mapType(type.asCone(), mode, sw)
                 }
             }
         }
@@ -224,6 +231,7 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
     }
 
     internal fun getJvmShortName(classId: ClassId): String {
+        @OptIn(ClassIdBasedLocality::class)
         val result = runUnless(classId.isLocal) {
             classId.asSingleFqName().toUnsafe().let { JavaToKotlinClassMap.mapKotlinToJava(it)?.shortClassName?.asString() }
         }

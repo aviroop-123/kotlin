@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.metadata.jvm.deserialization
 
+import org.jetbrains.kotlin.metadata.ExtensionRegistryLite
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.builtins.BuiltInsProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
@@ -12,7 +13,6 @@ import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
 import org.jetbrains.kotlin.metadata.deserialization.NameResolverImpl
 import org.jetbrains.kotlin.metadata.deserialization.isKotlin1Dot4OrLater
 import org.jetbrains.kotlin.metadata.jvm.JvmModuleProtoBuf
-import org.jetbrains.kotlin.protobuf.ExtensionRegistryLite
 import java.io.*
 
 class ModuleMapping private constructor(
@@ -80,7 +80,7 @@ class ModuleMapping private constructor(
             }
 
             // "Builtin" extension registry is needed in order to deserialize annotations on optional annotation classes and their members.
-            val extensions = ExtensionRegistryLite.newInstance().apply(BuiltInsProtoBuf::registerAllExtensions)
+            val extensions = ExtensionRegistryLite(BuiltInsProtoBuf::registerAllExtensions)
             val moduleProto = JvmModuleProtoBuf.Module.parseFrom(stream, extensions) ?: return EMPTY
             val result = linkedMapOf<String, PackageParts>()
 
@@ -88,7 +88,7 @@ class ModuleMapping private constructor(
                 val packageFqName = proto.packageFqName
                 val packageParts = result.getOrPut(packageFqName) { PackageParts(packageFqName) }
 
-                for ((index, partShortName) in proto.shortClassNameList.withIndex()) {
+                for ([index, partShortName] in proto.shortClassNameList.withIndex()) {
                     packageParts.addPart(
                         internalNameOf(packageFqName, partShortName),
                         loadMultiFileFacadeInternalName(
@@ -98,7 +98,7 @@ class ModuleMapping private constructor(
                 }
 
                 if (isJvmPackageNameSupported) {
-                    for ((index, partShortName) in proto.classWithJvmPackageNameShortNameList.withIndex()) {
+                    for ([index, partShortName] in proto.classWithJvmPackageNameShortNameList.withIndex()) {
                         val packageId = proto.classWithJvmPackageNamePackageIdList.getOrNull(index)
                             ?: proto.classWithJvmPackageNamePackageIdList.lastOrNull()
                             ?: continue
@@ -184,7 +184,7 @@ class PackageParts(val packageFqName: String) {
                 packageFqName = this@PackageParts.packageFqName
 
                 val packageInternalName = packageFqName.replace('.', '/')
-                val (partsWithinPackage, partsOutsidePackage) = parts.partition { partInternalName ->
+                val [partsWithinPackage, partsOutsidePackage] = parts.partition { partInternalName ->
                     partInternalName.packageName == packageInternalName
                 }
 
@@ -207,7 +207,7 @@ class PackageParts(val packageFqName: String) {
         parts: List<String>,
         facadeNameToId: MutableMap<String, Int>
     ) {
-        for ((facadeInternalName, partInternalNames) in parts.groupBy { getMultifileFacadeName(it) }.toSortedMap(nullsLast())) {
+        for ([facadeInternalName, partInternalNames] in parts.groupBy { getMultifileFacadeName(it) }.toSortedMap(nullsLast())) {
             for (partInternalName in partInternalNames.sorted()) {
                 addShortClassName(partInternalName.className)
                 if (facadeInternalName != null) {
@@ -224,13 +224,13 @@ class PackageParts(val packageFqName: String) {
         packageTableBuilder: JvmModuleProtoBuf.Module.Builder
     ) {
         val packageIds = mutableListOf<Int>()
-        for ((packageInternalName, partsInPackage) in parts.groupBy { it.packageName }.toSortedMap()) {
+        for ([packageInternalName, partsInPackage] in parts.groupBy { it.packageName }.toSortedMap()) {
             val packageFqName = packageInternalName.replace('/', '.')
             if (packageFqName !in packageTableBuilder.jvmPackageNameList) {
                 packageTableBuilder.addJvmPackageName(packageFqName)
             }
             val packageId = packageTableBuilder.jvmPackageNameList.indexOf(packageFqName)
-            for ((facadeInternalName, partInternalNames) in partsInPackage.groupBy { getMultifileFacadeName(it) }.toSortedMap(nullsLast())) {
+            for ([facadeInternalName, partInternalNames] in partsInPackage.groupBy { getMultifileFacadeName(it) }.toSortedMap(nullsLast())) {
                 for (partInternalName in partInternalNames.sorted()) {
                     addClassWithJvmPackageNameShortName(partInternalName.className)
                     if (facadeInternalName != null) {
@@ -256,7 +256,7 @@ class PackageParts(val packageFqName: String) {
     }
 
     private fun JvmModuleProtoBuf.PackageParts.Builder.writeMultifileFacadeNames(facadeNameToId: Map<String, Int>) {
-        for ((facadeId, facadeName) in facadeNameToId.values.zip(facadeNameToId.keys).sortedBy(Pair<Int, String>::first)) {
+        for ([facadeId, facadeName] in facadeNameToId.values.zip(facadeNameToId.keys).sortedBy(Pair<Int, String>::first)) {
             assert(facadeId == multifileFacadeShortNameCount) { "Multifile facades are loaded incorrectly: $facadeNameToId" }
             addMultifileFacadeShortName(facadeName)
         }
@@ -268,7 +268,7 @@ class PackageParts(val packageFqName: String) {
     fun getMultifileFacadeName(partInternalName: String): String? = packageParts[partInternalName]
 
     operator fun plusAssign(other: PackageParts) {
-        for ((partInternalName, facadeInternalName) in other.packageParts) {
+        for ([partInternalName, facadeInternalName] in other.packageParts) {
             addPart(partInternalName, facadeInternalName)
         }
         other.metadataParts.forEach(this::addMetadataPart)

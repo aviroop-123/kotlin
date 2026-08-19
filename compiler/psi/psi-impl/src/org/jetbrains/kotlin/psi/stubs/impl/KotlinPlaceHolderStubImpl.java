@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.psi.KtElementImplStub;
 import org.jetbrains.kotlin.psi.KtImplementationDetail;
 import org.jetbrains.kotlin.psi.stubs.KotlinPlaceHolderStub;
+import org.jetbrains.kotlin.psi.stubs.KotlinStubElement;
 
 public class KotlinPlaceHolderStubImpl<T extends KtElementImplStub<? extends StubElement<?>>> extends KotlinStubBaseImpl<T>
         implements KotlinPlaceHolderStub<T> {
@@ -19,9 +20,17 @@ public class KotlinPlaceHolderStubImpl<T extends KtElementImplStub<? extends Stu
         super(parent, elementType);
     }
 
+    @SuppressWarnings("deprecation") // KT-78356
     @Override
     @KtImplementationDetail
     public @NotNull KotlinPlaceHolderStubImpl<T> copyInto(@Nullable StubElement<?> newParent) {
         return new KotlinPlaceHolderStubImpl<>(newParent, getStubType());
+    }
+
+
+    @Override
+    public boolean isEquivalentTo(@NotNull KotlinStubElement<?> other) {
+        if (other.getClass() != this.getClass()) return false;
+        return this.getElementType() == other.getElementType();
     }
 }

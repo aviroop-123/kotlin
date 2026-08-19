@@ -8,6 +8,8 @@ implicit values:
       type: C
     ownerSymbol = KaNamedFunctionSymbol:
       /foo(<extension receiver>: C, param: kotlin.Int, param2: kotlin.String): kotlin.Unit
+    label = foo
+
 
   KaScopeImplicitArgumentValue:
     scopeIndexInTower = 3
@@ -27,6 +29,7 @@ scopes:
         compilerVisibility: Local
         isActual: false
         isExpect: false
+        isExternal: false
         isReified: false
         location: LOCAL
         modality: FINAL
@@ -40,6 +43,7 @@ scopes:
         compilerVisibility: Local
         isActual: false
         isExpect: false
+        isExternal: false
         isReified: false
         location: LOCAL
         modality: FINAL
@@ -71,6 +75,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -98,11 +103,15 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             generatedPrimaryConstructorProperty: null
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -129,6 +138,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -161,6 +171,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -192,8 +203,10 @@ scopes:
         contextReceivers: []
         hasStableParameterNames: true
         isActual: false
+        isCompanion: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isPrimary: true
         location: CLASS
         modality: FINAL
@@ -217,8 +230,11 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         isActual: false
+        isCompanion: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isVal: true
         location: LOCAL
         modality: FINAL
@@ -236,11 +252,15 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -261,11 +281,15 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -290,6 +314,7 @@ scopes:
         compilerVisibility: Local
         isActual: false
         isExpect: false
+        isExternal: false
         isReified: false
         location: LOCAL
         modality: FINAL
@@ -450,8 +475,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -476,6 +504,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: true
         isExternal: false
@@ -496,8 +525,11 @@ scopes:
           compilerVisibility: Public
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isVal: true
           location: LOCAL
           modality: FINAL
@@ -520,6 +552,7 @@ scopes:
             compilerVisibility: Local
             isActual: false
             isExpect: false
+            isExternal: false
             isReified: false
             location: LOCAL
             modality: FINAL
@@ -536,11 +569,15 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             generatedPrimaryConstructorProperty: null
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -561,11 +598,15 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             generatedPrimaryConstructorProperty: null
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -595,4 +636,3 @@ scopes:
     constructors: 0
 
   DefaultStarImportingScope, index = 11
-

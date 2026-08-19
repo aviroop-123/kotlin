@@ -1,8 +1,6 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_PARAMETER
 // WITH_STDLIB
-// SKIP_TXT
 
 class A<T>
 class B<T>(val x: MutableList<T>) : MutableList<T> by x

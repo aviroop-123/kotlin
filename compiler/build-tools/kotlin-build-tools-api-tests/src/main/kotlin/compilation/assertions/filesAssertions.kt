@@ -3,11 +3,13 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.buildtools.api.tests.compilation.assertions
+package org.jetbrains.kotlin.buildtools.tests.compilation.assertions
 
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.model.CompilationOutcome
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.model.LogLevel
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.model.Module
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.CompilationOutcome
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.JvmModule
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.LogLevel
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.Module
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.ModuleContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import java.nio.file.Path
 import kotlin.io.path.isRegularFile
@@ -17,39 +19,100 @@ import kotlin.io.path.walk
 /**
  * Equivalent to [assertNoCompiledSources] with an empty array/set
  */
-fun CompilationOutcome.assertNoCompiledSources(module: Module) {
-    assertCompiledSources(module)
+context(module: ModuleContext)
+fun CompilationOutcome.assertNoCompiledSources() {
+    assertCompiledSources()
 }
 
-fun CompilationOutcome.assertCompiledSources(module: Module, vararg expectedCompiledSources: String) {
-    assertCompiledSources(module, expectedCompiledSources.toSet())
+context(module: ModuleContext)
+fun CompilationOutcome.assertCompiledSources(vararg expectedCompiledSources: String) {
+    assertCompiledSources(expectedCompiledSources.toSet())
 }
 
-fun CompilationOutcome.assertCompiledSources(module: Module, expectedCompiledSources: Set<String>) {
-    requireLogLevel(LogLevel.DEBUG)
-    val actualCompiledSources = logLines.getValue(LogLevel.DEBUG)
-        .filter { it.startsWith("compile iteration") }
-        .flatMap { it.replace("compile iteration: ", "").trim().split(", ") }
-        .toSet()
-    val normalizedPaths = expectedCompiledSources
-        .map { module.sourcesDirectory.resolve(it) }
-        .map { it.relativeTo(module.project.projectDirectory) }
-        .map(Path::toString)
-        .toSet()
+context(module: ModuleContext)
+fun CompilationOutcome.assertCompiledSources(expectedCompiledSources: Set<String>) {
+    val actualCompiledSources = parseCompilationSteps().flatten().toSet()
+    val normalizedPaths = normalizeFileNames(expectedCompiledSources)
     assertEquals(normalizedPaths, actualCompiledSources) {
-        "Compiled sources do not match "
+        """
+            Compiled sources do not match. Set diff:
+            Unexpected: ${actualCompiledSources - normalizedPaths}
+            Missing: ${normalizedPaths - actualCompiledSources}
+        
+            Full sets:
+        """.trimIndent()
     }
 }
 
-fun CompilationOutcome.assertOutputs(module: Module, vararg expectedOutputs: String) {
-    assertOutputs(module, expectedOutputs.toSet())
+/**
+ * Asserts the per-step compilation sets during incremental compilation.
+ * Unlike [assertCompiledSources], this checks each IC iteration separately,
+ * which is necessary for verifying monotonous compile set expansion behavior.
+ *
+ * @param steps each set contains file names expected in the corresponding compile iteration
+ */
+context(module: ModuleContext)
+fun CompilationOutcome.assertCompilationSteps(vararg steps: Set<String>) {
+    val actualSteps = parseCompilationSteps()
+    val expectedSteps = steps.map { normalizeFileNames(it) }
+    assertEquals(expectedSteps.size, actualSteps.size) {
+        "Expected ${expectedSteps.size} compilation steps but got ${actualSteps.size}.\nActual steps: $actualSteps"
+    }
+    expectedSteps.zip(actualSteps).forEachIndexed { index, [expected, actual] ->
+        assertEquals(expected, actual) {
+            """
+                Compilation step ${index + 1} does not match.
+                Unexpected: ${actual - expected}
+                Missing: ${expected - actual}
+            """.trimIndent()
+        }
+    }
 }
 
-fun CompilationOutcome.assertOutputs(module: Module, expectedOutputs: Set<String>) {
+context(module: ModuleContext)
+private fun normalizeFileNames(fileNames: Set<String>): Set<String> =
+    fileNames.map { fileName ->
+        module.sourcesDirectory.resolve(fileName)
+            .relativeTo(module.project.projectDirectory)
+            .toString()
+    }.toSet()
+
+private fun CompilationOutcome.parseCompilationSteps(): List<Set<String>> {
+    requireLogLevel(LogLevel.DEBUG)
+    return logLines.getValue(LogLevel.DEBUG)
+        .map { it.removePrefix("[KOTLIN] ") }
+        .filter { it.startsWith("compile iteration") }
+        .map { line ->
+            line.removePrefix("compile iteration: ").trim().split(", ").toSet()
+        }
+}
+
+/**
+ * Asserts that the compiler produces all files declared as expected outputs.
+ * Unless there's explicit expected output for the module's Kotlin module files, the default matching [Module.moduleName] will be added automatically.
+ */
+context(module: ModuleContext)
+fun CompilationOutcome.assertOutputs(vararg expectedOutputs: String) {
+    assertOutputs(expectedOutputs.toSet())
+}
+
+context(module: ModuleContext)
+fun CompilationOutcome.assertOutputsContains(vararg expectedOutputs: String) {
+    assertOutputs(expectedOutputs.toSet(), doNotFailOnExtraFiles = true)
+}
+
+/**
+ * Asserts that the compiler produces all files declared as expected outputs.
+ * Unless there's explicit expected output for the module's Kotlin module files, the default matching [Module.moduleName] will be added automatically.
+ */
+context(module: ModuleContext)
+fun CompilationOutcome.assertOutputs(expectedOutputs: Set<String>, doNotFailOnExtraFiles: Boolean = false) {
     val filesLeft = expectedOutputs.map { module.outputDirectory.resolve(it).relativeTo(module.outputDirectory) }
         .toMutableSet()
         .apply {
-            add(module.outputDirectory.resolve("META-INF/${module.moduleName}.kotlin_module").relativeTo(module.outputDirectory))
+            if (module is JvmModule && none { it.fileName.toString().endsWith(".kotlin_module") }) {
+                add(module.outputDirectory.resolve("META-INF/${module.moduleName}.kotlin_module").relativeTo(module.outputDirectory))
+            }
         }
     val notDeclaredFiles = hashSetOf<Path>()
     for (file in module.outputDirectory.walk()) {
@@ -59,7 +122,7 @@ fun CompilationOutcome.assertOutputs(module: Module, expectedOutputs: Set<String
             if (!wasPreviously) notDeclaredFiles.add(currentFile)
         }
     }
-    assert(filesLeft.isEmpty() && notDeclaredFiles.isEmpty()) {
+    assert(filesLeft.isEmpty() && (doNotFailOnExtraFiles || notDeclaredFiles.isEmpty())) {
         val errors = mutableListOf<String>()
         if (filesLeft.isNotEmpty()) {
             errors.add("The following files were declared as expected, but not actually produced: $filesLeft")

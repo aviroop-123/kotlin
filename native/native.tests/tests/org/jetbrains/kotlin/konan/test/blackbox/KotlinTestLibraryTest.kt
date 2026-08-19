@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.TestCaseId
 import org.jetbrains.kotlin.konan.test.blackbox.support.TestRunnerType
 import org.jetbrains.kotlin.konan.test.blackbox.support.group.PredefinedTestCases
 import org.jetbrains.kotlin.konan.test.blackbox.support.group.UsePartialLinkage
+import org.jetbrains.kotlin.testFederation.SmokeTest
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.TestFactory
 import org.jetbrains.kotlin.konan.test.blackbox.support.group.PredefinedTestCase as TC
@@ -22,7 +23,8 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.group.PredefinedTestCase
         sourceLocations = ["libraries/kotlin.test/common/src/test/kotlin/**.kt"]
     )
 )
-@UsePartialLinkage(UsePartialLinkage.Mode.DISABLED)
+@UsePartialLinkage(UsePartialLinkage.Mode.ERROR)
+@SmokeTest
 class KotlinTestLibraryTest : AbstractNativeBlackBoxTest() {
     @TestFactory
     fun default() = dynamicTestCase(TestCaseId.Named("default"))

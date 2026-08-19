@@ -1,0 +1,22 @@
+@kotlin.Metadata
+public final class A {
+    // source: 'k.kt'
+    public method <init>(): void
+    public synthetic static method compBlockFunR$default(p0: java.lang.String, p1: int, p2: java.lang.Object): java.lang.String
+    public final static @kotlin.jvm.JvmOverloads @kotlin.jvm.JvmName(name="compBlockFunR") @org.jetbrains.annotations.NotNull method compBlockFunR(): java.lang.String
+    public final static @kotlin.jvm.JvmOverloads @kotlin.jvm.JvmName(name="compBlockFunR") @org.jetbrains.annotations.NotNull method compBlockFunR(@org.jetbrains.annotations.NotNull p0: java.lang.String): java.lang.String
+}
+
+@kotlin.Metadata
+public final class KKt {
+    // source: 'k.kt'
+    public final static @org.jetbrains.annotations.NotNull method box(): java.lang.String
+    public synthetic static method compExtFunJR$default(p0: java.lang.String, p1: int, p2: java.lang.Object): java.lang.String
+    public final static @kotlin.jvm.JvmOverloads @kotlin.jvm.JvmName(name="compExtFunJR") @org.jetbrains.annotations.NotNull method compExtFunJR(): java.lang.String
+    public final static @kotlin.jvm.JvmOverloads @kotlin.jvm.JvmName(name="compExtFunJR") @org.jetbrains.annotations.NotNull method compExtFunJR(@org.jetbrains.annotations.NotNull p0: java.lang.String): java.lang.String
+    public synthetic static method compExtFunR$default(p0: java.lang.String, p1: int, p2: java.lang.Object): java.lang.String
+    public final static @kotlin.jvm.JvmOverloads @kotlin.jvm.JvmName(name="compExtFunR") @org.jetbrains.annotations.NotNull method compExtFunR(): java.lang.String
+    public final static @kotlin.jvm.JvmOverloads @kotlin.jvm.JvmName(name="compExtFunR") @org.jetbrains.annotations.NotNull method compExtFunR(@org.jetbrains.annotations.NotNull p0: java.lang.String): java.lang.String
+    public final static @org.jetbrains.annotations.NotNull method testJ(): java.lang.String
+    public final static @org.jetbrains.annotations.NotNull method testK(): java.lang.String
+}

@@ -3,7 +3,6 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-@file:Suppress("UNUSED_PARAMETER") // TODO: Remove after bootstrap update
 @file:OptIn(ExperimentalWasmJsInterop::class)
 
 package kotlin.js
@@ -52,7 +51,7 @@ public fun JsAny.toThrowableOrNull(): Throwable? {
     val thisAny: Any = this
     if (thisAny is Throwable) return thisAny
     var result: Throwable? = null
-    jsCatch {
+    val _ = jsCatch {
         try {
             jsThrow(this)
         } catch (e: Throwable) {

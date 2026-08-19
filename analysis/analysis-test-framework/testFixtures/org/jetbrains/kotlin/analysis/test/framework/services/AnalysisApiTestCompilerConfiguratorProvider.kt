@@ -12,22 +12,18 @@ import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.Standa
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.ktTestModuleStructure
 import org.jetbrains.kotlin.cli.jvm.compiler.JvmPackagePartProvider
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
-import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
 import org.jetbrains.kotlin.test.model.TestModule
-import org.jetbrains.kotlin.test.services.AbstractEnvironmentConfigurator
-import org.jetbrains.kotlin.test.services.CompilerConfigurationProvider
-import org.jetbrains.kotlin.test.services.TestServices
-import org.jetbrains.kotlin.test.services.createCompilerConfiguration
+import org.jetbrains.kotlin.test.services.*
 
 class AnalysisApiTestCompilerConfiguratorProvider(
     testServices: TestServices,
     override val testRootDisposable: Disposable,
     override val configurators: List<AbstractEnvironmentConfigurator>
 ) : CompilerConfigurationProvider(testServices) {
-    private val configurationCache: MutableMap<TestModule, CompilerConfiguration> = mutableMapOf()
+    private val configurationCache: MutableMap<Pair<TestModule, CompilationStage>, CompilerConfiguration> = mutableMapOf()
 
     private val allProjectBinaryRoots by lazy {
         StandaloneProjectFactory.getAllBinaryRoots(
@@ -40,18 +36,18 @@ class AnalysisApiTestCompilerConfiguratorProvider(
         return testServices.environmentManager.getProject()
     }
 
-    override fun getCompilerConfiguration(module: TestModule): CompilerConfiguration {
-        return configurationCache.getOrPut(module) {
-            createKotlinCompilerConfiguration(module)
+    override fun getCompilerConfiguration(module: TestModule, compilationStage: CompilationStage): CompilerConfiguration {
+        return configurationCache.getOrPut(module to compilationStage) {
+            createKotlinCompilerConfiguration(module, compilationStage)
         }
     }
 
     override fun getPackagePartProviderFactory(module: TestModule): (GlobalSearchScope) -> JvmPackagePartProvider {
-        val configuration = getCompilerConfiguration(module)
+        val configuration = getCompilerConfiguration(module, CompilationStage.FIRST)
 
         return { scope ->
             JvmPackagePartProvider(configuration.languageVersionSettings, scope).apply {
-                addRoots(allProjectBinaryRoots, configuration.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY))
+                addRoots(allProjectBinaryRoots, configuration)
             }
         }
     }
@@ -61,7 +57,7 @@ class AnalysisApiTestCompilerConfiguratorProvider(
     }
 
     @OptIn(TestInfrastructureInternals::class)
-    private fun createKotlinCompilerConfiguration(module: TestModule): CompilerConfiguration {
-        return createCompilerConfiguration(testServices, module, configurators)
+    private fun createKotlinCompilerConfiguration(module: TestModule, compilationStage: CompilationStage): CompilerConfiguration {
+        return createCompilerConfiguration(testServices, module, configurators, compilationStage)
     }
 }

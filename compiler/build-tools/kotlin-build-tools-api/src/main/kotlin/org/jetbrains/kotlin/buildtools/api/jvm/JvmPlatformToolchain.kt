@@ -6,30 +6,36 @@
 package org.jetbrains.kotlin.buildtools.api.jvm
 
 import org.jetbrains.kotlin.buildtools.api.ExperimentalBuildToolsApi
+import org.jetbrains.kotlin.buildtools.api.KotlinToolchains
+import org.jetbrains.kotlin.buildtools.api.getToolchain
+import org.jetbrains.kotlin.buildtools.api.jvm.operations.DiscoverScriptExtensionsOperation
 import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmClasspathSnapshottingOperation
 import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmCompilationOperation
 import java.nio.file.Path
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 
 /**
  * Allows creating operations that can be used for performing Kotlin/JVM compilations.
  *
  * This interface is not intended to be implemented by the API consumers.
  *
- * Obtain an instance of this interface from [org.jetbrains.kotlin.buildtools.api.KotlinToolchain.jvm].
+ * Obtain an instance of this interface from [org.jetbrains.kotlin.buildtools.api.KotlinToolchains.jvm].
  *
  * An example of the basic usage is:
  *  ```
- *   val toolchain = KotlinToolchain.loadImplementation(ClassLoader.getSystemClassLoader())
- *   val operation = toolchain.jvm.createJvmCompilationOperation(listOf(Path("/path/foo.kt")), Path("/path/to/outputDirectory"))
+ *   val toolchain = KotlinToolchains.loadImplementation(ClassLoader.getSystemClassLoader())
+ *   val operation = toolchain.jvm.jvmCompilationOperationBuilder(listOf(Path("/path/foo.kt")), Path("/path/to/outputDirectory")).build()
  *   toolchain.createBuildSession().use { it.executeOperation(operation) }
  *  ```
  *
  * @since 2.3.0
  */
 @ExperimentalBuildToolsApi
-public interface JvmPlatformToolchain {
+public interface JvmPlatformToolchain : KotlinToolchains.Toolchain {
     /**
-     * Creates a build operation for compiling Kotlin sources into class files.
+     * Creates a builder for an operation for compiling Kotlin sources into class files.
      *
      * Note that [sources] should include .java files from the same module (as defined in https://kotl.in/spec-modules),
      * so that Kotlin compiler can properly resolve references to Java code and track changes in them.
@@ -37,9 +43,9 @@ public interface JvmPlatformToolchain {
      *
      * @param sources all sources of the compilation unit. This includes Java source files.
      * @param destinationDirectory where to put the output of the compilation
-     * @see org.jetbrains.kotlin.buildtools.api.KotlinToolchain.BuildSession.executeOperation
+     * @see org.jetbrains.kotlin.buildtools.api.KotlinToolchains.BuildSession.executeOperation
      */
-    public fun createJvmCompilationOperation(sources: List<Path>, destinationDirectory: Path): JvmCompilationOperation
+    public fun jvmCompilationOperationBuilder(sources: List<Path>, destinationDirectory: Path): JvmCompilationOperation.Builder
 
     /**
      * Creates a build operation for calculating classpath snapshots used for detecting changes in incremental compilation.
@@ -49,7 +55,85 @@ public interface JvmPlatformToolchain {
      * changes in dependent modules have no effect on the current module.
      *
      * @param classpathEntry path to existing classpath entry
-     * @see org.jetbrains.kotlin.buildtools.api.KotlinToolchain.BuildSession.executeOperation
+     * @see org.jetbrains.kotlin.buildtools.api.KotlinToolchains.BuildSession.executeOperation
      */
-    public fun createClasspathSnapshottingOperation(classpathEntry: Path): JvmClasspathSnapshottingOperation
+    public fun classpathSnapshottingOperationBuilder(classpathEntry: Path): JvmClasspathSnapshottingOperation.Builder
+
+    /**
+     * Creates a builder for an operation for discovering Kotlin script extensions.
+     *
+     * @param classpath classpath to search for custom script extensions
+     * @see org.jetbrains.kotlin.buildtools.api.KotlinToolchains.BuildSession.executeOperation
+     *
+     * @since 2.4.0
+     */
+    public fun discoverScriptExtensionsOperationBuilder(classpath: List<Path>): DiscoverScriptExtensionsOperation.Builder
+
+    public companion object {
+        /**
+         * Gets a [JvmPlatformToolchain] instance from [KotlinToolchains].
+         *
+         * Equivalent to `kotlinToolchains.getToolchain<JvmPlatformToolchain>()`
+         */
+        @JvmStatic
+        @get:JvmName("from")
+        public inline val KotlinToolchains.jvm: JvmPlatformToolchain get() = getToolchain<JvmPlatformToolchain>()
+    }
+}
+
+/**
+ * Convenience function for creating a [JvmCompilationOperation] with options configured by [builderAction].
+ *
+ * @return an immutable `JvmCompilationOperation`.
+ * @see JvmPlatformToolchain.jvmCompilationOperationBuilder
+ */
+@OptIn(ExperimentalContracts::class)
+@ExperimentalBuildToolsApi
+public inline fun JvmPlatformToolchain.jvmCompilationOperation(
+    sources: List<Path>,
+    destinationDirectory: Path,
+    builderAction: JvmCompilationOperation.Builder.() -> Unit = {},
+): JvmCompilationOperation {
+    contract {
+        callsInPlace(builderAction, InvocationKind.EXACTLY_ONCE)
+    }
+    return jvmCompilationOperationBuilder(sources, destinationDirectory).apply(builderAction).build()
+}
+
+/**
+ * Convenience function for creating a [JvmClasspathSnapshottingOperation] with options configured by [builderAction].
+ *
+ * @return an immutable `JvmClasspathSnapshottingOperation`.
+ * @see JvmPlatformToolchain.classpathSnapshottingOperationBuilder
+ */
+@OptIn(ExperimentalContracts::class)
+@ExperimentalBuildToolsApi
+public inline fun JvmPlatformToolchain.classpathSnapshottingOperation(
+    classpathEntry: Path,
+    builderAction: JvmClasspathSnapshottingOperation.Builder.() -> Unit = {},
+): JvmClasspathSnapshottingOperation {
+    contract {
+        callsInPlace(builderAction, InvocationKind.EXACTLY_ONCE)
+    }
+    return classpathSnapshottingOperationBuilder(classpathEntry).apply(builderAction).build()
+}
+
+/**
+ * Convenience function for creating a [DiscoverScriptExtensionsOperation] with options configured by [builderAction].
+ *
+ * @return an immutable `DiscoverScriptExtensionsOperation`.
+ * @see JvmPlatformToolchain.discoverScriptExtensionsOperationBuilder
+ *
+ * @since 2.4.0
+ */
+@OptIn(ExperimentalContracts::class)
+@ExperimentalBuildToolsApi
+public inline fun JvmPlatformToolchain.discoverScriptExtensionsOperation(
+    classpath: List<Path>,
+    builderAction: DiscoverScriptExtensionsOperation.Builder.() -> Unit = {},
+): DiscoverScriptExtensionsOperation {
+    contract {
+        callsInPlace(builderAction, InvocationKind.EXACTLY_ONCE)
+    }
+    return discoverScriptExtensionsOperationBuilder(classpath).apply(builderAction).build()
 }

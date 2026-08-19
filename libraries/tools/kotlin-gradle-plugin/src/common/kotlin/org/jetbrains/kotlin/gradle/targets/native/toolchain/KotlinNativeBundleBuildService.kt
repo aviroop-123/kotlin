@@ -11,7 +11,6 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.file.ArchiveOperations
 import org.gradle.api.file.FileCollection
-import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.logging.Logging
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.ListProperty
@@ -20,11 +19,10 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.Internal
-import org.jetbrains.kotlin.compilerRunner.KotlinCompilerArgumentsLogLevel
-import org.jetbrains.kotlin.gradle.dsl.NativeCacheKind
 import org.jetbrains.kotlin.commonizer.CommonizerTarget
 import org.jetbrains.kotlin.commonizer.konanTargets
-import org.jetbrains.kotlin.compilerRunner.getKonanCacheKind
+import org.jetbrains.kotlin.compilerRunner.KotlinCompilerArgumentsLogLevel
+import org.jetbrains.kotlin.gradle.dsl.NativeCacheKind
 import org.jetbrains.kotlin.gradle.internal.ClassLoadersCachingBuildService
 import org.jetbrains.kotlin.gradle.internal.properties.nativeProperties
 import org.jetbrains.kotlin.gradle.plugin.mpp.enabledOnCurrentHostForBinariesCompilation
@@ -32,7 +30,7 @@ import org.jetbrains.kotlin.gradle.report.GradleBuildMetricsReporter
 import org.jetbrains.kotlin.gradle.targets.native.KonanPropertiesBuildService
 import org.jetbrains.kotlin.gradle.targets.native.internal.NativeDistributionTypeProvider
 import org.jetbrains.kotlin.gradle.targets.native.internal.PlatformLibrariesGenerator
-import org.jetbrains.kotlin.gradle.targets.native.internal.getNativeDistributionDependencies
+import org.jetbrains.kotlin.gradle.targets.native.internal.getNativeDistributionDependenciesWithNativeDistributionProvider
 import org.jetbrains.kotlin.gradle.tasks.withType
 import org.jetbrains.kotlin.gradle.utils.SingleActionPerProject
 import org.jetbrains.kotlin.gradle.utils.property
@@ -68,9 +66,6 @@ internal abstract class KotlinNativeBundleBuildService : BuildService<KotlinNati
         val konanPropertiesBuildService: Property<KonanPropertiesBuildService>
         val platformLibrariesGeneratorService: Property<PlatformLibrariesGenerator.GeneratedPlatformLibrariesService>
     }
-
-    @get:Inject
-    abstract val fileSystemOperations: FileSystemOperations
 
     @get:Inject
     abstract val archiveOperations: ArchiveOperations
@@ -109,7 +104,7 @@ internal abstract class KotlinNativeBundleBuildService : BuildService<KotlinNati
         ): FileCollection {
             val kotlinNativeProvider =
                 KotlinNativeFromToolchainProvider(project, commonizerTarget.konanTargets, kotlinNativeBundleBuildService)
-            return project.getNativeDistributionDependencies(
+            return project.getNativeDistributionDependenciesWithNativeDistributionProvider(
                 kotlinNativeProvider.konanDistributionProvider,
                 commonizerTarget
             )
@@ -178,10 +173,10 @@ internal abstract class KotlinNativeBundleBuildService : BuildService<KotlinNati
         }
     }
 
-    internal fun getNativeCacheKind(project: Project, konanTargets: KonanTarget) =
-        project.nativeProperties.getKonanCacheKind(konanTargets, parameters.konanPropertiesBuildService)
+    internal fun defaultCacheKindForTarget(konanTarget: KonanTarget) =
+        parameters.konanPropertiesBuildService.map { it.defaultCacheKindForTarget(konanTarget) }
 
-    private inner class DependencyExtractor : ArchiveExtractor {
+    internal inner class DependencyExtractor : ArchiveExtractor {
 
         override fun extract(archive: File, targetDirectory: File, archiveType: ArchiveType) {
             when (archiveType) {

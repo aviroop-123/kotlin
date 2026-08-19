@@ -7,11 +7,13 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders
 
 import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScope
+import org.jetbrains.kotlin.analysis.api.impl.base.util.withKaModuleEntry
+import org.jetbrains.kotlin.analysis.api.impl.base.util.withPsiEntry
 import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinCompositeDeclarationProvider
 import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinDeclarationProvider
 import org.jetbrains.kotlin.analysis.api.platform.packages.KotlinCompositePackageProvider
 import org.jetbrains.kotlin.analysis.api.platform.packages.createPackageProvider
-import org.jetbrains.kotlin.analysis.api.utils.errors.withPsiEntry
+import org.jetbrains.kotlin.analysis.api.projectStructure.analysisContextModule
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirModuleResolveComponents
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.llFirModuleData
 import org.jetbrains.kotlin.analysis.low.level.api.fir.resolve.extensions.LLFirResolveExtensionTool
@@ -37,6 +39,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -66,6 +69,7 @@ import org.jetbrains.kotlin.utils.exceptions.withVirtualFileEntry
  * to duplicate symbols because FIR files (from which the symbols are taken) are unique in the session, but we would still cache a symbol in
  * the wrong symbol provider.
  */
+@OptIn(KtExperimentalApi::class)
 internal class LLKotlinSourceSymbolProvider private constructor(
     session: LLFirSession,
     private val moduleComponents: LLFirModuleResolveComponents,
@@ -122,7 +126,7 @@ internal class LLKotlinSourceSymbolProvider private constructor(
     override fun getClassLikeSymbolByClassId(classId: ClassId, classLikeDeclaration: KtClassLikeDeclaration): FirClassLikeSymbol<*>? =
         getClassLikeSymbolByClassIdAndDeclaration(classId, classLikeDeclaration)
 
-    @OptIn(LLModuleSpecificSymbolProviderAccess::class)
+    @OptIn(LLModuleSpecificSymbolProviderAccess::class, ClassIdBasedLocality::class)
     private fun getClassLikeSymbolByClassIdAndDeclaration(
         classId: ClassId,
         classLikeDeclaration: KtClassLikeDeclaration?,
@@ -136,6 +140,7 @@ internal class LLKotlinSourceSymbolProvider private constructor(
     }
 
     @LLModuleSpecificSymbolProviderAccess
+    @OptIn(ClassIdBasedLocality::class)
     override fun getClassLikeSymbolByPsi(classId: ClassId, declaration: PsiElement): FirClassLikeSymbol<*>? {
         if (!classId.isAccepted()) return null
         return classLikeCache.getSymbolByPsi<KtClassLikeDeclaration>(
@@ -160,6 +165,10 @@ internal class LLKotlinSourceSymbolProvider private constructor(
             if (virtualFile != null) {
                 val isInContentScope = searchScope.contains(virtualFile)
                 withEntry("isContextInScope", isInContentScope.toString())
+
+                @Suppress("DEPRECATION")
+                val analysisContextModule = virtualFile.analysisContextModule
+                withKaModuleEntry("analysisContextModule", analysisContextModule)
             }
         }
 
@@ -172,14 +181,22 @@ internal class LLKotlinSourceSymbolProvider private constructor(
         return declarations.mapNotNull { getClassLikeSymbolByPsi(classId, it) }
     }
 
+    @ClassIdBasedLocality
     private fun ClassId.isAccepted(): Boolean = !isLocal && (allowKotlinPackage || !isKotlinPackage())
 
     private fun computeClassLikeSymbolByClassId(classId: ClassId, context: KtClassLikeDeclaration?): FirClassLikeSymbol<*>? {
         require(context == null || context.isPhysical)
-        val ktClass = context ?: declarationProvider.getClassLikeDeclarationByClassId(classId) ?: return null
+        val ktClass = context ?: declarationProvider.getClassLikeDeclarationByClassId(classId)
+        if (ktClass != null && ktClass.getClassId() == null) return null
+        val declaration = ktClass ?: run {
+            if (!classId.isNestedClass) {
+                declarationProvider.findFilesForScript(classId.asSingleFqName()).find(KtScript::isReplSnippet)
+            } else {
+                null
+            }
+        } ?: return null
 
-        if (ktClass.getClassId() == null) return null
-        return findClassLikeSymbol(classId, ktClass) { FirElementFinder.findClassifierWithClassId(it, classId) }
+        return findClassLikeSymbol(classId, declaration) { FirElementFinder.findClassifierWithClassId(it, classId) }
     }
 
     private fun computeClassLikeSymbolByPsi(declaration: KtClassLikeDeclaration): FirClassLikeSymbol<*>? {
@@ -193,7 +210,7 @@ internal class LLKotlinSourceSymbolProvider private constructor(
 
     private inline fun findClassLikeSymbol(
         classId: ClassId,
-        declaration: KtClassLikeDeclaration,
+        declaration: KtNamedDeclaration,
         findFirElement: (FirFile) -> FirClassLikeDeclaration?,
     ): FirClassLikeSymbol<*> {
         val firFile = moduleComponents.firFileBuilder.buildRawFirFileWithCaching(declaration.containingKtFile)

@@ -1,0 +1,241 @@
+FILE: annotationArgumentsRepl.repl.kts
+    REPL_SNIPPET: <snippet-annotationArgumentsRepl.repl.kts>
+        public final object AnnotationArgumentsRepl_repl : R|kotlin/Any| {
+            public AnnotationArgumentsRepl_repl.constructor(): R|AnnotationArgumentsRepl_repl| {
+                super<R|kotlin/Any|>()
+            }
+
+            public final fun $$eval(): <implicit> {
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithArrays
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithExplicitArrays
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithClassLiteral
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithEnumLiteral
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.OneVararg
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.TwoVararg
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.ThreeVararg
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.SpreadVararg
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithNested
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithQualifiedNested
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.Qualified
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.Sum
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.Negative
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.Negative2
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.Positive
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithSimple
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithNamedSimple
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithSimpleOperations
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithConversionCall
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithResolvedConversionCall
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.ConversionCallConsumer
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithStringLiteral
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithStringLiteralConcat
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithStringInterpolationPrefix
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.LongStringTemplateEntryWithTwoExpressions
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.Another
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.WithIncorrectArguments
+                <repl declaration reference>: /AnnotationArgumentsRepl_repl.Qualified
+            }
+
+            @Arrays(<collectionLiteralCall>(IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)), <collectionLiteralCall>(Long(1)), <collectionLiteralCall>(), <collectionLiteralCall>(Double(2.2)), <collectionLiteralCall>(Char(a)), <collectionLiteralCall>(Boolean(true), Boolean(false))) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithArrays : R|kotlin/Any| {
+                public? [ContainingClassKey=WithArrays] constructor(): R|AnnotationArgumentsRepl_repl.WithArrays| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Arrays(intArrayOf#(IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)), longArrayOf#(Long(1)), floatArrayOf#(), doubleArrayOf#(Double(2.2)), charArrayOf#(Char(a)), booleanArrayOf#(Boolean(true), Boolean(false))) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithExplicitArrays : R|kotlin/Any| {
+                public? [ContainingClassKey=WithExplicitArrays] constructor(): R|AnnotationArgumentsRepl_repl.WithExplicitArrays| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @ClassLiteral(<getClass>(WithClassLiteral#), <getClass>(Boolean#)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithClassLiteral : R|kotlin/Any| {
+                public? [ContainingClassKey=WithClassLiteral] constructor(): R|AnnotationArgumentsRepl_repl.WithClassLiteral| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @EnumLiteral(E1#, E#.E2#, e3 = test#.E#.E2#) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithEnumLiteral : R|kotlin/Any| {
+                public? [ContainingClassKey=WithEnumLiteral] constructor(): R|AnnotationArgumentsRepl_repl.WithEnumLiteral| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @VarArg(IntegerLiteral(1)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class OneVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=OneVararg] constructor(): R|AnnotationArgumentsRepl_repl.OneVararg| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @VarArg(IntegerLiteral(1), IntegerLiteral(2)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class TwoVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=TwoVararg] constructor(): R|AnnotationArgumentsRepl_repl.TwoVararg| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @VarArg(IntegerLiteral(1), IntegerLiteral(2), VarArg#.CONSTANT#) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class ThreeVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=ThreeVararg] constructor(): R|AnnotationArgumentsRepl_repl.ThreeVararg| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @VarArg(*<collectionLiteralCall>(IntegerLiteral(1), IntegerLiteral(2), VarArg#.CONSTANT#, IntegerLiteral(4))) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class SpreadVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=SpreadVararg] constructor(): R|AnnotationArgumentsRepl_repl.SpreadVararg| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Outer(String(value), nested = Nested#(IntegerLiteral(0), String(nested value))) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithNested : R|kotlin/Any| {
+                public? [ContainingClassKey=WithNested] constructor(): R|AnnotationArgumentsRepl_repl.WithNested| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Outer(String(value), foo#.Nested#(IntegerLiteral(1), String(nested value))) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithQualifiedNested : R|kotlin/Any| {
+                public? [ContainingClassKey=WithQualifiedNested] constructor(): R|AnnotationArgumentsRepl_repl.WithQualifiedNested| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(test#.Simple#.Companion#.CONST1#) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Qualified : R|kotlin/Any| {
+                public? [ContainingClassKey=Qualified] constructor(): R|AnnotationArgumentsRepl_repl.Qualified| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(test#.Simple#.Companion#.CONST1#.plus#(Simple#.CONST2#)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Sum : R|kotlin/Any| {
+                public? [ContainingClassKey=Sum] constructor(): R|AnnotationArgumentsRepl_repl.Sum| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(test#.Simple#.Companion#.CONST1#.unaryMinus#()) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Negative : R|kotlin/Any| {
+                public? [ContainingClassKey=Negative] constructor(): R|AnnotationArgumentsRepl_repl.Negative| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(test#.Simple#.Companion#.CONST1#.unaryMinus#().unaryMinus#().unaryMinus#()) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Negative2 : R|kotlin/Any| {
+                public? [ContainingClassKey=Negative2] constructor(): R|AnnotationArgumentsRepl_repl.Negative2| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(test#.Simple#.Companion#.CONST1#.unaryMinus#().unaryMinus#()) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Positive : R|kotlin/Any| {
+                public? [ContainingClassKey=Positive] constructor(): R|AnnotationArgumentsRepl_repl.Positive| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(IntegerLiteral(12), Long(12), IntegerLiteral(12), Double(3.3), Float(3.3), Char(a), Boolean(true), Boolean(false)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithSimple : R|kotlin/Any| {
+                public? [ContainingClassKey=WithSimple] constructor(): R|AnnotationArgumentsRepl_repl.WithSimple| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(IntegerLiteral(12), Long(12), IntegerLiteral(12), d = Double(3.3), f = Float(3.3), c = Char(a), b1 = Boolean(true), b2 = Boolean(false)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithNamedSimple : R|kotlin/Any| {
+                public? [ContainingClassKey=WithNamedSimple] constructor(): R|AnnotationArgumentsRepl_repl.WithNamedSimple| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(IntegerLiteral(12).div#(IntegerLiteral(6)), Long(12).rem#(Long(5)), IntegerLiteral(12), Double(3.3).minus#(Double(3.0)), Float(3.3).times#(Float(2.0)), Char(a), Boolean(true) && Boolean(false), Boolean(false) || Boolean(true)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithSimpleOperations : R|kotlin/Any| {
+                public? [ContainingClassKey=WithSimpleOperations] constructor(): R|AnnotationArgumentsRepl_repl.WithSimpleOperations| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Simple(IntegerLiteral(12).toByte#()) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithConversionCall : R|kotlin/Any| {
+                public? [ContainingClassKey=WithConversionCall] constructor(): R|AnnotationArgumentsRepl_repl.WithConversionCall| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @ConversionCallConsumer(IntegerLiteral(12).toByte#()) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithResolvedConversionCall : R|kotlin/Any| {
+                public? [ContainingClassKey=WithResolvedConversionCall] constructor(): R|AnnotationArgumentsRepl_repl.WithResolvedConversionCall| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] annotation class ConversionCallConsumer : R|kotlin/Annotation| {
+                public? [ContainingClassKey=ConversionCallConsumer] constructor([CorrespondingProperty=/AnnotationArgumentsRepl_repl.ConversionCallConsumer.b] b: Byte): R|AnnotationArgumentsRepl_repl.ConversionCallConsumer| {
+                    super<R|kotlin/Any|>()
+                }
+
+                public? final? [IsFromPrimaryConstructor=true] val b: Byte = R|<local>/b|
+                    public? [ContainingClassKey=ConversionCallConsumer] get(): Byte
+
+            }
+
+            @StringLiteral(String(some), String(), <strcat>(String(H), CONSTANT#)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithStringLiteral : R|kotlin/Any| {
+                public? [ContainingClassKey=WithStringLiteral] constructor(): R|AnnotationArgumentsRepl_repl.WithStringLiteral| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @StringLiteral(<strcat>(String(some), String(1)), String().plus#(CONSTANT#).plus#(String(2)), <strcat>(<strcat>(CONSTANT#), String(3))) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithStringLiteralConcat : R|kotlin/Any| {
+                public? [ContainingClassKey=WithStringLiteralConcat] constructor(): R|AnnotationArgumentsRepl_repl.WithStringLiteralConcat| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @StringLiteral(<strcat>(CONSTANT#), <strcat>(CONSTANT#), <strcat>(CONSTANT#)) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithStringInterpolationPrefix : R|kotlin/Any| {
+                public? [ContainingClassKey=WithStringInterpolationPrefix] constructor(): R|AnnotationArgumentsRepl_repl.WithStringInterpolationPrefix| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @InvalidArguments(<strcat>(CONSTANT#, fun <implicit>.<anonymous>(): <implicit> <inline=Unknown>  {
+                ^ Unit
+            }
+            )) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class LongStringTemplateEntryWithTwoExpressions : R|kotlin/Any| {
+                public? [ContainingClassKey=LongStringTemplateEntryWithTwoExpressions] constructor(): R|AnnotationArgumentsRepl_repl.LongStringTemplateEntryWithTwoExpressions| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Deprecated(String(Deprecated), ReplaceWith#(String(NewClass), String(foo.bar.baz.NewClass)), DeprecationLevel#.HIDDEN#) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Another : R|kotlin/Any| {
+                public? [ContainingClassKey=Another] constructor(): R|AnnotationArgumentsRepl_repl.Another| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @Arrays(<collectionLiteralCall>(bar#?.{ $subj$.foo#(String(str)) }, baz#.bar#?.{ $subj$.doo# }, !=(IntegerLiteral(1), IntegerLiteral(2)))) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithIncorrectArguments : R|kotlin/Any| {
+                public? [ContainingClassKey=WithIncorrectArguments] constructor(): R|AnnotationArgumentsRepl_repl.WithIncorrectArguments| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+            @kotlin.Deprecated(String(Deprecated), kotlin#.ReplaceWith#(String(NewClass), String(foo.bar.baz.NewClass)), level = kotlin#.DeprecationLevel#.HIDDEN#) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Qualified : R|kotlin/Any| {
+                public? [ContainingClassKey=Qualified] constructor(): R|AnnotationArgumentsRepl_repl.Qualified| {
+                    super<R|kotlin/Any|>()
+                }
+
+            }
+
+        }

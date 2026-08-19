@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.daemon.common
 
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import java.io.Serializable
 import java.rmi.Remote
 import java.rmi.RemoteException
@@ -22,7 +23,14 @@ enum class ReportCategory(val code: Int) {
     EXCEPTION(1),
     DAEMON_MESSAGE(2),
     IC_MESSAGE(3),
-    OUTPUT_MESSAGE(4);
+    OUTPUT_MESSAGE(4),
+
+    /**
+     * Messages with this category will contain an attachment of type [org.jetbrains.kotlin.incremental.components.LookupInfo] or `null`.
+     * A `null` attachment is equivalent to calling the [org.jetbrains.kotlin.incremental.components.LookupTracker.clear] method.
+     */
+    COMPILER_LOOKUP(5),
+    ;
 
     companion object {
         fun fromCode(code: Int): ReportCategory? = entries.firstOrNull { it.code == code }
@@ -42,6 +50,20 @@ enum class ReportSeverity(val code: Int) {
     }
 }
 
-fun CompilerServicesFacadeBase.report(category: ReportCategory, severity: ReportSeverity, message: String? = null, attachment: Serializable? = null) {
+fun CompilerServicesFacadeBase.report(
+    category: ReportCategory,
+    severity: ReportSeverity,
+    message: String? = null,
+    attachment: Serializable? = null,
+) {
     report(category.code, severity.code, message, attachment)
+}
+
+data class CompilerMessageAttachment(
+    val location: CompilerMessageSourceLocation?,
+    val diagnosticId: String?,
+) : Serializable {
+    companion object {
+        private const val serialVersionUID: Long = 1L
+    }
 }

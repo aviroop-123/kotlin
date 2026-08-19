@@ -1,5 +1,4 @@
-// FIR_IDENTICAL
-// LANGUAGE: +ResolveTopLevelLambdasAsSyntheticCallArgument
+// LANGUAGE_FEATURE_TOGGLED: ResolveTopLevelLambdasAsSyntheticCallArgument
 // RUN_PIPELINE_TILL: FRONTEND
 // ISSUE: KT-80434
 @DslMarker
@@ -27,3 +26,4 @@ fun demo(block: @MyDsl DemoDsl.() -> Unit) {}
 
 /* GENERATED_FIR_TAGS: annotationDeclaration, assignment, classDeclaration, functionDeclaration, functionalType,
 lambdaLiteral, objectDeclaration, propertyDeclaration, typeWithExtension */
+

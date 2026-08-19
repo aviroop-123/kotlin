@@ -1,0 +1,5 @@
+KDocName(44,50): 'Nested'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /C.Nested
+    ]

@@ -1,3 +1,6 @@
+// IGNORE_KLIB_BACKEND_ERRORS_WITH_CUSTOM_SECOND_STAGE: Native:2.3
+// ^^^ KT-86026 TODO: Rework testdata to move functions/globals definitions from .def/.h into separate source files
+
 // TARGET_BACKEND: NATIVE
 // `import objcnames` somehow works only with NATIVE_STANDALONE test directive
 // NATIVE_STANDALONE
@@ -94,7 +97,7 @@ fun <T : ForwardDeclaredProtocolProtocol> testProtocol2Impl(s: Any?) = consumePr
 fun testClass2(s: Any?) = testClass2Impl<ForwardDeclaredClass>(s)
 fun testProtocol2(s: Any?) = testProtocol2Impl<ForwardDeclaredProtocolProtocol>(s)
 
-// MODULE: main(lib, b)
+// MODULE: main(lib, b, a)
 // FILE: main.kt
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 

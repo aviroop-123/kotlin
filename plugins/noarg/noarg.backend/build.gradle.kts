@@ -2,13 +2,14 @@ description = "Kotlin NoArg Compiler Plugin (Backend)"
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
     api(project(":compiler:ir.backend.common"))
-    api(project(":core:descriptors"))
+    implementation(project(":core:descriptors"))
+    implementation(project(":compiler:frontend"))
     implementation(project(":compiler:frontend.java"))
+    compileOnly(project(":kotlin-noarg-compiler-plugin.common"))
     compileOnly(intellijCore())
     compileOnly(libs.intellij.asm)
     implementation(kotlinStdlib())
@@ -20,6 +21,8 @@ sourceSets {
     "main" { projectDefault() }
     "test" { none() }
 }
+
+optInToK1Deprecation()
 
 runtimeJar()
 sourcesJar()

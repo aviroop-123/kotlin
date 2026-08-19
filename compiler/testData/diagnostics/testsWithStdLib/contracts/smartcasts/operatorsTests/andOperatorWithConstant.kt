@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseReturnsEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -24,7 +23,7 @@ fun falseWhenString(x: Any?): Boolean {
 
 fun annotatedTrueAndTrue(x: Any?) {
     if (trueWhenString(x) && true) {
-        <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        x.length
     }
     else {
         x.<!UNRESOLVED_REFERENCE!>length<!>
@@ -34,7 +33,7 @@ fun annotatedTrueAndTrue(x: Any?) {
 fun annotatedTrueAndFalse(x: Any?) {
     if (trueWhenString(x) && false) {
         // Unreachable
-        <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        x.length
     }
     else {
         x.<!UNRESOLVED_REFERENCE!>length<!>
@@ -46,7 +45,7 @@ fun annotatedFalseAndTrue(x: Any?) {
         x.<!UNRESOLVED_REFERENCE!>length<!>
     }
     else {
-        <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        x.length
     }
 }
 

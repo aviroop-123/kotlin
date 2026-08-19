@@ -1,7 +1,5 @@
-// FIR_IDENTICAL
 // LANGUAGE: -BreakContinueInInlineLambdas
 // OPT_IN: kotlin.contracts.ExperimentalContracts
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (NEGATIVE)

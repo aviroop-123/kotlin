@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -22,7 +21,7 @@ import libCase1.*
 import kotlin.text.format
 
 fun case1() {
-    val y2 : () ->String =<!PARENTHESIZED_COMPANION_LHS_DEPRECATION!>(String)<!>::<!DEBUG_INFO_CALL("fqName: libCase1.format; typeCall: variable")!>format<!>
+    val y2 : () ->String =(String)::format
 }
 
 // FILE: LibCase1.kt
@@ -40,9 +39,9 @@ import kotlin.text.format
 
 fun case2() {
     //
-    val x = "".format::<!DEBUG_INFO_CALL("fqName: testsCase2.invoke; typeCall: extension function")!>invoke<!>
+    val x = "".format::invoke
     //
-    val y = String.format::<!DEBUG_INFO_CALL("fqName: testsCase2.invoke; typeCall: extension function")!>invoke<!>
+    val y = String.format::invoke
 }
 
 fun String.invoke(format: String, vararg args: Any?): String = "" //(2)
@@ -77,10 +76,10 @@ import libCase3.format
 import kotlin.text.*
 
 fun case3() {
-    val y1 =<!PARENTHESIZED_COMPANION_LHS_DEPRECATION!>(String)<!>::<!DEBUG_INFO_CALL("fqName: libCase3.format; typeCall: variable")!>format<!>
-    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.reflect.KProperty0<kotlin.Unit>")!>y1<!>
+    val y1 =(String)::format
+    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.reflect.KProperty1<kotlin.String, kotlin.Int>")!>y1<!>
 
-    val y2 =""::<!DEBUG_INFO_CALL("fqName: libCase3.format; typeCall: variable")!>format<!>
+    val y2 =""::format
     <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.reflect.KProperty0<kotlin.Int>")!>y2<!>
 }
 
@@ -92,4 +91,3 @@ val String.Companion.format: Unit
 
 val String.format: Int
     get() = TODO()
-

@@ -1,12 +1,11 @@
 // RUN_PIPELINE_TILL: BACKEND
-// DIAGNOSTICS: -CONTEXT_RECEIVERS_DEPRECATED
-// LANGUAGE: +ContextReceivers
+// LANGUAGE: +ContextParameters
 // ISSUE: KT-61447
 // MODULE: m1-common
 // FILE: common.kt
 
 expect open class Foo {
-    fun <!AMBIGUOUS_ACTUALS{JVM}!>foo<!>()
+    fun foo()
 }
 
 // MODULE: m2-jvm()()(m1-common)
@@ -15,8 +14,8 @@ expect open class Foo {
 actual open class Foo {
     actual fun foo() {}
 
-    context(Int)
-    fun <!ACTUAL_MISSING!>foo<!>() {}
+    context(_: Int)
+    <!CONTEXTUAL_OVERLOAD_SHADOWED!>fun foo()<!> {}
 }
 
 /* GENERATED_FIR_TAGS: actual, classDeclaration, expect, functionDeclaration, functionDeclarationWithContext */

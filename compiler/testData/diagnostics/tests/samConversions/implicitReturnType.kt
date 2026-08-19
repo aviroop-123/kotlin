@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// SKIP_TXT
 // ISSUE: KT-52691
 
 fun test() = compose(C1())

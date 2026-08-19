@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 import kotlin.reflect.*
 
 @OptIn(kotlin.ExperimentalStdlibApi::class)

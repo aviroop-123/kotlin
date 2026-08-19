@@ -52,9 +52,13 @@ open class SExpressionBuilder {
 
 
 class WasmIrToText(
+    val module: WasmModule,
     private val debugInformationGenerator: DebugInformationGenerator? = null,
-    private val optimizeInstructionFlow: Boolean = true,
 ) : SExpressionBuilder(), DebugInformationConsumer {
+    private var currentFunction: WasmFunction.Defined? = null
+
+    private val resolver = module.resolver
+
     override fun consumeDebugInformation(debugInformation: DebugInformation) {
         debugInformation.forEach {
             newLine()
@@ -81,12 +85,8 @@ class WasmIrToText(
     }
 
     private fun appendInstrList(instr: List<WasmInstr>) {
-        if (optimizeInstructionFlow) {
-            for (instruction in processInstructionsFlow(instr.asSequence())) {
-                appendInstr(instruction)
-            }
-        } else {
-            instr.forEach(::appendInstr)
+        instr.forEach {
+            appendInstr(it)
         }
     }
 
@@ -103,8 +103,11 @@ class WasmIrToText(
         val op = wasmInstr.operator
 
         if (op.opcode == WASM_OP_PSEUDO_OPCODE) {
-            fun commentText() =
-                (wasmInstr.immediates.single() as WasmImmediate.ConstString).value
+            fun commentText(): String {
+                val comment = (wasmInstr.firstImmediateOrNull() as? WasmImmediate.ConstString?)?.value
+                check(comment != null)
+                return comment
+            }
 
             when (op) {
                 WasmOp.PSEUDO_COMMENT_PREVIOUS_INSTR -> {
@@ -124,6 +127,16 @@ class WasmIrToText(
                 WasmOp.PSEUDO_COMMENT_GROUP_END -> {
                     newLine()
                 }
+                WasmOp.PSEUDO_ANNOTATION_BRANCH_HINT -> {
+                    val likely = (wasmInstr.firstImmediateOrNull() as WasmImmediate.ConstU8).value != 0u.toUByte()
+                    newLine()
+                    stringBuilder.append("(@metadata.code.branch_hint ${if (likely) "likely" else "unlikely"})")
+                }
+                WasmOp.PSEUDO_ANNOTATION_TRACE_INST -> {
+                    val markId = (wasmInstr.firstImmediateOrNull() as WasmImmediate.ConstI32).value
+                    newLine()
+                    stringBuilder.append("(@metadata.code.trace_inst mark=$markId)")
+                }
                 else -> error("Unknown pseudo op $op")
             }
             return
@@ -133,6 +146,7 @@ class WasmIrToText(
             indent--
 
         newLine()
+
         stringBuilder.append(wasmInstr.operator.mnemonic)
 
         if (
@@ -148,14 +162,19 @@ class WasmIrToText(
             indent++
 
         if (wasmInstr.operator in setOf(WasmOp.CALL_INDIRECT, WasmOp.TABLE_INIT)) {
-            wasmInstr.immediates.reversed().forEach {
+            val reversed = mutableListOf<WasmImmediate>()
+            wasmInstr.forEachImmediates(reversed::add)
+            reversed.reverse()
+            reversed.forEach {
                 appendImmediate(it)
             }
+            stringBuilder.append(wasmInstr.operator.tailMnemonic)
             return
         }
-        wasmInstr.immediates.forEach {
+        wasmInstr.forEachImmediates {
             appendImmediate(it)
         }
+        stringBuilder.append(wasmInstr.operator.tailMnemonic)
     }
 
     private fun appendImmediate(x: WasmImmediate) {
@@ -171,10 +190,12 @@ class WasmIrToText(
                 appendAlign(x.align)
             }
             is WasmImmediate.BlockType -> appendBlockType(x)
-            is WasmImmediate.FuncIdx -> appendModuleFieldReference(x.value.owner)
-            is WasmImmediate.LocalIdx -> appendLocalReference(x.value.owner)
-            is WasmImmediate.GlobalIdx -> appendModuleFieldReference(x.value.owner)
-            is WasmImmediate.TypeIdx -> sameLineList("type") { appendModuleFieldReference(x.value.owner) }
+            is WasmImmediate.FuncIdx -> appendModuleFieldReference(resolver.resolve(x))
+            is WasmImmediate.LocalIdx -> appendLocalReference(x.value)
+
+            is WasmImmediate.GlobalIdx -> appendModuleFieldReference(resolver.resolve(x))
+            is WasmImmediate.TypeIdx -> sameLineList("type") { appendModuleFieldReference(resolver.resolve(x)) }
+
             is WasmImmediate.MemoryIdx -> appendIdxIfNotZero(x.value)
             is WasmImmediate.DataIdx -> appendElement(x.value.toString())
             is WasmImmediate.TableIdx -> appendElement(x.value.toString())
@@ -187,8 +208,7 @@ class WasmIrToText(
 
             is WasmImmediate.ValTypeVector -> sameLineList("result") { x.value.forEach { appendType(it) } }
 
-            is WasmImmediate.GcType -> appendModuleFieldReference(x.value.owner)
-            is WasmImmediate.StructFieldIdx -> appendElement(x.value.owner.toString())
+            is WasmImmediate.StructFieldIdx -> appendElement(x.value.toString())
             is WasmImmediate.HeapType -> {
                 appendHeapType(x.value)
             }
@@ -290,7 +310,7 @@ class WasmIrToText(
         }
     }
 
-    fun appendWasmModule(module: WasmModule) {
+    fun appendWasmModule() {
         with(module) {
             newLineList("module") {
                 recGroups.forEach { recGroup ->
@@ -356,7 +376,8 @@ class WasmIrToText(
     private fun appendStructTypeDeclaration(type: WasmStructDeclaration) {
         newLineList("type") {
             appendModuleFieldReference(type)
-            maybeSubType(type.superType?.owner) {
+            val superTypeOwner = type.superType?.let { resolver.resolve(it) }
+            maybeSubType(superTypeOwner) {
                 sameLineList("struct") {
                     type.fields.forEach {
                         appendStructField(it)
@@ -380,29 +401,36 @@ class WasmIrToText(
         newLineList("func") {
             appendModuleFieldReference(function)
             function.importPair.appendImportPair()
-            sameLineList("type") { appendModuleFieldReference(function.type) }
+            sameLineList("type") { appendModuleFieldReference(resolver.resolve(function.type)) }
         }
     }
 
     private fun WasmImportDescriptor.appendImportPair() {
         sameLineList("import") {
-            toWatString(moduleName)
-            toWatString(declarationName.owner)
+            appendWatString(moduleName)
+            appendWatString(declarationName.owner)
         }
     }
 
     private fun appendDefinedFunction(function: WasmFunction.Defined) {
+        function.functionAnnotations.forEach { annotation ->
+            newLine()
+            stringBuilder.append("(@${annotation.sectionName})")
+        }
         newLineList("func") {
             appendModuleFieldReference(function)
-            sameLineList("type") { appendModuleFieldReference(function.type) }
+            val functionType = resolver.resolve(function.type) as WasmFunctionType
+            sameLineList("type") { appendModuleFieldReference(functionType) }
             function.locals.forEach { if (it.isParameter) appendLocal(it) }
-            if (function.type.owner.resultTypes.isNotEmpty()) {
+            if (functionType.resultTypes.isNotEmpty()) {
                 sameLineList("result") {
-                    function.type.owner.resultTypes.forEach { appendType(it) }
+                    functionType.resultTypes.forEach { appendType(it) }
                 }
             }
             function.locals.forEach { if (!it.isParameter) appendLocal(it) }
+            currentFunction = function
             appendInstrList(function.instructions)
+            currentFunction = null
         }
     }
 
@@ -445,7 +473,7 @@ class WasmIrToText(
 
     private fun appendExport(export: WasmExport<*>) {
         newLineList("export") {
-            toWatString(export.name)
+            appendWatString(export.name)
             sameLineList(export.keyword) {
                 appendModuleFieldReference(export.field)
             }
@@ -508,7 +536,7 @@ class WasmIrToText(
                 }
             }
 
-            appendElement(wasmData.bytes.toWatData())
+            appendElement(wasmData.bytes.toWatString())
         }
     }
 
@@ -518,10 +546,11 @@ class WasmIrToText(
 
             wasmTag.importPair?.appendImportPair()
 
+            val tagType = resolver.resolve(wasmTag.type) as WasmFunctionType
             sameLineList("param") {
-                wasmTag.type.parameterTypes.forEach { appendType(it) }
+                tagType.parameterTypes.forEach { appendType(it) }
             }
-            assert(wasmTag.type.resultTypes.isEmpty()) { "must be as per spec" }
+            check(tagType.resultTypes.isEmpty()) { "must be as per spec" }
         }
     }
 
@@ -539,7 +568,7 @@ class WasmIrToText(
 
             is WasmHeapType.Type -> {
 //                appendElement("opt")
-                appendModuleFieldReference(type.type.owner)
+                appendModuleFieldReference(resolver.resolve(type))
             }
         }
     }
@@ -591,6 +620,10 @@ class WasmIrToText(
         appendElement("$${local.id}_${sanitizeWatIdentifier(local.name)}")
     }
 
+    fun appendLocalReference(local: Int) {
+        appendLocalReference(currentFunction!!.locals[local])
+    }
+
     fun appendIdxIfNotZero(id: Int) {
         if (id != 0) appendElement(id.toString())
     }
@@ -622,14 +655,8 @@ class WasmIrToText(
         appendElement("\$${sanitizeWatIdentifier(field.name)}___${indexSpaceKind}_$id")
     }
 
-    private fun toWatString(s: String) {
-        if (s.all { isValidWatIdentifierChar(it) }) {
-            stringBuilder.append(" \"")
-            stringBuilder.append(s)
-            stringBuilder.append('"')
-        } else {
-            stringBuilder.append(s.toByteArray().toWatData())
-        }
+    private fun appendWatString(s: String) {
+        appendElement(s.toByteArray().toWatString())
     }
 }
 
@@ -670,8 +697,20 @@ class StringBuilderWithLocations {
 }
 
 
-fun Byte.toWatData() = "\\" + this.toUByte().toString(16).padStart(2, '0')
-fun ByteArray.toWatData(): String = "\"" + joinToString("") { it.toWatData() } + "\""
+private fun Byte.toWatHexString() = "\\" + this.toUByte().toString(16).padStart(2, '0')
+
+private fun Byte.toWatString(): String = when (this.toInt()) {
+    '\t'.code -> "\\t"
+    '\n'.code -> "\\n"
+    '\r'.code -> "\\r"
+    '"'.code -> "\\\""
+    '\''.code -> "\\\'"
+    '\\'.code -> "\\\\"
+    in 0x20..<0x7F -> this.toInt().toChar().toString()
+    else -> this.toWatHexString()
+}
+
+private fun ByteArray.toWatString(): String = joinToString("", prefix = "\"", postfix = "\"", transform = Byte::toWatString) 
 
 fun sanitizeWatIdentifier(indent: String): String {
     if (indent.isEmpty())

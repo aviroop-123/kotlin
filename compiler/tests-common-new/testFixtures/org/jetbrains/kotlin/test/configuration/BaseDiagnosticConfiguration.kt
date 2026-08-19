@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.test.configuration
 
 import org.jetbrains.kotlin.config.ExplicitApiMode
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.ReturnValueCheckerMode
 import org.jetbrains.kotlin.fir.FirSession
@@ -19,10 +20,11 @@ import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
 import org.jetbrains.kotlin.test.builders.firHandlersStep
 import org.jetbrains.kotlin.test.builders.irHandlersStep
 import org.jetbrains.kotlin.test.cli.CliDirectives.CHECK_COMPILER_OUTPUT
+import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.IGNORE_DEXING
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives.DIAGNOSTICS
+import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_WITH_PARSER
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DUMP_VFIR
-import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.TEST_ALONGSIDE_K1_TESTDATA
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.USE_LATEST_LANGUAGE_VERSION
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.WITH_EXPERIMENTAL_CHECKERS
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.WITH_EXTRA_CHECKERS
@@ -32,9 +34,11 @@ import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.ALLOW_DAN
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.ALLOW_KOTLIN_PACKAGE
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.EXPLICIT_API_MODE
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.EXPLICIT_RETURN_TYPES_MODE
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.HEADER_MODE
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE_VERSION
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.RETURN_VALUE_CHECKER_MODE
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.TESTED_LANGUAGE_FEATURE_DISABLED
 import org.jetbrains.kotlin.test.directives.configureFirParser
 import org.jetbrains.kotlin.test.frontend.classic.handlers.FirTestDataConsistencyHandler
 import org.jetbrains.kotlin.test.frontend.fir.*
@@ -47,12 +51,15 @@ import org.jetbrains.kotlin.test.runners.DuplicateFileNameChecker
 import org.jetbrains.kotlin.test.services.LibraryProvider
 import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.configuration.JvmEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.JvmForeignAnnotationsConfigurator
 import org.jetbrains.kotlin.test.services.configuration.ScriptingEnvironmentConfigurator
-import org.jetbrains.kotlin.test.services.fir.FirOldFrontendMetaConfigurator
+import org.jetbrains.kotlin.test.services.fir.FirSpecificParserSuppressor
+import org.jetbrains.kotlin.test.services.fir.LanguageFeatureDisabledMetaConfigurator
 import org.jetbrains.kotlin.test.services.fir.LatestLanguageVersionMetaConfigurator
 import org.jetbrains.kotlin.test.services.service
 import org.jetbrains.kotlin.test.services.sourceProviders.AdditionalDiagnosticsSourceFilesProvider
 import org.jetbrains.kotlin.test.services.sourceProviders.CoroutineHelpersSourceFilesProvider
+import org.jetbrains.kotlin.utils.addToStdlib.runIf
 
 /**
  * General test configuration for FIR-based diagnostic tests
@@ -63,6 +70,7 @@ fun TestConfigurationBuilder.configureDiagnosticTest(parser: FirParser) {
     configureFirParser(parser)
 
     useAdditionalService(::LibraryProvider)
+    useMetaTestConfigurators(::FirSpecificParserSuppressor)
 }
 
 /**
@@ -81,21 +89,20 @@ fun TestConfigurationBuilder.configureIrActualizerDiagnosticsTest() {
 }
 
 /**
- * Setups the configuration for K2 diagnostics tests which share the testdata with K1 diagnostic tests.
- * Enables duplication of testdata in `.fir.kt` files in case if diagnostics are different between K1 and K2
+ * The list of `UNUSED_*` diagnostics which are disabled by default
+ * within diagnostic tests.
  */
-fun TestConfigurationBuilder.configurationForClassicAndFirTestsAlongside(
-    testDataConsistencyHandler: Constructor<AfterAnalysisChecker> = ::FirTestDataConsistencyHandler,
-) {
-    defaultDirectives {
-        +TEST_ALONGSIDE_K1_TESTDATA
-    }
-    useAfterAnalysisCheckers(
-        ::FirFailingTestSuppressor,
-        testDataConsistencyHandler,
-    )
-    useMetaTestConfigurators(::FirOldFrontendMetaConfigurator)
-}
+val DEFAULT_UNUSED_DIAGNOSTICS = listOf(
+    "UNUSED_VARIABLE",
+    "UNUSED_PARAMETER",
+    "UNUSED_ANONYMOUS_PARAMETER",
+    "UNUSED_DESTRUCTURED_PARAMETER_ENTRY",
+    "UNUSED_TYPEALIAS_PARAMETER",
+    "UNUSED_VALUE",
+    "UNUSED_CHANGED_VALUE",
+    "UNUSED_EXPRESSION",
+    "UNUSED_LAMBDA_EXPRESSION",
+)
 
 /**
  * Setups the base configuration for diagnostic tests
@@ -106,7 +113,6 @@ fun TestConfigurationBuilder.configurationForClassicAndFirTestsAlongside(
  *
  * @param [testDataConsistencyHandler] is used to ensure consistency between `.kt` and `.xxx.kt` files if they are present.
  * Known usages:
- * - `.fir.kt` for diagnostics testdata shared between the K1 and K2
  * - `.latestLV.kt` for tests which run with latest LV instead of latest stable LV
  * - `.ll.kt` for AA tests
  * - `.reversed.fir.kt` for reversed AA tests
@@ -124,12 +130,14 @@ fun TestConfigurationBuilder.baseFirDiagnosticTestConfiguration(
 
     defaultDirectives {
         LANGUAGE + "+EnableDfaWarningsInK2"
+        DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "-$it" }
     }
 
     enableMetaInfoHandler()
 
     useConfigurators(
         ::CommonEnvironmentConfigurator,
+        ::JvmForeignAnnotationsConfigurator,
         ::JvmEnvironmentConfigurator,
         ::ScriptingEnvironmentConfigurator,
     )
@@ -145,10 +153,12 @@ fun TestConfigurationBuilder.baseFirDiagnosticTestConfiguration(
     }
 
     useMetaInfoProcessors(::PsiLightTreeMetaInfoProcessor)
-    configureCommonDiagnosticTestPaths(testDataConsistencyHandler)
+    useAfterAnalysisCheckers(testDataConsistencyHandler)
+    useFailureSuppressors(::FirFailingTestSuppressor)
+    configureCommonDiagnosticTestPaths()
 }
 
-fun HandlersStepBuilder<FirOutputArtifact, FrontendKinds.FIR>.setupHandlersForDiagnosticTest() {
+fun TestStepBuilder.HandlersStepBuilder.NonGroupingStage<FirOutputArtifact, FrontendKinds.FIR>.setupHandlersForDiagnosticTest() {
     useHandlers(
         ::FirDiagnosticsHandler,
         ::FirDumpHandler,
@@ -158,30 +168,21 @@ fun HandlersStepBuilder<FirOutputArtifact, FrontendKinds.FIR>.setupHandlersForDi
         ::FirCfgConsistencyHandler,
         ::FirResolvedTypesVerifier,
         ::FirScopeDumpHandler,
+        ::FirDistinctSourceElementsHandler,
     )
 }
 
 /**
  * Setups specific directives for tests located (or not located) in some specific directories
  */
-fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths(
-    testDataConsistencyHandler: Constructor<AfterAnalysisChecker> = ::FirTestDataConsistencyHandler,
-) {
-    forTestsMatching("compiler/testData/diagnostics/*") {
-        configurationForClassicAndFirTestsAlongside(testDataConsistencyHandler)
-    }
-
-    forTestsMatching("compiler/fir/analysis-tests/testData/*") {
-        useAfterAnalysisCheckers(::FirFailingTestSuppressor)
-    }
-
-    forTestsMatching("compiler/fir/analysis-tests/testData/resolve/vfir/*") {
+fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths() {
+    forTestsMatching("compiler/testData/diagnostics/tests/vfir/*") {
         defaultDirectives {
             +DUMP_VFIR
         }
     }
 
-    forTestsMatching("compiler/fir/analysis-tests/testData/resolve/withAllowedKotlinPackage/*") {
+    forTestsMatching("compiler/testData/diagnostics/tests/withAllowedKotlinPackage/*") {
         defaultDirectives {
             +ALLOW_KOTLIN_PACKAGE
         }
@@ -189,20 +190,20 @@ fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths(
 
     forTestsMatching(
         "compiler/testData/diagnostics/testsWithStdLib/*" or
-                "compiler/fir/analysis-tests/testData/resolveWithStdlib/*" or
-                "compiler/testData/diagnostics/tests/unsignedTypes/*"
+                "compiler/testData/diagnostics/tests/unsignedTypes/*" or
+                "compiler/testData/diagnostics/tests/collectionLiterals/stdlibTypes/*"
     ) {
         defaultDirectives {
             +WITH_STDLIB
         }
     }
 
-    forTestsMatching("compiler/testData/diagnostics/jvmIntegration/*") {
+    forTestsMatching("compiler/testData/diagnostics/tests/jvm/*") {
         defaultDirectives {
             +WITH_STDLIB
             +CHECK_COMPILER_OUTPUT
+            +IGNORE_DEXING
         }
-        configurationForClassicAndFirTestsAlongside(testDataConsistencyHandler)
     }
 
     forTestsMatching("compiler/testData/diagnostics/tests/testsWithExplicitApi/*") {
@@ -221,6 +222,7 @@ fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths(
         defaultDirectives {
             RETURN_VALUE_CHECKER_MODE with ReturnValueCheckerMode.CHECKER
             +WITH_EXTRA_CHECKERS
+            DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "+$it" }
             DIAGNOSTICS with "-UNUSED_VARIABLE"
             LANGUAGE with "+UnnamedLocalVariables"
         }
@@ -230,8 +232,15 @@ fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths(
         defaultDirectives {
             RETURN_VALUE_CHECKER_MODE with ReturnValueCheckerMode.FULL
             +WITH_EXTRA_CHECKERS
+            DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "+$it" }
             DIAGNOSTICS with "-UNUSED_VARIABLE"
             LANGUAGE with "+UnnamedLocalVariables"
+        }
+    }
+
+    forTestsMatching("compiler/testData/diagnostics/tests/crvFull/contracts/*") {
+        defaultDirectives {
+            LANGUAGE with "+AllowReturnsResultOfContract"
         }
     }
 
@@ -241,19 +250,26 @@ fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths(
         }
     }
 
-    forTestsMatching(
-        "compiler/fir/analysis-tests/testData/resolve/extraCheckers/*" or
-                "compiler/testData/diagnostics/tests/controlFlowAnalysis/deadCode/*"
-    ) {
+    forTestsMatching("compiler/testData/diagnostics/tests/controlFlowAnalysis/*") {
         defaultDirectives {
-            +WITH_EXTRA_CHECKERS
+            DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "+$it" }
         }
     }
 
     forTestsMatching(
-        "compiler/fir/analysis-tests/testData/resolve/extraCheckers/*" or
-                "compiler/fir/analysis-tests/testData/resolveWithStdlib/contracts/fromSource/bad/returnsImplies/*" or
-                "compiler/fir/analysis-tests/testData/resolveWithStdlib/contracts/fromSource/good/returnsImplies/*"
+        "compiler/testData/diagnostics/tests/extraCheckers/*" or
+                "compiler/testData/diagnostics/tests/controlFlowAnalysis/deadCode/*"
+    ) {
+        defaultDirectives {
+            +WITH_EXTRA_CHECKERS
+            DIAGNOSTICS with DEFAULT_UNUSED_DIAGNOSTICS.map { "+$it" }
+        }
+    }
+
+    forTestsMatching(
+        "compiler/testData/diagnostics/tests/extraCheckers/*" or
+                "compiler/testData/diagnostics/testsWithStdLib/contracts/fromSource/bad/returnsImplies/*" or
+                "compiler/testData/diagnostics/testsWithStdLib/contracts/fromSource/good/returnsImplies/*"
     ) {
         defaultDirectives {
             +WITH_EXPERIMENTAL_CHECKERS
@@ -276,7 +292,7 @@ fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths(
         }
     }
 
-    forTestsMatching("compiler/fir/analysis-tests/testData/resolveWithStdlib/properties/backingField/*") {
+    forTestsMatching("compiler/testData/diagnostics/testsWithStdLib/properties/backingField/*") {
         defaultDirectives {
             LANGUAGE + "+ExplicitBackingFields"
         }
@@ -288,26 +304,50 @@ fun TestConfigurationBuilder.configureCommonDiagnosticTestPaths(
         }
     }
 
-    forTestsMatching("compiler/fir/analysis-tests/testData/resolve/nestedTypeAliases/*") {
+    forTestsMatching("compiler/testData/diagnostics/tests/nestedTypeAliases/*") {
         defaultDirectives {
             LANGUAGE + "+NestedTypeAliases"
+        }
+    }
+
+    forTestsMatching("compiler/testData/diagnostics/tests/headerMode/*") {
+        defaultDirectives {
+            +HEADER_MODE
+            DISABLE_WITH_PARSER with FirParser.Psi
         }
     }
 }
 
 /**
- * Setups running the test with latest LV instead of latest stable LV
+ * Sets up running the test with latest LV instead of latest stable LV
  */
 fun TestConfigurationBuilder.configurationForTestWithLatestLanguageVersion() {
     defaultDirectives {
         LANGUAGE_VERSION with LanguageVersion.entries.last()
         +ALLOW_DANGEROUS_LANGUAGE_VERSION_TESTING
         +USE_LATEST_LANGUAGE_VERSION
+        LANGUAGE with LanguageFeature.entries.mapNotNull { feature ->
+            runIf(feature.enabledInLatestLVTests) { "+${feature.name}" }
+        }
     }
     useMetaTestConfigurators(::LatestLanguageVersionMetaConfigurator)
     useAfterAnalysisCheckers(
         ::FirTestDataConsistencyHandler,
         ::LatestLVIdenticalChecker,
+    )
+}
+
+/**
+ * Sets up running the test with some LF disabled.
+ */
+fun TestConfigurationBuilder.configurationForTestWithLanguageFeatureDisabled() {
+    defaultDirectives {
+        +TESTED_LANGUAGE_FEATURE_DISABLED
+    }
+    useMetaTestConfigurators(::LanguageFeatureDisabledMetaConfigurator)
+    useAfterAnalysisCheckers(
+        ::FirTestDataConsistencyHandler,
+        ::LfDisabledIdenticalChecker,
     )
 }
 
@@ -323,7 +363,7 @@ fun TestConfigurationBuilder.enableLazyResolvePhaseChecking() {
     // It's important to filter out failures from lazy resolve before calling other suppressors like BlackBoxCodegenSuppressor
     // Otherwise other suppressors can filter out every failure from test and keep it as ignored even if
     // the only problem in lazy resolve contracts, which disables with special directive
-    useAfterAnalysisCheckers(::DisableLazyResolveChecksAfterAnalysisChecker, insertAtFirst = true)
+    useFailureSuppressors(::DisableLazyResolveChecksAfterAnalysisChecker, insertAtFirst = true)
 
     configureFirHandlersStep {
         useHandlers(

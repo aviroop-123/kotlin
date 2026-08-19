@@ -1,0 +1,920 @@
+KtFile: 'positionalDestructuringShortFormErrors.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtClass(0,111): '// LANGUAGE: +NameBasedDestructuring'
+  null
+
+KtDeclarationModifierList(59,63): 'data'
+  null
+
+KtPrimaryConstructor(75,111): '(val first: String, val second: Int)'
+  null
+
+KtParameterList(75,111): '(val first: String, val second: Int)'
+  null
+
+KtParameter(76,93): 'val first: String'
+  null
+
+KtTypeReference(87,93): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(87,93): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(87,93): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtParameter(95,110): 'val second: Int'
+  null
+
+KtTypeReference(107,110): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(107,110): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(107,110): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtClass(112,166): 'class NonDataTuple(val first: String, val second: Int)'
+  null
+
+KtPrimaryConstructor(130,166): '(val first: String, val second: Int)'
+  null
+
+KtParameterList(130,166): '(val first: String, val second: Int)'
+  null
+
+KtParameter(131,148): 'val first: String'
+  null
+
+KtTypeReference(142,148): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(142,148): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(142,148): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtParameter(150,165): 'val second: Int'
+  null
+
+KtTypeReference(162,165): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(162,165): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(162,165): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNamedFunction(168,368): 'fun declaration(x: Tuple, y: NonDataTuple) {'
+  null
+
+KtParameterList(183,210): '(x: Tuple, y: NonDataTuple)'
+  null
+
+KtParameter(184,192): 'x: Tuple'
+  null
+
+KtTypeReference(187,192): 'Tuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtUserType(187,192): 'Tuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtNameReferenceExpression(187,192): 'Tuple'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtParameter(194,209): 'y: NonDataTuple'
+  null
+
+KtTypeReference(197,209): 'NonDataTuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtUserType(197,209): 'NonDataTuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtNameReferenceExpression(197,209): 'NonDataTuple'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtBlockExpression(211,368): '{'
+  null
+
+KtIfExpression(217,263): 'if (true) { val [first, second: String,] = x }'
+  null
+
+KtContainerNode(221,225): 'true'
+  null
+
+KtConstantExpression(221,225): 'true'
+  null
+
+KtContainerNodeForControlStructureBody(227,263): '{ val [first, second: String,] = x }'
+  null
+
+KtBlockExpression(227,263): '{ val [first, second: String,] = x }'
+  null
+
+KtDestructuringDeclaration(229,261): 'val [first, second: String,] = x'
+  null
+
+KtDestructuringDeclarationEntry(234,239): 'first'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component1(<dispatch receiver>: Tuple): kotlin.String
+    ]
+
+KtDestructuringDeclarationEntry(241,255): 'second: String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component2(<dispatch receiver>: Tuple): kotlin.Int
+    ]
+
+KtTypeReference(249,255): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(249,255): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(249,255): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(260,261): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      x: Tuple
+    ]
+
+KtIfExpression(268,302): 'if (true) { var [first: Int] = x }'
+  null
+
+KtContainerNode(272,276): 'true'
+  null
+
+KtConstantExpression(272,276): 'true'
+  null
+
+KtContainerNodeForControlStructureBody(278,302): '{ var [first: Int] = x }'
+  null
+
+KtBlockExpression(278,302): '{ var [first: Int] = x }'
+  null
+
+KtDestructuringDeclaration(280,300): 'var [first: Int] = x'
+  null
+
+KtDestructuringDeclarationEntry(285,295): 'first: Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component1(<dispatch receiver>: Tuple): kotlin.String
+    ]
+
+KtTypeReference(292,295): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(292,295): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(292,295): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(299,300): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      x: Tuple
+    ]
+
+KtIfExpression(307,336): 'if (true) { val [first] = y }'
+  null
+
+KtContainerNode(311,315): 'true'
+  null
+
+KtConstantExpression(311,315): 'true'
+  null
+
+KtContainerNodeForControlStructureBody(317,336): '{ val [first] = y }'
+  null
+
+KtBlockExpression(317,336): '{ val [first] = y }'
+  null
+
+KtDestructuringDeclaration(319,334): 'val [first] = y'
+  null
+
+KtDestructuringDeclarationEntry(324,329): 'first'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'component1' on receiver of type 'NonDataTuple'.>
+
+KtNameReferenceExpression(333,334): 'y'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      y: NonDataTuple
+    ]
+
+KtIfExpression(341,366): 'if (true) { val [first] }'
+  null
+
+KtContainerNode(345,349): 'true'
+  null
+
+KtConstantExpression(345,349): 'true'
+  null
+
+KtContainerNodeForControlStructureBody(351,366): '{ val [first] }'
+  null
+
+KtBlockExpression(351,366): '{ val [first] }'
+  null
+
+KtDestructuringDeclaration(353,364): 'val [first]'
+  null
+
+KtDestructuringDeclarationEntry(358,363): 'first'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'component1'.>
+
+KtNamedFunction(370,523): 'fun loop(x: List<Tuple>, y: NonDataTuple) {'
+  null
+
+KtParameterList(378,411): '(x: List<Tuple>, y: NonDataTuple)'
+  null
+
+KtParameter(379,393): 'x: List<Tuple>'
+  null
+
+KtTypeReference(382,393): 'List<Tuple>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/List
+    ]
+
+KtUserType(382,393): 'List<Tuple>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/List
+    ]
+
+KtNameReferenceExpression(382,386): 'List'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/List
+    ]
+
+KtTypeArgumentList(386,393): '<Tuple>'
+  null
+
+KtTypeProjection(387,392): 'Tuple'
+  null
+
+KtTypeReference(387,392): 'Tuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtUserType(387,392): 'Tuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtNameReferenceExpression(387,392): 'Tuple'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtParameter(395,410): 'y: NonDataTuple'
+  null
+
+KtTypeReference(398,410): 'NonDataTuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtUserType(398,410): 'NonDataTuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtNameReferenceExpression(398,410): 'NonDataTuple'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtBlockExpression(412,523): '{'
+  null
+
+KtForExpression(418,456): 'for ([first, second: String,] in x) {}'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/List.iterator(<dispatch receiver>: kotlin.collections.List<E>): kotlin.collections.Iterator<E>,
+      kotlin/collections/Iterator.hasNext(<dispatch receiver>: kotlin.collections.Iterator<T>): kotlin.Boolean,
+      kotlin/collections/Iterator.next(<dispatch receiver>: kotlin.collections.Iterator<T>): T
+    ]
+
+KtParameter(423,447): '[first, second: String,]'
+  null
+
+KtDestructuringDeclaration(423,447): '[first, second: String,]'
+  null
+
+KtDestructuringDeclarationEntry(424,429): 'first'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component1(<dispatch receiver>: Tuple): kotlin.String
+    ]
+
+KtDestructuringDeclarationEntry(431,445): 'second: String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component2(<dispatch receiver>: Tuple): kotlin.Int
+    ]
+
+KtTypeReference(439,445): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(439,445): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(439,445): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtContainerNode(451,452): 'x'
+  null
+
+KtNameReferenceExpression(451,452): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      x: kotlin.collections.List<Tuple>
+    ]
+
+KtContainerNodeForControlStructureBody(454,456): '{}'
+  null
+
+KtBlockExpression(454,456): '{}'
+  null
+
+KtForExpression(461,487): 'for ([first: Int] in x) {}'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/List.iterator(<dispatch receiver>: kotlin.collections.List<E>): kotlin.collections.Iterator<E>,
+      kotlin/collections/Iterator.hasNext(<dispatch receiver>: kotlin.collections.Iterator<T>): kotlin.Boolean,
+      kotlin/collections/Iterator.next(<dispatch receiver>: kotlin.collections.Iterator<T>): T
+    ]
+
+KtParameter(466,478): '[first: Int]'
+  null
+
+KtDestructuringDeclaration(466,478): '[first: Int]'
+  null
+
+KtDestructuringDeclarationEntry(467,477): 'first: Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component1(<dispatch receiver>: Tuple): kotlin.String
+    ]
+
+KtTypeReference(474,477): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(474,477): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(474,477): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtContainerNode(482,483): 'x'
+  null
+
+KtNameReferenceExpression(482,483): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      x: kotlin.collections.List<Tuple>
+    ]
+
+KtContainerNodeForControlStructureBody(485,487): '{}'
+  null
+
+KtBlockExpression(485,487): '{}'
+  null
+
+KtForExpression(492,521): 'for ([first: String] in y) {}'
+  KaCompoundSymbolResolutionError:
+    attempts = [
+      KaSymbolResolutionError:
+        candidateSymbols = []
+        diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'iterator' on receiver of type 'NonDataTuple'.>,
+      KaSymbolResolutionError:
+        candidateSymbols = []
+        diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'hasNext'.>,
+      KaSymbolResolutionError:
+        candidateSymbols = []
+        diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'next'.>
+    ]
+
+KtParameter(497,512): '[first: String]'
+  null
+
+KtDestructuringDeclaration(497,512): '[first: String]'
+  null
+
+KtDestructuringDeclarationEntry(498,511): 'first: String'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'component1'.>
+
+KtTypeReference(505,511): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(505,511): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(505,511): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtContainerNode(516,517): 'y'
+  null
+
+KtNameReferenceExpression(516,517): 'y'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      y: NonDataTuple
+    ]
+
+KtContainerNodeForControlStructureBody(519,521): '{}'
+  null
+
+KtBlockExpression(519,521): '{}'
+  null
+
+KtNamedFunction(525,710): 'fun lambda() {'
+  null
+
+KtParameterList(535,537): '()'
+  null
+
+KtBlockExpression(538,710): '{'
+  null
+
+KtNamedFunction(544,574): 'fun foo(f: (Tuple) -> Unit) {}'
+  null
+
+KtParameterList(551,571): '(f: (Tuple) -> Unit)'
+  null
+
+KtParameter(552,570): 'f: (Tuple) -> Unit'
+  null
+
+KtTypeReference(555,570): '(Tuple) -> Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Function1
+    ]
+
+KtFunctionType(555,570): '(Tuple) -> Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Function1
+    ]
+
+KtParameterList(555,562): '(Tuple)'
+  null
+
+KtParameter(556,561): 'Tuple'
+  null
+
+KtTypeReference(556,561): 'Tuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtUserType(556,561): 'Tuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtNameReferenceExpression(556,561): 'Tuple'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple
+    ]
+
+KtTypeReference(566,570): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(566,570): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(566,570): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(572,574): '{}'
+  null
+
+KtNamedFunction(579,616): 'fun bar(f: (NonDataTuple) -> Unit) {}'
+  null
+
+KtParameterList(586,613): '(f: (NonDataTuple) -> Unit)'
+  null
+
+KtParameter(587,612): 'f: (NonDataTuple) -> Unit'
+  null
+
+KtTypeReference(590,612): '(NonDataTuple) -> Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Function1
+    ]
+
+KtFunctionType(590,612): '(NonDataTuple) -> Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Function1
+    ]
+
+KtParameterList(590,604): '(NonDataTuple)'
+  null
+
+KtParameter(591,603): 'NonDataTuple'
+  null
+
+KtTypeReference(591,603): 'NonDataTuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtUserType(591,603): 'NonDataTuple'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtNameReferenceExpression(591,603): 'NonDataTuple'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /NonDataTuple
+    ]
+
+KtTypeReference(608,612): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(608,612): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(608,612): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(614,616): '{}'
+  null
+
+KtCallExpression(622,657): 'foo { [first, second: String,] -> }'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      foo(f: (Tuple) -> kotlin.Unit): kotlin.Unit
+    ]
+
+KtNameReferenceExpression(622,625): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      foo(f: (Tuple) -> kotlin.Unit): kotlin.Unit
+    ]
+
+KtLambdaArgument(626,657): '{ [first, second: String,] -> }'
+  null
+
+KtLambdaExpression(626,657): '{ [first, second: String,] -> }'
+  null
+
+KtFunctionLiteral(626,657): '{ [first, second: String,] -> }'
+  null
+
+KtParameterList(628,652): '[first, second: String,]'
+  null
+
+KtParameter(628,652): '[first, second: String,]'
+  null
+
+KtDestructuringDeclaration(628,652): '[first, second: String,]'
+  null
+
+KtDestructuringDeclarationEntry(629,634): 'first'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component1(<dispatch receiver>: Tuple): kotlin.String
+    ]
+
+KtDestructuringDeclarationEntry(636,650): 'second: String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component2(<dispatch receiver>: Tuple): kotlin.Int
+    ]
+
+KtTypeReference(644,650): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(644,650): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(644,650): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtBlockExpression(656,656): ''
+  null
+
+KtCallExpression(662,685): 'foo { [first: Int] -> }'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      foo(f: (Tuple) -> kotlin.Unit): kotlin.Unit
+    ]
+
+KtNameReferenceExpression(662,665): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      foo(f: (Tuple) -> kotlin.Unit): kotlin.Unit
+    ]
+
+KtLambdaArgument(666,685): '{ [first: Int] -> }'
+  null
+
+KtLambdaExpression(666,685): '{ [first: Int] -> }'
+  null
+
+KtFunctionLiteral(666,685): '{ [first: Int] -> }'
+  null
+
+KtParameterList(668,680): '[first: Int]'
+  null
+
+KtParameter(668,680): '[first: Int]'
+  null
+
+KtDestructuringDeclaration(668,680): '[first: Int]'
+  null
+
+KtDestructuringDeclarationEntry(669,679): 'first: Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Tuple.component1(<dispatch receiver>: Tuple): kotlin.String
+    ]
+
+KtTypeReference(676,679): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(676,679): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(676,679): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtBlockExpression(684,684): ''
+  null
+
+KtCallExpression(690,708): 'bar { [first] -> }'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      bar(f: (NonDataTuple) -> kotlin.Unit): kotlin.Unit
+    ]
+
+KtNameReferenceExpression(690,693): 'bar'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      bar(f: (NonDataTuple) -> kotlin.Unit): kotlin.Unit
+    ]
+
+KtLambdaArgument(694,708): '{ [first] -> }'
+  null
+
+KtLambdaExpression(694,708): '{ [first] -> }'
+  null
+
+KtFunctionLiteral(694,708): '{ [first] -> }'
+  null
+
+KtParameterList(696,703): '[first]'
+  null
+
+KtParameter(696,703): '[first]'
+  null
+
+KtDestructuringDeclaration(696,703): '[first]'
+  null
+
+KtDestructuringDeclarationEntry(697,702): 'first'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'component1' on receiver of type 'NonDataTuple'.>
+
+KtBlockExpression(707,707): ''
+  null

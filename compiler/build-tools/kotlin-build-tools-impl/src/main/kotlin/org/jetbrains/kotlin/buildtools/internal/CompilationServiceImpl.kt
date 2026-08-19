@@ -3,6 +3,8 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
+@file:Suppress("DEPRECATION_ERROR")
+
 package org.jetbrains.kotlin.buildtools.internal
 
 import com.intellij.openapi.vfs.impl.ZipHandler
@@ -100,10 +102,10 @@ internal object CompilationServiceImpl : CompilationService {
         check(compilationConfig is JvmCompilationConfigurationImpl) {
             "Initial JVM compilation configuration object must be acquired from the `makeJvmCompilationConfiguration` method."
         }
-        val loggerAdapter = KotlinLoggerMessageCollectorAdapter(compilationConfig.logger)
+        val loggerAdapter = KotlinLoggerMessageCollectorAdapter(compilationConfig.logger, DefaultCompilerMessageRenderer, warningsAsErrors = false)
         val kotlinFilenameExtensions =
             (DEFAULT_KOTLIN_SOURCE_FILES_EXTENSIONS + compilationConfig.kotlinScriptFilenameExtensions)
-        val (filteredSources, unknownSources) = sources.partition { it.isJavaFile() || it.isKotlinFile(kotlinFilenameExtensions) }
+        val [filteredSources, unknownSources] = sources.partition { it.isJavaFile() || it.isKotlinFile(kotlinFilenameExtensions) }
         if (unknownSources.isNotEmpty()) {
             compilationConfig.logger.warn("Sources with unknown extensions were passed, they will be skipped: ${unknownSources.joinToString()}")
         }
@@ -171,18 +173,19 @@ internal object CompilationServiceImpl : CompilationService {
         return when (val options = aggregatedIcConfiguration?.options) {
             is ClasspathSnapshotBasedIncrementalJvmCompilationConfiguration -> {
                 @Suppress("DEPRECATION") // TODO: get rid of that parsing KT-62759
-                val kotlinSources = extractKotlinSourcesFromFreeCompilerArguments(
+                val allSources = extractKotlinSourcesFromFreeCompilerArguments(
                     parsedArguments,
                     kotlinFilenameExtensions,
                     includeJavaSources = true
                 ) + sources
+                val javaSources = allSources.filter { it.isJavaFile() }.map { it.absolutePath }
 
                 @Suppress("UNCHECKED_CAST")
                 val classpathChanges =
                     (aggregatedIcConfiguration as AggregatedIcConfiguration<ClasspathSnapshotBasedIncrementalCompilationApproachParameters>).classpathChanges
                 val buildReporter = BuildReporter(
-                    icReporter = BuildToolsApiBuildICReporter(loggerAdapter.kotlinLogger, options.rootProjectDir),
-                    buildMetricsReporter = DoNothingBuildMetricsReporter
+                    icReporter = BuildToolsApiBuildICReporter(loggerAdapter.kotlinLogger, options.rootProjectDir, null),
+                    buildMetricsReporter = DoNothingBuildMetricsReporter,
                 )
                 val verifiedPreciseJavaTracking = parsedArguments.disablePreciseJavaTrackingIfK2(usePreciseJavaTrackingByDefault = options.preciseJavaTrackingEnabled)
                 val icFeatures = options.extractIncrementalCompilationFeatures().copy(
@@ -211,8 +214,9 @@ internal object CompilationServiceImpl : CompilationService {
                 val rootProjectDir = options.rootProjectDir
                 val buildDir = options.buildDir
                 parsedArguments.incrementalCompilation = true
+                parsedArguments.freeArgs += javaSources
                 incrementalCompiler.compile(
-                    kotlinSources, parsedArguments, loggerAdapter, aggregatedIcConfiguration.sourcesChanges.asChangedFiles,
+                    allSources, parsedArguments, loggerAdapter, aggregatedIcConfiguration.sourcesChanges.asChangedFiles,
                     fileLocations = if (rootProjectDir != null && buildDir != null) {
                         FileLocations(rootProjectDir, buildDir)
                     } else null
@@ -283,15 +287,18 @@ internal object CompilationServiceImpl : CompilationService {
             }
         )
 
-        val (daemon, sessionId) = KotlinCompilerRunnerUtils.newDaemonConnection(
-            compilerId,
-            clientIsAliveFile,
-            sessionIsAliveFlagFile,
-            loggerAdapter,
-            isDebugEnabled = true, // actually, prints daemon messages even unrelated to debug logs
-            daemonJVMOptions = jvmOptions,
-            daemonOptions = daemonOptions,
-        ) ?: return ExitCode.INTERNAL_ERROR.asCompilationResult
+        (
+            val daemon = compileService, val sessionId
+        ) =
+            KotlinCompilerRunnerUtils.newDaemonConnection(
+                compilerId,
+                clientIsAliveFile,
+                sessionIsAliveFlagFile,
+                loggerAdapter,
+                isDebugEnabled = true, // actually, prints daemon messages even unrelated to debug logs
+                daemonJVMOptions = jvmOptions,
+                daemonOptions = daemonOptions,
+            ) ?: return ExitCode.INTERNAL_ERROR.asCompilationResult
         val daemonCompileOptions = compilationConfiguration.asDaemonCompilationOptions
         val isIncrementalCompilation = daemonCompileOptions is IncrementalCompilationOptions
 
@@ -306,7 +313,8 @@ internal object CompilationServiceImpl : CompilationService {
             BasicCompilerServicesWithResultsFacadeServer(loggerAdapter),
             DaemonCompilationResults(
                 loggerAdapter.kotlinLogger,
-                compilationConfiguration.aggregatedIcConfiguration?.options?.rootProjectDir
+                compilationConfiguration.aggregatedIcConfiguration?.options?.rootProjectDir,
+                DoNothingBuildMetricsReporter,
             )
         ).get()
 

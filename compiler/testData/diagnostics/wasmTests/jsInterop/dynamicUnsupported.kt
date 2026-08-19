@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: FRONTEND
 val foo: <!UNSUPPORTED!>dynamic<!> = 1
 
 fun foo(x: <!UNSUPPORTED!>dynamic<!>): <!UNSUPPORTED!>dynamic<!> {

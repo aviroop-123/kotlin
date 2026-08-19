@@ -169,7 +169,9 @@ message Type {
    */
   optional int32 flags = 1;
 
-  extensions 100 to 199;
+  repeated Annotation annotation = 100;
+
+  extensions 101 to 199;
 }
 
 message TypeParameter {
@@ -189,7 +191,12 @@ message TypeParameter {
   repeated Type upper_bound = 5;
   repeated int32 upper_bound_id = 6 [packed = true, (type_id_in_table) = true];
 
-  extensions 100 to 999;
+  repeated Annotation annotation = 100;
+
+  extensions 101 to 999;
+
+  // WARNING: Don't occupy index 171 which was previously used for storing DescriptorUniqId.
+  // DescriptorUniqId type_param_uniq_id = 171;
 }
 
 message Class {
@@ -206,9 +213,9 @@ message Class {
 
   /*
     hasAnnotations
-    Visibility
-    Modality
-    ClassKind
+    Visibility (3 bits)
+    Modality (2 bits)
+    ClassKind (3 bits)
     isInner
     isData
     isExternal
@@ -258,6 +265,9 @@ message Class {
   repeated CompilerPluginData compiler_plugin_data = 33;
 
   extensions 100 to 18999;
+
+  // WARNING: Don't occupy index 171 which was previously used for storing DescriptorUniqId.
+  // DescriptorUniqId class_uniq_id = 171;
 }
 
 message Package {
@@ -285,9 +295,10 @@ message TypeTable {
 message Constructor {
   /*
     hasAnnotations
-    Visibility
+    Visibility (2 bits)
     isSecondary
     hasNonStableParameterNames
+    ReturnValueStatus (2 bits)
   */
   optional int32 flags = 1 [default = 6 /* public constructor, no annotations */];
 
@@ -300,14 +311,17 @@ message Constructor {
   repeated Annotation annotation = 3;
 
   extensions 100 to 18999;
+
+  // WARNING: Don't occupy index 172 which was previously used for storing DescriptorUniqId.
+  // DescriptorUniqId constructor_uniq_id = 172;
 }
 
 message Function {
   /*
     hasAnnotations
-    Visibility
-    Modality
-    MemberKind
+    Visibility (3 bits)
+    Modality (2 bits)
+    MemberKind (2 bits)
     isOperator
     isInfix
     isInline
@@ -316,6 +330,8 @@ message Function {
     isSuspend
     isExpect
     hasNonStableParameterNames
+    ReturnValueStatus (2 bits)
+    isStatic
   */
   optional int32 flags = 9 [default = 6 /* public final function, no annotations */];
   optional int32 old_flags = 1 [default = 6];
@@ -349,14 +365,17 @@ message Function {
   repeated Annotation extension_receiver_annotation = 34;
 
   extensions 100 to 18999;
+
+  // WARNING: Don't occupy index 173 which was previously used for storing DescriptorUniqId.
+  // DescriptorUniqId function_uniq_id = 173;
 }
 
 message Property {
   /*
     hasAnnotations
-    Visibility
-    Modality
-    MemberKind
+    Visibility (3 bits)
+    Modality (2 bits)
+    MemberKind (2 bits)
     isVar
     hasGetter
     hasSetter
@@ -366,6 +385,8 @@ message Property {
     isExternal
     isDelegated
     isExpect
+    ReturnValueStatus (2 bits)
+    isStatic
   */
   optional int32 flags = 11 [default = 518 /* public (6) final property with getter (512) */];
   optional int32 old_flags = 1 [default = 2054];
@@ -389,8 +410,8 @@ message Property {
 
   /*
     hasAnnotations
-    Visibility
-    Modality
+    Visibility (3 bits)
+    Modality (2 bits)
     isNotDefault
     isExternal
     isInline
@@ -413,7 +434,13 @@ message Property {
   repeated Annotation backing_field_annotation = 34;
   repeated Annotation delegate_field_annotation = 35;
 
+  optional Contract getterContract = 40;
+  optional Contract setterContract = 41;
+
   extensions 100 to 18999;
+
+  // WARNING: Don't occupy index 179 which was previously used for storing DescriptorUniqId.
+  // DescriptorUniqId property_uniq_id = 179;
 }
 
 message ValueParameter {
@@ -443,7 +470,7 @@ message ValueParameter {
 message TypeAlias {
   /*
     hasAnnotations
-    Visibility
+    Visibility (2 bits)
   */
   optional int32 flags = 1 [default = 6 /* public, no annotations */];
 
@@ -464,6 +491,9 @@ message TypeAlias {
   repeated CompilerPluginData compiler_plugin_data = 32;
 
   extensions 100 to 199;
+
+  // WARNING: Don't occupy index 131 which was previously used for storing DescriptorUniqId.
+  // DescriptorUniqId type_alias_uniq_id = 131;
 }
 
 message EnumEntry {
@@ -472,6 +502,9 @@ message EnumEntry {
   repeated Annotation annotation = 2;
 
   extensions 100 to 199;
+
+  // WARNING: Don't occupy index 172 which was previously used for storing DescriptorUniqId.
+  // DescriptorUniqId enum_entry_uniq_id = 172;
 }
 
 enum Modality {
@@ -560,7 +593,13 @@ message PackageFragment {
 
   repeated Class class = 4;
 
+  repeated org.jetbrains.kotlin.metadata.Annotation file_annotation = 5;
+
   extensions 100 to 199;
+
+  // WARNING: Don't occupy index 170 which was previously used for storing package_fragment_files.
+  // int32 package_fragment_files = 170;
+
 }
 
 
@@ -585,6 +624,9 @@ message Effect {
 
     // ReturnsNotNull()
     RETURNS_NOT_NULL = 2;
+
+    // ReturnsResultOf(callable: ParameterReference)
+    RETURNS_RESULT_OF = 3;
   }
   optional EffectType effect_type = 1;
 

@@ -6,9 +6,14 @@
 package org.jetbrains.kotlin.fir.renderer
 
 import org.jetbrains.kotlin.builtins.functions.FunctionTypeKind
+import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.types.model.TypeConstructorMarker
 import org.jetbrains.kotlin.utils.addToStdlib.ifNotEmpty
+import org.jetbrains.kotlin.utils.addToStdlib.nextOrNull
+import org.jetbrains.kotlin.utils.addToStdlib.withSeenElementsCounting
 
 open class ConeTypeRenderer(
     private val attributeRenderer: ConeAttributeRenderer = ConeAttributeRenderer.ToString,
@@ -55,7 +60,7 @@ open class ConeTypeRenderer(
 
         if (contextParameters.isNotEmpty()) {
             builder.append("context(")
-            for ((index, contextParameter) in contextParameters.withIndex()) {
+            for ([index, contextParameter] in contextParameters.withIndex()) {
                 if (index != 0) {
                     builder.append(", ")
                 }
@@ -72,7 +77,7 @@ open class ConeTypeRenderer(
             builder.append(".")
         }
         builder.append("(")
-        for ((index, argument) in arguments.withIndex()) {
+        for ([index, argument] in arguments.withIndex()) {
             if (index != 0) {
                 builder.append(", ")
             }
@@ -87,10 +92,10 @@ open class ConeTypeRenderer(
 
     fun render(
         type: ConeKotlinType,
-        nullabilityMarker: String = if (type !is ConeFlexibleType && type.isMarkedNullable) "?" else "",
+        nullabilityMarker: String = if (type !is ConeFlexibleType && type !is ConeIntersectionType && type.isMarkedNullable) "?" else "",
     ) {
-        if (type !is ConeFlexibleType && type !is ConeDefinitelyNotNullType) {
-            // We don't render attributes for flexible/definitely not null types here,
+        if (type !is ConeFlexibleType && type !is ConeDefinitelyNotNullType && type.classId?.isFunctionType() != true) {
+            // We don't render attributes for flexible/definitely not null/extension function types here,
             // because bounds duplicate these attributes often
             type.renderAttributes()
         }
@@ -111,20 +116,98 @@ open class ConeTypeRenderer(
                 render(type)
             }
 
-            is ConeSimpleKotlinType -> {
-                val hasTypeArguments = type is ConeClassLikeType && type.typeArguments.isNotEmpty()
-                renderConstructor(type.getConstructor(), nullabilityMarker = nullabilityMarker.takeIf { !hasTypeArguments } ?: "")
-                if (hasTypeArguments) {
-                    type.renderTypeArguments()
-                    builder.append(nullabilityMarker)
+            is ConeSimpleKotlinType -> when {
+                type is ConeClassLikeType && type.classId.isFunctionType() -> {
+                    renderFunctionType(type, nullabilityMarker)
+                    return
                 }
-                return
+
+                else -> {
+                    renderSimpleType(type, nullabilityMarker)
+                    return
+                }
             }
         }
         builder.append(nullabilityMarker)
     }
 
-    open fun renderConstructor(constructor: TypeConstructorMarker, nullabilityMarker: String = "") {
+    private fun renderFunctionType(type: ConeClassLikeType, nullabilityMarker: String = "") {
+        if (nullabilityMarker != "") {
+            builder.append('(')
+        }
+        if (type.classId.isSuspendFunctionType()) {
+            builder.append("suspend ")
+        }
+        val arguments = type.typeArguments.iterator().withSeenElementsCounting()
+
+        if (type.hasContextParameters) {
+            builder.append("context(")
+            repeat(type.contextParameterNumberForFunctionType - 1) {
+                arguments.nextOrNull()?.render()
+                builder.append(", ")
+            }
+            arguments.nextOrNull()?.render()
+            builder.append(") ")
+        }
+
+        if (type.isExtensionFunctionType) {
+            arguments.nextOrNull()?.let { next ->
+                if (couldBenefitFromParenthesizing(next)) {
+                    builder.append('(')
+                }
+                next.render()
+                if (couldBenefitFromParenthesizing(next)) {
+                    builder.append(')')
+                }
+            }
+            builder.append(".")
+        }
+
+        builder.append('(')
+        while (arguments.numberOfElementsSeen < type.typeArguments.size - 2) {
+            arguments.nextOrNull()?.render()
+            builder.append(", ")
+        }
+        if (arguments.numberOfElementsSeen == type.typeArguments.size - 2) {
+            arguments.nextOrNull()?.render()
+        }
+        builder.append(") -> ")
+        arguments.nextOrNull()?.render()
+
+        if (nullabilityMarker != "") {
+            builder.append(')')
+            builder.append(nullabilityMarker)
+        }
+        return
+    }
+
+    protected open fun couldBenefitFromParenthesizing(projection: ConeTypeProjection): Boolean =
+        // For non-invariant projections, e.g., `(in T).() -> Unit`
+        projection !is ConeKotlinType
+                // For `(T & Any).() -> Unit`
+                || projection is ConeDefinitelyNotNullType
+                // For `(() -> Unit)?.() -> Unit` and `(() -> Unit).() -> Unit`
+                || projection.classId?.isFunctionType() == true && !projection.isMarkedNullable
+
+    private fun ClassId.isFunctionType(): Boolean = isNonSuspendFunctionType() || isSuspendFunctionType()
+
+    private fun ClassId.isNonSuspendFunctionType(): Boolean =
+        this.asString().removePrefix(StandardClassIds.Function.asString()).toIntOrNull() != null
+
+    private fun ClassId.isSuspendFunctionType(): Boolean =
+        this.asString().removePrefix(StandardClassIds.SuspendFunction.asString()).toIntOrNull() != null
+
+    protected open fun renderSimpleType(type: ConeSimpleKotlinType, nullabilityMarker: String) {
+        val hasTypeArguments = type is ConeClassLikeType && type.typeArguments.isNotEmpty()
+        renderConstructor(type.getConstructor())
+        if (hasTypeArguments) {
+            type.renderTypeArguments()
+        }
+
+        builder.append(nullabilityMarker)
+    }
+
+    fun renderConstructor(constructor: TypeConstructorMarker) {
         require(constructor is ConeTypeConstructorMarker)
         when (constructor) {
             is ConeTypeVariableTypeConstructor -> {
@@ -149,7 +232,7 @@ open class ConeTypeRenderer(
                 }
             }
 
-            is ConeClassLikeErrorLookupTag -> builder.append("ERROR CLASS: ${constructor.diagnostic.reason}")
+            is ConeClassLikeErrorLookupTag -> builder.append(renderDiagnostic(constructor.diagnostic, prefix = "ERROR CLASS: "))
 
             is ConeClassLikeLookupTag -> idRenderer.renderClassId(constructor.classId)
             is ConeClassifierLookupTag -> builder.append(constructor.name.asString())
@@ -162,13 +245,16 @@ open class ConeTypeRenderer(
                         "Call `render` to simply render the type or filter out intersection types on the call-site."
             )
         }
-        builder.append(nullabilityMarker)
+    }
+
+    open fun renderDiagnostic(diagnostic: ConeDiagnostic, prefix: String = "", suffix: String = ""): String {
+        return "$prefix${diagnostic.reason}$suffix"
     }
 
     private fun ConeClassLikeType.renderTypeArguments() {
         if (typeArguments.isEmpty()) return
         builder.append("<")
-        for ((index, typeArgument) in typeArguments.withIndex()) {
+        for ([index, typeArgument] in typeArguments.withIndex()) {
             if (index > 0) {
                 builder.append(", ")
             }
@@ -178,6 +264,11 @@ open class ConeTypeRenderer(
     }
 
     private fun ConeFlexibleType.renderForSameLookupTags(): Boolean {
+        if (isTrivial && lowerBound !is ConeDefinitelyNotNullType) {
+            render(lowerBound, nullabilityMarker = "!")
+            return true
+        }
+
         if (lowerBound is ConeLookupTagBasedType && upperBound is ConeLookupTagBasedType &&
             lowerBound.lookupTag == upperBound.lookupTag &&
             !lowerBound.isMarkedNullable && upperBound.isMarkedNullable
@@ -215,7 +306,7 @@ open class ConeTypeRenderer(
             .ifNotEmpty { builder.append(attributeRenderer.render(this)) }
     }
 
-    private fun ConeTypeProjection.render() {
+    protected fun ConeTypeProjection.render() {
         when (this) {
             ConeStarProjection -> {
                 builder.append("*")
@@ -261,7 +352,7 @@ open class ConeTypeRenderer(
 
     protected open fun render(type: ConeIntersectionType) {
         builder.append("it(")
-        for ((index, intersected) in type.intersectedTypes.withIndex()) {
+        for ([index, intersected] in type.intersectedTypes.withIndex()) {
             if (index > 0) {
                 builder.append(" & ")
             }

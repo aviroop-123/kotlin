@@ -5,7 +5,7 @@
 
 package org.jetbrains.kotlin.fir.analysis.collectors.components
 
-import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
+import org.jetbrains.kotlin.diagnostics.PendingDiagnosticReporter
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.cfa.util.PropertyInitializationInfoData
@@ -21,14 +21,15 @@ import org.jetbrains.kotlin.fir.references.toResolvedPropertySymbol
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ControlFlowGraph
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularPropertySymbol
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 
 class ControlFlowAnalysisDiagnosticComponent(
     session: FirSession,
-    reporter: DiagnosticReporter,
+    reporter: PendingDiagnosticReporter,
     declarationCheckers: DeclarationCheckers,
 ) : AbstractDiagnosticCollectorComponent(session, reporter) {
-    constructor(session: FirSession, reporter: DiagnosticReporter, mppKind: MppCheckerKind) : this(
+    constructor(session: FirSession, reporter: PendingDiagnosticReporter, mppKind: MppCheckerKind) : this(
         session,
         reporter,
         when (mppKind) {
@@ -89,8 +90,8 @@ class ControlFlowAnalysisDiagnosticComponent(
         analyze(function, data)
     }
 
-    override fun visitSimpleFunction(simpleFunction: FirSimpleFunction, data: CheckerContext) {
-        analyze(simpleFunction, data)
+    override fun visitNamedFunction(namedFunction: FirNamedFunction, data: CheckerContext) {
+        analyze(namedFunction, data)
     }
 
     override fun visitPropertyAccessor(propertyAccessor: FirPropertyAccessor, data: CheckerContext) {
@@ -143,7 +144,7 @@ class ControlFlowAnalysisDiagnosticComponent(
 
         override fun visitProperty(property: FirProperty, data: Set<ControlFlowGraph>) {
             if (
-                !property.isLocal ||
+                property.symbol is FirRegularPropertySymbol ||
                 property.origin == FirDeclarationOrigin.ScriptCustomization.Parameter ||
                 property.origin == FirDeclarationOrigin.ScriptCustomization.ParameterFromBaseClass
             ) return visitElement(property, data)

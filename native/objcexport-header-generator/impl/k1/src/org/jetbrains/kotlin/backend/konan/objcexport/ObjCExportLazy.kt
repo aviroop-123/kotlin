@@ -209,7 +209,7 @@ class ObjCExportLazyImpl(
 
         val result = mutableListOf<ObjCInterface>()
 
-        extensions.mapTo(result) { (classDescriptor, declarations) ->
+        extensions.mapTo(result) { [classDescriptor, declarations] ->
             translateExtensions(file, classDescriptor, declarations)
         }
 
@@ -356,7 +356,7 @@ class ObjCExportLazyImpl(
 
         override val origin: ObjCExportStubOrigin? by lazy { ObjCExportStubOrigin(descriptor) }
 
-        override fun computeRealStub(): ObjCInterface = lazy.translator.translateClass(descriptor)
+        override fun computeRealStub(): ObjCInterface = lazy.translator.translateClass(descriptor).objCInterface
     }
 
     private class LazyObjCFileInterface(

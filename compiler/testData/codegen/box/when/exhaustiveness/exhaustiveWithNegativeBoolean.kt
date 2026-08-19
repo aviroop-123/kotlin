@@ -1,5 +1,4 @@
 // LANGUAGE: +DataFlowBasedExhaustiveness
-// IGNORE_BACKEND_K1: ANY
 
 fun foo(b: Boolean): Int {
     if (b == false) return 1

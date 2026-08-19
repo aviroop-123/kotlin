@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -19,12 +18,12 @@
 fun case1(): Int {
     var a = 1
     try {
-        <!UNREACHABLE_CODE!>throw<!> Exception() //invalid UNREACHABLE_CODE diagnostic
+        throw Exception() //invalid UNREACHABLE_CODE diagnostic
     } catch (e: Exception) {
         a = 5
-        <!UNREACHABLE_CODE!>return<!>++a
+        return++a
     } finally {
         return a
     }
-    <!UNREACHABLE_CODE!>return 0<!>
+    return 0
 }

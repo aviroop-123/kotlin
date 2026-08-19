@@ -7,6 +7,7 @@ package kotlin.metadata.test
 
 import kotlin.metadata.jvm.KotlinClassMetadata
 import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
@@ -17,16 +18,18 @@ class DifferentVersionsTest {
 
     fun Metadata.changeVersion(newVersion: IntArray) = Metadata(
         kind, newVersion,
-        bytecodeVersion, data1, data2, extraString, packageName, extraInt
+        @Suppress("DEPRECATION") bytecodeVersion,
+        data1, data2, extraString, packageName, extraInt,
     )
 
     fun Metadata.addFlag(flags: Int) = Metadata(
-        kind, metadataVersion, bytecodeVersion, data1, data2,
-        extraString, packageName,
-        extraInt or flags
+        kind, metadataVersion,
+        @Suppress("DEPRECATION") bytecodeVersion,
+        data1, data2, extraString, packageName, extraInt or flags,
     )
 
     @Test
+    @Disabled("Enable when KT-83081 is fixed")
     fun readsCurrentVersion() {
         assertContentEquals(MetadataVersion.INSTANCE.toArray(), metadata.metadataVersion)
         assertIs<KotlinClassMetadata.Class>(KotlinClassMetadata.readStrict(metadata))

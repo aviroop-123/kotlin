@@ -1,0 +1,209 @@
+FILE: annotationArgumentsRepl.repl.kts
+    REPL_SNIPPET: <snippet-annotationArgumentsRepl.repl.kts>
+        public final object AnnotationArgumentsRepl_repl : R|kotlin/Any| {
+            public AnnotationArgumentsRepl_repl.constructor(): R|AnnotationArgumentsRepl_repl| {
+                super<R|kotlin/Any|>()
+            }
+
+            public final fun $$eval(): <implicit> { LAZY_BLOCK }
+
+            @Arrays(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithArrays : R|kotlin/Any| {
+                public? [ContainingClassKey=WithArrays] constructor(): R|AnnotationArgumentsRepl_repl.WithArrays| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Arrays(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithExplicitArrays : R|kotlin/Any| {
+                public? [ContainingClassKey=WithExplicitArrays] constructor(): R|AnnotationArgumentsRepl_repl.WithExplicitArrays| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @ClassLiteral(LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithClassLiteral : R|kotlin/Any| {
+                public? [ContainingClassKey=WithClassLiteral] constructor(): R|AnnotationArgumentsRepl_repl.WithClassLiteral| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @EnumLiteral(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithEnumLiteral : R|kotlin/Any| {
+                public? [ContainingClassKey=WithEnumLiteral] constructor(): R|AnnotationArgumentsRepl_repl.WithEnumLiteral| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @VarArg(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class OneVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=OneVararg] constructor(): R|AnnotationArgumentsRepl_repl.OneVararg| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @VarArg(LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class TwoVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=TwoVararg] constructor(): R|AnnotationArgumentsRepl_repl.TwoVararg| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @VarArg(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class ThreeVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=ThreeVararg] constructor(): R|AnnotationArgumentsRepl_repl.ThreeVararg| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @VarArg(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class SpreadVararg : R|kotlin/Any| {
+                public? [ContainingClassKey=SpreadVararg] constructor(): R|AnnotationArgumentsRepl_repl.SpreadVararg| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Outer(LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithNested : R|kotlin/Any| {
+                public? [ContainingClassKey=WithNested] constructor(): R|AnnotationArgumentsRepl_repl.WithNested| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Outer(LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithQualifiedNested : R|kotlin/Any| {
+                public? [ContainingClassKey=WithQualifiedNested] constructor(): R|AnnotationArgumentsRepl_repl.WithQualifiedNested| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Qualified : R|kotlin/Any| {
+                public? [ContainingClassKey=Qualified] constructor(): R|AnnotationArgumentsRepl_repl.Qualified| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Sum : R|kotlin/Any| {
+                public? [ContainingClassKey=Sum] constructor(): R|AnnotationArgumentsRepl_repl.Sum| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Negative : R|kotlin/Any| {
+                public? [ContainingClassKey=Negative] constructor(): R|AnnotationArgumentsRepl_repl.Negative| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Negative2 : R|kotlin/Any| {
+                public? [ContainingClassKey=Negative2] constructor(): R|AnnotationArgumentsRepl_repl.Negative2| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Positive : R|kotlin/Any| {
+                public? [ContainingClassKey=Positive] constructor(): R|AnnotationArgumentsRepl_repl.Positive| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithSimple : R|kotlin/Any| {
+                public? [ContainingClassKey=WithSimple] constructor(): R|AnnotationArgumentsRepl_repl.WithSimple| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithNamedSimple : R|kotlin/Any| {
+                public? [ContainingClassKey=WithNamedSimple] constructor(): R|AnnotationArgumentsRepl_repl.WithNamedSimple| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithSimpleOperations : R|kotlin/Any| {
+                public? [ContainingClassKey=WithSimpleOperations] constructor(): R|AnnotationArgumentsRepl_repl.WithSimpleOperations| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Simple(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithConversionCall : R|kotlin/Any| {
+                public? [ContainingClassKey=WithConversionCall] constructor(): R|AnnotationArgumentsRepl_repl.WithConversionCall| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @ConversionCallConsumer(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithResolvedConversionCall : R|kotlin/Any| {
+                public? [ContainingClassKey=WithResolvedConversionCall] constructor(): R|AnnotationArgumentsRepl_repl.WithResolvedConversionCall| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] annotation class ConversionCallConsumer : R|kotlin/Annotation| {
+                public? [ContainingClassKey=ConversionCallConsumer] constructor([CorrespondingProperty=/AnnotationArgumentsRepl_repl.ConversionCallConsumer.b] b: Byte): R|AnnotationArgumentsRepl_repl.ConversionCallConsumer| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+                public? final? [IsFromPrimaryConstructor=true] val b: Byte = R|<local>/b|
+                    public? [ContainingClassKey=ConversionCallConsumer] get(): Byte
+
+            }
+
+            @StringLiteral(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithStringLiteral : R|kotlin/Any| {
+                public? [ContainingClassKey=WithStringLiteral] constructor(): R|AnnotationArgumentsRepl_repl.WithStringLiteral| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @StringLiteral(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithStringLiteralConcat : R|kotlin/Any| {
+                public? [ContainingClassKey=WithStringLiteralConcat] constructor(): R|AnnotationArgumentsRepl_repl.WithStringLiteralConcat| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @StringLiteral(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithStringInterpolationPrefix : R|kotlin/Any| {
+                public? [ContainingClassKey=WithStringInterpolationPrefix] constructor(): R|AnnotationArgumentsRepl_repl.WithStringInterpolationPrefix| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @InvalidArguments(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class LongStringTemplateEntryWithTwoExpressions : R|kotlin/Any| {
+                public? [ContainingClassKey=LongStringTemplateEntryWithTwoExpressions] constructor(): R|AnnotationArgumentsRepl_repl.LongStringTemplateEntryWithTwoExpressions| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Deprecated(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Another : R|kotlin/Any| {
+                public? [ContainingClassKey=Another] constructor(): R|AnnotationArgumentsRepl_repl.Another| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @Arrays(LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class WithIncorrectArguments : R|kotlin/Any| {
+                public? [ContainingClassKey=WithIncorrectArguments] constructor(): R|AnnotationArgumentsRepl_repl.WithIncorrectArguments| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+            @kotlin.Deprecated(LAZY_EXPRESSION, LAZY_EXPRESSION, LAZY_EXPRESSION) public final? [ContainingReplKey=FirReplSnippetSymbol AnnotationArgumentsRepl_repl, ReplSnippetTopLevelDeclaration=true] class Qualified : R|kotlin/Any| {
+                public? [ContainingClassKey=Qualified] constructor(): R|AnnotationArgumentsRepl_repl.Qualified| {
+                    LAZY_super<R|kotlin/Any|>
+                }
+
+            }
+
+        }

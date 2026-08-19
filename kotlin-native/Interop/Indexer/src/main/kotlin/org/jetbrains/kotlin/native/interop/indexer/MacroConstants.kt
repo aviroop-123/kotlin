@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.native.interop.indexer
 import clang.*
 import kotlinx.cinterop.*
 import java.io.File
+import java.util.stream.Collectors
 
 val predefinedMacros = setOf("__DATE__", "__TIME__", "__TIMESTAMP__", "__FILE__", "__FILE_NAME__", "__BASE_FILE__", "__LINE__")
 
@@ -29,9 +30,10 @@ internal fun findMacros(
         nativeIndex: NativeIndexImpl,
         compilation: CompilationWithPCH,
         translationUnits: List<CXTranslationUnit>,
-        headers: Set<ClangFile?>
+        headers: Set<ClangFile?>,
+        mode: MacroNamesCollectingMode,
 ) {
-    val names = collectMacroNames(nativeIndex, translationUnits, headers)
+    val names = collectMacroNames(nativeIndex, translationUnits, headers, mode)
     // TODO: apply user-defined filters.
     val macros = expandMacros(compilation, names, typeConverter = { nativeIndex.convertType(it) })
 
@@ -79,7 +81,7 @@ private fun expandMacros(
                 unprocessedMacros -= (processedMacros.keys + unprocessedMacros.first())
                 // Note: removing first macro should not have any effect, doing this to ensure the loop is finite.
 
-                processedMacros.forEach { (name, macroDef) ->
+                processedMacros.forEach { [name, macroDef] ->
                     if (macroDef != null) nameToMacroDef[name] = macroDef
                 }
             }
@@ -286,7 +288,29 @@ enum class VisitorState {
     EXPECT_END, INVALID
 }
 
-private fun collectMacroNames(nativeIndex: NativeIndexImpl, translationUnits: List<CXTranslationUnit>, headers: Set<ClangFile?>): List<String> {
+private fun collectMacroNames(
+        nativeIndex: NativeIndexImpl,
+        translationUnits: List<CXTranslationUnit>,
+        headers: Set<ClangFile?>,
+        mode: MacroNamesCollectingMode,
+): List<String> {
+    val result = when (mode) {
+        MacroNamesCollectingMode.LEGACY ->
+            collectMacroNamesLegacy(nativeIndex, translationUnits, headers)
+        MacroNamesCollectingMode.LIBCLANGEXT ->
+            collectMacroNamesLibclangext(nativeIndex, translationUnits, headers, false)
+        MacroNamesCollectingMode.LIBCLANGEXT_PARALLEL ->
+            collectMacroNamesLibclangext(nativeIndex, translationUnits, headers, true)
+    }
+
+    return result.filterNot { predefinedMacros.contains(it) }
+}
+
+private fun collectMacroNamesLegacy(
+        nativeIndex: NativeIndexImpl,
+        translationUnits: List<CXTranslationUnit>,
+        headers: Set<ClangFile?>,
+): List<String> {
     val result = mutableSetOf<String>()
 
     translationUnits.forEach {
@@ -305,7 +329,36 @@ private fun collectMacroNames(nativeIndex: NativeIndexImpl, translationUnits: Li
         }
     }
 
-    return result.filterNot { predefinedMacros.contains(it) }.toList()
+    return result.toList()
+}
+
+private fun collectMacroNamesLibclangext(
+        nativeIndex: NativeIndexImpl,
+        translationUnits: List<CXTranslationUnit>,
+        headers: Set<ClangFile?>,
+        parallelize: Boolean,
+): List<String> {
+    fun processTranslationUnit(translationUnit: CXTranslationUnit): Set<String> {
+        val result = mutableSetOf<String>()
+        visitObjectLikeMacroDefinitions(translationUnit, nativeIndex.library.excludeSystemLibs) { spelling, _, file ->
+            if (spelling != null && file != null && file in headers) {
+                result.add(spelling.toKString())
+            }
+        }
+        return result
+    }
+
+    val result = if (parallelize && translationUnits.size > 1) {
+        translationUnits.parallelStream()
+                .flatMap { processTranslationUnit(it).stream() }
+                .collect(Collectors.toSet())
+    } else {
+        translationUnits.asSequence()
+                .flatMap { processTranslationUnit(it) }
+                .toSet()
+    }
+
+    return result.sorted()
 }
 
 private fun canMacroBeConstant(cursor: CValue<CXCursor>): Boolean {

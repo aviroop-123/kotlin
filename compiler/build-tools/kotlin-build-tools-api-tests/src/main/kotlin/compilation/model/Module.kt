@@ -3,24 +3,21 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.buildtools.api.tests.compilation.model
+package org.jetbrains.kotlin.buildtools.tests.compilation.model
 
-import org.jetbrains.kotlin.buildtools.api.CompilationResult
-import org.jetbrains.kotlin.buildtools.api.ExecutionPolicy
-import org.jetbrains.kotlin.buildtools.api.SourcesChanges
-import org.jetbrains.kotlin.buildtools.api.jvm.JvmSnapshotBasedIncrementalCompilationOptions
-import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmCompilationOperation
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.model.Module.Companion.EXECUTION_TIMEOUT_SECONDS
+import org.jetbrains.kotlin.buildtools.api.*
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.Module.Companion.EXECUTION_TIMEOUT_SECONDS
 import java.nio.file.Path
 
-interface Module : Dependency {
+interface Module<O : BaseCompilationOperation, B : BaseCompilationOperation.Builder, IC : BaseIncrementalCompilationConfiguration.Builder> :
+    Dependency {
     val project: Project
     val moduleName: String
 
     /**
      * Hook for any additional configuration for the compilation operations within this module.
      */
-    val moduleCompilationConfigAction: (JvmCompilationOperation) -> Unit
+    val moduleCompilationConfigAction: (B) -> Unit
 
     /**
      * Directory containing all the source (.kt) files of the module
@@ -49,11 +46,20 @@ interface Module : Dependency {
 
     val defaultStrategyConfig: ExecutionPolicy
 
+    fun compileAndThrow(
+        strategyConfig: ExecutionPolicy = defaultStrategyConfig,
+        forceOutput: LogLevel? = null,
+        compilationConfigAction: (B) -> Unit = {},
+        compilationAction: (O) -> Unit = {},
+        assertions: context(ModuleContext) CompilationOutcome.(Throwable) -> Unit = {},
+    ): Throwable
+
     fun compile(
         strategyConfig: ExecutionPolicy = defaultStrategyConfig,
         forceOutput: LogLevel? = null,
-        compilationConfigAction: (JvmCompilationOperation) -> Unit = {},
-        assertions: CompilationOutcome.(Module) -> Unit = {},
+        compilationConfigAction: (B) -> Unit = {},
+        compilationAction: (O) -> Unit = {},
+        assertions: context(ModuleContext) CompilationOutcome.() -> Unit = {},
     ): CompilationResult
 
     fun compileIncrementally(
@@ -61,9 +67,10 @@ interface Module : Dependency {
         strategyConfig: ExecutionPolicy = defaultStrategyConfig,
         forceOutput: LogLevel? = null,
         forceNonIncrementalCompilation: Boolean = false,
-        compilationConfigAction: (JvmCompilationOperation) -> Unit = {},
-        icOptionsConfigAction: (JvmSnapshotBasedIncrementalCompilationOptions) -> Unit = {},
-        assertions: CompilationOutcome.(module: Module) -> Unit = {},
+        compilationConfigAction: (B) -> Unit = {},
+        compilationAction: (O) -> Unit = {},
+        icOptionsConfigAction: (IC) -> Unit = {},
+        assertions: context(Module<*, *, *>) CompilationOutcome.() -> Unit = {},
     ): CompilationResult
 
     /**
@@ -84,3 +91,5 @@ interface Module : Dependency {
         const val EXECUTION_TIMEOUT_SECONDS = 10L
     }
 }
+
+typealias ModuleContext = Module<*, *, *>

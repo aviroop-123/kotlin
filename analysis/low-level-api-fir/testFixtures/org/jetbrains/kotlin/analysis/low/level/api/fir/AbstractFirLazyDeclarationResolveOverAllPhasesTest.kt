@@ -6,13 +6,13 @@
 package org.jetbrains.kotlin.analysis.low.level.api.fir
 
 import org.jetbrains.kotlin.analysis.low.level.api.fir.AbstractFirLazyDeclarationResolveOverAllPhasesTest.Directives.PRE_RESOLVED_PHASE
-import org.jetbrains.kotlin.analysis.low.level.api.fir.AbstractFirLazyDeclarationResolveOverAllPhasesTest.OutputRenderingMode.*
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.resolveToFirSymbol
 import org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve.LLFirResolveDesignationCollector
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.ktTestModuleStructure
 import org.jetbrains.kotlin.analysis.test.framework.services.expressionMarkerProvider
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
+import org.jetbrains.kotlin.test.frontend.fir.checkDistinctSourceElements
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.resolvePhase
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseRecursively
@@ -55,29 +55,20 @@ abstract class AbstractFirLazyDeclarationResolveOverAllPhasesTest : AbstractFirL
     ) {
         val resultBuilder = StringBuilder()
         val renderer = lazyResolveRenderer(resultBuilder)
+        val allKtFiles = testServices.ktTestModuleStructure.allMainKtFiles
+
+        preresolveElements(allKtFiles, testServices)
 
         withResolutionFacade(ktFile) { resolutionFacade ->
             checkResolutionFacade(resolutionFacade)
-            val allKtFiles = testServices.ktTestModuleStructure.allMainKtFiles
 
-            val preresolvedElementCarets = testServices.expressionMarkerProvider.getBottommostElementsOfTypeAtCarets<KtDeclaration>(
-                files = allKtFiles,
-                qualifier = "preresolved",
-            )
-
-            val phase = testServices.moduleStructure.allDirectives.singleOrZeroValue(PRE_RESOLVED_PHASE)
-            if (preresolvedElementCarets.isEmpty() && phase != null) {
-                error("$PRE_RESOLVED_PHASE is declared, but there is not any pre-resolved carets")
-            }
-
-            preresolvedElementCarets.forEach { (declaration, _) ->
-                declaration.resolveToFirSymbol(resolutionFacade, phase ?: FirResolvePhase.BODY_RESOLVE)
-            }
-
-            val (elementToResolve, resolver) = resolverProvider(resolutionFacade)
+            val [elementToResolve, resolver] = resolverProvider(resolutionFacade)
             val filesToRender = when (outputRenderingMode) {
                 OutputRenderingMode.ALL_FILES_FROM_ALL_MODULES -> {
-                    allKtFiles.map(resolutionFacade::getOrBuildFirFile)
+                    val firFile = resolutionFacade.getOrBuildFirFile(ktFile)
+                    // The current firFile might not be present in allKtFiles in case of dangling files
+                    // since it is not declared in the test infrastructure directly
+                    allKtFiles.map(resolutionFacade::getOrBuildFirFile).plus(firFile).distinct()
                 }
                 OutputRenderingMode.USE_SITE_AND_DESIGNATION_FILES -> {
                     val firFile = resolutionFacade.getOrBuildFirFile(ktFile)
@@ -92,6 +83,11 @@ abstract class AbstractFirLazyDeclarationResolveOverAllPhasesTest : AbstractFirL
             for (currentPhase in FirResolvePhase.entries) {
                 if (currentPhase == FirResolvePhase.SEALED_CLASS_INHERITORS || currentPhase < basePhase) continue
                 resolver(currentPhase)
+
+                // While compiler raw FIR and compiler-based LL tests already check for distinct source elements, we should also check them
+                // phase by phase. In Analysis API mode, parts of the FIR file can be lazily built, so the set of source elements might
+                // change between phases.
+                checkDistinctSourceElements(filesToRender) { _, _ -> "Duplicate source elements found at phase $currentPhase" }
 
                 if (resultBuilder.isNotEmpty()) {
                     resultBuilder.appendLine()
@@ -128,6 +124,29 @@ abstract class AbstractFirLazyDeclarationResolveOverAllPhasesTest : AbstractFirL
             resultBuilder.toString(),
             extension = outputExtension,
         )
+    }
+
+    private fun preresolveElements(allKtFiles: List<KtFile>, testServices: TestServices) {
+        val preresolvedElementCarets = testServices.expressionMarkerProvider.getBottommostElementsOfTypeAtCarets<KtDeclaration>(
+            files = allKtFiles,
+            qualifier = "preresolved",
+        )
+
+        val phase = testServices.moduleStructure.allDirectives.singleOrZeroValue(PRE_RESOLVED_PHASE)
+        if (preresolvedElementCarets.isEmpty() && phase != null) {
+            error("$PRE_RESOLVED_PHASE is declared, but there are no pre-resolved carets.")
+        }
+
+        preresolvedElementCarets.forEach { [declaration, _] ->
+            val containingFile = declaration.containingKtFile
+
+            // We should preresolve the declaration with its own resolution facade instead of the main file's facade, as the preresolved
+            // element might not be in the scope of the main module (for example, it might be a dependent).
+            withResolutionFacade(containingFile) { resolutionFacade ->
+                checkResolutionFacade(resolutionFacade)
+                declaration.resolveToFirSymbol(resolutionFacade, phase ?: FirResolvePhase.BODY_RESOLVE)
+            }
+        }
     }
 
     override val additionalDirectives: List<DirectivesContainer>

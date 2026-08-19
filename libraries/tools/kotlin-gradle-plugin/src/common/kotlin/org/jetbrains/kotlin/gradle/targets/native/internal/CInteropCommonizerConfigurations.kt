@@ -22,8 +22,6 @@ import org.jetbrains.kotlin.gradle.plugin.sources.internal
 import org.jetbrains.kotlin.gradle.targets.metadata.awaitMetadataCompilationsCreated
 import org.jetbrains.kotlin.gradle.targets.metadata.findMetadataCompilation
 import org.jetbrains.kotlin.gradle.utils.*
-import org.jetbrains.kotlin.gradle.utils.createConsumable
-import org.jetbrains.kotlin.gradle.utils.createResolvable
 import org.jetbrains.kotlin.tooling.core.UnsafeApi
 
 /* Elements configuration */
@@ -65,16 +63,16 @@ internal fun Project.locateOrCreateCommonizedCInteropApiElementsConfiguration(co
     val configurationName = commonizerTarget.identityString + "CInteropApiElements"
     configurations.findByName(configurationName)?.let { return it }
 
-    return configurations.createConsumable(configurationName).also { configuration ->
-        setupBasicCommonizedCInteropConfigurationAttributes(configuration, commonizerTarget)
+    return configurations.createConsumable(configurationName) {
+        setupBasicCommonizedCInteropConfigurationAttributes(this, commonizerTarget)
 
         launch {
             val metadataTarget = multiplatformExtension.metadataTarget
             metadataTarget.awaitMetadataCompilationsCreated()
                 .filter { compilation -> compilation.commonizerTarget.await() == commonizerTarget }
-                .forEach { compilation -> configuration.extendsFrom(compilation.internal.configurations.apiConfiguration) }
+                .forEach { compilation -> this@createConsumable.extendsFrom(compilation.internal.configurations.apiConfiguration) }
         }
-    }
+    }.get()
 }
 
 
@@ -103,8 +101,7 @@ internal suspend fun Project.locateOrCreateCommonizedCInteropDependencyConfigura
     configurations.findByName(configurationName)?.let { return it }
 
     val configuration = configurations.createResolvable(configurationName).also { configuration ->
-        configuration.isVisible = false
-
+        configuration.setInvisibleIfSupported()
         // Extends from Metadata Configuration associated with given source set to ensure matching
         configuration.extendsFrom(sourceSet.internal.resolvableMetadataConfiguration)
         setupBasicCommonizedCInteropConfigurationAttributes(configuration, commonizerTarget)

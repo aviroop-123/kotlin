@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -25,7 +24,7 @@ class Case1() {
     fun case() {
         <!DEBUG_INFO_CALL("fqName: Case1.foo; typeCall: function")!>foo(::boo)<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>foo(::boo)<!>
-        foo(::<!DEBUG_INFO_CALL("fqName: Case1.boo; typeCall: function")!>boo<!>)
+        foo(::boo)
     }
 }
 
@@ -57,7 +56,7 @@ class Case3() {
     fun case() {
         <!DEBUG_INFO_CALL("fqName: Case3.foo; typeCall: function")!>foo(::boo)<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>foo(::boo)<!>
-        foo(::<!DEBUG_INFO_CALL("fqName: Case3.boo; typeCall: function")!>boo<!>)
+        foo(::boo)
         foo(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.reflect.KFunction0<kotlin.String>")!>::boo<!>)
 
         <!DEBUG_INFO_CALL("fqName: Case3.foo; typeCall: function")!>foo({ "" })<!>
@@ -78,7 +77,7 @@ class Case4() {
     fun case() {
         <!DEBUG_INFO_CALL("fqName: Case4.foo; typeCall: function")!>foo(::boo)<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>foo(::boo)<!>
-        foo(::<!DEBUG_INFO_CALL("fqName: Case4.boo; typeCall: variable")!>boo<!>)
+        foo(::boo)
         foo(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.reflect.KProperty0<kotlin.String>")!>::boo<!>)
 
         <!DEBUG_INFO_CALL("fqName: Case4.foo; typeCall: function")!>foo({ "" })<!>
@@ -98,7 +97,7 @@ class Case5() {
     fun case() {
         <!DEBUG_INFO_CALL("fqName: Case5.foo; typeCall: function")!>foo(::boo)<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>foo(::boo)<!>
-        foo(::<!DEBUG_INFO_CALL("fqName: Case5.boo; typeCall: variable")!>boo<!>)
+        foo(::boo)
         foo(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.reflect.KProperty0<kotlin.String>")!>::boo<!>)
 
         <!DEBUG_INFO_CALL("fqName: Case5.foo; typeCall: function")!>foo({ "" })<!>
@@ -118,8 +117,7 @@ class Case6() {
     fun case() {
         <!DEBUG_INFO_CALL("fqName: Case6.foo; typeCall: function")!>foo(::boo)<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>foo(::boo)<!>
-        foo(::<!DEBUG_INFO_CALL("fqName: Case6.boo; typeCall: function")!>boo<!>)
+        foo(::boo)
         foo(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.reflect.KFunction0<kotlin.String>")!>::boo<!>)
     }
 }
-

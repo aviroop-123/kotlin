@@ -7,6 +7,8 @@
 
 package kotlin.wasm.internal
 
+import kotlin.internal.UsedFromCompilerGeneratedCode
+
 internal const val CHAR_SIZE_BYTES = 2
 
 internal fun unsafeRawMemoryToWasmCharArray(srcAddr: Int, dstOffset: Int, dstLength: Int, dst: WasmCharArray) {
@@ -37,20 +39,24 @@ internal fun unsafeWasmCharArrayToRawMemory(src: WasmCharArray, srcOffset: Int, 
 internal fun unsafeNotNull(x: Any?): Any =
     implementedAsIntrinsic
 
+@UsedFromCompilerGeneratedCode
 internal fun nullableEquals(lhs: Any?, rhs: Any?): Boolean {
     if (wasm_ref_is_null(lhs))
         return wasm_ref_is_null(rhs)
     return unsafeNotNull(lhs).equals(rhs)
 }
 
+@UsedFromCompilerGeneratedCode
 internal fun anyNtoString(x: Any?): String = x.toString()
 
+@UsedFromCompilerGeneratedCode
 internal fun nullableFloatIeee754Equals(lhs: Float?, rhs: Float?): Boolean {
     if (lhs == null) return rhs == null
     if (rhs == null) return false
     return wasm_f32_eq(lhs, rhs)
 }
 
+@UsedFromCompilerGeneratedCode
 internal fun nullableDoubleIeee754Equals(lhs: Double?, rhs: Double?): Boolean {
     if (lhs == null) return rhs == null
     if (rhs == null) return false
@@ -60,6 +66,7 @@ internal fun nullableDoubleIeee754Equals(lhs: Double?, rhs: Double?): Boolean {
 private var TRUE: Boolean? = null
 private var FALSE: Boolean? = null
 
+@UsedFromCompilerGeneratedCode
 internal fun getBoxedBoolean(x: Boolean): Boolean? =
     if (x) {
         TRUE ?: boxBoolean(true).also { TRUE = it }
@@ -68,19 +75,33 @@ internal fun getBoxedBoolean(x: Boolean): Boolean? =
     }
 
 @ExcludedFromCodegen
+@UsedFromCompilerGeneratedCode
 internal fun boxBoolean(x: Boolean): Boolean? =
     implementedAsIntrinsic
 
 @ExcludedFromCodegen
+@UsedFromCompilerGeneratedCode
 internal fun <T, R> boxIntrinsic(x: T): R =
     implementedAsIntrinsic
 
 @ExcludedFromCodegen
+@UsedFromCompilerGeneratedCode
 internal fun <T, R> unboxIntrinsic(x: T): R =
+    implementedAsIntrinsic
+
+// This intrinsic technically takes varargs, but we only introduce
+// this in IR lowerings with arguments added in manually. The type of
+// F is completely ignored and constrained by the backend to match a
+// function type with argument types from the arguments of this
+// instrinsic. The return type must be specified explicitly.
+@ExcludedFromCodegen
+@UsedFromCompilerGeneratedCode
+internal fun <R> wasm_call_ref(f: Function<R>): R =
     implementedAsIntrinsic
 
 // Represents absence of a value. Should never be used as a real object. See UnitToVoidLowering.kt for more info.
 @ExcludedFromCodegen
+@UsedFromCompilerGeneratedCode
 internal class Void private constructor()
 
 // This is the only way to introduce Void type.
@@ -120,15 +141,13 @@ internal fun consumeFloatIntoVoid(a: Float): Void =
 internal fun consumeDoubleIntoVoid(a: Double): Void =
     implementedAsIntrinsic
 
-// TODO make intrinsic after bootstrap
-internal fun getWasmAbiVersion(): Int = 0
-
 @ExcludedFromCodegen
-internal fun stringGetPoolSize(): Int =
+@UsedFromCompilerGeneratedCode
+internal fun getWasmAbiVersion(): Int =
     implementedAsIntrinsic
 
-// This initializer is a special case in FieldInitializersLowering (remove after bootstrap)
-@Suppress("DEPRECATION")
-@OptIn(ExperimentalStdlibApi::class)
-@EagerInitialization
-internal val stringPool: Array<String?> = Array(stringGetPoolSize())
+// Internal interface for producing Wasm branch hint annotations
+@UsedFromCompilerGeneratedCode
+internal fun likely(cond: Boolean): Boolean = cond
+@UsedFromCompilerGeneratedCode
+internal fun unlikely(cond: Boolean): Boolean = cond

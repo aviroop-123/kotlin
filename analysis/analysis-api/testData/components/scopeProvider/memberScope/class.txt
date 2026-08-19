@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -39,6 +40,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -48,8 +51,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -70,6 +77,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: test.C
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: test/C.bar
   compilerVisibility: Public
   contextParameters: []
@@ -81,8 +89,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -104,13 +114,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: test.C
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaConstantInitializerValue("")
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -139,11 +151,10 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: test.C
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getBar
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -155,6 +166,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -186,6 +198,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -195,8 +209,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -217,6 +235,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: test.A
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: test/A.x
   compilerVisibility: Public
   contextParameters: []
@@ -228,8 +247,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -251,13 +272,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: test.A
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaConstantInitializerValue(0)
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -286,11 +309,10 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: test.A
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getX
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -302,6 +324,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -329,11 +352,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -352,6 +379,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: kotlin.Any
       getContainingModule: KaLibraryModule "Library kotlin-stdlib"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getDispatchReceiver(): KaUsualClassType:
@@ -363,6 +391,8 @@ KaNamedFunctionSymbol:
   canBeOperator: true
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -374,6 +404,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -405,6 +436,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -416,6 +449,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -447,6 +481,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -478,6 +514,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.C.C2
 
 KaNamedClassSymbol:
   annotations: []
@@ -509,6 +546,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.C.O2
 
 KaNamedClassSymbol:
   annotations: []
@@ -540,6 +578,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.C.Companion
 
 KaNamedClassSymbol:
   annotations: []
@@ -571,6 +610,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.A.C1
 
 KaNamedClassSymbol:
   annotations: []
@@ -602,6 +642,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.A.O1
 
 KaConstructorSymbol:
   annotations: []
@@ -611,8 +652,10 @@ KaConstructorSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isPrimary: true
   location: CLASS
   modality: FINAL
@@ -629,3 +672,4 @@ KaConstructorSymbol:
   getContainingJvmClassName: test.C
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: test.C

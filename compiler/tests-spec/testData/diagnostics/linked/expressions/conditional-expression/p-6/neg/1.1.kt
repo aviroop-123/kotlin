@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 // FULL_JDK
 
 /*
@@ -35,8 +34,8 @@ import checkSubtype
  */
 fun case1() {
     val a: Any = true
-    if (<!TYPE_MISMATCH, TYPE_MISMATCH!>a<!>) { "true" } else "false"
-    checkSubtype<Boolean>(<!TYPE_MISMATCH!>a<!>)
+    if (<!CONDITION_TYPE_MISMATCH!>a<!>) { "true" } else "false"
+    checkSubtype<Boolean>(<!ARGUMENT_TYPE_MISMATCH!>a<!>)
 }
 
 /*
@@ -46,8 +45,8 @@ fun case1() {
  */
 fun case2() {
     val a = JavaContainer.aO
-    if (<!TYPE_MISMATCH, TYPE_MISMATCH!>a<!>) { "true" } else "false"
-    checkSubtype<Boolean>(<!TYPE_MISMATCH!>a<!>)
+    if (<!CONDITION_TYPE_MISMATCH!>a<!>) { "true" } else "false"
+    checkSubtype<Boolean>(<!ARGUMENT_TYPE_MISMATCH!>a<!>)
 }
 
 // TESTCASE NUMBER: 3
@@ -62,8 +61,8 @@ public class JavaClassCase3{
 // TESTCASE NUMBER: 3
 fun case3() {
     val x = JavaClassCase3.id(null) // Nothing!
-    <!DEBUG_INFO_CONSTANT, DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing?")!>x<!>
-    val a = if (<!DEBUG_INFO_CONSTANT, TYPE_MISMATCH, TYPE_MISMATCH!>x<!>) {
+    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing?")!>x<!>
+    val a = if (<!CONDITION_TYPE_MISMATCH!>x<!>) {
         "NOK"
     } else "NOK"
 }

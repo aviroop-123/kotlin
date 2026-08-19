@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.serialization
 
 import com.intellij.openapi.project.Project
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.isSuspendFunctionType
 import org.jetbrains.kotlin.builtins.transformSuspendFunctionToRuntimeFunctionType
@@ -45,6 +46,7 @@ import org.jetbrains.kotlin.types.extensions.TypeAttributeTranslators
 import org.jetbrains.kotlin.types.typeUtil.replaceAnnotations
 import java.util.*
 
+@K1Deprecation
 class DescriptorSerializer private constructor(
     private val containingDeclaration: DeclarationDescriptor?,
     private val typeParameters: Interner<TypeParameterDescriptor>,
@@ -247,7 +249,7 @@ class DescriptorSerializer private constructor(
             ProtoEnumFlags.modality(descriptor.modality),
             ProtoEnumFlags.memberKind(descriptor.kind),
             descriptor.isVar, hasGetter, hasSetter, hasConstant, descriptor.isConst, descriptor.isLateInit, descriptor.isExternal,
-            descriptor.isDelegated, descriptor.isExpect, ProtoBuf.ReturnValueStatus.UNSPECIFIED
+            descriptor.isDelegated, descriptor.isExpect, false, ProtoBuf.ReturnValueStatus.UNSPECIFIED
         )
         if (flags != builder.flags) {
             builder.flags = flags
@@ -323,7 +325,8 @@ class DescriptorSerializer private constructor(
             ProtoEnumFlags.memberKind(descriptor.kind),
             descriptor.isOperator, descriptor.isInfix, descriptor.isInline, descriptor.isTailrec, descriptor.isExternal,
             descriptor.isSuspend, descriptor.isExpect,
-            shouldSerializeHasStableParameterNames(descriptor), ProtoBuf.ReturnValueStatus.UNSPECIFIED,
+            shouldSerializeHasStableParameterNames(descriptor), false,
+            ProtoBuf.ReturnValueStatus.UNSPECIFIED,
         )
         if (flags != builder.flags) {
             builder.flags = flags

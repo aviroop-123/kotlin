@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.ide.*
 import org.jetbrains.kotlin.gradle.plugin.ide.IdeDependencyResolver.Companion.gradleArtifact
-import org.jetbrains.kotlin.gradle.plugin.ide.dependencyResolvers.IdeBinaryDependencyResolver.ArtifactResolutionStrategy
+import org.jetbrains.kotlin.gradle.plugin.internal.BuildIdentifierAccessor
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinMetadataCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.internal
 import org.jetbrains.kotlin.gradle.plugin.mpp.resolvableMetadataConfiguration
@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.uklibs.consumption.isFromUklib
 import org.jetbrains.kotlin.gradle.plugin.sources.DefaultKotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.sources.InternalKotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.sources.internal
+import org.jetbrains.kotlin.gradle.plugin.variantImplementationFactoryProvider
 import org.jetbrains.kotlin.gradle.utils.detachedResolvable
 import org.jetbrains.kotlin.gradle.utils.relativeOrAbsolute
 import org.jetbrains.kotlin.tooling.core.mutableExtrasOf
@@ -139,8 +140,27 @@ class IdeBinaryDependencyResolver @JvmOverloads internal constructor(
     override fun resolve(sourceSet: KotlinSourceSet): Set<IdeaKotlinDependency> {
         val artifacts = artifactResolutionStrategy.createArtifactView(sourceSet.internal)?.artifacts ?: return emptySet()
 
+        // Safe handle for gradle bug https://github.com/gradle/gradle/issues/36284
+        fun Throwable.safeWrap(): Throwable {
+            val maybeMessage = runCatching { message }
+            return if (maybeMessage.isFailure) {
+                RuntimeException(
+                    "Got ${this.javaClass} error when trying to resolve Artifact, but explanation message can't be displayed because it " +
+                            "failed with ${maybeMessage.exceptionOrNull()!!.javaClass}. For details please visit https://github.com/gradle/gradle/issues/36284",
+                    maybeMessage.exceptionOrNull()!!
+                )
+            } else {
+                this
+            }
+        }
+
         val unresolvedDependencies = artifacts.failures
-            .onEach { reason -> sourceSet.project.logger.info("Failed to resolve platform dependency on ${sourceSet.name}", reason) }
+            .onEach { reason ->
+                sourceSet.project.logger.info(
+                    "Failed to resolve platform dependency on ${sourceSet.name}",
+                    reason.safeWrap()
+                )
+            }
             .mapNotNull { reason ->
                 val selector = (reason as? ModuleVersionResolveException)?.selector
 
@@ -148,7 +168,7 @@ class IdeBinaryDependencyResolver @JvmOverloads internal constructor(
                 if (selector is ModuleComponentSelector)
                     return@mapNotNull IdeaKotlinUnresolvedBinaryDependency(
                         coordinates = IdeaKotlinBinaryCoordinates(selector.group, selector.module, selector.version, null),
-                        cause = reason.message?.takeIf { it.isNotBlank() },
+                        cause = reason.safeWrap().message,
                         extras = mutableExtrasOf()
                     )
 
@@ -171,12 +191,13 @@ class IdeBinaryDependencyResolver @JvmOverloads internal constructor(
                 )
             }.toSet()
 
+        val buildIdentifierAccessor = sourceSet.project.variantImplementationFactoryProvider<BuildIdentifierAccessor.Factory>()
         val resolvedDependencies = artifacts.artifacts.mapNotNull { artifact ->
             when (val componentId = artifact.id.componentIdentifier) {
                 is ProjectComponentIdentifier -> {
                     IdeaKotlinProjectArtifactDependency(
                         type = IdeaKotlinSourceDependency.Type.Regular,
-                        coordinates = IdeaKotlinProjectCoordinates(componentId)
+                        coordinates = IdeaKotlinProjectCoordinates(componentId, buildIdentifierAccessor)
                     ).apply {
                         artifactsClasspath.add(artifact.file)
                     }

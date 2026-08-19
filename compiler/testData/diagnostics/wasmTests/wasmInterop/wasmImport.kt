@@ -1,3 +1,4 @@
+// RUN_PIPELINE_TILL: FRONTEND
 // LANGUAGE: +ContextParameters
 // OPT_IN: kotlin.js.ExperimentalWasmJsInterop
 
@@ -54,6 +55,6 @@ external fun fooDeafultAndVararg(
 <!WASM_IMPORT_EXPORT_UNSUPPORTED_PARAMETER_TYPE, WASM_IMPORT_EXPORT_VARARG_PARAMETER!>vararg b: Int<!>
 ): Unit
 
-<!CONTEXT_PARAMETERS_UNSUPPORTED!>context(x: <!DEBUG_INFO_MISSING_UNRESOLVED!>Int<!>)<!>
+<!EXTERNAL_DECLARATION_WITH_CONTEXT_PARAMETERS!>context(x: Int)
 @WasmImport("a", "b")
-external fun fooWithContext(): Unit
+external fun fooWithContext(): Unit<!>

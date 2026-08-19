@@ -13,6 +13,8 @@ import org.jetbrains.kotlin.util.nanosInSecond
 import org.jetbrains.kotlin.util.phaseSideTypeName
 import org.jetbrains.kotlin.util.phaseTypeName
 import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 class MarkdownReportRenderer(val statsCalculator: StatsCalculator) {
@@ -29,6 +31,7 @@ class MarkdownReportRenderer(val statsCalculator: StatsCalculator) {
         return buildString {
             renderInfo()
             renderAggregateTimeStats()
+            renderKlibStats()
             renderSystemStats()
             if (statsCalculator.unitStats.size > 1) {
                 renderTopUnitStats()
@@ -103,6 +106,15 @@ class MarkdownReportRenderer(val statsCalculator: StatsCalculator) {
         appendLine()
     }
 
+    private fun StringBuilder.renderKlibStats() {
+        totalStats.klibElementStats?.let { stats ->
+            appendLine("# KLIB stats")
+            stats.forEach { (path, size) ->
+                appendLine("* KLIB element '$path' has size of $size Bytes")
+            }
+        }
+    }
+
     private fun StringBuilder.renderTopUnitStats() {
         appendLine("# Slowest ${if (isTimestampMode) "runs" else "modules"}")
         appendLine()
@@ -170,7 +182,9 @@ class MarkdownReportRenderer(val statsCalculator: StatsCalculator) {
         }
     }
 
-    private val dateTimeFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
+    private val dateTimeFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
 }
 
 class MarkdownTableRenderer(val columnsCount: Int, val nameColumnWidth: Int, val valueColumnWidth: Int) {

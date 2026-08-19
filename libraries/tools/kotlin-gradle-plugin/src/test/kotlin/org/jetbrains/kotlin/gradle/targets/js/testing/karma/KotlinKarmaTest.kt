@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.targets.js.internal.jsQuoted
 import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProjectModules
 import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinTestRunnerCliArgs
-import org.junit.Test
+import kotlin.test.Test
 import java.nio.file.Files.createTempDirectory
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
@@ -114,11 +114,13 @@ class KotlinKarmaTest {
         ) {}
 
         outputResult.toFile().readText().let {
-            assertContains(it, "\"singleRun\": false")
-            assertContains(it, "\"autoWatch\": true")
+            assertContains(it, "\"singleRun\": true")
+            assertContains(it, "\"autoWatch\": false")
             assertContains(it, "\"basePath\": ${testDir.absolutePathString().jsQuoted()}")
             assertContains(it, "\"port\": 12345")
             assertContains(it, "\"browsers\": []")
+
+            assertContains(it, "config.plugins.push('kotlin-web-helpers/dist/karma-kotlin-debug-plugin.js');")
 
             additionalCheck(it, testDir)
         }

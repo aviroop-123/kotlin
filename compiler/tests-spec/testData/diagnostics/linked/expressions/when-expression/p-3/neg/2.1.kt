@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -27,7 +26,7 @@ fun case1() {
     val when1 = when (z) {
         JavaEnum.Val_1 -> { false }
         <!ELSE_MISPLACED_IN_WHEN!>else<!> -> {true}
-        <!UNREACHABLE_CODE!>JavaEnum.Val_2 -> { false }<!>
+        JavaEnum.Val_2 -> { false }
     }
 }
 
@@ -37,8 +36,8 @@ fun case2() {
     val z = JavaEnum.Val_3
     val when1 = when (z) {
         <!ELSE_MISPLACED_IN_WHEN!>else<!> -> {true}
-        <!UNREACHABLE_CODE!>JavaEnum.Val_1 -> { false }<!>
-        <!UNREACHABLE_CODE!>JavaEnum.Val_2 -> { false }<!>
+        JavaEnum.Val_1 -> { false }
+        JavaEnum.Val_2 -> { false }
     }
 }// TESTCASE NUMBER: 3
 
@@ -46,8 +45,8 @@ fun case3() {
     val z = JavaEnum.Val_3
     val when1 = when (z) {
         <!ELSE_MISPLACED_IN_WHEN!>else<!> -> {true}
-        <!UNREACHABLE_CODE!>JavaEnum.Val_1 -> { false }<!>
-        <!UNREACHABLE_CODE!>JavaEnum.Val_2 -> { false }<!>
-        <!UNREACHABLE_CODE!>else -> { true }<!>
+        JavaEnum.Val_1 -> { false }
+        JavaEnum.Val_2 -> { false }
+        else -> { true }
     }
 }

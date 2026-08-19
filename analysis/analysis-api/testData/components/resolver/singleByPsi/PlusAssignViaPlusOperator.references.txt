@@ -1,3 +1,0 @@
-KtOperationReferenceExpression(195,197): '+='
-  KtSimpleNameReference:
-    (in test.WithOperator) operator fun plus(f: test.Foo): test.WithOperator

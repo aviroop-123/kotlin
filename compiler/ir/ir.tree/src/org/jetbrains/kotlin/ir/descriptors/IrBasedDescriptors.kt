@@ -374,7 +374,7 @@ abstract class IrBasedFunctionDescriptor<Function : IrFunction>(owner: Function)
         .toList()
 }
 
-// We make all IR-based function descriptors instances of DescriptorWithContainerSource, and use .parentClassId to
+// We make all IR-based function descriptors instances of DescriptorWithContainerSource, and use .outerClassId to
 // check whether declaration is deserialized. See IrInlineCodegen.descriptorIsDeserialized
 open class IrBasedSimpleFunctionDescriptor(owner: IrSimpleFunction) : SimpleFunctionDescriptor, DescriptorWithContainerSource,
     IrBasedFunctionDescriptor<IrSimpleFunction>(owner) {
@@ -587,7 +587,7 @@ open class IrBasedClassDescriptor(owner: IrClass) : ClassDescriptor, IrBasedDecl
 
     override fun isData() = owner.isData
 
-    override fun isInline() = owner.isSingleFieldValueClass
+    override fun isInline() = error("Should not be called, use K2")
 
     override fun isFun() = owner.isFun
 

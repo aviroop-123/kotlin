@@ -18,11 +18,15 @@ KaNamedFunctionSymbol:
               compilerVisibility: Public
               contextReceivers: []
               generatedPrimaryConstructorProperty: null
+              hasDeclaredDefaultValue: false
               hasDefaultValue: false
               isActual: false
+              isCompanion: false
               isCrossinline: false
+              isDelegated: false
               isExpect: false
               isExtension: false
+              isExternal: false
               isImplicitLambdaParameter: false
               isNoinline: false
               isVal: true
@@ -40,17 +44,19 @@ KaNamedFunctionSymbol:
                     typeArguments: []
                     type: kotlin/Unit
                 ]
-                type: kotlin/Function0<kotlin/Unit>
+                type: () -> kotlin/Unit
               visibility: PUBLIC
               getContainingFileSymbol: KaFileSymbol(callsInPlaceUnknownContract.kt)
               getContainingJvmClassName: CallsInPlaceUnknownContractKt
               getContainingModule: KaSourceModule "Sources of main"
               deprecationStatus: null
+              importableFqName: null
       occurrencesRange: UNKNOWN
   ]
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -78,11 +84,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -100,12 +110,13 @@ KaNamedFunctionSymbol:
             typeArguments: []
             type: kotlin/Unit
         ]
-        type: kotlin/Function0<kotlin/Unit>
+        type: () -> kotlin/Unit
       visibility: PUBLIC
       getContainingFileSymbol: KaFileSymbol(callsInPlaceUnknownContract.kt)
       getContainingJvmClassName: CallsInPlaceUnknownContractKt
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(callsInPlaceUnknownContract.kt)
@@ -113,3 +124,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: unknownContract

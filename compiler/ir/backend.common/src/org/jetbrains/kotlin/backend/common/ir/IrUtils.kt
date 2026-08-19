@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.backend.common.ir
 import org.jetbrains.kotlin.CompilerVersionOfApiDeprecation
 import org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi
 import org.jetbrains.kotlin.backend.common.CommonBackendContext
+import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.compilationException
 import org.jetbrains.kotlin.backend.common.descriptors.synthesizedName
 import org.jetbrains.kotlin.backend.common.lower.at
@@ -50,33 +51,6 @@ fun IrReturnTarget.returnType(context: CommonBackendContext) =
         else -> error("Unknown ReturnTarget: $this")
     }
 
-@DeprecatedForRemovalCompilerApi(
-    deprecatedSince = CompilerVersionOfApiDeprecation._2_1_20,
-    replaceWith = "org.jetbrains.kotlin.ir.builders.declarations.buildReceiverParameter",
-)
-inline fun IrSimpleFunction.addDispatchReceiver(builder: IrValueParameterBuilder.() -> Unit): IrValueParameter =
-    IrValueParameterBuilder().run {
-        builder()
-        name = "this".synthesizedName
-        factory.buildValueParameter(this, this@addDispatchReceiver).also { receiver ->
-            dispatchReceiverParameter = receiver
-        }
-    }
-
-@DeprecatedForRemovalCompilerApi(
-    deprecatedSince = CompilerVersionOfApiDeprecation._2_1_20,
-    replaceWith = "org.jetbrains.kotlin.backend.common.ir.createExtensionReceiver",
-)
-fun IrSimpleFunction.addExtensionReceiver(type: IrType, origin: IrDeclarationOrigin = IrDeclarationOrigin.DEFINED): IrValueParameter =
-    IrValueParameterBuilder().run {
-        this.type = type
-        this.origin = origin
-        this.name = "receiver".synthesizedName
-        factory.buildValueParameter(this, this@addExtensionReceiver).also { receiver ->
-            extensionReceiverParameter = receiver
-        }
-    }
-
 fun IrSimpleFunction.createExtensionReceiver(type: IrType, origin: IrDeclarationOrigin = IrDeclarationOrigin.DEFINED): IrValueParameter =
     IrValueParameterBuilder().run {
         this.type = type
@@ -90,7 +64,7 @@ fun IrSimpleFunction.createExtensionReceiver(type: IrType, origin: IrDeclaration
 fun IrExpression?.isPure(
     anyVariable: Boolean,
     checkFields: Boolean = true,
-    symbols: Symbols? = null
+    symbols: BackendSymbols? = null
 ): Boolean {
     if (this == null) return true
 
@@ -138,14 +112,14 @@ fun CommonBackendContext.createArrayOfExpression(
     arrayElements: List<IrExpression>
 ): IrExpression {
 
-    val arrayType = symbols.array.typeWith(arrayElementType)
+    val arrayType = irBuiltIns.arrayClass.typeWith(arrayElementType)
     val arg0 = IrVarargImpl(startOffset, endOffset, arrayType, arrayElementType, arrayElements)
 
     return IrCallImpl(
         startOffset,
         endOffset,
         arrayType,
-        symbols.arrayOf,
+        irBuiltIns.arrayOf,
         typeArgumentsCount = 1,
     ).apply {
         typeArguments[0] = arrayElementType
@@ -164,7 +138,7 @@ val IrFile.isJvmBuiltin: Boolean get() = hasAnnotation(StandardClassIds.Annotati
 
 val IrFile.isBytecodeGenerationSuppressed: Boolean get() = hasAnnotation(StandardClassIds.Annotations.SuppressBytecodeGeneration)
 
-fun IrFunction.wrapWithLambdaCall(parent: IrDeclarationParent, context: CommonBackendContext): IrRichFunctionReference {
+fun IrFunction.wrapWithLambdaCall(parent: IrDeclarationParent, context: LoweringContext): IrRichFunctionReference {
     require(this.typeParameters.isEmpty())
     val wrapper = factory.buildFun {
         setSourceRange(this@wrapWithLambdaCall)
@@ -177,7 +151,7 @@ fun IrFunction.wrapWithLambdaCall(parent: IrDeclarationParent, context: CommonBa
         val builder = context.createIrBuilder(this@apply.symbol).at(this@wrapWithLambdaCall)
         body = builder.irBlockBody {
             +irReturn(irCall(this@wrapWithLambdaCall).apply {
-                for ((index, param) in parameters.withIndex()) {
+                for ([index, param] in parameters.withIndex()) {
                     arguments[index] = irGet(param)
                 }
             })

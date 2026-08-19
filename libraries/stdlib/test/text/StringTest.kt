@@ -95,6 +95,16 @@ class StringTest {
         testStringFromChars("Ц月語Ŭᎍ🀺", chars)
         testStringFromChars("月", chars, 1, 1)
         testStringFromChars("Ŭᎍ🀺", chars, 3, 4)
+
+        // U+1F600 = 0xD83D+0xDE00
+        // With the K/JS implementation, the surrogate pair is split into different chunks 3 times at indexes:
+        // - 16383-16384
+        // - 36863-36864
+        // - 57343-57344
+        val longString = "Kot\uD83D\uDE00".repeat(15_000)
+        val longChars = longString.toCharArray()
+        testStringFromChars(longString, longChars)
+        testStringFromChars("Kot\uD83D\uDE00Kot", longChars, offset = 16_380, length = 8)
     }
 
     @Suppress("DEPRECATION_ERROR")
@@ -542,7 +552,7 @@ class StringTest {
             " \u00A0 a \u00A0 "
         )
 
-        for ((source, example) in examples.map { it to arg1(it) }) {
+        for ([source, example] in examples.map { it to arg1(it) }) {
             assertContentEquals(source.trimEnd().trimStart(), example.trim())
             assertContentEquals(source.trimStart().trimEnd(), example.trim())
         }
@@ -554,7 +564,7 @@ class StringTest {
 
         val trimChars = charArrayOf('-', '=')
         val trimPredicate = { it: Char -> !it.isAsciiDigit() }
-        for ((source, example) in examplesForPredicate.map { it to arg1(it) }) {
+        for ([source, example] in examplesForPredicate.map { it to arg1(it) }) {
             assertContentEquals(source.trimStart(*trimChars).trimEnd(*trimChars), example.trim(*trimChars))
             assertContentEquals(source.trimStart(trimPredicate).trimEnd(trimPredicate), example.trim(trimPredicate))
         }
@@ -926,7 +936,7 @@ class StringTest {
             assertCompareResult(expectedResultIgnoreCase, v1, v2, true)
         }
 
-        val (EQ, LT, GT) = listOf(0, -1, 1)
+        val [EQ, LT, GT] = listOf(0, -1, 1)
 
         assertCompareResult(EQ, EQ, "ABC", "ABC")
         assertCompareResult(LT, EQ, "ABC", "ABc")
@@ -1001,7 +1011,7 @@ class StringTest {
             }
         }.sorted()
 
-        assertTrue(strings.zipWithNext().all { (s1, s2) ->
+        assertTrue(strings.zipWithNext().all { [s1, s2] ->
             val chars1 = s1.toCharArray()
             val chars2 = s2.toCharArray()
             for (i in 0 until minOf(chars1.size, chars2.size)) {
@@ -1031,7 +1041,7 @@ class StringTest {
         assertEquals("-a-b-b-A-b-", input.replace("", "-", ignoreCase = true))
 
         fun testIgnoreCase(chars: String) {
-            for ((i, c) in chars.withIndex()) {
+            for ([i, c] in chars.withIndex()) {
                 val message = "Char: $c (${c.code})"
                 val expectOneReplaced = chars.replaceRange(i..i, "_")
                 val expectAllReplaced = "_".repeat(chars.length)

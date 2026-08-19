@@ -39,10 +39,8 @@ class KotlinDirtySourceFilesHolder(
     val byTarget: Map<ModuleBuildTarget, TargetFiles>
 
     inner class TargetFiles(val target: ModuleBuildTarget, val removed: Collection<File>) {
-        private val _dirty: MutableMap<File, KotlinModuleBuildTarget.Source> = mutableMapOf()
-
         val dirty: Map<File, KotlinModuleBuildTarget.Source>
-            get() = _dirty
+            field = mutableMapOf()
 
         /**
          * Should be called only from [FSOperationsHelper.markFilesForCurrentRound]
@@ -50,7 +48,7 @@ class KotlinDirtySourceFilesHolder(
          */
         internal fun _markDirty(file: File, root: JavaSourceRootDescriptor) {
             val isCrossCompiled = root is KotlinIncludedModuleSourceRoot
-            val old = _dirty.put(file.normalize().absoluteFile, KotlinModuleBuildTarget.Source(file, isCrossCompiled))
+            val old = dirty.put(file.normalize().absoluteFile, KotlinModuleBuildTarget.Source(file, isCrossCompiled))
 
             check(old == null || old.isCrossCompiled == isCrossCompiled) {
                 "`${file.normalize().absoluteFile}` already marked as dirty: " +
@@ -73,8 +71,8 @@ class KotlinDirtySourceFilesHolder(
         val byTarget = mutableMapOf<ModuleBuildTarget, TargetFiles>()
 
         chunk.targets.forEach { target ->
-            val removedFiles = delegate.getRemovedFiles(target)
-                .map { File(it) }
+            val removedFiles = delegate.getRemoved(target)
+                .map { it.toFile() }
                 .filter { it.isKotlinSourceFile }
 
             byTarget[target] = TargetFiles(target, removedFiles)

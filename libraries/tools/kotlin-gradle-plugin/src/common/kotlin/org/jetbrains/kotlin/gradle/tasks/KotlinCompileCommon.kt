@@ -19,6 +19,8 @@ package org.jetbrains.kotlin.gradle.tasks
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.Property
 import org.gradle.api.tasks.*
 import org.gradle.work.InputChanges
 import org.gradle.work.NormalizeLineEndings
@@ -71,6 +73,13 @@ abstract class KotlinCompileCommon @Inject constructor(
     @get:Internal
     internal var executionTimeFreeCompilerArgs: List<String>? = null
 
+    @get:Deprecated(
+        message = "Task.moduleName is only used in metadata compilations",
+        level = DeprecationLevel.WARNING,
+    )
+    @get:Input
+    abstract override val moduleName: Property<String>
+
     @Suppress("DeprecatedCallableAddReplaceWith")
     @Deprecated("KTIJ-25227: Necessary override for IDEs < 2023.2", level = DeprecationLevel.ERROR)
     override fun setupCompilerArgs(args: K2MetadataCompilerArguments, defaultsOnly: Boolean, ignoreClasspathResolutionErrors: Boolean) {
@@ -82,7 +91,8 @@ abstract class KotlinCompileCommon @Inject constructor(
         primitive { args ->
             args.multiPlatform = multiPlatformEnabled.get()
 
-            args.moduleName = this@KotlinCompileCommon.moduleName.get()
+            @Suppress("DEPRECATION")
+            args.moduleName = moduleName.get()
 
             args.pluginOptions = (pluginOptions.toSingleCompilerPluginOptions() + kotlinPluginData?.orNull?.options)
                 .arguments.toTypedArray()
@@ -103,6 +113,8 @@ abstract class KotlinCompileCommon @Inject constructor(
             if (localExecutionTimeFreeCompilerArgs != null) {
                 args.freeArgs = localExecutionTimeFreeCompilerArgs
             }
+
+            args.targetPlatform = targetPlatformArg.get().toTypedArray()
         }
 
         pluginClasspath { args ->
@@ -110,12 +122,12 @@ abstract class KotlinCompileCommon @Inject constructor(
                 listOfNotNull(
                     pluginClasspath, kotlinPluginData?.orNull?.classpath
                 ).reduce(FileCollection::plus).toPathsArray()
-            }
+            } ?: emptyArray()
         }
 
         dependencyClasspath { args ->
             args.classpath = runSafe { libraries.files.filter { it.exists() }.joinToString(File.pathSeparator) }
-            args.friendPaths = runSafe { this@KotlinCompileCommon.friendPaths.files.toPathsArray() }
+            args.friendPaths = runSafe { this@KotlinCompileCommon.friendPaths.files.toPathsArray() } ?: emptyArray()
             args.refinesPaths = refinesMetadataPaths.toPathsArray()
         }
 
@@ -133,6 +145,9 @@ abstract class KotlinCompileCommon @Inject constructor(
 
     @get:Internal
     internal val produceMetadataKlib = objectFactory.property(Boolean::class.java)
+
+    @get:Input
+    internal val targetPlatformArg: ListProperty<String> = objectFactory.listProperty(String::class.java)
 
     override fun callCompilerAsync(
         args: K2MetadataCompilerArguments,

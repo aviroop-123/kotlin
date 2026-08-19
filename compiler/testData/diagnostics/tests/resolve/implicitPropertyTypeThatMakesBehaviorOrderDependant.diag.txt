@@ -1,0 +1,8 @@
+/NewWarnings.kt:13:18: warning: The resolution result depends on the declaration order. This can lead to false-positive errors in the IDE. Specify the return type of 'val f: String' defined in 'Foo' explicitly.
+
+/NewWarnings.kt:22:20: warning: The resolution result depends on the declaration order. This can lead to false-positive errors in the IDE. Specify the return type of 'val g: ??? (Recursive implicit type)' defined in 'Bar' explicitly.
+
+/NewWarnings.kt:23:13: error: Type checking has run into a recursive problem. Easiest workaround: specify the types of your declarations explicitly.
+/NoWarningsInCaseOfNullExplicitReceiver.kt:40:14: error: Type checking has run into a recursive problem. Easiest workaround: specify the types of your declarations explicitly.
+
+/NoWarningsInCaseOfNullExplicitReceiver.kt:41:16: error: Type checking has run into a recursive problem. Easiest workaround: specify the types of your declarations explicitly.

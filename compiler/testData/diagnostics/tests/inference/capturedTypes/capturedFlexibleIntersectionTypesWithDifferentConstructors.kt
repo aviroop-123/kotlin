@@ -1,7 +1,6 @@
 // RUN_PIPELINE_TILL: BACKEND
 // FULL_JDK
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// SKIP_TXT
 
 // FILE: Bar.java
 
@@ -26,7 +25,7 @@ fun main(x: Foo<*>?) {
     if (x != y) return
     // Here we capture `({Foo<*> & MutableList<*>}..{Foo<*>? & List<*>?})`
     // `*` inside `MutableList` and `List` have to become the same captured type
-    takeFoo(<!DEBUG_INFO_SMARTCAST!>x<!>)
+    takeFoo(x)
 }
 
 /* GENERATED_FIR_TAGS: capturedType, equalityExpression, flexibleType, functionDeclaration, ifExpression, isExpression,

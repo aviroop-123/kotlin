@@ -1,0 +1,5 @@
+KDocName(38,40): 'pp'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      pp
+    ]

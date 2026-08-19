@@ -1,6 +1,7 @@
-// LANGUAGE: +UnrestrictedBuilderInference
+// NO_CHECK_LAMBDA_INLINING
 // WITH_STDLIB
 
+// FILE: lib.kt
 import kotlin.experimental.ExperimentalTypeInference
 
 @OptIn(ExperimentalTypeInference::class)
@@ -23,6 +24,7 @@ interface SelectBuilder<in R> {
 
 inline fun <R> select(crossinline builder: SelectBuilder<R>.() -> Unit) = Unit as R
 
+// FILE: main.kt
 fun box(): String {
     val x: Flow<String> = flow {
         produce {

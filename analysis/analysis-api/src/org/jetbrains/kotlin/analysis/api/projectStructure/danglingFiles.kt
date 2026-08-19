@@ -24,13 +24,20 @@ import org.jetbrains.kotlin.psi.doNotAnalyze
  */
 public enum class KaDanglingFileResolutionMode {
     /**
-     * Resolve first to declarations in the dangling file, and delegate to the original file or module only when needed.
+     * Resolve first to declarations in the dangling file and delegate to the original file or module only when needed.
      */
     PREFER_SELF,
 
     /**
-     * Resolve only to declarations in the original file or module. Ignore all non-local declarations in the dangling file.
-     * The mode is only supported for single-file dangling file modules.
+     * Resolve only to declarations in the original file or module by default. Ignore all non-local declarations in the dangling file during
+     * resolution. The mode is only supported for single-file dangling file modules.
+     *
+     * If a declaration from the dangling file is explicitly requested through the Analysis API, it will be resolved from the dangling file.
+     * [IGNORE_SELF] only affects declarations which are internally resolved in the course of an analysis request, for example when getting
+     * the type of an expression or resolving a call.
+     *
+     * The mode is offered for optimization purposes, as it removes the need to re-analyze the declarations in the dangling file and instead
+     * reuses the (possibly) resolved declarations from the original file.
      */
     IGNORE_SELF
 }
@@ -38,9 +45,14 @@ public enum class KaDanglingFileResolutionMode {
 private val CONTEXT_MODULE_KEY = Key.create<KaModule>("CONTEXT_MODULE")
 
 /**
- * A context module against which analysis of this in-memory file should be performed.
+ * A context module against which analysis of this in-memory file should be performed. It can only be specified for an in-memory file.
  *
- * A [contextModule] can only be specified for an in-memory file.
+ * Normally, the context module is determined automatically from a context element or an original file. This property can be used to specify
+ * the context module explicitly in certain cases.
+ *
+ * [contextModule] cannot be specified for a code fragment. The context module of the code fragment must be determined by the context
+ * element. It is the essence of a code fragment to be analyzed in the context of another element, and this behavior should not be
+ * overridden.
  */
 @KaExperimentalApi
 public var KtFile.contextModule: KaModule?
@@ -102,8 +114,8 @@ public var KtFile.explicitModule: KaModule?
     }
 
 /**
- * Returns the non-dangling module that represents the base context of the [KaDanglingFileModule], skipping any context modules which are
- * themselves [KaDanglingFileModule]s.
+ * The non-dangling module that represents the base context of the [KaDanglingFileModule], skipping any context modules which are themselves
+ * [KaDanglingFileModule]s.
  *
  * When a dangling file is a code fragment, the dangling file module may itself have a dangling file module as a context.
  * [baseContextModule] can be used to find the non-dangling context at the base of the chain.
@@ -121,7 +133,7 @@ public val KaDanglingFileModule.baseContextModule: KaModule
     }
 
 /**
- * Returns the [KaModule]'s [baseContextModule], or the module itself if it's not a [KaDanglingFileModule].
+ * The [KaModule]'s [baseContextModule], or the module itself if it's not a [KaDanglingFileModule].
  */
 @KaPlatformInterface
 public val KaModule.baseContextModuleOrSelf: KaModule
@@ -140,6 +152,7 @@ public val KtFile.isDangling: Boolean
     get() = when {
         this is KtCodeFragment -> true
         contextModule != null -> true
+        @Suppress("DEPRECATION")
         virtualFile?.analysisContextModule != null -> false
         !isPhysical -> true
         copyOrigin != null -> true
@@ -159,8 +172,7 @@ public val PsiFile.copyOrigin: PsiFile?
     }
 
 /**
- * Returns the resolution mode that is explicitly set for this dangling file, or `null` for files that are not dangling or if the mode was
- * not set.
+ * The resolution mode explicitly set for this dangling file, or `null` for files that are not dangling or if the mode was not set.
  *
  * Use the [analyzeCopy][org.jetbrains.kotlin.analysis.api.analyzeCopy] function for specifying the analysis mode. The effect is
  * thread-local by design, as the file might potentially be resolved concurrently in different threads.

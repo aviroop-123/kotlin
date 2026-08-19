@@ -51,11 +51,6 @@ sourcesJar {
     from sourceSets.java9.allSource
 }
 
-artifacts {
-    archives sourcesJar
-    sources sourcesJar
-}
-
 compileKotlin {
     kotlinOptions.moduleName = project.name
 }
@@ -81,7 +76,7 @@ check.dependsOn(tasks.register("moduleInfoTest", Test) {test ->
     test.group = "verification"
     test.testClassesDirs = sourceSets.moduleTest.output.classesDirs
     test.classpath = files(sourceSets.moduleTest.runtimeClasspath, tasks.jar)
-    test.javaLauncher.set(JvmToolchain.getToolchainLauncherFor(project, JdkMajorVersion.JDK_9_0))
+    test.javaLauncher.set(JvmToolchain.getToolchainLauncherFor(project, JdkMajorVersion.JDK_11_0))
     doFirst {
         test.systemProperty("stdlibJars", test.classpath.filter { it.name.contains('kotlin-stdlib') }.join(File.pathSeparator))
     }

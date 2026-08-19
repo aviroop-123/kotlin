@@ -1,4 +1,3 @@
-// IGNORE_BACKEND_K1: ANY
 // LANGUAGE: +ContextParameters
 class Scope {
     fun test1(): String = "member "

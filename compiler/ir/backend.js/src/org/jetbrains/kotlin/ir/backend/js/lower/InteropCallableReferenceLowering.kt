@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,9 +7,11 @@ package org.jetbrains.kotlin.ir.backend.js.lower
 
 import org.jetbrains.kotlin.backend.common.BodyLoweringPass
 import org.jetbrains.kotlin.backend.common.compilationException
-import org.jetbrains.kotlin.backend.common.functionReferenceLinkageError
 import org.jetbrains.kotlin.backend.common.functionReferenceReflectedName
-import org.jetbrains.kotlin.backend.common.lower.WebCallableReferenceLowering
+import org.jetbrains.kotlin.backend.common.lower.LocalDeclarationsLowering
+import org.jetbrains.kotlin.backend.common.lower.LocalDelegatedPropertiesLowering
+import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
@@ -17,9 +19,17 @@ import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.JsStatementOrigins
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
-import org.jetbrains.kotlin.ir.backend.js.utils.Namer
+import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.JsSuspendFunctionWithGeneratorsLowering
+import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.JsSuspendFunctionsLowering
+import org.jetbrains.kotlin.ir.backend.js.originalCallableReferenceClass
+import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.shouldBeCompiledAsGenerator
+import org.jetbrains.kotlin.ir.backend.js.utils.compileSuspendAsJsGenerator
+import org.jetbrains.kotlin.ir.backend.js.utils.getVoid
 import org.jetbrains.kotlin.ir.backend.js.utils.isDispatchReceiver
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
+import org.jetbrains.kotlin.ir.builders.irBlockBody
+import org.jetbrains.kotlin.ir.builders.irCall
+import org.jetbrains.kotlin.ir.builders.irReturn
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
@@ -33,22 +43,32 @@ import org.jetbrains.kotlin.ir.types.isUnit
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.*
-import org.jetbrains.kotlin.js.config.JSConfigurationKeys
+import org.jetbrains.kotlin.js.config.compileLambdasAsEs6ArrowFunctions
+import org.jetbrains.kotlin.js.config.compileSuspendAsJsGenerator
+import org.jetbrains.kotlin.js.config.generateInlineAnonymousFunctions
 import org.jetbrains.kotlin.name.JsStandardClassIds
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 import org.jetbrains.kotlin.utils.addToStdlib.cast
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
+import org.jetbrains.kotlin.utils.filterIsInstanceAnd
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
 // TODO: Consider merging this lowering with CallableReferenceLowering (KT-78283).
 /**
  * Interop layer for function references and lambdas.
  */
+@PhasePrerequisites(
+    JsSuspendFunctionsLowering::class,
+    JsSuspendFunctionWithGeneratorsLowering::class,
+    LocalDeclarationsLowering::class,
+    LocalDelegatedPropertiesLowering::class,
+    JsCallableReferenceLowering::class
+)
 class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLoweringPass {
-
-    val generateInlineAnonymousFunctions: Boolean
-        get() = context.configuration.getBoolean(JSConfigurationKeys.GENERATE_INLINE_ANONYMOUS_FUNCTIONS)
+    private val getContinuation = context.symbols.getContinuation
+    private val orPromiseFunctionSymbol = context.symbols.orPromiseFunctionSymbol
+    private val constructCallableReferenceSymbol = context.symbols.constructCallableReferenceSymbol
 
     /**
      * A factory that creates [IrFunctionExpression] for lambdas being constructed.
@@ -102,14 +122,12 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
             )
 
             // TODO: Do we need to set proper offsets?
-            if (capturedDispatchReceiver != null &&
-                !context.configuration.getBoolean(JSConfigurationKeys.COMPILE_LAMBDAS_AS_ES6_ARROW_FUNCTIONS)
-            ) {
+            if (capturedDispatchReceiver != null && !context.configuration.compileLambdasAsEs6ArrowFunctions) {
                 return IrCallImpl(
                     UNDEFINED_OFFSET,
                     UNDEFINED_OFFSET,
                     context.irBuiltIns.anyType,
-                    context.intrinsics.jsBind,
+                    context.symbols.jsBind,
                     typeArgumentsCount = 0,
                     origin = JsStatementOrigins.BIND_CALL,
                 ).apply {
@@ -138,7 +156,7 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
 
         val closureUsageAnalyser = ClosureUsageAnalyser()
 
-        if (generateInlineAnonymousFunctions)
+        if (context.configuration.generateInlineAnonymousFunctions)
             irFile.acceptChildrenVoid(closureUsageAnalyser)
 
         val callableReferenceClassTransformer = CallableReferenceClassTransformer(
@@ -328,7 +346,7 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
                     // This allows us to avoid allocating a new object each time the lambda is created.
                     liftLambda(ctorToFreeFunctionMap, lambdaInfo)
                 } else if (
-                    generateInlineAnonymousFunctions
+                    context.configuration.generateInlineAnonymousFunctions
                     // If the lambda constructor is called from more than one place, don't inline.
                     && closureUsageAnalyser.getLambdaConstructorCalls(lambdaClass.primaryConstructor!!.symbol).size == 1
                     // In-line anonymous functions that capture variables declared in loops are dangerous.
@@ -344,6 +362,55 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
                 buildFactoryFunction(ctorToFactoryMap, lambdaInfo)
             }.onEach { it.parent = lambdaClass.parent }
         }
+    }
+
+    /**
+     * The function is wrapping suspend callable references and lambdas with a special function `orPromise`
+     * This function is doing quite a simple thing:
+     *  - If the callable reference/lambda is called with a continuation: it just calls it as any suspend function
+     *  - If the continuation was not provided (it's expected only on the JS/TS call side) it's called via Promise
+     *    to emulate `async` function behavior
+     */
+    private fun promisifiedSuspendLambda(
+        lambdaDeclaration: IrSimpleFunction,
+        lambdaType: IrType,
+    ): IrSimpleFunction {
+        if (!context.compileSuspendAsJsGenerator || !lambdaDeclaration.isSuspend) return lambdaDeclaration
+
+        val innerLambda = context.irFactory.buildFun {
+            startOffset = lambdaDeclaration.startOffset
+            endOffset = lambdaDeclaration.endOffset
+            returnType = lambdaDeclaration.returnType
+            visibility = DescriptorVisibilities.LOCAL
+            name = Name.identifier("$")
+            isSuspend = true
+        }
+
+        innerLambda.parent = lambdaDeclaration
+        innerLambda.shouldBeCompiledAsGenerator = true
+
+
+        val lambdaBody = lambdaDeclaration.body
+            ?.patchDeclarationParents(innerLambda) ?: return lambdaDeclaration
+
+        innerLambda.body = lambdaBody
+        lambdaDeclaration.shouldBeCompiledAsGenerator = false
+
+        lambdaDeclaration.body = context.createIrBuilder(lambdaDeclaration.symbol, lambdaBody.startOffset, lambdaBody.endOffset)
+            .irBlockBody {
+                +irReturn(irCall(orPromiseFunctionSymbol).apply {
+                    arguments[0] = irCall(getContinuation)
+                    arguments[1] = IrFunctionExpressionImpl(
+                        startOffset,
+                        endOffset,
+                        lambdaType,
+                        innerLambda,
+                        JsStatementOrigins.SYNTHESIZED_STATEMENT
+                    )
+                })
+            }
+
+        return lambdaDeclaration
     }
 
     /**
@@ -381,12 +448,18 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
                 }
 
                 outerReceiverMapping[expression.symbol]?.let {
+                    val receiver = it.receiver?.deepCopyWithSymbols()?.apply {
+                        val oldReceiver = expression.receiver ?: return@apply
+                        startOffset = oldReceiver.startOffset
+                        endOffset = oldReceiver.endOffset
+                    }
+
                     return IrGetFieldImpl(
                         expression.startOffset,
                         expression.endOffset,
                         it.symbol,
                         it.type,
-                        it.receiver?.deepCopyWithSymbols()
+                        receiver
                     )
                 }
 
@@ -506,14 +579,15 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
         val superClass = lambdaInfo.superInvokeFun.parentAsClass
         val lambdaName = Name.identifier("${lambdaInfo.lambdaClass.name.asString()}\$lambda")
 
-        val lambdaDeclaration =
+        val rawLambdaDeclaration =
             createLambdaDeclaration(lambdaInfo.invokeFun, lambdaName, factoryFunction, lambdaInfo.superInvokeFun)
 
         val statements = ArrayList<IrStatement>(4)
         val constructor = lambdaInfo.lambdaClass.declarations.firstNotNullOf { it as? IrConstructor }
 
-        if (lambdaInfo.isSuspendLambda) {
-            // Due to suspend lambda is a class itself it's not easy to inline it correctly and moreover I see no reason to do so
+        // Due to suspend lambda is a class itself in non-generator mode
+        // it's not easy to inline it correctly and moreover I see no reason to do so
+        if (lambdaInfo.isSuspendLambda && !context.configuration.compileSuspendAsJsGenerator) {
             val lambdaType = lambdaInfo.lambdaClass.defaultType
             val instanceVal = JsIrBuilder.buildVar(lambdaType, factoryFunction, "i").apply {
                 val newCtorCall = IrConstructorCallImpl(
@@ -534,73 +608,83 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
 
             statements.add(instanceVal)
 
-            lambdaDeclaration.body = buildLambdaBody(instanceVal, lambdaDeclaration, lambdaInfo.invokeFun)
+            rawLambdaDeclaration.body = buildLambdaBody(instanceVal, rawLambdaDeclaration, lambdaInfo.invokeFun)
 
             newDeclarations.add(lambdaInfo.lambdaClass)
         } else {
             val fieldToParameterMapping = remapCapturedFields(constructor) { factoryFunction.parameters[it.owner.indexInParameters].symbol }
-            val oldToNewInvokeParametersMapping = lambdaInfo.createOldToNewInvokeParametersMapping(lambdaDeclaration)
-            lambdaDeclaration.body =
-                inlineLambdaBody(lambdaDeclaration, lambdaInfo.invokeFun, oldToNewInvokeParametersMapping, fieldToParameterMapping)
+            val oldToNewInvokeParametersMapping = lambdaInfo.createOldToNewInvokeParametersMapping(rawLambdaDeclaration)
+            rawLambdaDeclaration.body =
+                inlineLambdaBody(rawLambdaDeclaration, lambdaInfo.invokeFun, oldToNewInvokeParametersMapping, fieldToParameterMapping)
 
             // lambdas can contain another lambdas and local classes in so let's not lose them
             newDeclarations.addAll(lambdaInfo.lambdaInnerClasses())
         }
 
         val lambdaType = lambdaInfo.lambdaClass.superTypes.single { it.classifierOrNull === superClass.symbol }
+        val lambdaDeclaration = promisifiedSuspendLambda(rawLambdaDeclaration, lambdaType)
+
         val functionExpression = lambdaInfo.lambdaClass.run {
             IrFunctionExpressionImpl(startOffset, endOffset, lambdaType, lambdaDeclaration, JsStatementOrigins.CALLABLE_REFERENCE_CREATE)
         }
 
-        val functionReferenceLinkageError = lambdaInfo.lambdaClass.functionReferenceLinkageError
         val functionReferenceReflectedName = lambdaInfo.lambdaClass.functionReferenceReflectedName
 
-        if (functionReferenceLinkageError != null || functionReferenceReflectedName != null || lambdaDeclaration.isSuspend) {
-            val tmpVar = JsIrBuilder.buildVar(functionExpression.type, factoryFunction, "l", initializer = functionExpression)
-            statements.add(tmpVar)
+        val callableName = functionReferenceReflectedName
+            ?.toIrConst(context.irBuiltIns.stringType, UNDEFINED_OFFSET, UNDEFINED_OFFSET)
+            ?: context.getVoid()
 
-            if (functionReferenceLinkageError != null) {
-                statements.add(
-                    JsIrBuilder.buildCall(context.throwLinkageErrorInCallableNameSymbol).apply {
-                        arguments[0] = JsIrBuilder.buildGetValue(tmpVar.symbol)
-                        arguments[1] =
-                            functionReferenceLinkageError.toIrConst(context.irBuiltIns.stringType, UNDEFINED_OFFSET, UNDEFINED_OFFSET)
+        val kFunctionImplCall = constructor.body?.statements
+            ?.filterIsInstanceAnd<IrDelegatingConstructorCallImpl> { it.symbol == context.symbols.kFunctionImplConstructorSymbol }
+            ?.firstOrNull()
+
+        val constructedCallableReference = when {
+            kFunctionImplCall != null -> {
+                val [flags, arity, id] = kFunctionImplCall.arguments
+
+                JsIrBuilder.buildCall(constructCallableReferenceSymbol)
+                    .apply {
+                        arguments[0] = functionExpression
+
+                        // Regular arity includes $continuation parameter, so it's more precises to take the lambdaDeclaration arguments size
+                        arguments[1] = if (lambdaInfo.isSuspendLambda) {
+                            lambdaDeclaration.parameters.size.toIrConst(context.irBuiltIns.intType)
+                        } else arity?.shallowCopy() ?: compilationException("'arity' is expected to be passed to a parent constructor", kFunctionImplCall)
+
+                        arguments[2] = flags?.shallowCopy()
+                            ?: compilationException("'flags' is expected to be passed to a parent constructor", kFunctionImplCall)
+
+                        arguments[3] = id?.deepCopyWithoutPatchingParents()
+                            ?: compilationException("'id' is expected to be passed to a parent constructor", kFunctionImplCall)
+
+                        arguments[4] = callableName
+                        arguments[5] = if (factoryFunction.parameters.any()) {
+                            JsIrBuilder.buildArray(
+                                factoryFunction.parameters.map { JsIrBuilder.buildGetValue(it.symbol) },
+                                context.irBuiltIns.arrayClass.typeWith(context.irBuiltIns.anyNType),
+                                context.irBuiltIns.anyNType
+                            )
+                        } else context.getVoid()
                     }
-                )
-            } else if (functionReferenceReflectedName != null) {
-                statements.add(
-                    setDynamicProperty(
-                        tmpVar.symbol,
-                        Namer.KCALLABLE_NAME,
-                        functionReferenceReflectedName.toIrConst(context.irBuiltIns.stringType, UNDEFINED_OFFSET, UNDEFINED_OFFSET)
-                    )
-                )
             }
 
-            if (lambdaDeclaration.isSuspend) {
-                statements.add(
-                    setDynamicProperty(
-                        tmpVar.symbol, Namer.KCALLABLE_ARITY,
-                        IrConstImpl.int(
-                            UNDEFINED_OFFSET,
-                            UNDEFINED_OFFSET,
-                            context.irBuiltIns.intType,
-                            lambdaDeclaration.parameters.size
-                        )
-                    )
-                )
+            // It's required to set $arity for suspend function references
+            lambdaInfo.isSuspendLambda -> {
+                JsIrBuilder.buildCall(constructCallableReferenceSymbol)
+                    .apply {
+                        arguments[0] = functionExpression
+                        arguments[1] = lambdaDeclaration.parameters.size.toIrConst(context.irBuiltIns.intType)
+                        arguments[2] = context.getVoid()
+                        arguments[3] = context.getVoid()
+                        arguments[4] = context.getVoid()
+                        arguments[5] = context.getVoid()
+                    }
             }
 
-            statements.add(
-                JsIrBuilder.buildReturn(
-                    factoryFunction.symbol,
-                    JsIrBuilder.buildGetValue(tmpVar.symbol),
-                    context.irBuiltIns.nothingType
-                )
-            )
-        } else {
-            statements.add(JsIrBuilder.buildReturn(factoryFunction.symbol, functionExpression, context.irBuiltIns.nothingType))
+            else -> functionExpression
         }
+
+        statements.add(JsIrBuilder.buildReturn(factoryFunction.symbol, constructedCallableReference, context.irBuiltIns.nothingType))
 
         return context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, statements)
     }
@@ -623,6 +707,10 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
         }
 
         lambdaDeclaration.parent = parent
+
+        if (context.configuration.compileSuspendAsJsGenerator && invokeFun.isSuspend) {
+            lambdaDeclaration.shouldBeCompiledAsGenerator = true
+        }
 
         lambdaDeclaration.parameters = superInvokeFun.nonDispatchParameters.memoryOptimizedMap { superInvokeParameter ->
             val originalValueParameter = invokeFun.parameters[superInvokeParameter.indexInParameters]
@@ -663,6 +751,7 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
         factoryDeclaration.returnType = lambdaInfo.lambdaClass.typeWith(factoryTypeParameters.map { it.defaultType })
 
         factoryDeclaration.body = buildFactoryBody(factoryDeclaration, newDeclarations, lambdaInfo)
+        factoryDeclaration.originalCallableReferenceClass = lambdaInfo.lambdaClass
 
         if (oldToNewTypeParameterMapping.isNotEmpty()) {
             factoryDeclaration.body?.remapTypes(typeRemapper)
@@ -729,12 +818,5 @@ class InteropCallableReferenceLowering(val context: JsIrBackendContext) : BodyLo
         ctorToFreeFunctionMap[constructor.symbol] = freeFunctionDeclaration.symbol
 
         return newDeclarations
-    }
-
-    private fun setDynamicProperty(r: IrValueSymbol, property: String, value: IrExpression): IrStatement {
-        return IrDynamicOperatorExpressionImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, context.irBuiltIns.unitType, IrDynamicOperator.EQ).apply {
-            receiver = IrDynamicMemberExpressionImpl(startOffset, endOffset, context.dynamicType, property, JsIrBuilder.buildGetValue(r))
-            arguments += value
-        }
     }
 }

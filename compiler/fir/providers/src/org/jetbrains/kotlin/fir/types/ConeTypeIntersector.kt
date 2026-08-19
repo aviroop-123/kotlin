@@ -5,12 +5,16 @@
 
 package org.jetbrains.kotlin.fir.types
 
+import org.jetbrains.kotlin.config.LanguageFeature
+import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.types.AbstractTypeChecker
 
 object ConeTypeIntersector {
     fun intersectTypes(
-        context: ConeInferenceContext,
-        types: Collection<ConeKotlinType>
+        context: ConeTypeContext,
+        types: Collection<ConeKotlinType>,
+        upperBoundForApproximation: ConeKotlinType? = null,
     ): ConeKotlinType {
         when (types.size) {
             0 -> error("Expected some types")
@@ -30,17 +34,14 @@ object ConeTypeIntersector {
         // Note: we aren't sure how to intersect raw & dynamic types properly (see KT-55762)
         if (inputTypes.any { it is ConeFlexibleType } && inputTypes.none { it.isRaw() || it is ConeDynamicType }) {
             // (A..B) & C = (A & C)..(B & C)
-            val lowerBound = intersectTypes(context, inputTypes.map { it.lowerBoundIfFlexible() })
-            val upperBound = intersectTypes(context, inputTypes.map { it.upperBoundIfFlexible() })
+            val lowerBound = intersectTypes(context, inputTypes.map { it.lowerBoundIfFlexible() }, upperBoundForApproximation)
+            val upperBound = intersectTypes(context, inputTypes.map { it.upperBoundIfFlexible() }, upperBoundForApproximation)
             // Special case - if C is `Nothing?`, then the result is `Nothing!`; but if it is non-null,
             // then this code is unreachable, so it's more useful to do resolution/diagnostics
             // under the assumption that it is purely nullable.
             return if (lowerBound.isNothing) upperBound else coneFlexibleOrSimpleType(context, lowerBound, upperBound, isTrivial = false)
         }
-
-        val isResultNotNullable = with(context) {
-            inputTypes.any { !it.isNullableType() }
-        }
+        val isResultNotNullable = inputTypes.any { !it.canBeNull(context.session) }
         val inputTypesMadeNotNullIfNeeded = inputTypes.mapTo(LinkedHashSet()) {
             if (isResultNotNullable) it.makeConeTypeDefinitelyNotNullOrNotNull(context) else it
         }
@@ -58,24 +59,44 @@ object ConeTypeIntersector {
          *   A came from inference and B came from smartcast we want to save both types in intersection
          */
         val resultList = inputTypesMadeNotNullIfNeeded.toMutableList()
-        resultList.removeIfNonSingleErrorOrInRelation { candidate, other -> other.isStrictSubtypeOf(context, candidate) }
+        val languageVersionSettings = context.session.languageVersionSettings
+        resultList.removeIfNonSingleErrorOrInRelation(languageVersionSettings) { candidate, other -> other.isStrictSubtypeOf(context, candidate) }
         assert(resultList.isNotEmpty()) { "no types left after removing strict supertypes: ${inputTypes.joinToString()}" }
 
         ConeIntegerLiteralIntersector.findCommonIntersectionType(resultList)?.let { return it }
 
-        resultList.removeIfNonSingleErrorOrInRelation { candidate, other -> AbstractTypeChecker.equalTypes(context, candidate, other) }
+        resultList.removeIfNonSingleErrorOrInRelation(languageVersionSettings) { candidate, other -> AbstractTypeChecker.equalTypes(context, candidate, other) }
         assert(resultList.isNotEmpty()) { "no types left after removing equal types: ${inputTypes.joinToString()}" }
-        return resultList.singleOrNull() ?: ConeIntersectionType(resultList)
+
+        @OptIn(DelicateIntersectionConstructor::class)
+        return resultList.singleOrNull() ?: ConeIntersectionType(resultList, upperBoundForApproximation)
     }
 
     private fun MutableCollection<ConeKotlinType>.removeIfNonSingleErrorOrInRelation(
-        predicate: (candidate: ConeKotlinType, other: ConeKotlinType) -> Boolean
+        versionSettings: LanguageVersionSettings,
+        predicate: (candidate: ConeKotlinType, other: ConeKotlinType) -> Boolean,
     ) {
+        // We skip captured types with recursive supertypes because they can lead to infinite recursion through
+        // AbstractTypeChecker.isSubtypeOfForSingleClassifierType calling ConeTypeIntersector.intersectTypes.
+        // See compiler/fir/analysis-tests/testData/resolve/inference/capturedTypes/elvisWithDeepGeneric.kt.can-freeze-ide
+        // TODO should be removed if KT-82633 is resolved
+        fun ConeKotlinType.shouldBeSkipped(): Boolean {
+            if (!versionSettings.supportsFeature(LanguageFeature.ChangedIntersectionWithRecursiveCapturedType)) return false
+            val capturedType = unwrapToSimpleTypeUsingLowerBound() as? ConeCapturedType ?: return false
+            return capturedType.constructor.supertypes?.any { superType ->
+                superType.typeArguments.any {
+                    it.type?.unwrapToSimpleTypeUsingLowerBound()?.unwrapToSimpleTypeUsingLowerBound() == capturedType
+                }
+            } == true
+        }
+
         val iterator = iterator()
         while (iterator.hasNext()) {
             val candidate = iterator.next()
             if (candidate is ConeErrorType && size > 1 ||
-                any { other -> other !== candidate && predicate(candidate, other) }
+                !candidate.shouldBeSkipped() && any { other ->
+                    other !== candidate && !other.shouldBeSkipped() && predicate(candidate, other)
+                }
             ) {
                 iterator.remove()
             }

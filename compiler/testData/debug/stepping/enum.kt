@@ -38,6 +38,19 @@ fun box() {
 // test.kt:17 <clinit>
 // test.kt:25 box
 
+// EXPECTATIONS NATIVE
+// test.kt:23 box
+// test.kt:4 $getEnumAt
+// test.kt:13 $getEnumAt
+// test.kt:23 box
+// test.kt:8 foo
+// test.kt:10 foo
+// test.kt:23 box
+// test.kt:24 box
+// test.kt:15 $getEnumAt
+// test.kt:20 $getEnumAt
+// test.kt:25 box
+
 // EXPECTATIONS JS_IR
 // test.kt:23 box
 // test.kt:5 E_initEntries
@@ -48,7 +61,6 @@ fun box() {
 // test.kt:4 <init>
 // test.kt:23 box
 // test.kt:10 foo
-// test.kt:8 E$foo$lambda
 // test.kt:24 box
 // test.kt:16 E2_initEntries
 // test.kt:15 <init>
@@ -73,18 +85,6 @@ fun box() {
 // test.kt:10 $E.foo (5)
 // test.kt:23 $box (8)
 // test.kt:24 $box (7)
-
-// EXPECTATIONS ClassicFrontend WASM
-// test.kt:16 $E2_initEntries (4, 6, 4)
-// test.kt:15 $E2.<init> (14, 26)
-// test.kt:16 $E2_initEntries (4)
-// test.kt:17 $E2_initEntries (4)
-// test.kt:18 $E2_initEntries (8)
-// test.kt:17 $E2_initEntries (4)
-// test.kt:15 $E2.<init> (14, 26)
-// test.kt:17 $E2_initEntries (4)
-
-// EXPECTATIONS FIR WASM
 // test.kt:16 $E2_initEntries (5, 6, 5)
 // test.kt:15 $E2.<init> (14, 26)
 // test.kt:16 $E2_initEntries (5)
@@ -93,7 +93,5 @@ fun box() {
 // test.kt:17 $E2_initEntries (5)
 // test.kt:15 $E2.<init> (14, 26)
 // test.kt:17 $E2_initEntries (5)
-
-// EXPECTATIONS WASM
 // test.kt:24 $box (7)
 // test.kt:25 $box (1)

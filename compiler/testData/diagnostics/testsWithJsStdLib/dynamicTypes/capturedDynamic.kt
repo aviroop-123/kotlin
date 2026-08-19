@@ -1,5 +1,4 @@
-// FIR_IDENTICAL
-// SKIP_TXT
+// RUN_PIPELINE_TILL: BACKEND
 
 fun case_1(vararg args: dynamic) {
     (<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.collections.List<dynamic>")!>listOf(null) + args<!>).toTypedArray()

@@ -1,21 +1,31 @@
+import org.jetbrains.kotlin.testFederation.SmokeTestConfig
+import org.jetbrains.kotlin.testFederation.smokeTestConfig
+
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("project-tests-convention")
 }
 
 dependencies {
     testImplementation(intellijCore())
     testImplementation(testFixtures(project(":compiler:tests-common")))
+    testImplementation(kotlin("test-junit5", libs.versions.kotlin.`for`.gradle.plugins.compilation.get()))
 
     testImplementation(libs.jackson.dataformat.xml)
     testImplementation(libs.jackson.module.kotlin)
     testImplementation(libs.woodstox.core)
-    testApi(platform(libs.junit.bom))
-    testImplementation(libs.junit4)
-
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.jgit)
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+
+    testImplementation(testFixtures("org.jetbrains.kotlin:repo-test-fixtures"))
+    testImplementation("org.jetbrains.kotlin:test-federation-convention")
+    testImplementation(gradleTestKit())
+    testImplementation(libs.intellij.asm)
 }
+
+configureJvmToolchain(JdkMajorVersion.JDK_21_0)
 
 sourceSets {
     "main" {}
@@ -24,50 +34,42 @@ sourceSets {
     }
 }
 
-open class CodeOwnersArgumentProviders @Inject constructor(
-    objectFactory: ObjectFactory
+open class TestSystemPropertiesProvider @Inject constructor(
+    objectFactory: ObjectFactory,
 ) : CommandLineArgumentProvider {
-
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    val scriptFile: ConfigurableFileCollection = objectFactory.fileCollection()
 
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     val spaceCodeOwnersFile: ConfigurableFileCollection = objectFactory.fileCollection()
 
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    val virtualTeamMappingFile: ConfigurableFileCollection = objectFactory.fileCollection()
-
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    val githubCodeOwnersFile: ConfigurableFileCollection = objectFactory.fileCollection()
+    @get:Internal
+    val gradleUserHome: DirectoryProperty = objectFactory.directoryProperty()
 
     override fun asArguments(): Iterable<String> = listOf(
-        "-DcodeOwnersTest.scriptFile=${scriptFile.singleFile.absolutePath}",
         "-DcodeOwnersTest.spaceCodeOwnersFile=${spaceCodeOwnersFile.singleFile.absolutePath}",
-        "-DcodeOwnersTest.virtualTeamMappingFile=${virtualTeamMappingFile.singleFile.absolutePath}",
-        "-DcodeOwnersTest.githubCodeOwnersFile=${githubCodeOwnersFile.singleFile.absolutePath}"
+        "-Dgradle.user.home=${gradleUserHome.asFile.get().absolutePath}"
     )
 }
 
 projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit4) {
+    testTask(jUnitMode = JUnitMode.JUnit5, javaLauncher = JdkMajorVersion.JDK_21_0) {
         dependsOn(":dist")
+        dependsOn(":compileAll")
         workingDir = rootDir
-        javaLauncher.set(getToolchainLauncherFor(JdkMajorVersion.JDK_17_0))
         jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+        withJunit5ParallelExecution(2)
 
-        jvmArgumentProviders.add(objects.newInstance<CodeOwnersArgumentProviders>().apply {
-            scriptFile.from(rootDir.resolve(".space/generate-github-codeowners.sh"))
+        jvmArgumentProviders.add(objects.newInstance<TestSystemPropertiesProvider>().apply {
             spaceCodeOwnersFile.from(rootDir.resolve(".space/CODEOWNERS"))
-            virtualTeamMappingFile.from(rootDir.resolve(".space/codeowners-virtual-team-mapping.json"))
-            githubCodeOwnersFile.from(rootDir.resolve(".github/CODEOWNERS"))
+            gradleUserHome.set(gradle.gradleUserHomeDir)
         })
+
+        smokeTestConfig = SmokeTestConfig.RunAllTests
     }
 
     withJvmStdlibAndReflect()
+    withScriptRuntime()
+    withTestJar()
 }
 
 testsJar()

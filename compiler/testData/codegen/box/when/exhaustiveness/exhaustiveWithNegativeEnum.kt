@@ -1,5 +1,4 @@
 // LANGUAGE: +DataFlowBasedExhaustiveness
-// IGNORE_BACKEND_K1: ANY
 
 enum class Enum { A, B, C }
 

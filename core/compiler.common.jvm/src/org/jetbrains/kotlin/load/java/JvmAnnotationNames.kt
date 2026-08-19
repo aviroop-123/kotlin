@@ -18,6 +18,7 @@ package org.jetbrains.kotlin.load.java
 
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.StandardClassIds
 
 // old JSpecify annotations
 
@@ -119,6 +120,8 @@ val NULLABLE_ANNOTATIONS: Set<FqName> = setOf(
     FqName("org.eclipse.jdt.annotation.Nullable"),
     // Jakarta
     FqName("jakarta.annotation.Nullable"),
+    // vertx
+    FqName("io.vertx.codegen.annotations.Nullable"),
 )
 
 val FORCE_FLEXIBILITY_ANNOTATIONS: Set<FqName> = setOf(
@@ -139,7 +142,9 @@ val NULLABILITY_ANNOTATIONS: Set<FqName> = mutableSetOf<FqName>() +
 
 val READ_ONLY_ANNOTATIONS: Set<FqName> = setOf(
     JvmAnnotationNames.JETBRAINS_READONLY_ANNOTATION,
-    JvmAnnotationNames.READONLY_ANNOTATION
+    JvmAnnotationNames.READONLY_ANNOTATION,
+    JvmAnnotationNames.JETBRAINS_UNMODIFIABLE_ANNOTATION,
+    JvmAnnotationNames.JETBRAINS_UNMODIFIABLE_VIEW_ANNOTATION,
 )
 
 val MUTABLE_ANNOTATIONS: Set<FqName> = setOf(
@@ -159,3 +164,6 @@ val javaToKotlinNameMap: Map<FqName, FqName> = mapOf(
 // other
 
 val UNDER_MIGRATION_ANNOTATION_FQ_NAME = FqName("kotlin.annotations.jvm.UnderMigration")
+
+val FqName.isCompilerInternalSyntheticAnnotation: Boolean
+    get() = this == JvmAnnotationNames.ENHANCED_NULLABILITY_ANNOTATION || parent() == StandardClassIds.BASE_INTERNAL_IR_PACKAGE

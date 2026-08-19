@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +ReadDeserializedContracts +UseCallsInPlaceEffect
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
 fun testRunWithUnitReturn() {
@@ -19,7 +18,7 @@ fun testRunWithReturnValue() {
 }
 
 fun testRunWithCoercionToUnit() {
-    val <!ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE!>x<!>: Int
+    val x: Int
     run {
         x = 42
         "hello"

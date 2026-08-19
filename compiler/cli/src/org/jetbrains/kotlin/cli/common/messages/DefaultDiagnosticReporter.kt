@@ -29,8 +29,11 @@ interface MessageCollectorBasedReporter : DiagnosticMessageReporter {
     val messageCollector: MessageCollector
 
     override fun report(diagnostic: Diagnostic, file: PsiFile, render: String) = messageCollector.report(
-        AnalyzerWithCompilerReport.convertSeverity(diagnostic.severity),
+        diagnostic.severity.toCompilerMessageSeverity(),
         render,
-        MessageUtil.psiFileToMessageLocation(file, file.name, DiagnosticUtils.getLineAndColumnRange(diagnostic))
+        MessageUtil.psiFileToMessageLocation(file, file.name, DiagnosticUtils.getLineAndColumnRange(diagnostic)),
+        diagnostic.factoryNameOrNull()
     )
 }
+
+internal fun Diagnostic.factoryNameOrNull(): String? = factory.nameOrNull

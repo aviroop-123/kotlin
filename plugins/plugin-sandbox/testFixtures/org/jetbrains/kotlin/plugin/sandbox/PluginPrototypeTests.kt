@@ -5,33 +5,28 @@
 
 package org.jetbrains.kotlin.plugin.sandbox
 
-import org.jetbrains.kotlin.js.test.fir.AbstractFirJsTest
-import org.jetbrains.kotlin.js.test.fir.AbstractFirLoadK2CompiledJsKotlinTest
-import org.jetbrains.kotlin.js.test.ir.AbstractJsBlackBoxCodegenWithSeparateKmpCompilationTestBase
+import org.jetbrains.kotlin.js.test.runners.AbstractJsBlackBoxCodegenWithSeparateKmpCompilationTestBase
+import org.jetbrains.kotlin.js.test.runners.AbstractJsTest
+import org.jetbrains.kotlin.js.test.runners.AbstractLoadCompiledJsKotlinTest
 import org.jetbrains.kotlin.kotlinp.jvm.test.CompareMetadataHandler
 import org.jetbrains.kotlin.plugin.sandbox.PluginSandboxDirectives.DONT_LOAD_IN_SYNTHETIC_MODULES
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.backend.handlers.IrPrettyKotlinDumpHandler
-import org.jetbrains.kotlin.test.backend.ir.BackendCliJvmFacade
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.configureFirHandlersStep
 import org.jetbrains.kotlin.test.builders.configureIrHandlersStep
 import org.jetbrains.kotlin.test.builders.configureJvmArtifactsHandlersStep
-import org.jetbrains.kotlin.test.configuration.commonConfigurationForJvmTest
 import org.jetbrains.kotlin.test.configuration.enableLazyResolvePhaseChecking
+import org.jetbrains.kotlin.test.configuration.setupJvmPipelineSteps
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DISABLE_FIR_DUMP_HANDLER
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.ENABLE_PLUGIN_PHASES
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_DUMP
-import org.jetbrains.kotlin.test.directives.configureFirParser
-import org.jetbrains.kotlin.test.frontend.fir.Fir2IrCliJvmFacade
-import org.jetbrains.kotlin.test.frontend.fir.FirCliJvmFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirFailingTestSuppressor
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
-import org.jetbrains.kotlin.test.model.FrontendKinds
 import org.jetbrains.kotlin.test.runners.AbstractFirLoadK2CompiledJvmKotlinTest
-import org.jetbrains.kotlin.test.runners.AbstractFirPsiDiagnosticTest
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
+import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticPsiTest
 import org.jetbrains.kotlin.test.runners.codegen.AbstractFirLightTreeBlackBoxCodegenTest
 import org.jetbrains.kotlin.test.runners.codegen.AbstractJvmBlackBoxCodegenWithSeparateKmpCompilationTestBase
 
@@ -51,9 +46,9 @@ open class AbstractFirJvmLightTreePluginBlackBoxCodegenWithSeparateKmpCompilatio
     }
 }
 
-open class AbstractFirJsLightTreePluginBlackBoxCodegenTest : AbstractFirJsTest(
+open class AbstractJsLightTreePluginBlackBoxCodegenTest : AbstractJsTest(
     pathToTestDir = "plugins/plugin-sandbox/testData/box",
-    testGroupOutputDirPrefix = "firPluginSandboxBox/",
+    testGroupOutputDirPrefix = "pluginSandboxBox/",
     parser = FirParser.LightTree
 ) {
     override fun configure(builder: TestConfigurationBuilder) {
@@ -65,10 +60,10 @@ open class AbstractFirJsLightTreePluginBlackBoxCodegenTest : AbstractFirJsTest(
     }
 }
 
-open class AbstractFirJsLightTreePluginBlackBoxCodegenWithSeparateKmpCompilationTest :
+open class AbstractJsLightTreePluginBlackBoxCodegenWithSeparateKmpCompilationTest :
     AbstractJsBlackBoxCodegenWithSeparateKmpCompilationTestBase(
         pathToTestDir = "plugins/plugin-sandbox/testData/box",
-        testGroupOutputDirPrefix = "firPluginSandboxBox/",
+        testGroupOutputDirPrefix = "pluginSandboxBoxWithSeparateKmpCompilation/",
         parser = FirParser.LightTree
     ) {
 
@@ -81,12 +76,12 @@ open class AbstractFirJsLightTreePluginBlackBoxCodegenWithSeparateKmpCompilation
     }
 }
 
-abstract class AbstractFirPsiPluginDiagnosticTest : AbstractFirPsiDiagnosticTest() {
+abstract class AbstractFirPsiPluginDiagnosticTest : AbstractPhasedJvmDiagnosticPsiTest() {
     override fun configure(builder: TestConfigurationBuilder) {
         super.configure(builder)
         with(builder) {
             commonFirWithPluginFrontendConfiguration()
-            useAfterAnalysisCheckers(::FirFailingTestSuppressor)
+            useFailureSuppressors(::FirFailingTestSuppressor)
         }
     }
 }
@@ -106,7 +101,7 @@ open class AbstractFirLoadK2CompiledWithPluginJvmKotlinTest : AbstractFirLoadK2C
     }
 }
 
-open class AbstractFirLoadK2CompiledWithPluginJsKotlinTest : AbstractFirLoadK2CompiledJsKotlinTest() {
+open class AbstractLoadCompiledWithPluginJsKotlinTest : AbstractLoadCompiledJsKotlinTest() {
     override fun configure(builder: TestConfigurationBuilder) {
         super.configure(builder)
         with(builder) {
@@ -121,15 +116,14 @@ open class AbstractFirLoadK2CompiledWithPluginJsKotlinTest : AbstractFirLoadK2Co
 open class AbstractFirMetadataPluginSandboxTest : AbstractKotlinCompilerWithTargetBackendTest(TargetBackend.JVM_IR) {
     override fun configure(builder: TestConfigurationBuilder) {
         with(builder) {
-            commonConfigurationForJvmTest(FrontendKinds.FIR, ::FirCliJvmFacade, ::Fir2IrCliJvmFacade, ::BackendCliJvmFacade)
+            setupJvmPipelineSteps(FirParser.LightTree)
             configureFirHandlersStep {
                 useHandlers(::FirDiagnosticsHandler)
             }
             enableMetaInfoHandler()
-            configureFirParser(FirParser.LightTree)
             commonFirWithPluginFrontendConfiguration(dumpFir = false)
             configureJvmArtifactsHandlersStep {
-                useHandlers({ CompareMetadataHandler(it, extension = ".metadata.txt") })
+                useHandlers({ CompareMetadataHandler(it, extension = ".metadata.txt", verbose = true) })
             }
         }
     }
@@ -154,7 +148,7 @@ fun TestConfigurationBuilder.commonFirWithPluginFrontendConfiguration(dumpFir: B
         ::PluginRuntimeAnnotationsProvider
     )
 
-    useAfterAnalysisCheckers(
+    useFailureSuppressors(
         ::FirFailingTestSuppressor,
     )
 }

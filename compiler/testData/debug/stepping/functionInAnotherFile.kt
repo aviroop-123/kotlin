@@ -1,4 +1,4 @@
-
+// IGNORE_BACKEND_K2_MULTI_MODULE: ANY
 // FILE: foo.kt
 import bar
 fun foo(x: Int): Int {
@@ -33,6 +33,24 @@ fun bar(x: Int) =
 // test.kt:22 bar
 // foo.kt:8 foo
 // test.kt:14 box
+// test.kt:15 box
+
+// EXPECTATIONS NATIVE
+// test.kt:14 box
+// foo.kt:4 foo
+// foo.kt:5 foo
+// foo.kt:8 foo
+// test.kt:17 bar
+// test.kt:18 bar
+// test.kt:19 bar
+// foo.kt:4 foo
+// foo.kt:5 foo
+// foo.kt:6 foo
+// foo.kt:9 foo
+// test.kt:19 bar
+// test.kt:22 bar
+// foo.kt:8 foo
+// foo.kt:9 foo
 // test.kt:15 box
 
 // EXPECTATIONS JS_IR

@@ -1,0 +1,5 @@
+KDocName(48,50): 'bb'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val bb: kotlin.Int
+    ]

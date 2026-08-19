@@ -6,9 +6,6 @@
 package org.jetbrains.kotlin.wasm.ir.convertors
 
 import org.jetbrains.kotlin.wasm.ir.*
-import java.io.ByteArrayOutputStream
-import java.io.OutputStream
-import kotlinx.collections.immutable.*
 import org.jetbrains.kotlin.wasm.ir.debug.DebugData
 import org.jetbrains.kotlin.wasm.ir.debug.DebugInformation
 import org.jetbrains.kotlin.wasm.ir.debug.DebugInformationConsumer
@@ -53,22 +50,48 @@ private object WasmBinary {
     }
 }
 
+private enum class AnnotationKind(val sectionName: String) {
+    BRANCH_HINT("metadata.code.branch_hint"),
+    TRACE_INST("metadata.code.trace_inst"),
+    JS_CALLED("binaryen.js.called"),
+}
+
+/**
+ * Annotation data extracted from pseudo-instructions during code emission.
+ * Stores the kind, byte offset, and raw payload value for later section generation.
+ */
+private class ResolvedAnnotation(
+    val kind: AnnotationKind,
+    val byteOffset: Int,
+    val value: Int = 0,
+)
+
+/**
+ * Collected resolved annotations for a function, ready for section emission.
+ */
+private class FunctionResolvedAnnotations(
+    val functionIndex: Int,
+    val annotations: List<ResolvedAnnotation>
+)
+
 class WasmIrToBinary(
-    outputStream: OutputStream,
+    val b: ByteWriterWithOffsetWrite,
     val module: WasmModule,
     val moduleName: String,
     val emitNameSection: Boolean,
     private val debugInformationGenerator: DebugInformationGenerator? = null,
-    private val optimizeInstructionFlow: Boolean = true,
 ) : DebugInformationConsumer {
-    private var b: ByteWriter = ByteWriter.OutputStream(outputStream)
-    private var codeSectionOffset: Int = 0
-    private val codeSectionOffsetDelegate = ::codeSectionOffset
+    private var codeSectionOffset = Box(0)
+    private val appendImmediateDelegate = ::appendImmediate
+    private val defaultEndInstruction = wasmInstrWithoutLocation(WasmOp.END)
+    private val resolver = module.resolver
 
-    // "Stack" of offsets waiting initialization. 
-    // Since blocks have as a prefix variable length number encoding its size, we can't calculate absolute offsets inside those blocks
-    // until we generate the whole block and generate size. So, we put them into "stack" and initialize as soon as we have all required data.
-    private var offsets = persistentListOf<Box>()
+    // Collected resolved annotations per function for code metadata section emission
+    private val resolvedAnnotationsByFunction = mutableListOf<FunctionResolvedAnnotations>()
+
+    // Context for tracking annotations during function emission
+    private var currentFunctionCodeStart: Int = -1
+    private var currentFunctionAnnotations: MutableList<ResolvedAnnotation>? = null
 
     override fun consumeDebugInformation(debugInformation: DebugInformation) {
         debugInformation.forEach {
@@ -181,10 +204,23 @@ class WasmIrToBinary(
             }
 
             // code section
-            appendSection(WasmBinary.Section.CODE, beforeContentWrite = { codeSectionOffset = b.written }) {
+            appendSection(WasmBinary.Section.CODE) {
                 appendVectorSize(definedFunctions.size)
-                definedFunctions.forEach { appendCode(it) }
+                val importedFunctionCount = importedFunctions.size
+                definedFunctions.forEachIndexed { index, func ->
+                    appendCode(func, importedFunctionCount + index)
+                }
             }
+
+            // code metadata sections
+            //
+            // Note: We generate the code metadata sections after the code section is appended
+            // because the metadata sections depend on the annotations processed in the instruction
+            // stream. However,
+            // https://github.com/WebAssembly/branch-hinting/blob/main/proposals/branch-hinting/Overview.md
+            // specifies that the section comes before. This is actually not a problem for us,
+            // because binaryen itself reorders the section if necessary.
+            emitCodeMetadataSections()
 
             appendSection(WasmBinary.Section.DATA) {
                 appendVectorSize(data.size)
@@ -197,6 +233,56 @@ class WasmIrToBinary(
             }
 
             debugInformationGenerator?.let { consumeDebugInformation(it.generateDebugInformation()) }
+        }
+    }
+
+    /**
+     * Emit code metadata sections for all collected annotations.
+     */
+    private fun emitCodeMetadataSections() {
+        if (resolvedAnnotationsByFunction.isEmpty()) return
+
+        // Group all annotations by kind
+        val byKind = mutableMapOf<AnnotationKind, MutableList<Pair<Int, ResolvedAnnotation>>>()
+        for (funcAnnotations in resolvedAnnotationsByFunction) {
+            for (resolved in funcAnnotations.annotations) {
+                byKind.getOrPut(resolved.kind) { mutableListOf() }
+                    .add(funcAnnotations.functionIndex to resolved)
+            }
+        }
+
+        // Emit a custom section for each annotation type in the format described here:
+        // https://github.com/WebAssembly/tool-conventions/blob/main/CodeMetadata.md
+        for ([kind, entries] in byKind) {
+            appendSection(WasmBinary.Section.CUSTOM) {
+                b.writeString(kind.sectionName)
+
+                // Group by function index
+                val byFunction = entries.groupBy({ it.first }, { it.second })
+                    .toSortedMap()
+
+                b.writeVarUInt32(byFunction.size)
+
+                for ([funcIdx, annotations] in byFunction) {
+                    b.writeVarUInt32(funcIdx)
+                    b.writeVarUInt32(annotations.size)
+
+                    for (resolved in annotations.sortedBy { it.byteOffset }) {
+                        b.writeVarUInt32(resolved.byteOffset)
+                        withVarUInt32PayloadSizePrepended {
+                            when (kind) {
+                                AnnotationKind.BRANCH_HINT -> {
+                                    b.writeVarUInt32(resolved.value)
+                                }
+                                AnnotationKind.TRACE_INST -> {
+                                    b.writeVarInt32(resolved.value)
+                                }
+                                AnnotationKind.JS_CALLED -> {}
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -270,8 +356,27 @@ class WasmIrToBinary(
 
         val opcode = instr.operator.opcode
 
-        if (opcode == WASM_OP_PSEUDO_OPCODE)
+        if (opcode == WASM_OP_PSEUDO_OPCODE) {
+            // Handle annotation pseudo-instructions by recording them without emitting bytes
+            require(currentFunctionCodeStart != -1) { "Annotation context not set up." }
+            val annotations = currentFunctionAnnotations ?: mutableListOf<ResolvedAnnotation>().also { currentFunctionAnnotations = it }
+            val byteOffset = b.written - currentFunctionCodeStart
+            when (instr.operator) {
+                WasmOp.PSEUDO_ANNOTATION_BRANCH_HINT -> {
+                    val likely = (instr.firstImmediateOrNull()!! as WasmImmediate.ConstU8).value.toInt()
+                    annotations.add(ResolvedAnnotation(AnnotationKind.BRANCH_HINT, byteOffset, likely))
+                }
+                WasmOp.PSEUDO_ANNOTATION_TRACE_INST -> {
+                    val markId = (instr.firstImmediateOrNull()!! as WasmImmediate.ConstI32).value
+                    annotations.add(ResolvedAnnotation(AnnotationKind.TRACE_INST, byteOffset, markId))
+                }
+                WasmOp.PSEUDO_COMMENT_PREVIOUS_INSTR -> {}
+                WasmOp.PSEUDO_COMMENT_GROUP_START -> {}
+                WasmOp.PSEUDO_COMMENT_GROUP_END -> {}
+                else -> error("Unknown annotation pseudo-instruction: ${instr.operator}")
+            }
             return
+        }
 
         if (opcode > 0xFF) {
             b.writeByte((opcode ushr 8).toByte())
@@ -280,13 +385,15 @@ class WasmIrToBinary(
             b.writeByte(opcode.toByte())
         }
 
-        instr.immediates.forEach {
-            appendImmediate(it)
-        }
+        instr.forEachImmediates(appendImmediateDelegate)
     }
 
     private fun getCurrentSourceLocationMapping(sourceLocation: SourceLocation): SourceLocationMappingToBinary =
-        SourceLocationMappingToBinary(sourceLocation, offsets + Box(b.written), codeSectionOffsetDelegate)
+        SourceLocationMappingToBinary(
+            sourceLocation = sourceLocation,
+            codeSectionOffset = codeSectionOffset,
+            offset = b.written
+        )
 
     private fun appendImmediate(x: WasmImmediate) {
         when (x) {
@@ -301,10 +408,11 @@ class WasmIrToBinary(
                 b.writeVarUInt32(x.offset)
             }
             is WasmImmediate.BlockType -> appendBlockType(x)
-            is WasmImmediate.FuncIdx -> appendModuleFieldReference(x.value.owner)
-            is WasmImmediate.LocalIdx -> appendLocalReference(x.value.owner)
-            is WasmImmediate.GlobalIdx -> appendModuleFieldReference(x.value.owner)
-            is WasmImmediate.TypeIdx -> appendModuleFieldReference(x.value.owner)
+            is WasmImmediate.FuncIdx -> appendModuleFieldReference(resolver.resolve(x))
+            is WasmImmediate.LocalIdx -> appendLocalReference(x.value)
+            is WasmImmediate.GlobalIdx -> appendModuleFieldReference(resolver.resolve(x))
+            is WasmImmediate.TypeIdx -> appendModuleFieldReference(resolver.resolve(x))
+
             is WasmImmediate.MemoryIdx -> b.writeVarUInt32(x.value)
             is WasmImmediate.DataIdx -> b.writeVarUInt32(x.value.owner)
             is WasmImmediate.TableIdx -> b.writeVarUInt32(x.value.owner)
@@ -323,8 +431,7 @@ class WasmIrToBinary(
                     appendType(type)
                 }
             }
-            is WasmImmediate.GcType -> appendModuleFieldReference(x.value.owner)
-            is WasmImmediate.StructFieldIdx -> b.writeVarUInt32(x.value.owner)
+            is WasmImmediate.StructFieldIdx -> b.writeVarUInt32(x.value)
             is WasmImmediate.HeapType -> appendHeapType(x.value)
             is WasmImmediate.ConstString ->
                 error("Instructions with pseudo immediates should be skipped")
@@ -336,28 +443,23 @@ class WasmIrToBinary(
         }
     }
 
-    private inline fun appendSection(section: WasmBinary.Section, beforeContentWrite: () -> Unit = {}, content: () -> Unit) {
+    private inline fun appendSection(section: WasmBinary.Section, content: () -> Unit) {
         b.writeVarUInt7(section.id)
-        withVarUInt32PayloadSizePrepended(beforeContentWrite, content)
+        codeSectionOffset = Box(-1)
+        codeSectionOffset.value = withVarUInt32PayloadSizePrepended(content)
     }
 
-    private inline fun withVarUInt32PayloadSizePrepended(beforeContentWrite: () -> Unit = {}, fn: () -> Unit) {
-        val box = Box(-1)
-        val previousOffsets = offsets
-        offsets += box
+    private inline fun withVarUInt32PayloadSizePrepended(fn: () -> Unit): Int {
+        val prependOffset = b.written //offset for placeholder
+        b.writeVarUInt32Fixed(0) //placeholder for size
+        val prependStart = b.written
 
-        val previousWriter = b
-        val newWriter = b.createTemp()
-        b = newWriter
         fn()
-        b = previousWriter
-        b.writeVarUInt32(newWriter.written)
 
-        box.value = b.written
-        offsets = previousOffsets
+        val size = b.written - prependStart
+        b.writeVarUInt32FixedSize(size, prependOffset) //placeholder for size
 
-        beforeContentWrite()
-        b.write(newWriter)
+        return prependStart
     }
 
     private fun appendVectorSize(size: Int) {
@@ -387,7 +489,7 @@ class WasmIrToBinary(
         }
     }
 
-    private fun appendFiledType(field: WasmStructFieldDeclaration) {
+    private fun appendFieldType(field: WasmStructFieldDeclaration) {
         appendType(field.type)
         b.writeVarUInt1(field.isMutable)
     }
@@ -409,7 +511,8 @@ class WasmIrToBinary(
 
             if (superType != null) {
                 appendVectorSize(1)
-                appendModuleFieldReference(superType.owner)
+                val superType = resolver.resolve(superType)
+                appendModuleFieldReference(superType)
             } else {
                 appendVectorSize(0)
             }
@@ -418,17 +521,14 @@ class WasmIrToBinary(
         b.writeVarInt7(WasmBinary.STRUCT_TYPE)
         b.writeVarUInt32(type.fields.size)
         type.fields.forEach {
-            appendFiledType(it)
+            appendFieldType(it)
         }
     }
 
     private fun appendArrayTypeDeclaration(type: WasmArrayDeclaration) {
         b.writeVarInt7(WasmBinary.ARRAY_TYPE)
-        appendFiledType(type.field)
+        appendFieldType(type.field)
     }
-
-    val WasmFunctionType.index: Int
-        get() = id!!
 
     private fun appendLimits(limits: WasmLimits) {
         b.writeVarUInt1(limits.maxSize != null)
@@ -441,11 +541,11 @@ class WasmIrToBinary(
         b.writeString(function.importPair.moduleName)
         b.writeString(function.importPair.declarationName.owner)
         b.writeByte(0)  // Function external kind.
-        b.writeVarUInt32(function.type.owner.index)
+        b.writeVarUInt32((resolver.resolve(function.type).id!!))
     }
 
     private fun appendDefinedFunction(function: WasmFunction.Defined) {
-        b.writeVarUInt32(function.type.owner.index)
+        b.writeVarUInt32((resolver.resolve(function.type).id!!))
     }
 
     private fun appendTable(table: WasmTable) {
@@ -489,23 +589,20 @@ class WasmIrToBinary(
             b.writeByte(4)
         }
         b.writeByte(0) // attribute
-        assert(t.type.id != null) { "Unlinked tag id" }
-        b.writeVarUInt32(t.type.id!!)
+
+        val tagType = resolver.resolve(t.type) as WasmFunctionType
+        check(tagType.resultTypes.isEmpty()) { "Must have empty return as per current spec" }
+        val typeId = tagType.id
+        check(typeId != null) { "Unlinked tag id" }
+        b.writeVarUInt32(typeId)
     }
 
-    private fun appendExpr(expr: Iterable<WasmInstr>, endLocation: SourceLocation = SourceLocation.NoLocation("End of instruction list")) {
-        val expressionWithEndOp = sequence {
-            yieldAll(expr)
-            yield(WasmInstrWithLocation(WasmOp.END, endLocation))
+    private fun appendExpr(expr: Iterable<WasmInstr>, endLocation: SourceLocation? = null) {
+        expr.forEach {
+            appendInstr(it)
         }
-
-        if (optimizeInstructionFlow) {
-            for (instruction in processInstructionsFlow(expressionWithEndOp)) {
-                appendInstr(instruction)
-            }
-        } else {
-            expressionWithEndOp.forEach(::appendInstr)
-        }
+        val endInstr = endLocation?.let { wasmInstrWithLocation(WasmOp.END, it) } ?: defaultEndInstruction
+        appendInstr(endInstr)
     }
 
     private fun appendExport(export: WasmExport<*>) {
@@ -580,20 +677,36 @@ class WasmIrToBinary(
         }
     }
 
-    private fun appendCode(function: WasmFunction.Defined) {
+    private fun appendCode(function: WasmFunction.Defined, functionIndex: Int) {
         val shouldWriteLocationBeforeFunctionHeader = function.endLocation is SourceLocation.IgnoredLocation
 
         if (shouldWriteLocationBeforeFunctionHeader) {
             debugInformationGenerator?.addSourceLocation(
-                SourceLocationMappingToBinary(SourceLocation.IgnoredLocation, offsets + Box(b.written), ::codeSectionOffset)
+                SourceLocationMappingToBinary(
+                    sourceLocation = SourceLocation.IgnoredLocation,
+                    codeSectionOffset = codeSectionOffset,
+                    offset = b.written
+                )
             )
         }
 
         withVarUInt32PayloadSizePrepended {
             if (!shouldWriteLocationBeforeFunctionHeader) {
                 debugInformationGenerator?.addSourceLocation(
-                    SourceLocationMappingToBinary(SourceLocation.NextLocation, offsets + Box(b.written), ::codeSectionOffset)
+                    getCurrentSourceLocationMapping(SourceLocation.NextLocation)
                 )
+            }
+
+            // Code annotation offsets are relative to the first byte
+            // of the locals.
+            currentFunctionCodeStart = b.written
+
+            for (annotation in function.functionAnnotations) {
+                val annotations = currentFunctionAnnotations ?: mutableListOf<ResolvedAnnotation>().also { currentFunctionAnnotations = it }
+                val kind = when (annotation) {
+                    WasmFunctionAnnotation.JsCalled -> AnnotationKind.JS_CALLED
+                }
+                annotations.add(ResolvedAnnotation(kind, 0))
             }
 
             b.writeVarUInt32(function.locals.count { !it.isParameter })
@@ -606,6 +719,17 @@ class WasmIrToBinary(
 
             debugInformationGenerator?.startFunction(getCurrentSourceLocationMapping(function.startLocation), function.name)
             appendExpr(function.instructions, function.endLocation)
+
+            // Clear annotation tracking context; save any collected annotations
+            val annotations = currentFunctionAnnotations
+            currentFunctionAnnotations = null
+            currentFunctionCodeStart = -1
+
+            // Store resolved annotations for later section emission
+            if (annotations != null) {
+                resolvedAnnotationsByFunction.add(FunctionResolvedAnnotations(functionIndex, annotations))
+            }
+
             debugInformationGenerator?.endFunction(getCurrentSourceLocationMapping(function.endLocation))
         }
     }
@@ -631,7 +755,7 @@ class WasmIrToBinary(
     fun appendHeapType(type: WasmHeapType) {
         val code: Int = when (type) {
             is WasmHeapType.Simple -> type.code.toInt()
-            is WasmHeapType.Type -> type.type.owner.id!!
+            is WasmHeapType.Type -> resolver.resolve(type).id!!
         }
         b.writeVarInt32(code)
     }
@@ -647,8 +771,8 @@ class WasmIrToBinary(
         }
     }
 
-    fun appendLocalReference(local: WasmLocal) {
-        b.writeVarUInt32(local.id)
+    fun appendLocalReference(local: Int) {
+        b.writeVarUInt32(local)
     }
 
     fun appendModuleFieldReference(field: WasmNamedModuleField) {
@@ -661,6 +785,10 @@ class WasmIrToBinary(
         this.writeVarUInt32(v.toUInt())
     }
 
+    fun ByteWriter.writeVarUInt32Fixed(v: Int) {
+        this.writeVarUInt32FixedSize(v.toUInt())
+    }
+
     private fun ByteWriter.writeString(str: String) {
         val bytes = str.toByteArray()
         this.writeVarUInt32(bytes.size)
@@ -670,150 +798,22 @@ class WasmIrToBinary(
 
     private class SourceLocationMappingToBinary(
         override val sourceLocation: SourceLocation,
-        // Offsets in generating binary, initialized lazily. Since blocks has as a prefix variable length number encoding its size
-        // we can't calculate absolute offsets inside those blocks until we generate whole block and generate size.
-        private val offsets: List<Box>,
-        private val codeSectionOffsetProvider: () -> Int
+        private val codeSectionOffset: Box,
+        private val offset: Int
     ) : SourceLocationMapping() {
-        override val generatedLocation by lazy {
-            SourceLocation.DefinedLocation(
+
+        override val generatedLocation: SourceLocation.DefinedLocation
+            get() = SourceLocation.DefinedLocation(
                 file = "",
                 line = 0,
-                column = offsets.sumOf {
-                    assert(it.value >= 0) { "Offset must be >=0 but ${it.value}" }
-                    it.value
-                }
+                column = offset
             )
-        }
 
-        override val generatedLocationRelativeToCodeSection by lazy {
-            generatedLocation.copy(column = generatedLocation.column - codeSectionOffsetProvider())
-        }
-    }
-}
-
-interface ByteWriter {
-    val written: Int
-
-    fun write(v: ByteWriter)
-    fun writeByte(v: Byte)
-    fun writeBytes(v: ByteArray)
-    fun createTemp(): ByteWriter
-
-    fun writeUByte(v: UByte) {
-        writeByte(v.toByte())
-    }
-
-    fun writeUInt16(v: UShort) {
-        writeByte(v.toByte())
-        writeByte((v.toUInt() shr 8).toByte())
-    }
-
-    fun writeUInt32(v: UInt) {
-        writeByte(v.toByte())
-        writeByte((v shr 8).toByte())
-        writeByte((v shr 16).toByte())
-        writeByte((v shr 24).toByte())
-    }
-
-    fun writeUInt64(v: ULong) {
-        writeByte(v.toByte())
-        writeByte((v shr 8).toByte())
-        writeByte((v shr 16).toByte())
-        writeByte((v shr 24).toByte())
-        writeByte((v shr 32).toByte())
-        writeByte((v shr 40).toByte())
-        writeByte((v shr 48).toByte())
-        writeByte((v shr 56).toByte())
-    }
-
-    fun writeUInt64(v: ULong, size: Int) =
-        when (size) {
-            1 -> writeUByte(v.toUByte())
-            2 -> writeUInt16(v.toUShort())
-            4 -> writeUInt32(v.toUInt())
-            8 -> writeUInt64(v)
-            else -> error("Unsupported size $size")
-        }
-
-    fun writeVarInt7(v: Byte) {
-        writeSignedLeb128(v.toLong())
-    }
-
-    fun writeVarInt32(v: Int) {
-        writeSignedLeb128(v.toLong())
-    }
-
-    fun writeVarInt64(v: Long) {
-        writeSignedLeb128(v)
-    }
-
-    fun writeVarUInt1(v: Boolean) {
-        writeUnsignedLeb128(if (v) 1u else 0u)
-    }
-
-    fun writeVarUInt7(v: UShort) {
-        writeUnsignedLeb128(v.toUInt())
-    }
-
-    fun writeVarUInt32(v: UInt) {
-        writeUnsignedLeb128(v)
-    }
-
-    fun writeBoolean(value: Boolean) {
-        writeByte(if (value) 1 else 0)
-    }
-
-    private fun writeUnsignedLeb128(v: UInt) {
-        // Taken from Android source, Apache licensed
-        @Suppress("NAME_SHADOWING")
-        var v = v
-        var remaining = v shr 7
-        while (remaining != 0u) {
-            val byte = (v and 0x7fu) or 0x80u
-            writeByte(byte.toByte())
-            v = remaining
-            remaining = remaining shr 7
-        }
-        val byte = v and 0x7fu
-        writeByte(byte.toByte())
-    }
-
-    private fun writeSignedLeb128(v: Long) {
-        // Taken from Android source, Apache licensed
-        @Suppress("NAME_SHADOWING")
-        var v = v
-        var remaining = v shr 7
-        var hasMore = true
-        val end = if (v and Long.MIN_VALUE == 0L) 0L else -1L
-        while (hasMore) {
-            hasMore = remaining != end || remaining and 1 != (v shr 6) and 1
-            val byte = ((v and 0x7f) or if (hasMore) 0x80 else 0).toInt()
-            writeByte(byte.toByte())
-            v = remaining
-            remaining = remaining shr 7
-        }
-    }
-
-    class OutputStream(val os: java.io.OutputStream) : ByteWriter {
-        override var written = 0; private set
-
-        override fun write(v: ByteWriter) {
-            if (v !is OutputStream || v.os !is ByteArrayOutputStream) error("Writer not created from createTemp")
-            v.os.writeTo(os)
-            written += v.os.size()
-        }
-
-        override fun writeByte(v: Byte) {
-            os.write(v.toInt())
-            written++
-        }
-
-        override fun writeBytes(v: ByteArray) {
-            os.write(v)
-            written += v.size
-        }
-
-        override fun createTemp() = OutputStream(ByteArrayOutputStream())
+        override val generatedLocationRelativeToCodeSection: SourceLocation.DefinedLocation
+            get() = SourceLocation.DefinedLocation(
+                file = "",
+                line = 0,
+                column = offset - codeSectionOffset.value
+            )
     }
 }

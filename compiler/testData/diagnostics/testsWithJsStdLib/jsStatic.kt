@@ -1,6 +1,5 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: FRONTEND
 // OPT_IN: kotlin.js.ExperimentalJsStatic
-// IGNORE_BACKEND_K1: JS_IR, JS_IR_ES6
 // DIAGNOSTICS: -UNUSED_VARIABLE
 class A {
     companion object {
@@ -24,20 +23,20 @@ class A {
     }
 
     object A {
-        <!JS_STATIC_NOT_IN_CLASS_COMPANION!>@JsStatic fun a2()<!> {
+        @JsStatic fun a2() {
 
         }
     }
 
     fun test() {
         val s = object {
-            <!JS_STATIC_NOT_IN_CLASS_COMPANION!>@JsStatic fun a3()<!> {
+            <!JS_STATIC_NOT_IN_OBJECT!>@JsStatic fun a3()<!> {
 
             }
         }
     }
 
-    <!JS_STATIC_NOT_IN_CLASS_COMPANION!>@JsStatic fun a4()<!> {
+    <!JS_STATIC_NOT_IN_OBJECT!>@JsStatic fun a4()<!> {
 
     }
 }
@@ -50,20 +49,23 @@ interface B {
     }
 
     object A {
-        <!JS_STATIC_NOT_IN_CLASS_COMPANION!>@JsStatic fun a2()<!> {
+        @JsStatic fun a2() {
 
         }
     }
 
     fun test() {
         val s = object {
-            <!JS_STATIC_NOT_IN_CLASS_COMPANION!>@JsStatic fun a3()<!> {
+            <!JS_STATIC_NOT_IN_OBJECT!>@JsStatic fun a3()<!> {
 
             }
         }
     }
 
-    <!JS_STATIC_NOT_IN_CLASS_COMPANION!>@JsStatic fun a4()<!> {
+    <!JS_STATIC_NOT_IN_OBJECT!>@JsStatic fun a4()<!> {
 
     }
 }
+
+<!JS_STATIC_NOT_IN_OBJECT!>@JsStatic
+fun A.Companion.bar()<!> {}

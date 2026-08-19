@@ -70,7 +70,7 @@ class KaptOptions(
         val javacOptions: MutableMap<String, String> = mutableMapOf()
 
         // Initialize this set with the flags that are enabled by default. This set may be changed later (with flags added or removed).
-        val flags: MutableSet<KaptFlag> = KaptFlag.values().filter { it.defaultValue }.toMutableSet()
+        val flags: MutableSet<KaptFlag> = KaptFlag.entries.filter { it.defaultValue }.toMutableSet()
 
         var mode: AptMode = AptMode.WITH_COMPILATION
         var detectMemoryLeaks: DetectMemoryLeaksMode = DetectMemoryLeaksMode.DEFAULT
@@ -110,17 +110,12 @@ interface KaptFlags {
             override fun get(flag: KaptFlag) = flag in flags
         }
     }
-
-    object Empty : KaptFlags {
-        override fun get(flag: KaptFlag) = false
-    }
 }
 
 enum class KaptFlag(val description: String, val defaultValue: Boolean = false) {
     SHOW_PROCESSOR_STATS("Show processor stats"),
     VERBOSE("Verbose mode"),
     INFO_AS_WARNINGS("Info as warnings"),
-    USE_LIGHT_ANALYSIS("Use light analysis", defaultValue = true),
     CORRECT_ERROR_TYPES("Correct error types"),
     DUMP_DEFAULT_PARAMETER_VALUES("Dump default parameter values"),
     MAP_DIAGNOSTIC_LOCATIONS("Map diagnostic locations"),

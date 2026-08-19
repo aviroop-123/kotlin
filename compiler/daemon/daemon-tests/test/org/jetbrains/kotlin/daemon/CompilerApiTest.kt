@@ -25,14 +25,15 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollectorImpl
 import org.jetbrains.kotlin.cli.common.messages.OutputMessageUtil
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.Services
 import org.jetbrains.kotlin.daemon.client.DaemonReportingTargets
 import org.jetbrains.kotlin.daemon.client.KotlinCompilerClient
 import org.jetbrains.kotlin.daemon.common.*
 import org.jetbrains.kotlin.integration.KotlinIntegrationTestBase
-import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.TestDataAssertions
 import org.jetbrains.kotlin.test.testFramework.resetApplicationToNull
-import org.jetbrains.kotlin.test.util.KtTestUtil
+import org.jetbrains.kotlin.test.util.KtTestUtil.getTestDataFileLocatedInCompilerTestData
 import org.junit.Assert
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -88,12 +89,13 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
         return code to outputs
     }
 
-    private fun getHelloAppBaseDir(): String = KtTestUtil.getTestDataPathBase() + "/integration/smoke/helloApp"
-    private fun getSimpleScriptBaseDir(): String = KtTestUtil.getTestDataPathBase() + "/integration/smoke/simpleScript"
+    private fun getHelloAppBaseDir(): File = ForTestCompileRuntime.transformTestDataPath("compiler/tests-integration/testData/integration/smoke/helloApp")
+    private fun getSimpleScriptBaseDir(): File = ForTestCompileRuntime.transformTestDataPath("compiler/tests-integration/testData/integration/smoke/simpleScript")
 
-    private fun run(baseDir: String, logName: String, vararg args: String): Int = runJava(baseDir, logName, *args)
 
-    private fun runScriptWithArgs(testDataDir: String, logName: String?, scriptClassName: String, classpath: List<File>, vararg arguments: String) {
+    private fun run(baseDir: File, logName: String, vararg args: String): Int = runJava(baseDir, logName, *args)
+
+    private fun runScriptWithArgs(testDataDir: File, logName: String?, scriptClassName: String, classpath: List<File>, vararg arguments: String) {
 
         val cl = URLClassLoader(classpath.map { it.toURI().toURL() }.toTypedArray())
         val scriptClass = cl.loadClass(scriptClassName)
@@ -102,16 +104,16 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
 
         if (logName != null) {
             val expectedFile = File(testDataDir, logName + ".expected")
-            val normalizedContent = normalizeOutput(File(testDataDir), "OUT:\n$scriptOut\nReturn code: 0")
+            val normalizedContent = normalizeOutput(testDataDir, "OUT:\n$scriptOut\nReturn code: 0")
 
-            KotlinTestUtils.assertEqualsToFile(expectedFile, normalizedContent)
+            TestDataAssertions.assertEqualsToFile(expectedFile, normalizedContent)
         }
     }
 
     fun testHelloAppLocal() {
         val messageCollector = MessageCollectorImpl()
         val jar = tmpdir.absolutePath + File.separator + "hello.jar"
-        val (code, outputs) = compileLocally(
+        val [code, outputs] = compileLocally(
             messageCollector, K2JVMCompilerArguments::includeRuntime.cliArgument, File(getHelloAppBaseDir(), "hello.kt").absolutePath,
             K2JVMCompilerArguments::destination.cliArgument, jar, K2JVMCompilerArguments::reportOutputFiles.cliArgument
         )
@@ -136,7 +138,7 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
             val jar = tmpdir.absolutePath + File.separator + "hello.jar"
 
             try {
-                val (code, outputs) = compileOnDaemon(
+                val [code, outputs] = compileOnDaemon(
                     flagFile,
                     compilerId,
                     daemonJVMOptions,
@@ -160,7 +162,7 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
 
     fun testSimpleScriptLocal() {
         val messageCollector = MessageCollectorImpl()
-        val (code, outputs) = compileLocally(
+        val [code, outputs] = compileLocally(
             messageCollector,
             File(getSimpleScriptBaseDir(), "script.kts").absolutePath,
             K2JVMCompilerArguments::destination.cliArgument,
@@ -186,7 +188,7 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
             val daemonJVMOptions = configureDaemonJVMOptions("D${CompilerSystemProperties.COMPILE_DAEMON_LOG_PATH_PROPERTY.property}=\"${logFile.loggerCompatiblePath}\"",
                                                              inheritMemoryLimits = false, inheritOtherJvmOptions = false, inheritAdditionalProperties = false)
             try {
-                val (code, outputs) = compileOnDaemon(
+                val [code, outputs] = compileOnDaemon(
                     flagFile,
                     compilerId,
                     daemonJVMOptions,

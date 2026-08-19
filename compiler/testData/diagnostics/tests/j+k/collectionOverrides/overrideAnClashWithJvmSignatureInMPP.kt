@@ -1,7 +1,7 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // WITH_STDLIB
 // FULL_JDK
-// RENDER_DIAGNOSTICS_MESSAGES
+// RENDER_DIAGNOSTIC_ARGUMENTS
 // RENDER_ALL_DIAGNOSTICS_FULL_TEXT
 // LANGUAGE: +MultiPlatformProjects
 // IGNORE_NON_REVERSED_RESOLVE
@@ -15,11 +15,11 @@ expect abstract class B() {
 }
 
 expect abstract class KA : B {
-    override fun get(index: Int): Char
+    override fun <!ACCIDENTAL_OVERRIDE_CLASH_BY_JVM_SIGNATURE("'fun get(index: Int): Char' defined in 'A'; a renamed function; 'fun charAt(index: Int): Char' defined in 'A'")!>get<!>(index: Int): Char
 }
 
 abstract class KA2() : B() {
-    override fun get(index: Int): Char = 'A'
+    override fun <!ACCIDENTAL_OVERRIDE_CLASH_BY_JVM_SIGNATURE("'fun get(index: Int): Char' defined in 'A'; a renamed function; 'fun charAt(index: Int): Char' defined in 'A'")!>get<!>(index: Int): Char = 'A'
 }
 
 // MODULE: jvm()()(common)

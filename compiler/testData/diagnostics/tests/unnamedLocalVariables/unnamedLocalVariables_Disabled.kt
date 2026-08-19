@@ -1,8 +1,7 @@
-// FIR_IDENTICAL
 // RUN_PIPELINE_TILL: FRONTEND
 // ISSUE: KT-74809
 // WITH_STDLIB
-// LANGUAGE: -UnnamedLocalVariables, +NameBasedDestructuring +NameBasedDestructuring +DeprecateNameMismatchInShortDestructuringWithParentheses +EnableNameBasedDestructuringShortForm
+// LANGUAGE: -UnnamedLocalVariables, +NameBasedDestructuring +DeprecateNameMismatchInShortDestructuringWithParentheses +EnableNameBasedDestructuringShortForm
 
 fun writeTo(): Boolean = false
 
@@ -29,7 +28,7 @@ fun foo() {
 
     <!MUST_BE_INITIALIZED!>val <!UNSUPPORTED_FEATURE, VARIABLE_WITH_NO_TYPE_NO_INITIALIZER!>_<!><!>
     <!MUST_BE_INITIALIZED!>val <!UNSUPPORTED_FEATURE!>_<!>: Int<!>
-    val <!UNSUPPORTED_FEATURE!>_<!>: String = <!INITIALIZER_TYPE_MISMATCH!>1<!>
+    val <!UNSUPPORTED_FEATURE!>_<!>: String <!INITIALIZER_TYPE_MISMATCH!>=<!> 1
     val <!UNSUPPORTED_FEATURE!>_<!> = 1
     val <!UNSUPPORTED_FEATURE!>_<!>: Int = 1
 }

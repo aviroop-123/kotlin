@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +DefinitelyNonNullableTypes +ProhibitUsingNullableTypeParameterAgainstNotNullAnnotated
 
 // FILE: A.java
 import org.jetbrains.annotations.*;
@@ -18,7 +17,7 @@ interface B<T1> : A<T1> {
 }
 
 interface C<T2> : A<T2> {
-    <!NOTHING_TO_OVERRIDE!>override<!> fun foo(x: T2 & Any): T2 & Any
+    override fun foo(x: T2 & Any): T2 & Any
     <!NOTHING_TO_OVERRIDE!>override<!> fun bar(x: T2): T2
 }
 

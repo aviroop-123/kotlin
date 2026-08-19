@@ -7,11 +7,20 @@ package org.jetbrains.sir.lightclasses
 
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.builtins.StandardNames
+import org.jetbrains.kotlin.sir.SirDeclaration
+import org.jetbrains.kotlin.sir.SirEnum
 import org.jetbrains.kotlin.sir.SirFunction
+import org.jetbrains.kotlin.sir.SirProtocol
+import org.jetbrains.kotlin.sir.SirVariable
 import org.jetbrains.kotlin.sir.providers.SirDeclarationProvider
 import org.jetbrains.kotlin.sir.providers.SirSession
 import org.jetbrains.kotlin.sir.providers.SirTranslationResult
+import org.jetbrains.kotlin.sir.providers.getSirParent
 import org.jetbrains.kotlin.sir.providers.source.KotlinSource
+import org.jetbrains.kotlin.sir.providers.withSessions
+import org.jetbrains.kotlin.sir.util.isUnavailable
+import org.jetbrains.kotlin.sir.util.swiftIdentifier
+import org.jetbrains.kotlin.utils.addToStdlib.runIf
 import org.jetbrains.sir.lightclasses.nodes.*
 import org.jetbrains.sir.lightclasses.utils.SirOperatorTranslationStrategy
 
@@ -21,45 +30,72 @@ public class SirDeclarationFromKtSymbolProvider(
     public override fun KaDeclarationSymbol.toSir(): SirTranslationResult =
         when (val ktSymbol = this@toSir) {
             is KaNamedClassSymbol -> {
-                if (ktSymbol.classKind == KaClassKind.INTERFACE) {
-                    val protocol = SirProtocolFromKtSymbol(
-                        ktSymbol = ktSymbol,
-                        sirSession = sirSession,
-                    )
-                    SirTranslationResult.RegularInterface(
-                        declaration = protocol,
-                        bridgedImplementation = SirBridgedProtocolImplementationFromKtSymbol(protocol),
-                        markerDeclaration = protocol.existentialMarker,
-                        existentialExtension = SirExistentialProtocolImplementationFromKtSymbol(protocol),
-                        samConverter = protocol.samConverter,
-                    )
-                } else {
-                    createSirClassFromKtSymbol(
-                        ktSymbol = ktSymbol,
-                        sirSession = sirSession,
-                    ).let(SirTranslationResult::RegularClass)
+                when (ktSymbol.classKind) {
+                    KaClassKind.INTERFACE -> {
+                        val protocol = when {
+                            ktSymbol.classId in SirFlowFromKtSymbol.CLASS_IDS -> SirFlowFromKtSymbol(
+                                ktSymbol = ktSymbol,
+                                sirSession = sirSession,
+                            )
+                            else -> SirProtocolFromKtSymbol(
+                                ktSymbol = ktSymbol,
+                                sirSession = sirSession,
+                            )
+                        }
+                        SirTranslationResult.RegularInterface(
+                            declaration = protocol,
+                            bridgedImplementation = SirBridgedProtocolImplementationFromKtSymbol(protocol),
+                            markerDeclaration = protocol.existentialMarker,
+                            existentialExtension = protocol.existentialExtension,
+                            auxExtension = protocol.auxExtension,
+                            samConverter = protocol.samConverter,
+                        )
+                    }
+                    KaClassKind.ENUM_CLASS -> {
+                        createSirEnumFromKtSymbol(ktSymbol, sirSession).let(SirTranslationResult::Enum)
+                    }
+                    else -> {
+                        createSirClassFromKtSymbol(
+                            ktSymbol = ktSymbol,
+                            sirSession = sirSession,
+                        ).let(SirTranslationResult::RegularClass)
+                    }
                 }
             }
             is KaConstructorSymbol -> {
-                SirInitFromKtSymbol(
+                SirRegularInitFromKtSymbol(
                     ktSymbol = ktSymbol,
                     sirSession = sirSession,
                 ).let(SirTranslationResult::Constructor)
             }
             is KaNamedFunctionSymbol -> {
                 SirOperatorTranslationStrategy(ktSymbol)?.translate(sirSession)
-                    ?: SirFunctionFromKtSymbol(
+                    ?: runIf(sirSession.withSessions { ktSymbol.getSirParent() is SirEnum }) {
+                        if (ktSymbol.isStatic && ktSymbol.name == StandardNames.ENUM_VALUE_OF) {
+                            SirTranslationResult.Untranslatable(KotlinSource(ktSymbol))
+                        } else null
+                    } ?: SirFunctionFromKtSymbol(
                         ktSymbol = ktSymbol,
                         sirSession = sirSession,
-                    ).let(SirTranslationResult::RegularFunction)
+                    ).takeUnlessUnavailableInProtocol()?.takeUnlessNSObjectConflict()
+                        ?.let(SirTranslationResult::RegularFunction)
+                    ?: SirTranslationResult.Untranslatable(KotlinSource(ktSymbol))
+            }
+            is KaEnumEntrySymbol -> {
+                SirTranslationResult.EnumCase(createSirEnumCaseFromKtSymbol(ktSymbol, sirSession))
             }
             is KaVariableSymbol -> {
-                if (ktSymbol is KaPropertySymbol && ktSymbol.isExtension) {
-                    ktSymbol.getter?.toSirFunction(ktSymbol)?.let {
-                        SirTranslationResult.ExtensionProperty(it, ktSymbol.setter?.toSirFunction(ktSymbol))
-                    } ?: SirTranslationResult.Untranslatable(KotlinSource(ktSymbol))
+                if (ktSymbol is KaPropertySymbol && (ktSymbol.isExtension || ktSymbol.contextParameters.isNotEmpty())) {
+                    ktSymbol.getter?.toSirFunction(ktSymbol)
+                        ?.takeUnlessUnavailableInProtocol()?.takeUnlessNSObjectConflict()?.let { getter ->
+                            val setter = ktSymbol.setter?.toSirFunction(ktSymbol)
+                                ?.takeUnlessUnavailableInProtocol()?.takeUnlessNSObjectConflict()
+                            SirTranslationResult.ExtensionProperty(getter, setter)
+                        } ?: SirTranslationResult.Untranslatable(KotlinSource(ktSymbol))
                 } else {
-                    ktSymbol.toSirVariable().let(SirTranslationResult::RegularProperty)
+                    ktSymbol.toSirVariable()?.takeUnlessUnavailableInProtocol()?.takeUnlessNSObjectConflict()
+                        ?.let(SirTranslationResult::RegularProperty)
+                        ?: SirTranslationResult.Untranslatable(KotlinSource(ktSymbol))
                 }
             }
             is KaTypeAliasSymbol -> {
@@ -77,22 +113,41 @@ public class SirDeclarationFromKtSymbolProvider(
         sirSession = sirSession,
     )
 
-    private fun KaVariableSymbol.toSirVariable(): SirAbstractVariableFromKtSymbol = when (this) {
-        is KaEnumEntrySymbol -> SirEnumCaseFromKtSymbol(
-            ktSymbol = this,
-            sirSession = sirSession,
-        )
-        else ->
-            if (this is KaPropertySymbol
-                && isStatic
-                && name == StandardNames.ENUM_ENTRIES
-            ) {
-                SirEnumEntriesStaticPropertyFromKtSymbol(this, sirSession)
-            } else {
-                SirVariableFromKtSymbol(
-                    ktSymbol = this@toSirVariable,
-                    sirSession = sirSession,
-                )
+    private fun KaVariableSymbol.toSirVariable(): SirAbstractVariableFromKtSymbol? =
+        if (this is KaPropertySymbol
+            && isStatic
+            && name == StandardNames.ENUM_ENTRIES
+        ) {
+            null
+        } else {
+            SirVariableFromKtSymbol(
+                ktSymbol = this@toSirVariable,
+                sirSession = sirSession,
+            )
+        }
+
+    private fun <T : SirDeclaration> T.takeUnlessUnavailableInProtocol(): T? =
+        takeUnless { it.parent is SirProtocol && it.isUnavailable }
+
+    private val nsObjectReservedProperties = setOf(
+        "debugDescription", "description", "hash", "hashValue", "superclass",
+    )
+    private val nsObjectReservedFunctions = setOf(
+        "copy()", "doesNotRecognizeSelector(_:)", "finalize()", "forwardingTarget(for:)", "hash(into:)", "method(for:)", "mutableCopy()",
+        "release()",
+    )
+
+    private fun <T : SirDeclaration> T.takeUnlessNSObjectConflict(): T? = when (this) {
+        is SirFromKtSymbol<*> if ktSymbol.isTopLevel -> this
+        is SirVariable -> this.takeUnless { name in nsObjectReservedProperties }
+        is SirFunction -> {
+            // Being lazy here, just checking the basic signature instead of the complete one
+            val parameters = listOfNotNull(contextParameter, extensionReceiverParameter) + parameters
+            val signature = parameters.joinToString(prefix = "${name.swiftIdentifier.trim('`')}(", postfix = ")", separator = "") {
+                "${it.argumentName?.swiftIdentifier?.trim('`') ?: "_"}:"
             }
+            this.takeUnless { signature in nsObjectReservedFunctions }
+        }
+        else -> this
     }
 }

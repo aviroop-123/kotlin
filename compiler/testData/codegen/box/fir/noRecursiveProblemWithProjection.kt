@@ -1,4 +1,3 @@
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-6413
 
 class A<in T> {

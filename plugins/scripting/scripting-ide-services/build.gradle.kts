@@ -4,7 +4,6 @@ description = "Kotlin Scripting Compiler extension providing code completion and
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 project.updateJvmTarget("1.8")
@@ -19,6 +18,10 @@ dependencies {
     api(project(":kotlin-scripting-jvm"))
     compileOnly(project(":kotlin-scripting-compiler"))
     compileOnly(project(":compiler:cli"))
+    compileOnly(project(":core:descriptors"))
+    compileOnly(project(":compiler:container"))
+    compileOnly(project(":compiler:frontend"))
+    compileOnly(project(":compiler:resolution"))
     compileOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
     compileOnly(intellijCore())
     publishedRuntime(project(":kotlin-compiler"))
@@ -30,6 +33,8 @@ sourceSets {
     "main" { projectDefault() }
     "test" { }
 }
+
+optInToK1Deprecation()
 
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions.freeCompilerArgs.addAll(

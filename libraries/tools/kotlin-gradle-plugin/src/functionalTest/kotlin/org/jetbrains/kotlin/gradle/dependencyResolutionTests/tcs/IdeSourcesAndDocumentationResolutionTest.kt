@@ -8,7 +8,6 @@
 package org.jetbrains.kotlin.gradle.dependencyResolutionTests.tcs
 
 import org.jetbrains.kotlin.gradle.dependencyResolutionTests.configureRepositoriesForTests
-import org.jetbrains.kotlin.gradle.dependencyResolutionTests.mavenCentralCacheRedirector
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
 import org.jetbrains.kotlin.gradle.idea.tcs.IdeaKotlinResolvedBinaryDependency
 import org.jetbrains.kotlin.gradle.idea.tcs.extras.documentationClasspathKey
@@ -19,10 +18,7 @@ import org.jetbrains.kotlin.gradle.idea.testFixtures.tcs.binaryCoordinates
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.ide.dependencyResolvers.IdeNativeStdlibDependencyResolver
 import org.jetbrains.kotlin.gradle.plugin.ide.kotlinIdeMultiplatformImport
-import org.jetbrains.kotlin.gradle.util.applyMultiplatformPlugin
-import org.jetbrains.kotlin.gradle.util.buildProject
-import org.jetbrains.kotlin.gradle.util.enableDefaultStdlibDependency
-import org.jetbrains.kotlin.gradle.util.enableDependencyVerification
+import org.jetbrains.kotlin.gradle.util.*
 import kotlin.test.Test
 import kotlin.test.fail
 import kotlin.text.Regex.Companion.escape
@@ -32,6 +28,7 @@ class IdeSourcesAndDocumentationResolutionTest {
     @Test
     fun `test - MVIKotlin`() {
         val project = buildProject {
+            withTemporaryKotlinNativeHome()
             enableDefaultStdlibDependency(false)
             enableDependencyVerification(false)
             configureRepositoriesForTests()
@@ -42,7 +39,7 @@ class IdeSourcesAndDocumentationResolutionTest {
         kotlin.applyDefaultHierarchyTemplate()
         kotlin.jvm()
         kotlin.linuxX64()
-        kotlin.linuxArm64()
+        kotlin.iosArm64()
 
         val commonMain = kotlin.sourceSets.getByName("commonMain")
         val commonTest = kotlin.sourceSets.getByName("commonTest")

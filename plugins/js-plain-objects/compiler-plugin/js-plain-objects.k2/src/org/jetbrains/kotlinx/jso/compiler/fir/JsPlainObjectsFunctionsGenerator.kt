@@ -5,24 +5,29 @@
 
 package org.jetbrains.kotlinx.jspo.compiler.fir
 
+import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
+import org.jetbrains.kotlin.fakeElement
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.builder.FirAnnotationContainerBuilder
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.builder.buildRegularClass
-import org.jetbrains.kotlin.fir.declarations.builder.buildSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.builder.buildNamedFunction
 import org.jetbrains.kotlin.fir.declarations.builder.buildTypeParameterCopy
 import org.jetbrains.kotlin.fir.declarations.builder.buildValueParameter
 import org.jetbrains.kotlin.fir.declarations.impl.FirResolvedDeclarationStatusImpl
 import org.jetbrains.kotlin.fir.declarations.origin
 import org.jetbrains.kotlin.fir.declarations.utils.isCompanion
+import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.builder.buildAnnotation
+import org.jetbrains.kotlin.fir.expressions.builder.buildAnnotationArgumentMapping
+import org.jetbrains.kotlin.fir.expressions.builder.buildLiteralExpression
 import org.jetbrains.kotlin.fir.expressions.builder.buildPropertyAccessExpression
 import org.jetbrains.kotlin.fir.expressions.impl.FirEmptyAnnotationArgumentMapping
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
@@ -41,6 +46,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.impl.ConeTypeParameterTypeImpl
 import org.jetbrains.kotlin.name.*
+import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
 import org.jetbrains.kotlinx.jspo.compiler.fir.services.ClassProperty
@@ -143,6 +149,7 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
             name = classId.shortClassName
             symbol = FirRegularClassSymbol(classId)
             annotateWith(JsStandardClassIds.Annotations.JsExportIgnore)
+            source = owner.source?.fakeElement(KtFakeSourceElementKind.PluginGenerated.Default)
         }.symbol
     }
 
@@ -179,7 +186,7 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
         callableId: CallableId,
         parent: FirClassSymbol<*>,
         jsPlainObjectInterface: FirRegularClassSymbol,
-    ): FirSimpleFunction {
+    ): FirNamedFunction {
         return createJsPlainObjectsFunction(callableId, parent, jsPlainObjectInterface, isOperator = true) {
             runIf(resolvedTypeRef.coneType.isMarkedOrFlexiblyNullable) {
                 buildPropertyAccessExpression {
@@ -197,7 +204,7 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
         callableId: CallableId,
         parent: FirClassSymbol<*>,
         jsPlainObjectInterface: FirRegularClassSymbol,
-    ): FirSimpleFunction {
+    ): FirNamedFunction {
         return createJsPlainObjectsFunction(callableId, parent, jsPlainObjectInterface, includeJsPlainObjectInterfaceAsParameter = true) {
             buildPropertyAccessExpression {
                 calleeReference = buildResolvedNamedReference {
@@ -217,7 +224,7 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
         isOperator: Boolean = false,
         includeJsPlainObjectInterfaceAsParameter: Boolean = false,
         getParameterDefaultValueFromProperty: ClassProperty.() -> FirExpression?
-    ): FirSimpleFunction {
+    ): FirNamedFunction {
         var typeParameterSubstitutor: ConeSubstitutor? = null
         val jsPlainObjectProperties = session.jsPlainObjectPropertiesProvider.getJsPlainObjectsPropertiesForClass(jsPlainObjectInterface)
 
@@ -225,7 +232,7 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
         val jsPlainObjectInterfaceDefaultType = jsPlainObjectInterface.defaultType()
         val typeParameterSubstitutionMap = mutableMapOf<FirTypeParameterSymbol, ConeKotlinType>()
 
-        return buildSimpleFunction {
+        return buildNamedFunction {
             val functionalSymbol = FirNamedFunctionSymbol(callableId)
 
             moduleData = jsPlainObjectInterface.moduleData
@@ -233,6 +240,7 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
             origin = JsPlainObjectsPluginKey.origin
             symbol = functionalSymbol
             name = callableId.callableName
+            source = jsPlainObjectInterface.source?.fakeElement(KtFakeSourceElementKind.PluginGenerated.Default)
 
             status = FirResolvedDeclarationStatusImpl(
                 Visibilities.Public,
@@ -243,6 +251,7 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
                 isOverride = false
                 this.isOperator = isOperator
             }
+            isLocal = parent.isLocal
 
             annotateWith(JsStandardClassIds.Annotations.JsExportIgnore)
 
@@ -296,12 +305,14 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
                     isNoinline = true
                     isVararg = false
                     resolvePhase = FirResolvePhase.BODY_RESOLVE
-                    containingDeclarationSymbol = this@buildSimpleFunction.symbol
+                    containingDeclarationSymbol = this@buildNamedFunction.symbol
                 }
             }
 
             jsPlainObjectProperties.mapTo(valueParameters) {
                 val typeRef = it.resolvedTypeRef
+                val jsName = it.jsName
+
                 buildValueParameter {
                     moduleData = session.moduleData
                     origin = JsPlainObjectsPluginKey.origin
@@ -314,20 +325,37 @@ class JsPlainObjectsFunctionsGenerator(session: FirSession) : FirDeclarationGene
                     isNoinline = true
                     isVararg = false
                     resolvePhase = FirResolvePhase.BODY_RESOLVE
-                    containingDeclarationSymbol = this@buildSimpleFunction.symbol
+                    containingDeclarationSymbol = this@buildNamedFunction.symbol
                     defaultValue = it.getParameterDefaultValueFromProperty()
+                    source = it.source?.fakeElement(KtFakeSourceElementKind.PluginGenerated.Default)
+
+                    jsName?.let { name ->
+                        annotateWith(JsStandardClassIds.Annotations.JsName) {
+                            this[StandardNames.NAME] =
+                                buildLiteralExpression(null, ConstantValueKind.String, name, setType = true)
+                        }
+                    }
                 }
             }
         }.also(functionTarget::bind)
     }
 
-    private fun FirAnnotationContainerBuilder.annotateWith(classId: ClassId) {
+    private fun FirAnnotationContainerBuilder.annotateWith(
+        classId: ClassId,
+        fillArguments: (MutableMap<Name, FirExpression>.() -> Unit)? = null
+    ) {
         annotations += buildAnnotation {
             annotationTypeRef = buildResolvedTypeRef {
                 coneType = classId.toLookupTag()
                     .constructClassType(typeArguments = ConeTypeProjection.EMPTY_ARRAY, isMarkedNullable = false)
             }
-            argumentMapping = FirEmptyAnnotationArgumentMapping
+            argumentMapping = when (fillArguments) {
+                null -> FirEmptyAnnotationArgumentMapping
+                else -> buildAnnotationArgumentMapping {
+                    mapping.fillArguments()
+                }
+            }
+
         }
     }
 }

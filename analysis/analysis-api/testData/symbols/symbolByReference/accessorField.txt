@@ -9,8 +9,12 @@ KaBackingFieldSymbol:
   compilerVisibility: Private
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
+  isNotDefault: false
   isVal: false
   location: PROPERTY
   modality: FINAL
@@ -26,4 +30,5 @@ KaBackingFieldSymbol:
   getContainingFileSymbol: KaFileSymbol(accessorField.kt)
   getContainingJvmClassName: AccessorFieldKt
   getContainingModule: KaSourceModule "Sources of main"
-  deprecationStatus: DeprecationInfo(deprecationLevel=WARNING, propagatesToOverrides=false, message=null)
+  deprecationStatus: null
+  importableFqName: null

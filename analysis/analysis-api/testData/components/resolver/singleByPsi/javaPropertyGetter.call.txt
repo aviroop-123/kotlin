@@ -1,19 +1,19 @@
 KtNameReferenceExpression(76,79): 'foo'
-  KaSuccessCallInfo:
+  KaCallResolutionSuccess:
     call = KaSimpleVariableAccessCall:
-      partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
-        contextArguments = []
-        dispatchReceiver = KaExplicitReceiverValue:
-          expression = javaClass
-          isSafeNavigation = false
-          type = JavaClass
-        extensionReceiver = null
-        signature = KaVariableSignature:
-          name = foo
-          receiverType = null
-          returnType = kotlin.Int
-          symbol = val foo: kotlin.Int
-          contextParameters = []
-          callableId = /JavaClass.foo
-      simpleAccess = Read
+      contextArguments = []
+      dispatchReceiver = KaExplicitReceiverValue:
+        expression = javaClass
+        isSafeNavigation = false
+        type = JavaClass
+      extensionReceiver = null
+      isContextSensitive = false
+      kind = Read
+      signature = KaVariableSignature:
+        name = foo
+        receiverType = null
+        returnType = kotlin.Int
+        symbol = val foo: kotlin.Int
+        contextParameters = []
+        callableId = /JavaClass.foo
       typeArgumentsMapping = {}

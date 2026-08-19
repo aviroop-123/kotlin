@@ -9,7 +9,6 @@ import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
 import org.jetbrains.kotlin.backend.common.lower.irBlock
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
@@ -26,6 +25,8 @@ import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
 import org.jetbrains.kotlin.ir.util.transformInPlace
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
+import org.jetbrains.kotlin.config.AnalysisFlags
+import org.jetbrains.kotlin.config.languageVersionSettings
 
 /**
  * Moves evaluation of anonymous object super constructor arguments to call site. Specifically, transforms code like this:
@@ -54,7 +55,6 @@ import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
  *
  * (TODO fix the inliner instead. Then keep this code for one more version for backwards compatibility.)
  */
-@PhaseDescription(name = "AnonymousObjectSuperConstructor")
 internal class AnonymousObjectSuperConstructorLowering(val context: JvmBackendContext) : IrElementTransformerVoidWithContext(),
     FileLoweringPass {
     override fun lower(irFile: IrFile) {
@@ -62,8 +62,12 @@ internal class AnonymousObjectSuperConstructorLowering(val context: JvmBackendCo
     }
 
     override fun visitBlock(expression: IrBlock): IrExpression {
-        if (expression.origin != IrStatementOrigin.OBJECT_LITERAL)
+        if (
+            expression.origin != IrStatementOrigin.OBJECT_LITERAL ||
+            context.configuration.languageVersionSettings.getFlag(AnalysisFlags.headerMode)
+        ) {
             return super.visitBlock(expression)
+        }
 
         val objectConstructorCall = expression.statements.last() as? IrConstructorCall
             ?: throw AssertionError("object literal does not end in a constructor call")

@@ -1,0 +1,110 @@
+@Arrays(<collectionLiteralCall>(IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)), <collectionLiteralCall>(Long(1)), <collectionLiteralCall>(), <collectionLiteralCall>(Double(2.2)), <collectionLiteralCall>(Char(a)), <collectionLiteralCall>(Boolean(true), Boolean(false)))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithArrays
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithArrays
+
+@Arrays(intArrayOf#(IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)), longArrayOf#(Long(1)), floatArrayOf#(), doubleArrayOf#(Double(2.2)), charArrayOf#(Char(a)), booleanArrayOf#(Boolean(true), Boolean(false)))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithExplicitArrays
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithExplicitArrays
+
+@ClassLiteral(<getClass>(WithClassLiteral#), <getClass>(Boolean#))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithClassLiteral
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithClassLiteral
+
+@EnumLiteral(E1#, E#.E2#, e3 = test#.E#.E2#)
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithEnumLiteral
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithEnumLiteral
+
+@VarArg(IntegerLiteral(1))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.OneVararg
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.OneVararg
+
+@VarArg(IntegerLiteral(1), IntegerLiteral(2))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.TwoVararg
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.TwoVararg
+
+@VarArg(IntegerLiteral(1), IntegerLiteral(2), VarArg#.CONSTANT#)
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.ThreeVararg
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.ThreeVararg
+
+@VarArg(*<collectionLiteralCall>(IntegerLiteral(1), IntegerLiteral(2), VarArg#.CONSTANT#, IntegerLiteral(4)))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.SpreadVararg
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.SpreadVararg
+
+@Outer(String(value), nested = Nested#(IntegerLiteral(0), String(nested value)))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithNested
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithNested
+
+@Outer(String(value), foo#.Nested#(IntegerLiteral(1), String(nested value)))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithQualifiedNested
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithQualifiedNested
+
+@Simple(test#.Simple#.Companion#.CONST1#)
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Qualified
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Qualified
+
+@Simple(test#.Simple#.Companion#.CONST1#.plus#(Simple#.CONST2#))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Sum
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Sum
+
+@Simple(test#.Simple#.Companion#.CONST1#.unaryMinus#())
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Negative
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Negative
+
+@Simple(test#.Simple#.Companion#.CONST1#.unaryMinus#().unaryMinus#().unaryMinus#())
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Negative2
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Negative2
+
+@Simple(test#.Simple#.Companion#.CONST1#.unaryMinus#().unaryMinus#())
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Positive
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Positive
+
+@Simple(IntegerLiteral(12), Long(12), IntegerLiteral(12), Double(3.3), Float(3.3), Char(a), Boolean(true), Boolean(false))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithSimple
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithSimple
+
+@Simple(IntegerLiteral(12), Long(12), IntegerLiteral(12), d = Double(3.3), f = Float(3.3), c = Char(a), b1 = Boolean(true), b2 = Boolean(false))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithNamedSimple
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithNamedSimple
+
+@Simple(IntegerLiteral(12).div#(IntegerLiteral(6)), Long(12).rem#(Long(5)), IntegerLiteral(12), Double(3.3).minus#(Double(3.0)), Float(3.3).times#(Float(2.0)), Char(a), Boolean(true) && Boolean(false), Boolean(false) || Boolean(true))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithSimpleOperations
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithSimpleOperations
+
+@Simple(IntegerLiteral(12).toByte#())
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithConversionCall
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithConversionCall
+
+@ConversionCallConsumer(IntegerLiteral(12).toByte#())
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithResolvedConversionCall
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithResolvedConversionCall
+
+@StringLiteral(String(some), String(), <strcat>(String(H), CONSTANT#))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithStringLiteral
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithStringLiteral
+
+@StringLiteral(<strcat>(String(some), String(1)), String().plus#(CONSTANT#).plus#(String(2)), <strcat>(<strcat>(CONSTANT#), String(3)))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithStringLiteralConcat
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithStringLiteralConcat
+
+@StringLiteral(<strcat>(CONSTANT#), <strcat>(CONSTANT#), <strcat>(CONSTANT#))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithStringInterpolationPrefix
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithStringInterpolationPrefix
+
+@InvalidArguments(<strcat>(CONSTANT#, fun <implicit>.<anonymous>(): <implicit> <inline=Unknown>  {
+    ^ Unit
+}
+))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.LongStringTemplateEntryWithTwoExpressions
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.LongStringTemplateEntryWithTwoExpressions
+
+@Deprecated(String(Deprecated), ReplaceWith#(String(NewClass), String(foo.bar.baz.NewClass)), DeprecationLevel#.HIDDEN#)
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Another
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Another
+
+@Arrays(<collectionLiteralCall>(bar#?.{ $subj$.foo#(String(str)) }, baz#.bar#?.{ $subj$.doo# }, !=(IntegerLiteral(1), IntegerLiteral(2))))
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithIncorrectArguments
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.WithIncorrectArguments
+
+@kotlin.Deprecated(String(Deprecated), kotlin#.ReplaceWith#(String(NewClass), String(foo.bar.baz.NewClass)), level = kotlin#.DeprecationLevel#.HIDDEN#)
+owner -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Qualified
+context -> FirRegularClassSymbol AnnotationArgumentsRepl_repl.Qualified

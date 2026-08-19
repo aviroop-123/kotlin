@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // JSPECIFY_STATE: warn
 // DIAGNOSTICS: -UNUSED_PARAMETER
 
@@ -25,5 +24,5 @@ public class NullMarkedType {
 fun <T> accept(arg: T) {}
 
 fun test() {
-    accept<Any>(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>NullMarkedType.TargetType.INSTANCE().produce()<!>)
+    accept<Any>(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>NullMarkedType.TargetType.INSTANCE().produce()<!>)
 }

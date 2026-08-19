@@ -5,23 +5,21 @@
 
 package org.jetbrains.kotlin.konan.test.diagnostics
 
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.test.Constructor
+import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.firHandlersStep
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE
 import org.jetbrains.kotlin.test.frontend.classic.handlers.OldNewInferenceMetaInfoProcessor
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgConsistencyHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirCfgDumpHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirResolvedTypesVerifier
-import org.jetbrains.kotlin.test.frontend.fir.handlers.FirScopeDumpHandler
+import org.jetbrains.kotlin.test.frontend.fir.handlers.*
 import org.jetbrains.kotlin.test.model.FrontendFacade
 import org.jetbrains.kotlin.test.model.ResultingArtifact
 import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
-import org.jetbrains.kotlin.test.services.configuration.NativeEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.NativeFirstStageEnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.sourceProviders.AdditionalDiagnosticsSourceFilesProvider
 import org.jetbrains.kotlin.test.services.sourceProviders.CoroutineHelpersSourceFilesProvider
 
@@ -31,13 +29,17 @@ fun <R : ResultingArtifact.FrontendOutput<R>> TestConfigurationBuilder.baseNativ
     defaultDirectives {
         +JvmEnvironmentConfigurationDirectives.USE_PSI_CLASS_FILES_READING
         +ConfigurationDirectives.WITH_STDLIB
+        LANGUAGE with listOf(
+            "-${LanguageFeature.IrIntraModuleInlinerBeforeKlibSerialization.name}",
+            "-${LanguageFeature.IrCrossModuleInlinerBeforeKlibSerialization.name}",
+        )
     }
 
     enableMetaInfoHandler()
 
     useConfigurators(
         ::CommonEnvironmentConfigurator,
-        ::NativeEnvironmentConfigurator,
+        ::NativeFirstStageEnvironmentConfigurator,
     )
 
     useMetaInfoProcessors(::OldNewInferenceMetaInfoProcessor)
@@ -64,6 +66,8 @@ fun TestConfigurationBuilder.baseFirNativeDiagnosticTestConfiguration() {
             ::FirCfgConsistencyHandler,
             ::FirResolvedTypesVerifier,
             ::FirScopeDumpHandler,
+            ::NoFirCompilationErrorsHandler,
+            ::FirDistinctSourceElementsHandler,
         )
     }
 }

@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseCallsInPlaceEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -19,7 +18,7 @@ fun throwIfNotCalled() {
     myRun outer@ {
         unknownRun {
             myRun {
-                <!CAPTURED_VAL_INITIALIZATION!>x<!> = 42
+                x = 42
                 return@outer
             }
         }
@@ -36,7 +35,7 @@ fun catchThrowIfNotCalled() {
         myRun outer@ {
             unknownRun {
                 myRun {
-                    <!CAPTURED_VAL_INITIALIZATION!>x<!> = 42
+                    x = 42
                     return@outer
                 }
             }

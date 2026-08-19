@@ -97,9 +97,6 @@ abstract class KaptGenerateStubsTask @Inject constructor(
     override val scriptSources: FileCollection = objectFactory.fileCollection()
 
     @get:Internal
-    override val androidLayoutResources: FileCollection = objectFactory.fileCollection()
-
-    @get:Internal
     abstract val kotlinCompileDestinationDirectory: DirectoryProperty
 
     override val incrementalProps: List<FileCollection>
@@ -116,7 +113,6 @@ abstract class KaptGenerateStubsTask @Inject constructor(
 
             KotlinJvmCompilerOptionsHelper.fillCompilerArguments(compilerOptions, args)
 
-            overrideArgsUsingTaskModuleNameWithWarning(args)
             requireNotNull(args.moduleName)
 
             // Copied from KotlinCompile
@@ -138,7 +134,7 @@ abstract class KaptGenerateStubsTask @Inject constructor(
                 listOfNotNull(
                     pluginClasspath, kotlinPluginData?.orNull?.classpath
                 ).reduce(FileCollection::plus).toPathsArray()
-            }
+            } ?: emptyArray()
         }
 
         dependencyClasspath { args ->
@@ -146,7 +142,7 @@ abstract class KaptGenerateStubsTask @Inject constructor(
             args.friendPaths = friendPaths.toPathsArray()
         }
 
-        sources{ args ->
+        sources { args ->
             args.freeArgs += (scriptSources.asFileTree.files + javaSources.files + sources.asFileTree.files).map { it.absolutePath }
         }
     }

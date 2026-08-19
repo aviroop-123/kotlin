@@ -35,14 +35,10 @@ KtNameReferenceExpression(36,39): 'Foo'
   null
 
 KtNameReferenceExpression(40,43): 'Bar'
-  KaErrorCallInfo:
-    candidateCalls = []
-    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Bar'.>
+  null
 
 KtNameReferenceExpression(44,47): 'Baz'
-  KaErrorCallInfo:
-    candidateCalls = []
-    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Bar'.>
+  null
 
 KtNamedFunction(51,99): 'fun testFun() {'
   null
@@ -72,14 +68,10 @@ KtNameReferenceExpression(86,89): 'Foo'
   null
 
 KtNameReferenceExpression(90,93): 'Bar'
-  KaErrorCallInfo:
-    candidateCalls = []
-    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Bar'.>
+  null
 
 KtNameReferenceExpression(94,97): 'Baz'
-  KaErrorCallInfo:
-    candidateCalls = []
-    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Bar'.>
+  null
 
 KtNamedFunction(101,137): 'fun <T> take(action: (T) -> Unit) {}'
   null
@@ -133,86 +125,84 @@ KtProperty(139,190): 'val prop = take {'
   null
 
 KtCallExpression(150,190): 'take {'
-  KaErrorCallInfo:
+  KaCallResolutionError:
     candidateCalls = [
       KaSimpleFunctionCall:
-        argumentMapping = {
+        contextArgumentMapping = {}
+        contextArguments = []
+        dispatchReceiver = null
+        extensionReceiver = null
+        signature = KaFunctionSignature:
+          receiverType = null
+          returnType = kotlin.Unit
+          symbol = /take(action: (T) -> kotlin.Unit): kotlin.Unit
+          valueParameters = [
+            KaVariableSignature:
+              name = action
+              receiverType = null
+              returnType = (ERROR CLASS: Cannot infer argument for type parameter T) -> kotlin.Unit
+              symbol = action: (T) -> kotlin.Unit
+              contextParameters = []
+              callableId = null
+          ]
+          contextParameters = []
+          callableId = /take
+        typeArgumentsMapping = {
+          T -> (ERROR CLASS: Cannot infer argument for type parameter T)
+        }
+        valueArgumentMapping = {
           {
               lambdaParam: Foo.Bar.Baz ->
           } -> (KaVariableSignature:
             name = action
             receiverType = null
-            returnType = kotlin.Function1<ERROR CLASS: Cannot infer argument for type parameter T, kotlin.Unit>
-            symbol = action: kotlin.Function1<T, kotlin.Unit>
+            returnType = (ERROR CLASS: Cannot infer argument for type parameter T) -> kotlin.Unit
+            symbol = action: (T) -> kotlin.Unit
             contextParameters = []
             callableId = null)
         }
-        isImplicitInvoke = false
-        partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
-          contextArguments = []
-          dispatchReceiver = null
-          extensionReceiver = null
-          signature = KaFunctionSignature:
-            receiverType = null
-            returnType = kotlin.Unit
-            symbol = /take(action: kotlin.Function1<T, kotlin.Unit>): kotlin.Unit
-            valueParameters = [
-              KaVariableSignature:
-                name = action
-                receiverType = null
-                returnType = kotlin.Function1<ERROR CLASS: Cannot infer argument for type parameter T, kotlin.Unit>
-                symbol = action: kotlin.Function1<T, kotlin.Unit>
-                contextParameters = []
-                callableId = null
-            ]
-            contextParameters = []
-            callableId = /take
-        typeArgumentsMapping = {
-          T -> (ERROR CLASS: Cannot infer argument for type parameter T)
-        }
     ]
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'Function1<ERROR CLASS: Symbol not found for Foo.Bar.Baz, Unit>', but 'Function1<uninferred T (of fun <T> take), Unit>' was expected.>
+    diagnostic = ERROR<EXPECTED_PARAMETER_TYPE_MISMATCH: Parameter type mismatch: actual type is '??? (Unresolved qualified name: Foo.Bar.Baz)', but 'uninferred T (of fun <T> take)' was expected.>
 
 KtNameReferenceExpression(150,154): 'take'
-  KaErrorCallInfo:
+  KaCallResolutionError:
     candidateCalls = [
       KaSimpleFunctionCall:
-        argumentMapping = {
+        contextArgumentMapping = {}
+        contextArguments = []
+        dispatchReceiver = null
+        extensionReceiver = null
+        signature = KaFunctionSignature:
+          receiverType = null
+          returnType = kotlin.Unit
+          symbol = /take(action: (T) -> kotlin.Unit): kotlin.Unit
+          valueParameters = [
+            KaVariableSignature:
+              name = action
+              receiverType = null
+              returnType = (ERROR CLASS: Cannot infer argument for type parameter T) -> kotlin.Unit
+              symbol = action: (T) -> kotlin.Unit
+              contextParameters = []
+              callableId = null
+          ]
+          contextParameters = []
+          callableId = /take
+        typeArgumentsMapping = {
+          T -> (ERROR CLASS: Cannot infer argument for type parameter T)
+        }
+        valueArgumentMapping = {
           {
               lambdaParam: Foo.Bar.Baz ->
           } -> (KaVariableSignature:
             name = action
             receiverType = null
-            returnType = kotlin.Function1<ERROR CLASS: Cannot infer argument for type parameter T, kotlin.Unit>
-            symbol = action: kotlin.Function1<T, kotlin.Unit>
+            returnType = (ERROR CLASS: Cannot infer argument for type parameter T) -> kotlin.Unit
+            symbol = action: (T) -> kotlin.Unit
             contextParameters = []
             callableId = null)
         }
-        isImplicitInvoke = false
-        partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
-          contextArguments = []
-          dispatchReceiver = null
-          extensionReceiver = null
-          signature = KaFunctionSignature:
-            receiverType = null
-            returnType = kotlin.Unit
-            symbol = /take(action: kotlin.Function1<T, kotlin.Unit>): kotlin.Unit
-            valueParameters = [
-              KaVariableSignature:
-                name = action
-                receiverType = null
-                returnType = kotlin.Function1<ERROR CLASS: Cannot infer argument for type parameter T, kotlin.Unit>
-                symbol = action: kotlin.Function1<T, kotlin.Unit>
-                contextParameters = []
-                callableId = null
-            ]
-            contextParameters = []
-            callableId = /take
-        typeArgumentsMapping = {
-          T -> (ERROR CLASS: Cannot infer argument for type parameter T)
-        }
     ]
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'Function1<ERROR CLASS: Symbol not found for Foo.Bar.Baz, Unit>', but 'Function1<uninferred T (of fun <T> take), Unit>' was expected.>
+    diagnostic = ERROR<EXPECTED_PARAMETER_TYPE_MISMATCH: Parameter type mismatch: actual type is '??? (Unresolved qualified name: Foo.Bar.Baz)', but 'uninferred T (of fun <T> take)' was expected.>
 
 KtLambdaArgument(155,190): '{'
   null
@@ -245,14 +235,10 @@ KtNameReferenceExpression(174,177): 'Foo'
   null
 
 KtNameReferenceExpression(178,181): 'Bar'
-  KaErrorCallInfo:
-    candidateCalls = []
-    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+  null
 
 KtNameReferenceExpression(182,185): 'Baz'
-  KaErrorCallInfo:
-    candidateCalls = []
-    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+  null
 
 KtBlockExpression(189,189): ''
   null

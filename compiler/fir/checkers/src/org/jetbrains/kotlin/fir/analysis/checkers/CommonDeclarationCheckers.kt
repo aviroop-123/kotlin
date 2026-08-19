@@ -10,12 +10,17 @@ import org.jetbrains.kotlin.fir.analysis.cfa.FirCallsEffectAnalyzer
 import org.jetbrains.kotlin.fir.analysis.cfa.FirPropertyInitializationAnalyzer
 import org.jetbrains.kotlin.fir.analysis.checkers.cfa.FirControlFlowChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.*
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.crv.FirReturnValueAnnotationsChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.crv.FirReturnValueOverrideChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.crv.FirUnusedReturnValueChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.extra.FirUnusedExpressionChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.syntax.*
 
 object CommonDeclarationCheckers : DeclarationCheckers() {
     override val basicDeclarationCheckers: Set<FirBasicDeclarationChecker> = setOf(
         FirModifierChecker,
-        FirConflictsDeclarationChecker,
+        FirConflictsDeclarationChecker.Regular,
+        FirConflictsDeclarationChecker.ForExpectClass,
         FirTypeConstraintsChecker,
         FirReservedUnderscoreDeclarationChecker,
         FirExposedVisibilityDeclarationChecker,
@@ -33,8 +38,10 @@ object CommonDeclarationCheckers : DeclarationCheckers() {
         FirOptionalExpectationDeclarationChecker,
         FirMissingDependencySupertypeInDeclarationsChecker,
         FirContextParametersDeclarationChecker,
+        FirUnusedExpressionChecker,
         FirUnusedReturnValueChecker,
         FirReturnValueAnnotationsChecker,
+        FirIllegalCompanionBlockMemberChecker,
     )
 
     override val classLikeCheckers: Set<FirClassLikeChecker> = setOf(
@@ -49,6 +56,9 @@ object CommonDeclarationCheckers : DeclarationCheckers() {
         FirExtensionShadowedByMemberChecker.ForExpectDeclaration,
         FirReturnValueOverrideChecker,
         FirImplicitReturnTypeAnnotationMissingDependencyChecker,
+        FirCoroutineContextAsContextParameterDeclarationChecker,
+        FirCompanionExtensionChecker,
+        FirCompanionBlockMemberChecker,
     )
 
     override val functionCheckers: Set<FirFunctionChecker> = setOf(
@@ -61,13 +71,14 @@ object CommonDeclarationCheckers : DeclarationCheckers() {
         FirInfixFunctionDeclarationChecker,
         FirOperatorModifierChecker,
         FirTailrecFunctionChecker,
+        FirVersionOverloadsChecker,
     )
 
-    override val simpleFunctionCheckers: Set<FirSimpleFunctionChecker> = setOf(
+    override val namedFunctionCheckers: Set<FirNamedFunctionChecker> = setOf(
         FirFunctionNameChecker,
         FirFunctionTypeParametersSyntaxChecker,
         FirMemberFunctionsChecker,
-        FirInlineBodySimpleFunctionChecker,
+        FirInlineBodyNamedFunctionChecker,
         FirDataObjectContentChecker,
         ContractSyntaxV2FunctionChecker,
         FirAnyDeprecationChecker,
@@ -122,14 +133,17 @@ object CommonDeclarationCheckers : DeclarationCheckers() {
         FirMixedFunctionalTypesInSupertypesChecker.Regular,
         FirMixedFunctionalTypesInSupertypesChecker.ForExpectClass,
         FirDelegateFieldTypeMismatchChecker,
+        FirAnnotationClassInheritanceChecker,
         FirMultipleDefaultsInheritedFromSupertypesChecker.Regular,
         FirMultipleDefaultsInheritedFromSupertypesChecker.ForExpectClass,
         FirPropertyInitializationChecker,
+        FirCompanionBlockChecker,
     )
 
     override val regularClassCheckers: Set<FirRegularClassChecker> = setOf(
         FirAnnotationClassDeclarationChecker,
         FirOptInAnnotationClassChecker,
+        FirOperatorOfChecker,
         FirCommonConstructorDelegationIssuesChecker,
         FirDelegationSuperCallInEnumConstructorChecker,
         FirDelegationInExpectClassSyntaxChecker,
@@ -163,6 +177,7 @@ object CommonDeclarationCheckers : DeclarationCheckers() {
         FirImportsChecker,
         FirOptInImportsChecker,
         FirUnresolvedInMiddleOfImportChecker,
+        FirTooLargeFunctionImportChecker,
         FirTopLevelPropertiesChecker,
         FirPackageConflictsWithClassifierChecker,
         PlatformClassMappedToKotlinImportsChecker,

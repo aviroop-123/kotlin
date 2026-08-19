@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -17,7 +17,6 @@ import org.jetbrains.kotlin.ir.util.DumpIrTreeOptions
 import org.jetbrains.kotlin.ir.util.DumpIrTreeOptions.ReferenceRenderingStrategy
 import org.jetbrains.kotlin.ir.util.dumpTreesFromLineNumber
 import org.jetbrains.kotlin.ir.util.resolveFakeOverride
-import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.directives.KlibBasedCompilerTestDirectives
 import org.jetbrains.kotlin.test.directives.KlibBasedCompilerTestDirectives.SKIP_IR_DESERIALIZATION_CHECKS
@@ -191,7 +190,7 @@ class SerializedIrDumpHandler(
             replaceImplicitSetterParameterNameWith = DEFAULT_VALUE_PARAMETER,
 
             isHiddenDeclaration = { declaration ->
-                if (IrTextDumpHandler.isHiddenDeclaration(declaration, info.irPluginContext.irBuiltIns)) {
+                if (IrTextDumpHandler.isHiddenDeclaration(declaration, info.irBuiltIns)) {
                     /** Reuse the existing rules for filtering declarations as in IR text tests. */
                     true
                 } else if (
@@ -228,25 +227,6 @@ class SerializedIrDumpHandler(
              * which we don't care much.
              */
             printSourceOffsets = isFirFrontend,
-
-            /**
-             * A workaround for mismatched offsets in default value expressions in annotations of fake overrides,
-             * which is finally going to be fixed in KT-74938.
-             *
-             * Example:
-             * ```
-             * // Fir2LazyIr:
-             * FUN[138, 282] FAKE_OVERRIDE name:...
-             *   annotations:
-             *     Deprecated(message = "...", replaceWith = <null>, level = GET_ENUM[-1, -1] 'ENUM_ENTRY name:HIDDEN' type=kotlin.DeprecationLevel)
-             *
-             * // Deserialized IR:
-             * FUN[138, 282] FAKE_OVERRIDE name:...
-             *   annotations:
-             *     Deprecated(message = "...", replaceWith = <null>, level = GET_ENUM[1899, 1905] 'ENUM_ENTRY name:HIDDEN' type=kotlin.DeprecationLevel)
-             * ```
-             */
-            printAnnotationsInFakeOverrides = false,
 
             /**
              * It may happen that after running the IR inliner at the 1st phase of compilation, there are unbound symbols in

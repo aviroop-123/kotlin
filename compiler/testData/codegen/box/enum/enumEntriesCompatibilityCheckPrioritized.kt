@@ -1,5 +1,5 @@
-// LANGUAGE: +EnumEntries +PrioritizedEnumEntries
-// IGNORE_BACKEND_K1: ANY
+// LANGUAGE: +PrioritizedEnumEntries
+// IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE: ANY:1.9
 // FULL_JDK
 // WITH_STDLIB
 

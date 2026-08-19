@@ -577,6 +577,35 @@ class SirAsSwiftSourcesPrinterTests {
     }
 
     @Test
+    fun `should print simple enum with cases`() {
+        val module = buildModule {
+            name = "Test"
+            declarations.add(
+                buildEnum {
+                    origin = SirOrigin.Unknown
+                    name = "SimpleEnum"
+
+                    declarations.add(
+                        buildEnumCase {
+                            name = "FIRST"
+                        }
+                    )
+                    declarations.add(
+                        buildEnumCase {
+                            name = "LAST"
+                        }
+                    )
+                }
+            )
+        }
+
+        runTest(
+            module,
+            "testData/simple_enum_with_cases"
+        )
+    }
+
+    @Test
     fun `should print empty class inside class`() {
 
         val module = buildModule {
@@ -1166,14 +1195,14 @@ class SirAsSwiftSourcesPrinterTests {
         val clazz = buildClass {
             name = "OPEN_INTERNAL"
             origin = SirOrigin.Unknown
-            attributes += SirAttribute.Available(message = "Deprecated class", deprecated = true, obsoleted = false)
+            attributes += SirAttribute.Available(message = "Deprecated class", deprecated = true)
             declarations += buildFunction {
                 origin = SirOrigin.Unknown
                 visibility = SirVisibility.PUBLIC
                 name = "method"
                 returnType = SirNominalType(SirSwiftModule.bool)
                 documentation = "// Check that nested attributes handled properly"
-                attributes += SirAttribute.Available(message = "Deprecated method", deprecated = true, obsoleted = false)
+                attributes += SirAttribute.Available(message = "Deprecated method", deprecated = true)
             }
         }.attachDeclarations()
 
@@ -1186,7 +1215,7 @@ class SirAsSwiftSourcesPrinterTests {
                     visibility = SirVisibility.PUBLIC
                     name = "foo"
                     returnType = SirNominalType(SirSwiftModule.bool)
-                    attributes += SirAttribute.Available(message = "Oh no", deprecated = true, obsoleted = true)
+                    attributes += SirAttribute.Available(message = "Oh no", deprecated = true)
                 }
             }
             addChild {
@@ -1197,7 +1226,7 @@ class SirAsSwiftSourcesPrinterTests {
                     documentation = """
                             /// Example docstring
                         """.trimIndent()
-                    attributes += SirAttribute.Available(message = "Obsolete variable", deprecated = false, obsoleted = true)
+                    attributes += SirAttribute.Available(message = "Deprecated variable", deprecated = true)
                 }
             }
             addChild {
@@ -1416,6 +1445,253 @@ class SirAsSwiftSourcesPrinterTests {
         runTest(
             module,
             "testData/protocol_declarations"
+        )
+    }
+
+    @Test
+    fun `should print async callables`() {
+        val module = buildModule {
+            name = "Test"
+
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "asyncFunction"
+                    parameters.add(SirParameter(argumentName = "arg1", type = SirNominalType(SirSwiftModule.int32)))
+                    isAsync = true
+                    returnType = SirType.any
+                }
+            )
+
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "asyncFunctionEmptyArgs"
+                    isAsync = true
+                    returnType = SirType.void
+                }
+            )
+
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "throwingAsyncFunction"
+                    parameters.add(SirParameter(argumentName = "arg1", type = SirNominalType(SirSwiftModule.int32)))
+                    isAsync = true
+                    returnType = SirType.any
+                    errorType = SirType.any
+                }
+            )
+            declarations.add(
+                buildClass {
+                    origin = SirOrigin.Unknown
+                    name = "AsyncMethods"
+
+                    declarations.add(
+                        buildFunction {
+                            origin = SirOrigin.Unknown
+                            visibility = SirVisibility.PUBLIC
+                            name = "asyncMethodEmptyArgs"
+                            isAsync = true
+                            returnType = SirNominalType(SirSwiftModule.bool)
+                        }
+                    )
+
+                    declarations.add(
+                        buildFunction {
+                            origin = SirOrigin.Unknown
+                            visibility = SirVisibility.PUBLIC
+                            name = "asyncMethod"
+                            isAsync = true
+                            parameters.add(
+                                SirParameter(
+                                    argumentName = "value",
+                                    type = SirNominalType(SirSwiftModule.int32)
+                                )
+                            )
+                            returnType = SirType.void
+                        }
+                    )
+                }.attachDeclarations()
+            )
+
+            declarations.add(
+                buildVariable {
+                    origin = SirOrigin.Unknown
+                    name = "asyncProperty"
+                    type = SirNominalType(SirSwiftModule.int32)
+                    getter = buildGetter {
+                        isAsync = true
+                    }
+                }
+            )
+
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "functionWithAsyncClosure"
+                    parameters.add(
+                        SirParameter(
+                            argumentName = "asyncEmptyClosure",
+                            type = SirFunctionalType(
+                                parameterTypes = emptyList(),
+                                isAsync = true,
+                                returnType = SirType.void,
+                            )
+                        )
+                    )
+                    returnType = SirType.void
+                }
+            )
+
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "functionWithAsyncReturnClosure"
+                    parameters.add(
+                        SirParameter(
+                            argumentName = "asyncReturnClosure",
+                            type = SirFunctionalType(
+                                parameterTypes = listOf(SirNominalType(SirSwiftModule.int32)),
+                                isAsync = true,
+                                returnType = SirNominalType(SirSwiftModule.bool),
+                            )
+                        )
+                    )
+                    returnType = SirType.void
+                }
+            )
+
+            val asyncClosureTypealias = buildTypealias {
+                origin = SirOrigin.Unknown
+                name = "AsyncClosure"
+                type = SirFunctionalType(
+                    parameterTypes = emptyList(),
+                    isAsync = true,
+                    returnType = SirType.void,
+                    attributes = listOf(SirAttribute.Escaping)
+                )
+                attributes.add(SirAttribute.Escaping)
+            }
+            declarations.add(asyncClosureTypealias)
+
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "functionConsumingClosureConsumingClosure"
+                    parameters.add(
+                        SirParameter(
+                            argumentName = "asyncReturnClosure",
+                            type = SirFunctionalType(
+                                parameterTypes = listOf(
+                                    SirFunctionalType(
+                                        parameterTypes = listOf(SirNominalType(SirSwiftModule.int32)),
+                                        isAsync = true,
+                                        returnType = SirNominalType(SirSwiftModule.bool),
+                                        attributes = listOf(SirAttribute.Escaping)
+                                    )
+                                ),
+                                isAsync = true,
+                                returnType = SirNominalType(SirSwiftModule.bool),
+                                attributes = listOf(SirAttribute.Escaping)
+                            )
+                        )
+                    )
+                    parameters.add(
+                        SirParameter(
+                            argumentName = "typealiasedClosure",
+                            type = asyncClosureTypealias.nominalType(),
+                        )
+                    )
+                    returnType = SirFunctionalType(
+                        parameterTypes = listOf(
+                            SirFunctionalType(
+                                parameterTypes = listOf(SirNominalType(SirSwiftModule.int32)),
+                                isAsync = true,
+                                returnType = SirNominalType(SirSwiftModule.bool),
+                                attributes = listOf(SirAttribute.Escaping)
+                            )
+                        ),
+                        isAsync = true,
+                        returnType = SirNominalType(SirSwiftModule.bool),
+                        attributes = listOf(SirAttribute.Escaping)
+                    )
+                }
+            )
+        }.attachDeclarations()
+
+        runTest(
+            module,
+            "testData/async_callables"
+        )
+    }
+
+    @Test
+    fun `should print context parameter`() {
+        val module = buildModule {
+            name = "Test"
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "foo"
+                    contextParameter = SirParameter(
+                        parameterName = "context",
+                        type = SirNominalType(SirSwiftModule.int32)
+                    )
+                    parameters.add(
+                        SirParameter(
+                            parameterName = "arg",
+                            type = SirNominalType(SirSwiftModule.bool)
+                        )
+                    )
+                    returnType = SirType.void
+                }
+            )
+        }.attachDeclarations()
+
+        runTest(
+            module,
+            "testData/context_parameter"
+        )
+    }
+
+    @Test
+    fun `should print context parameter in functional type`() {
+        val module = buildModule {
+            name = "Test"
+            declarations.add(
+                buildFunction {
+                    origin = SirOrigin.Unknown
+                    visibility = SirVisibility.PUBLIC
+                    name = "foo"
+                    parameters.add(
+                        SirParameter(
+                            parameterName = "block",
+                            type = SirFunctionalType(
+                                contextTypes = listOf(
+                                    SirNominalType(SirSwiftModule.int32),
+                                    SirNominalType(SirSwiftModule.bool),
+                                ),
+                                parameterTypes = listOf(SirNominalType(SirSwiftModule.float)),
+                                returnType = SirType.void,
+                            )
+                        )
+                    )
+                    returnType = SirType.void
+                }
+            )
+        }.attachDeclarations()
+
+        runTest(
+            module,
+            "testData/context_parameter_functional_type"
         )
     }
 

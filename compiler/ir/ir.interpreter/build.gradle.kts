@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
@@ -8,6 +7,7 @@ dependencies {
     compileOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
 
     implementation(project(":core:compiler.common.js"))
+    implementation(project(":core:descriptors"))
     implementation(project(":compiler:ir.serialization.common"))
 
     compileOnly(intellijCore())
@@ -19,4 +19,3 @@ sourceSets {
     "main" { projectDefault() }
     "test" {}
 }
-

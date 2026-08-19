@@ -28,6 +28,7 @@ KaNamedClassSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: CLASS
       modality: FINAL
@@ -39,9 +40,11 @@ KaNamedClassSymbol:
       getContainingFileSymbol: null
       getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: null
   getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: kotlin.collections.Iterator

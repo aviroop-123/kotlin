@@ -29,8 +29,8 @@ Some handy links:
 
 Support for multiplatform programming is one of Kotlin’s key benefits. It reduces time spent writing and maintaining the same code for [different platforms](https://kotlinlang.org/docs/reference/mpp-supported-platforms.html) while retaining the flexibility and benefits of native programming.
 
- * [Kotlin Multiplatform Mobile](https://kotlinlang.org/lp/mobile/) for sharing code between Android and iOS
- * [Getting Started with Kotlin Multiplatform Mobile Guide](https://kotlinlang.org/docs/mobile/create-first-app.html)
+ * [Kotlin Multiplatform](https://www.jetbrains.com/kotlin-multiplatform/) and [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/) for sharing business logic and UI between Android, iOS, desktop, and web.
+ * [Get started with Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)
  * [Kotlin Multiplatform Benefits](https://kotlinlang.org/docs/reference/multiplatform.html)
  * [Share code on all platforms](https://kotlinlang.org/docs/reference/mpp-share-on-platforms.html#share-code-on-all-platforms)
  * [Share code on similar platforms](https://kotlinlang.org/docs/reference/mpp-share-on-platforms.html#share-code-on-similar-platforms)
@@ -44,7 +44,7 @@ Support for multiplatform programming is one of Kotlin’s key benefits. It redu
 ## Build environment requirements
 
 This repository is using [Gradle toolchains](https://docs.gradle.org/current/userguide/toolchains.html) feature
-to select and auto-provision required JDKs from [AdoptOpenJdk](https://adoptopenjdk.net) project.
+to select and auto-provision required JDKs from [Eclipse Adoptium](https://adoptium.net) project.
 
 Alternatively, it is still possible to only provide required JDKs via environment variables 
 (see [gradle.properties](./gradle.properties#L5) for supported variable names). To ensure Gradle uses only JDKs 
@@ -66,7 +66,7 @@ or the following command on Windows:
 
     gradlew <tasks-and-options>
 
-On the first project configuration gradle will download and setup the dependencies on
+On the first project configuration gradle will download and setup the dependencies on:
 
 * `intellij-core` is a part of command line compiler and contains only necessary APIs.
 * `idea-full` is a full blown IntelliJ IDEA Community Edition to be used in the plugin module.
@@ -100,8 +100,7 @@ It is recommended to use the latest released version of Intellij IDEA (Community
 
 After cloning the project, import the project in IntelliJ by choosing the project directory in the Open project dialog.
 
-For handy work with compiler tests it's recommended to use [
-Kotlin Compiler Test Helper](https://github.com/demiurg906/test-data-helper-plugin)
+For handy work with compiler tests it's recommended to use [Kotlin Compiler Test Helper](https://github.com/demiurg906/test-data-helper-plugin).
 
 ### Dependency verification
 
@@ -123,7 +122,7 @@ sed -i -e '/<components>/,/<\/components>/d' gradle/verification-metadata.xml
 - Re-generate dependencies with Gradle's `--write-verification-metadata` command (verify update relates to your changes)
 
 ```bash
-./gradlew --write-verification-metadata sha256,md5 -Pkotlin.native.enabled=true resolveDependencies
+./gradlew --write-verification-metadata sha256 -Pkotlin.native.enabled=true resolveDependencies
 ```
 
 *`resolveDependencies` task resolves dependencies for all platforms including dependencies downloaded by plugins.*

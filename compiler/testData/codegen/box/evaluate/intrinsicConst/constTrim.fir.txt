@@ -1,0 +1,137 @@
+FILE: constTrim.kt
+    public final fun <T> R|T|.id(): R|T| {
+        ^id this@R|/id|
+    }
+    public final const [EvaluatedValue=String(123)] val trim1: R|kotlin/String| = String(123).R|kotlin/text/trim|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(123
+    456)] val trim2: R|kotlin/String| = String( 123
+    456
+).R|kotlin/text/trim|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(123)] val trimStart1: R|kotlin/String| = String(123).R|kotlin/text/trimStart|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(123 456 )] val trimStart2: R|kotlin/String| = String( 123 456 ).R|kotlin/text/trimStart|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(123)] val trimEnd1: R|kotlin/String| = String(123).R|kotlin/text/trimEnd|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String( 123 456)] val trimEnd2: R|kotlin/String| = String( 123 456 ).R|kotlin/text/trimEnd|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(123)] val trimMargin1: R|kotlin/String| = String(123).R|kotlin/text/trimMargin|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(ABC
+123
+456)] val trimMargin2: R|kotlin/String| = String(ABC
+                |123
+                |456).R|kotlin/text/trimMargin|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(XYZ
+foo
+bar)] val trimMargin3: R|kotlin/String| = String(
+    #XYZ
+    #foo
+    #bar
+).R|kotlin/text/trimMargin|(String(#))
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(123)] val trimIndent1: R|kotlin/String| = String(123).R|kotlin/text/trimIndent|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String(ABC
+123
+456)] val trimIndent2: R|kotlin/String| = String(
+            ABC
+            123
+            456
+        ).R|kotlin/text/trimIndent|()
+        public get(): R|kotlin/String|
+    public final const [EvaluatedValue=String( apfelstrudel
+  apfelradl
+ krapfen)] val trimIndentMarginChain: R|kotlin/String| = String(
+	# apfelstrudel
+    #  apfelradl
+    # krapfen
+).R|kotlin/text/trimIndent|().R|kotlin/text/trimMargin|(String(#))
+        public get(): R|kotlin/String|
+    public final fun box(): R|kotlin/String| {
+        when () {
+            !=(R|/trim1|.R|/id|<R|kotlin/String|>(), String(123)) ->  {
+                ^box String(Fail trim1)
+            }
+        }
+
+        when () {
+            !=(R|/trim2|.R|/id|<R|kotlin/String|>(), String(123
+    456)) ->  {
+                ^box String(Fail trim2)
+            }
+        }
+
+        when () {
+            !=(R|/trimStart1|.R|/id|<R|kotlin/String|>(), String(123)) ->  {
+                ^box String(Fail trimStart1)
+            }
+        }
+
+        when () {
+            !=(R|/trimStart2|.R|/id|<R|kotlin/String|>(), String(123 456 )) ->  {
+                ^box String(Fail trimStart2)
+            }
+        }
+
+        when () {
+            !=(R|/trimEnd1|.R|/id|<R|kotlin/String|>(), String(123)) ->  {
+                ^box String(Fail trimEnd1)
+            }
+        }
+
+        when () {
+            !=(R|/trimEnd2|.R|/id|<R|kotlin/String|>(), String( 123 456)) ->  {
+                ^box String(Fail trimEnd2)
+            }
+        }
+
+        when () {
+            !=(R|/trimMargin1|.R|/id|<R|kotlin/String|>(), String(123)) ->  {
+                ^box String(Fail trimMargin1)
+            }
+        }
+
+        when () {
+            !=(R|/trimMargin2|.R|/id|<R|kotlin/String|>(), String(ABC
+123
+456)) ->  {
+                ^box String(Fail trimMargin2)
+            }
+        }
+
+        when () {
+            !=(R|/trimMargin3|.R|/id|<R|kotlin/String|>(), String(XYZ
+foo
+bar)) ->  {
+                ^box String(Fail trimMargin3)
+            }
+        }
+
+        when () {
+            !=(R|/trimIndent1|.R|/id|<R|kotlin/String|>(), String(123)) ->  {
+                ^box String(Fail trimIndent1)
+            }
+        }
+
+        when () {
+            !=(R|/trimIndent2|.R|/id|<R|kotlin/String|>(), String(ABC
+123
+456)) ->  {
+                ^box String(Fail trimIndent2)
+            }
+        }
+
+        when () {
+            !=(R|/trimIndentMarginChain|.R|/id|<R|kotlin/String|>(), String( apfelstrudel
+  apfelradl
+ krapfen)) ->  {
+                ^box String(Fail trimIndentMarginChain)
+            }
+        }
+
+        ^box String(OK)
+    }

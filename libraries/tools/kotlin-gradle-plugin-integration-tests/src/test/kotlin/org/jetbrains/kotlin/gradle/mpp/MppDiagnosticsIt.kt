@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.gradle.plugin.diagnostics.ToolingDiagnostic.Severity
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.ToolingDiagnosticFactory
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.gradle.uklibs.applyMultiplatform
+import org.jetbrains.kotlin.test.TestDataAssertions.assertEqualsToFile
 import org.jetbrains.kotlin.test.TestMetadata
 import org.junit.jupiter.api.DisplayName
 import java.io.File
@@ -69,22 +70,34 @@ class MppDiagnosticsIt : KGPBaseTest() {
         project("errorDiagnosticBuildFails", gradleVersion) {
             // 'assemble' (triggers compileKotlin-tasks indirectly): fail
             buildAndFail("assemble") {
-                assertEqualsToFile(expectedOutputFile("assemble"), extractProjectsAndTheirDiagnostics())
+                assertEqualsToFile(
+                    expectedOutputFile("assemble"),
+                    extractProjectsAndTheirDiagnostics()
+                )
             }
 
             // 'clean', not directly relevant to Kotlin tasks: build is OK
             build("clean") {
-                assertEqualsToFile(expectedOutputFile("clean"), extractProjectsAndTheirDiagnostics())
+                assertEqualsToFile(
+                    expectedOutputFile("clean"),
+                    extractProjectsAndTheirDiagnostics()
+                )
             }
 
             // Custom task, irrelevant to Kotlin tasks: build is OK
             build("myTask", "--rerun-tasks") {
-                assertEqualsToFile(expectedOutputFile("customTask"), extractProjectsAndTheirDiagnostics())
+                assertEqualsToFile(
+                    expectedOutputFile("customTask"),
+                    extractProjectsAndTheirDiagnostics()
+                )
             }
 
             // commonizer task: build is OK (otherwise IDE will be bricked)
             build("commonize") {
-                assertEqualsToFile(expectedOutputFile("commonize"), extractProjectsAndTheirDiagnostics())
+                assertEqualsToFile(
+                    expectedOutputFile("commonize"),
+                    extractProjectsAndTheirDiagnostics()
+                )
             }
         }
     }
@@ -95,13 +108,19 @@ class MppDiagnosticsIt : KGPBaseTest() {
         project("errorDiagnosticBuildFails", gradleVersion) {
             buildAndFail("assemble") {
                 assertConfigurationCacheStored()
-                assertEqualsToFile(expectedOutputFile("assemble"), extractProjectsAndTheirDiagnostics())
+                assertEqualsToFile(
+                    expectedOutputFile("assemble"),
+                    extractProjectsAndTheirDiagnostics()
+                )
             }
 
             // fails again
             buildAndFail("assemble") {
                 assertConfigurationCacheReused()
-                assertEqualsToFile(expectedOutputFile("assemble-cache-reused"), extractProjectsAndTheirDiagnostics())
+                assertEqualsToFile(
+                    expectedOutputFile("assemble-cache-reused"),
+                    extractProjectsAndTheirDiagnostics()
+                )
             }
         }
     }
@@ -134,7 +153,7 @@ class MppDiagnosticsIt : KGPBaseTest() {
             "kt64121",
             gradleVersion,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.disableIsolatedProjects(),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             build("assemble")
         }

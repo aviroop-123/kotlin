@@ -1,4 +1,3 @@
-// IGNORE_FE10
 
 // MODULE: anno
 // MODULE_KIND: LibraryBinary
@@ -48,5 +47,5 @@ public class Lib {
 package lib
 
 fun test(lib: Lib) {
-    lib.t<caret><caret_onAirContext>est(null)
+    lib.t<caret>est(null)
 }

@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("project-tests-convention")
     id("test-inputs-check")
     id("java-test-fixtures")
@@ -22,7 +21,6 @@ dependencies {
 
 sourceSets {
     "main" { }
-    "test" { generatedTestDir() }
     "testFixtures" { projectDefault() }
 }
 
@@ -36,7 +34,7 @@ projectTests {
 
     testTask(jUnitMode = JUnitMode.JUnit5)
 
-    testGenerator("org.jetbrains.kotlin.generators.tests.GenerateCompilerTestsAgainstKlibKt")
+    testGenerator("org.jetbrains.kotlin.generators.tests.GenerateCompilerTestsAgainstKlibKt", generateTestsInBuildDirectory = true)
 }
 
 optInToK1Deprecation()

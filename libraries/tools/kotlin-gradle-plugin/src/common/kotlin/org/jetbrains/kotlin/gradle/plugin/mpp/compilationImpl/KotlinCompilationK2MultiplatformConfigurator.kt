@@ -8,6 +8,8 @@ package org.jetbrains.kotlin.gradle.plugin.mpp.compilationImpl
 import org.gradle.api.Project
 import org.gradle.api.file.FileCollection
 import org.jetbrains.kotlin.commonizer.stdlib
+import org.jetbrains.kotlin.gradle.dsl.awaitMetadataTarget
+import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
 import org.jetbrains.kotlin.gradle.dsl.usesK2
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
@@ -16,11 +18,13 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinSharedNativeCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.compilationImpl.factory.KotlinCompilationImplFactory
 import org.jetbrains.kotlin.gradle.plugin.sources.android.androidSourceSetInfoOrNull
 import org.jetbrains.kotlin.gradle.plugin.sources.awaitPlatformCompilations
+import org.jetbrains.kotlin.gradle.plugin.sources.defaultImpl
+import org.jetbrains.kotlin.gradle.plugin.sources.getVisibleSourceSetsFromAssociateCompilations
 import org.jetbrains.kotlin.gradle.plugin.sources.internal
 import org.jetbrains.kotlin.gradle.plugin.sources.isSharedSourceSet
 import org.jetbrains.kotlin.gradle.targets.metadata.isNativeSourceSet
 import org.jetbrains.kotlin.gradle.targets.metadata.retrieveExternalDependencies
-import org.jetbrains.kotlin.gradle.targets.native.internal.retrievePlatformDependencies
+import org.jetbrains.kotlin.gradle.targets.native.internal.retrievePlatformDependenciesWithNativeDistribution
 import org.jetbrains.kotlin.gradle.tasks.K2MultiplatformCompilationTask
 import org.jetbrains.kotlin.gradle.tasks.K2MultiplatformStructure
 import org.jetbrains.kotlin.gradle.utils.Future
@@ -92,20 +96,21 @@ internal object KotlinCompilationK2MultiplatformConfigurator : KotlinCompilation
                 compilation.allKotlinSourceSets
                     .groupBy { it.fragmentName() }
                     .map { (fragmentName, sourceSets) ->
-                        val sourceFiles = sourceSets.map { it.kotlin.asFileTree }
+                        val sourceFiles = sourceSets.map { it.defaultImpl.allKotlin.asFileTree }
                             .reduce { acc, fileTree -> acc + fileTree }
                         K2MultiplatformStructure.Fragment(
-                            fragmentName,
-                            sourceFiles,
-                            if (project.kotlinPropertiesProvider.separateKmpCompilation.get()) {
+                            fragmentName = fragmentName,
+                            sources = sourceFiles,
+                            dependencies = if (project.kotlinPropertiesProvider.separateKmpCompilation.get()) {
                                 compilation.project.retrieveFragmentDependencies(
                                     sourceSets,
                                     fragmentName,
                                     mostCommonFragmentPerNativePlatforms
                                 )
-                            } else {
-                                project.files()
-                            }
+                            } else project.files(),
+                            friends = if (project.kotlinPropertiesProvider.separateKmpCompilation.get()) {
+                                project.files(sourceSets.map { compilation.project.retrieveFragmentFriends(it) })
+                            } else project.files(),
                         )
                     }
             })
@@ -137,7 +142,7 @@ internal object KotlinCompilationK2MultiplatformConfigurator : KotlinCompilation
                                 .filterIsInstance<AbstractKotlinNativeCompilation>()
                                 .map { compilation -> compilation.konanTarget.name }.toSet()
                             if (mostCommonFragmentPerNativePlatforms[nativePlatforms] == fragmentName) {
-                                add(metadataCompilation.retrievePlatformDependencies())
+                                add(metadataCompilation.retrievePlatformDependenciesWithNativeDistribution())
                             }
                         }
                     }
@@ -145,6 +150,32 @@ internal object KotlinCompilationK2MultiplatformConfigurator : KotlinCompilation
                     add(sourceSet.retrieveExternalDependencies(transitive = false))
                 }
             }
+        }.getOrThrow()
+    }
+
+    private fun Project.retrieveFragmentFriends(
+        sourceSet: KotlinSourceSet
+    ): FileCollection = filesProvider {
+        future {
+            val friendSourceSets = getVisibleSourceSetsFromAssociateCompilations(sourceSet)
+            val metadataTarget = multiplatformExtension.awaitMetadataTarget()
+            val relatedCompilationOutputs = friendSourceSets.mapNotNull { friendSourceSet ->
+                val platformCompilations = friendSourceSet.internal.awaitPlatformCompilations()
+                val compilation = if (platformCompilations.size > 1) {
+                    val metadataCompilation = metadataTarget.compilations.findByName(friendSourceSet.name)
+                    if (metadataCompilation == null) {
+                        logger.warn("Cannot find metadata compilation for friend source set: ${friendSourceSet.name}, but it was expected when calculating friend source sets for source set: ${sourceSet.name}")
+                        return@mapNotNull null
+                    }
+                    metadataCompilation
+                } else {
+                    platformCompilations.single()
+                }
+
+                compilation.output.classesDirs
+            }
+
+            relatedCompilationOutputs
         }.getOrThrow()
     }
 }

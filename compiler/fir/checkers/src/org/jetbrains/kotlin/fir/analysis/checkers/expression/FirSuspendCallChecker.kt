@@ -14,23 +14,18 @@ import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.isExplicit
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.analysis.getChild
-import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.InlineStatus
+import org.jetbrains.kotlin.fir.declarations.isRestrictSuspensionReceiver
 import org.jetbrains.kotlin.fir.declarations.utils.isInline
 import org.jetbrains.kotlin.fir.declarations.utils.isSuspend
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
-import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.isContextParameter
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirAnonymousFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
@@ -99,7 +94,7 @@ object FirSuspendCallChecker : FirQualifiedAccessExpressionChecker(MppCheckerKin
         } else if (reference.name == StandardClassIds.Callables.suspend.callableName) {
             when (expression.formOfSuspendModifierForLambdaOrFun()) {
                 SuspendCallArgumentKind.FUN -> {
-                    reporter.reportOn(expression.source, FirErrors.MODIFIER_FORM_FOR_NON_BUILT_IN_SUSPEND_FUN)
+                    reporter.reportOn(expression.source, FirErrors.MODIFIER_FORM_FOR_NON_BUILT_IN_SUSPEND_FUN_ERROR)
                 }
                 SuspendCallArgumentKind.LAMBDA -> {
                     reporter.reportOn(expression.source, FirErrors.MODIFIER_FORM_FOR_NON_BUILT_IN_SUSPEND)
@@ -173,7 +168,7 @@ object FirSuspendCallChecker : FirQualifiedAccessExpressionChecker(MppCheckerKin
             // If we found the nearest suspend function, we're finished.
             if (declaration == enclosingSuspendFunction) return true
             // Local variables are okay.
-            if (declaration is FirPropertySymbol && declaration.isLocal) continue
+            if (declaration is FirPropertySymbol && declaration is FirLocalPropertySymbol) continue
             // Inline lambdas are okay.
             if (declaration is FirAnonymousFunctionSymbol && declaration.inlineStatus.returnAllowed) continue
             // We already report UNSUPPORTED on suspend calls in value parameters default values, so they are okay for our purposes.
@@ -204,7 +199,7 @@ object FirSuspendCallChecker : FirQualifiedAccessExpressionChecker(MppCheckerKin
 
         val receiversInfo = expression.computeReceiversInfo(session, calledDeclarationSymbol)
         for (receiverExpression in receiversInfo.expressions) {
-            if (!receiverExpression.resolvedType.isRestrictSuspensionReceiver(session)) continue
+            if (!receiverExpression.resolvedType.isRestrictSuspensionReceiver()) continue
             if (sameInstanceOfReceiver(receiverExpression, enclosingSuspendFunctionDispatchReceiverOwnerSymbol)) continue
             if (sameInstanceOfReceiver(receiverExpression, enclosingSuspendFunctionExtensionReceiverSymbol)) continue
             if (enclosingSuspendFunctionContextParameterSymbols.any { sameInstanceOfReceiver(receiverExpression, it) }) continue
@@ -213,8 +208,8 @@ object FirSuspendCallChecker : FirQualifiedAccessExpressionChecker(MppCheckerKin
         }
 
         val restrictSuspensionSymbols: List<FirBasedSymbol<*>> =
-            listOfNotNull(enclosingSuspendFunctionExtensionReceiverSymbol?.takeIf { it.resolvedType.isRestrictSuspensionReceiver(session) }) +
-                    enclosingSuspendFunctionContextParameterSymbols.filter { it.resolvedReturnType.isRestrictSuspensionReceiver(session) }
+            listOfNotNull(enclosingSuspendFunctionExtensionReceiverSymbol?.takeIf { it.resolvedType.isRestrictSuspensionReceiver() }) +
+                    enclosingSuspendFunctionContextParameterSymbols.filter { it.resolvedReturnType.isRestrictSuspensionReceiver() }
 
         val chosenRestrictSuspensionSymbol = when (restrictSuspensionSymbols.size) {
             0 -> return true
@@ -228,7 +223,7 @@ object FirSuspendCallChecker : FirQualifiedAccessExpressionChecker(MppCheckerKin
 
         for (receiver in listOf(receiversInfo.extensionReceiver) + receiversInfo.contextParameters) {
             if (sameInstanceOfReceiver(receiver.expression, chosenRestrictSuspensionSymbol)) {
-                if (receiver.type?.isRestrictSuspensionReceiver(session) == true) {
+                if (receiver.type?.isRestrictSuspensionReceiver() == true) {
                     return true
                 }
             }
@@ -280,33 +275,18 @@ object FirSuspendCallChecker : FirQualifiedAccessExpressionChecker(MppCheckerKin
         return visualValueArgumentsCount != expression.arguments.count() - 1
     }
 
-    private fun ConeKotlinType.isRestrictSuspensionReceiver(session: FirSession): Boolean {
-        when (this) {
-            is ConeClassLikeType -> {
-                val regularClassSymbol = fullyExpandedType(session).lookupTag.toRegularClassSymbol(session) ?: return false
-                if (regularClassSymbol.hasAnnotationWithClassId(StandardClassIds.Annotations.RestrictsSuspension, session)) {
-                    return true
-                }
-                return regularClassSymbol.resolvedSuperTypes.any { it.isRestrictSuspensionReceiver(session) }
-            }
-            is ConeTypeParameterType -> {
-                return lookupTag.typeParameterSymbol.resolvedBounds.any { it.coneType.isRestrictSuspensionReceiver(session) }
-            }
-            else -> return false
-        }
-    }
-
     private fun sameInstanceOfReceiver(
         useSiteReceiverExpression: FirExpression?,
-        declarationSiteReceiverOwnerSymbol: FirBasedSymbol<*>?
-    ): Boolean = when {
-        declarationSiteReceiverOwnerSymbol == null || useSiteReceiverExpression == null -> false
-        useSiteReceiverExpression is FirThisReceiverExpression ->
-            useSiteReceiverExpression.calleeReference.boundSymbol == declarationSiteReceiverOwnerSymbol
-        useSiteReceiverExpression is FirPropertyAccessExpression ->
+        declarationSiteReceiverOwnerSymbol: FirBasedSymbol<*>?,
+    ): Boolean = when (val unwrappedReceiver = useSiteReceiverExpression?.unwrapSmartcastExpression()) {
+        null -> false
+        else if declarationSiteReceiverOwnerSymbol == null -> false
+        is FirThisReceiverExpression ->
+            unwrappedReceiver.calleeReference.boundSymbol == declarationSiteReceiverOwnerSymbol
+        is FirPropertyAccessExpression ->
             declarationSiteReceiverOwnerSymbol is FirValueParameterSymbol
                     && declarationSiteReceiverOwnerSymbol.isContextParameter()
-                    && useSiteReceiverExpression.toResolvedCallableSymbol() == declarationSiteReceiverOwnerSymbol
+                    && unwrappedReceiver.toResolvedCallableSymbol() == declarationSiteReceiverOwnerSymbol
         else -> false
     }
 

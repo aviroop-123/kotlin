@@ -1,5 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +EnumEntries +PrioritizedEnumEntries -ForbidEnumEntryNamedEntries
+// LANGUAGE: +PrioritizedEnumEntries -ForbidEnumEntryNamedEntries
 // WITH_STDLIB
 // FIR_DUMP
 
@@ -28,10 +28,10 @@ public enum JEnumField {
 // FILE: test.kt
 
 fun test(): String {
-    val first = JEnumEntry.entries
+    val first = JEnumEntry.<!OVERLOAD_RESOLUTION_AMBIGUITY!>entries<!>
     val second = JEnumStaticField.entries
 
-    val third = JEnumField::<!DEPRECATED_ACCESS_TO_ENUM_ENTRY_PROPERTY_AS_REFERENCE!>entries<!>
+    val third = JEnumField::entries
 
     return "$first$second$third"
 }

@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.gradle.uklibs
 
+import kotlinx.serialization.SerialName
 import org.gradle.api.Project
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.initialization.ConfigurableIncludedBuild
@@ -26,6 +27,7 @@ import java.io.Serializable
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.util.*
+import kotlin.text.set
 
 fun Project.applyMultiplatform(
     configure: KotlinMultiplatformExtension.() -> Unit,
@@ -62,6 +64,7 @@ data class PublishedProject(
         val jar: File get() = path.resolve("${artifactsPrefix}.jar")
         val psmJar: File get() = path.resolve("${artifactsPrefix}-psm.jar")
         val gradleMetadata: File get() = path.resolve("${artifactsPrefix}.module")
+        val swiftPmMetadata: File get() = path.resolve("${artifactsPrefix}-swiftpm-metadata.json")
     }
 
     val rootCoordinate: String = "$group:$name:$version"
@@ -102,7 +105,7 @@ fun TestProject.publishReturn(
     repositoryIdentifier: String,
 ): ReturnFromBuildScriptAfterExecution<PublishedProject> {
     buildScriptInjection {
-        if (project.hasProperty(repositoryIdentifier)) {
+        if (project.providers.gradleProperty(repositoryIdentifier).isPresent) {
             project.setupMavenPublication(repositoryIdentifier, publisherConfiguration)
         }
     }
@@ -230,8 +233,14 @@ fun TestProject.addPublishedProjectToRepositories(
 fun TestProject.include(
     subproject: TestProject,
     name: String,
+    useSymlink: Boolean = true,
 ) {
-    Files.createSymbolicLink(projectPath.resolve(name), subproject.projectPath)
+    val targetPath = projectPath.resolve(name)
+    if (useSymlink) {
+        Files.createSymbolicLink(targetPath, subproject.projectPath)
+    } else {
+        subproject.projectPath.toFile().copyRecursively(targetPath.toFile())
+    }
     settingsBuildScriptInjection {
         settings.include(":${name}")
     }
@@ -250,7 +259,12 @@ fun TestProject.includeBuild(
     }
 }
 
-fun TestProject.dumpKlibMetadataSignatures(klib: File): String {
+
+fun TestProject.dumpKlibMetadata(klib: File) = dumpKlib(klib, "dump-metadata")
+
+fun TestProject.dumpKlibMetadataSignatures(klib: File) = dumpKlib(klib, "dump-metadata-signatures")
+
+private fun TestProject.dumpKlib(klib: File, dumpMethod: String): String {
     val dumpName = "dump_${UUID.randomUUID().toString().replace("-", "_")}"
     val outputFile = projectPath.resolve(dumpName).toFile()
     outputFile.createNewFile()
@@ -280,7 +294,7 @@ fun TestProject.dumpKlibMetadataSignatures(klib: File): String {
                             PrintStream(it),
                             System.err,
                             arrayOf(
-                                "dump-metadata-signatures", klib.path,
+                                dumpMethod, klib.path,
                                 "-test-mode", "true",
                             )
                         ) as Int
@@ -319,9 +333,41 @@ internal fun Project.setUklibResolutionStrategy(strategy: KmpResolutionStrategy 
     )
 }
 
+internal fun Project.enableCinteropCommonization() {
+    propertiesExtension.set(
+        PropertiesProvider.PropertyNames.KOTLIN_MPP_ENABLE_CINTEROP_COMMONIZATION,
+        true,
+    )
+}
+
 fun Project.computeTransformedLibraryChecksum(enable: Boolean = false) {
     propertiesExtension.set(
         PropertiesProvider.PropertyNames.KOTLIN_MPP_COMPUTE_TRANSFORMED_LIBRARY_CHECKSUM,
         enable.toString(),
     )
 }
+
+@kotlinx.serialization.Serializable
+data class GradleMetadata(
+    val variants: Set<Variant>,
+)
+
+@kotlinx.serialization.Serializable
+data class Variant(
+    val name: String,
+    val attributes: Map<String, String>,
+    @SerialName("available-at")
+    val availableAt: ComponentPointer? = null,
+    val files: List<VariantFile> = emptyList(),
+)
+
+@kotlinx.serialization.Serializable
+data class ComponentPointer(
+    val url: String,
+)
+
+@kotlinx.serialization.Serializable
+data class VariantFile(
+    val name: String,
+    val url: String,
+)

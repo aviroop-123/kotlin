@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.resolve.calls.mpp
 
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.mpp.*
+import org.jetbrains.kotlin.resolve.calls.mpp.AbstractExpectActualChecker.sizesAreEqualAndElementsNotEqualBy
 import org.jetbrains.kotlin.resolve.multiplatform.ExpectActualMatchingCompatibility
 import org.jetbrains.kotlin.types.model.KotlinTypeMarker
 import org.jetbrains.kotlin.types.model.TypeSubstitutorMarker
@@ -106,7 +107,7 @@ object AbstractExpectActualMatcher {
 
         val matched = ArrayList<DeclarationSymbolMarker>()
         val mismatched = HashMap<ExpectActualMatchingCompatibility.Mismatch, MutableList<DeclarationSymbolMarker>>()
-        for ((actualMember, compatibility) in mapping) {
+        for ([actualMember, compatibility] in mapping) {
             when (compatibility) {
                 ExpectActualMatchingCompatibility.MatchedSuccessfully -> {
                     onMatchedMembers(expectMember, actualMember, expectClassSymbol, actualClassSymbol)
@@ -203,6 +204,14 @@ object AbstractExpectActualMatcher {
 
         if (!areCompatibleTypeParameterUpperBounds(expectedTypeParameters, actualTypeParameters, substitutor)) {
             return ExpectActualMatchingCompatibility.FunctionTypeParameterUpperBounds
+        }
+
+        if (
+            actualDeclaration.shouldMatchByParameterNames &&
+            expectDeclaration.shouldMatchByParameterNames &&
+            sizesAreEqualAndElementsNotEqualBy(expectedValueParameters, actualValueParameters) { nameOf(it) }
+        ) {
+            return ExpectActualMatchingCompatibility.ParameterNames
         }
 
         return ExpectActualMatchingCompatibility.MatchedSuccessfully

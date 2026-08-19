@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinModuleD
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.baseContextModule
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.llFirModuleData
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionCache
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCache
 import org.jetbrains.kotlin.fir.declarations.FirClass
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.SealedClassInheritorsProvider
@@ -47,7 +47,7 @@ internal class LLSealedInheritorsProvider(private val project: Project) : Sealed
         val classId = firClass.classId
 
         // Local classes cannot be sealed.
-        if (classId.isLocal) {
+        if (firClass.isLocal) {
             return emptyList()
         }
 
@@ -73,7 +73,7 @@ internal class LLSealedInheritorsProvider(private val project: Project) : Sealed
      *    See KT-65591.
      */
     private fun searchInheritors(firClass: FirClass): List<ClassId> {
-        val (targetModule, targetFirClass) = when (val classModule = firClass.llFirModuleData.ktModule) {
+        val [targetModule, targetFirClass] = when (val classModule = firClass.llFirModuleData.ktModule) {
             is KaDanglingFileModule -> {
                 // Since we are searching for inheritors in the context module's scope, we need to search for inheritors of the *original*
                 // FIR class, not the dangling FIR class.

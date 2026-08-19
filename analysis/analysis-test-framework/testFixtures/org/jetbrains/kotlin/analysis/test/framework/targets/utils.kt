@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.combinedDeclaredMemberScope
 import org.jetbrains.kotlin.analysis.api.components.combinedMemberScope
 import org.jetbrains.kotlin.analysis.api.components.containingDeclaration
+import org.jetbrains.kotlin.analysis.api.impl.base.symbols.findSyntheticJavaPropertyAccessor
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.name.CallableId
@@ -22,6 +23,19 @@ internal fun findMatchingCallableSymbols(callableId: CallableId, classSymbol: Ka
     if (declaredSymbols.isNotEmpty()) {
         return declaredSymbols
     }
+
+    // For Java getter/setter methods that are synthesized as Kotlin properties,
+    // look up the synthetic property and return the corresponding accessor's underlying function.
+    classSymbol.combinedDeclaredMemberScope
+        .findSyntheticJavaPropertyAccessor(callableId.callableName) { propertySymbol, accessorKind, _ ->
+            val javaMethodSymbol = accessorKind.getJavaAccessorSymbol(propertySymbol)
+            if (javaMethodSymbol?.name == callableId.callableName) {
+                javaMethodSymbol
+            } else {
+                null
+            }
+        }
+        ?.let { return listOf(it) }
 
     // Fake overrides are absent in the declared member scope.
     return classSymbol.combinedMemberScope

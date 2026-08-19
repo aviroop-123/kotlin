@@ -1,3 +1,0 @@
-KtNameReferenceExpression(66,75): 'TestClass'
-  KtSimpleNameReference:
-    Nothing (Unresolved reference)

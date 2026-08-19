@@ -1,3 +1,0 @@
-KtNameReferenceExpression(43,47): 'this'
-  KtSimpleNameReference:
-    (in Foo) fun kotlin.String.foo()

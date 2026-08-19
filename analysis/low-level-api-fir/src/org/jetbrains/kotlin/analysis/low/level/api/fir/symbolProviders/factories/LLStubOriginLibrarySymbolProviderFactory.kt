@@ -48,11 +48,11 @@ internal object LLStubOriginLibrarySymbolProviderFactory : LLLibrarySymbolProvid
                     scope,
                 )
             )
-            add(LLFirJavaSymbolProvider(session, scope))
+            add(LLFirJavaSymbolProvider(session, firJavaFacade, scope))
         }
     }
 
-    override fun createCommonLibrarySymbolProvider(
+    override fun createMetadataLibrarySymbolProvider(
         session: LLFirSession,
         packagePartProvider: PackagePartProvider,
         scope: GlobalSearchScope,

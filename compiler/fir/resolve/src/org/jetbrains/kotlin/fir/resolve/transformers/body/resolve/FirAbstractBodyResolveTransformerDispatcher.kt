@@ -39,7 +39,7 @@ abstract class FirAbstractBodyResolveTransformerDispatcher(
     open val buildCfgForFiles: Boolean get() = !implicitTypeOnly
 
     final override val context: BodyResolveContext =
-        outerBodyResolveContext ?: BodyResolveContext(returnTypeCalculator, DataFlowAnalyzerContext(session))
+        outerBodyResolveContext ?: BodyResolveContext(returnTypeCalculator, DataFlowAnalyzerContext(session), isContextCollectorMode = false)
     final override val components: BodyResolveTransformerComponents =
         BodyResolveTransformerComponents(session, scopeSession, this, context, expandTypeAliases)
 
@@ -424,13 +424,13 @@ abstract class FirAbstractBodyResolveTransformerDispatcher(
         FirExpressionsResolveTransformer::transformCheckedSafeCallSubject,
     )
 
-    override fun transformArrayLiteral(
-        arrayLiteral: FirArrayLiteral,
+    override fun transformCollectionLiteral(
+        collectionLiteral: FirCollectionLiteral,
         data: ResolutionMode,
     ): FirStatement = expressionTransformation(
-        arrayLiteral,
+        collectionLiteral,
         data,
-        FirExpressionsResolveTransformer::transformArrayLiteral,
+        FirExpressionsResolveTransformer::transformCollectionLiteral,
     )
 
     override fun transformSmartCastExpression(
@@ -570,13 +570,13 @@ abstract class FirAbstractBodyResolveTransformerDispatcher(
         FirExpressionsResolveTransformer::transformAnonymousObjectExpression,
     )
 
-    override fun transformSimpleFunction(
-        simpleFunction: FirSimpleFunction,
+    override fun transformNamedFunction(
+        namedFunction: FirNamedFunction,
         data: ResolutionMode,
-    ): FirSimpleFunction = declarationTransformation(
-        simpleFunction,
+    ): FirNamedFunction = declarationTransformation(
+        namedFunction,
         data,
-        FirDeclarationsResolveTransformer::transformSimpleFunction,
+        FirDeclarationsResolveTransformer::transformNamedFunction,
     )
 
     override fun transformFunction(
@@ -758,6 +758,42 @@ abstract class FirAbstractBodyResolveTransformerDispatcher(
         elvisExpression,
         data,
         FirControlFlowStatementsResolveTransformer::transformElvisExpression,
+    )
+
+    override fun transformReplDeclarationReference(
+        replDeclarationReference: FirReplDeclarationReference,
+        data: ResolutionMode,
+    ): FirStatement = expressionTransformation(
+        replDeclarationReference,
+        data,
+        FirExpressionsResolveTransformer::transformReplDeclarationReference,
+    )
+
+    override fun transformReplExpressionReference(
+        replExpressionReference: FirReplExpressionReference,
+        data: ResolutionMode,
+    ): FirStatement = expressionTransformation(
+        replExpressionReference,
+        data,
+        FirExpressionsResolveTransformer::transformReplExpressionReference,
+    )
+
+    override fun transformReplPropertyInitializer(
+        replPropertyInitializer: FirReplPropertyInitializer,
+        data: ResolutionMode,
+    ): FirStatement = expressionTransformation(
+        replPropertyInitializer,
+        data,
+        FirExpressionsResolveTransformer::transformReplPropertyInitializer,
+    )
+
+    override fun transformReplPropertyDelegate(
+        replPropertyDelegate: FirReplPropertyDelegate,
+        data: ResolutionMode,
+    ): FirStatement = expressionTransformation(
+        replPropertyDelegate,
+        data,
+        FirExpressionsResolveTransformer::transformReplPropertyDelegate,
     )
 
     // --------------------------------------------------------------------------

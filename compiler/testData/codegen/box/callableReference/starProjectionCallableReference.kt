@@ -1,6 +1,7 @@
 // WITH_STDLIB
-// IGNORE_BACKEND_K1: WASM
 // ISSUE: KT-70625
+// IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE: NATIVE,Wasm-JS:1.9,2.0
+// ^^^ KT-70625 Fixed in 2.1.0-Beta1
 // DUMP_IR
 
 fun <T> mutate(x: MutableList<T>): MutableList<T> {

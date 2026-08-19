@@ -36,6 +36,7 @@ import java.io.IOException
  * @throws IOException in case of input/output error.
  * @throws IllegalArgumentException if [prefix] is shorter than three symbols.
  */
+@DeprecatedSinceKotlin(warningSince = "1.4", errorSince = "2.3")
 @Deprecated(
     "Avoid creating temporary directories in the default temp location with this function " +
     "due to too wide permissions on the newly created directory. " +
@@ -76,6 +77,7 @@ public fun createTempDir(prefix: String = "tmp", suffix: String? = null, directo
  * @throws IOException in case of input/output error.
  * @throws IllegalArgumentException if [prefix] is shorter than three symbols.
  */
+@DeprecatedSinceKotlin(warningSince = "1.4", errorSince = "2.3")
 @Deprecated(
     "Avoid creating temporary files in the default temp location with this function " +
     "due to too wide permissions on the newly created file. " +
@@ -286,6 +288,7 @@ private class TerminateException(file: File) : FileSystemException(file) {}
  * @param overwrite `true` if it is allowed to overwrite existing destination files and directories.
  * @return `false` if the copying was terminated, `true` otherwise.
  */
+@IgnorableReturnValue
 public fun File.copyRecursively(
     target: File,
     overwrite: Boolean = false,
@@ -345,6 +348,7 @@ public fun File.copyRecursively(
  *
  * @return `true` if the file or directory is successfully deleted, `false` otherwise.
  */
+@IgnorableReturnValue
 public fun File.deleteRecursively(): Boolean = walkBottomUp().fold(true, { res, it -> (it.delete() || !it.exists()) && res })
 
 /**

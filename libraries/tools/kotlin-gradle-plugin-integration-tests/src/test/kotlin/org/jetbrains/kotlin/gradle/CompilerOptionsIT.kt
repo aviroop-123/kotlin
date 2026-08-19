@@ -7,21 +7,18 @@ package org.jetbrains.kotlin.gradle
 
 import org.gradle.api.logging.LogLevel
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.cli.common.arguments.K2NativeCompilerArguments
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import org.jetbrains.kotlin.cli.common.arguments.*
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.gradle.util.parseCompilerArguments
 import org.jetbrains.kotlin.gradle.util.parseCompilerArgumentsFromBuildOutput
-import org.jetbrains.kotlin.gradle.utils.named
+import org.jetbrains.kotlin.testFederation.SmokeTest
 import org.junit.jupiter.api.DisplayName
 import kotlin.io.path.appendText
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
+@SmokeTest
 internal class CompilerOptionsIT : KGPBaseTest() {
-    private val firstNonDeprecatedKotlinVersion = KotlinVersion.firstNonDeprecated
-    private val latestStableKotlinVersion = KotlinVersion.DEFAULT
 
     // In Gradle 7.3-8.0 'kotlin-dsl' plugin tries to set up freeCompilerArgs in doFirst task action
     // Related issue: https://github.com/gradle/gradle/issues/22091
@@ -123,7 +120,10 @@ internal class CompilerOptionsIT : KGPBaseTest() {
             )
 
             build("assemble") {
-                assertOutputContainsExactlyTimes("-P plugin:blah-blah:", 3)
+                assertOutputContainsAny(
+                    "-P plugin:blah-blah:blah-blah1=1 -P plugin:blah-blah:blah-blah2=1 -P plugin:blah-blah:blah-blah3=1",
+                    "-P plugin:blah-blah:blah-blah1=1,plugin:blah-blah:blah-blah2=1,plugin:blah-blah:blah-blah3=1"
+                )
             }
         }
     }
@@ -136,7 +136,7 @@ internal class CompilerOptionsIT : KGPBaseTest() {
             "new-mpp-lib-with-tests",
             gradleVersion,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             buildGradle.appendText(
                 //language=Gradle
@@ -166,75 +166,15 @@ internal class CompilerOptionsIT : KGPBaseTest() {
                 // we do not allow modifying free args for K/N at execution time
             )
             build(*compileTasks.toTypedArray()) {
-                assertOutputContainsExactlyTimes("-P plugin:blah-blah:", 3 * compileTasks.size) // 3 times per task
-            }
-        }
-    }
-
-    @DisplayName("Should pass -opt-in from compiler options DSL")
-    @JvmGradlePluginTests
-    @GradleTest
-    fun passesOptInAnnotation(gradleVersion: GradleVersion) {
-        project(
-            projectName = "simpleProject",
-            gradleVersion = gradleVersion,
-        ) {
-            buildGradle.appendText(
-                """
-                |
-                |tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
-                |    compilerOptions.optIn.addAll("kotlin.RequiresOptIn", "my.CustomOptIn")
-                |}
-                """.trimMargin()
-            )
-
-            build("compileKotlin") {
-                val expectedOptIn = "-opt-in kotlin.RequiresOptIn,my.CustomOptIn"
-                assertCompilerArgument(":compileKotlin", expectedOptIn, logLevel = LogLevel.INFO)
-            }
-        }
-    }
-
-    @DisplayName("Should combine -opt-in arguments from languageSettings DSL")
-    @MppGradlePluginTests
-    @GradleTest
-    fun combinesOptInFromLanguageSettings(gradleVersion: GradleVersion) {
-        project(
-            projectName = "new-mpp-lib-and-app/sample-lib",
-            gradleVersion = gradleVersion,
-            // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
-        ) {
-            if (gradleVersion < GradleVersion.version(TestVersions.Gradle.G_8_0)) {
-                buildScriptInjection {
-                    kotlinMultiplatform.jvmToolchain(17)
+                if (output.contains("-P plugin:blah-blah:blah-blah1=1,plugin:blah-blah:blah-blah2=1,plugin:blah-blah:blah-blah3=1")) {
+                    // output from BTA * 3
+                    assertOutputContainsExactlyTimes(
+                        "-P plugin:blah-blah:blah-blah1=1,plugin:blah-blah:blah-blah2=1,plugin:blah-blah:blah-blah3=1",
+                        compileTasks.size
+                    )
+                } else {
+                    assertOutputContainsExactlyTimes("-P plugin:blah-blah:", 3 * compileTasks.size) // 3 times per task
                 }
-            }
-            buildGradle.appendText(
-                //language=Groovy
-                """
-                |
-                |kotlin {
-                |    sourceSets {
-                |        jvm6Main {
-                |            languageSettings.optIn("my.custom.OptInAnnotation")
-                |        }
-                |    }
-                |}
-                |
-                |tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask.class).configureEach {
-                |    compilerOptions.optIn.add("another.custom.UnderOptIn")
-                |}
-                """.trimMargin()
-            )
-
-            build("compileKotlinJvm6") {
-                assertTasksExecuted(":compileKotlinJvm6")
-                assertCompilerArgument(
-                    ":compileKotlinJvm6",
-                    "-opt-in my.custom.OptInAnnotation,another.custom.UnderOptIn",
-                    logLevel = LogLevel.INFO
-                )
             }
         }
     }
@@ -247,7 +187,7 @@ internal class CompilerOptionsIT : KGPBaseTest() {
             projectName = "new-mpp-lib-and-app/sample-lib",
             gradleVersion = gradleVersion,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             buildGradle.appendText(
                 //language=Groovy
@@ -279,6 +219,7 @@ internal class CompilerOptionsIT : KGPBaseTest() {
             build("compileNativeMainKotlinMetadata") {
                 assertTasksExecuted(":compileNativeMainKotlinMetadata")
                 val taskOutput = getOutputForTask(":compileNativeMainKotlinMetadata", logLevel = LogLevel.INFO)
+                @Suppress("DEPRECATION")
                 val arguments = parseCompilerArgumentsFromBuildOutput(K2NativeCompilerArguments::class, taskOutput)
                 assertEquals(
                     setOf("another.custom.UnderOptIn", "my.custom.OptInAnnotation"), arguments.optIn?.toSet(),
@@ -289,6 +230,7 @@ internal class CompilerOptionsIT : KGPBaseTest() {
             build("compileKotlinLinux64") {
                 assertTasksExecuted(":compileKotlinLinux64")
                 val taskOutput = getOutputForTask(":compileKotlinLinux64", logLevel = LogLevel.INFO)
+                @Suppress("DEPRECATION")
                 val arguments = parseCompilerArgumentsFromBuildOutput(K2NativeCompilerArguments::class, taskOutput)
                 assertEquals(
                     setOf("another.custom.UnderOptIn", "my.custom.OptInAnnotation"), arguments.optIn?.toSet(),
@@ -317,6 +259,7 @@ internal class CompilerOptionsIT : KGPBaseTest() {
 
             build("compileKotlinHost") {
                 val expectedOptIn = listOf("kotlin.RequiresOptIn", "my.CustomOptIn")
+                @Suppress("DEPRECATION")
                 val arguments = parseCompilerArguments<K2NativeCompilerArguments>()
                 if (arguments.optIn?.toList() != listOf("kotlin.RequiresOptIn", "my.CustomOptIn")) {
                     fail(
@@ -365,32 +308,6 @@ internal class CompilerOptionsIT : KGPBaseTest() {
         }
     }
 
-    @DisplayName("Should pass -progressive from languageSettings if compiler options DSL is not configured")
-    @JvmGradlePluginTests
-    @GradleTest
-    fun passesProgressiveFromLanguageSettings(gradleVersion: GradleVersion) {
-        project(
-            projectName = "simpleProject",
-            gradleVersion = gradleVersion,
-        ) {
-            buildGradle.appendText(
-                //language=Groovy
-                """
-                |
-                |kotlin.sourceSets.all {
-                |    languageSettings {
-                |        progressiveMode = true
-                |    }
-                |}
-                """.trimMargin()
-            )
-
-            build("compileKotlin") {
-                assertCompilerArgument(":compileKotlin", "-progressive", logLevel = LogLevel.INFO)
-            }
-        }
-    }
-
     @DisplayName("Should pass -progressive from compiler options DSL in native project")
     @NativeGradlePluginTests
     @GradleTest
@@ -433,7 +350,7 @@ internal class CompilerOptionsIT : KGPBaseTest() {
             projectName = "new-mpp-lib-and-app/sample-lib",
             gradleVersion = gradleVersion,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             buildGradle.appendText(
                 //language=Groovy
@@ -478,7 +395,7 @@ internal class CompilerOptionsIT : KGPBaseTest() {
             projectName = "new-mpp-lib-and-app/sample-lib",
             gradleVersion = gradleVersion,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             buildGradle.append("base.archivesName.set(\"myNativeLib\")")
 
@@ -500,92 +417,4 @@ internal class CompilerOptionsIT : KGPBaseTest() {
         }
     }
 
-    @GradleTest
-    @DisplayName("Syncs languageSettings changes to the related compiler options")
-    @MppGradlePluginTests
-    fun syncLanguageSettingsToCompilerOptions(gradleVersion: GradleVersion) {
-        val firstNonDeprecatedVersion = firstNonDeprecatedKotlinVersion.version
-        val latestStableVersion = latestStableKotlinVersion.version
-        project("mpp-default-hierarchy", gradleVersion) {
-            buildScriptInjection {
-                kotlinMultiplatform.sourceSets.configureEach { sourceSet ->
-                    sourceSet.languageSettings.apiVersion = firstNonDeprecatedVersion
-                    sourceSet.languageSettings.languageVersion = latestStableVersion
-                }
-                project.tasks.register("printCompilerOptions") { task ->
-                    val taskName = project.property("kotlinTaskToCheck") as String
-                    task.dependsOn(taskName)
-                    val compilerOptionsProvider = project.tasks.named<KotlinCompilationTask<*>>(taskName).map { it.compilerOptions }
-                    task.doLast {
-                        it.logger.warn("###AV:${compilerOptionsProvider.get().apiVersion.getOrNull()}")
-                        it.logger.warn("###LV:${compilerOptionsProvider.get().languageVersion.getOrNull()}")
-                    }
-                }
-            }
-
-            listOf(
-                "compileCommonMainKotlinMetadata",
-                "compileKotlinJvm",
-                "compileNativeMainKotlinMetadata",
-                "compileLinuxMainKotlinMetadata",
-                "compileAppleMainKotlinMetadata",
-                "compileIosMainKotlinMetadata",
-                "compileKotlinLinuxX64",
-                "compileKotlinLinuxArm64",
-                "compileKotlinIosX64",
-                "compileKotlinIosArm64"
-            ).forEach { task ->
-                build("printCompilerOptions", "-PkotlinTaskToCheck=$task") {
-                    assertOutputContains("###AV:${firstNonDeprecatedKotlinVersion.name}")
-                    assertOutputContains("###LV:${latestStableKotlinVersion.name}")
-                }
-            }
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    @GradleTest
-    @DisplayName("Syncs compiler option changes to the related language settings")
-    @MppGradlePluginTests
-    fun syncCompilerOptionsToLanguageSettings(gradleVersion: GradleVersion) {
-        val firstNonDeprecatedVersion = firstNonDeprecatedKotlinVersion
-        val latestStableVersion = latestStableKotlinVersion
-        project("mpp-default-hierarchy", gradleVersion) {
-            buildScriptInjection {
-                project.tasks.withType(KotlinCompilationTask::class.java).all { task ->
-                    task.compilerOptions.apiVersion.set(firstNonDeprecatedVersion)
-                    task.compilerOptions.languageVersion.set(latestStableVersion)
-                }
-                project.tasks.register("printLanguageSettingsOptions") { task ->
-                    val languageSettingsProvider = project.provider {
-                        val sourceSetName = project.property("kotlinSourceSet") as String
-                        kotlinMultiplatform.sourceSets.getByName(sourceSetName).languageSettings
-                    }
-                    task.doLast {
-                        it.logger.warn("")
-                        it.logger.warn("###AV:${languageSettingsProvider.get().apiVersion}")
-                        it.logger.warn("###LV:${languageSettingsProvider.get().languageVersion}")
-                    }
-                }
-            }
-
-            listOf(
-                "commonMain",
-                "jvmMain",
-                "nativeMain",
-                "linuxMain",
-                "appleMain",
-                "iosMain",
-                "linuxX64Main",
-                "linuxArm64Main",
-                "iosX64Main",
-                "iosArm64Main",
-            ).forEach { sourceSet ->
-                build("printLanguageSettingsOptions", "-PkotlinSourceSet=${sourceSet}") {
-                    assertOutputContains("###AV:${firstNonDeprecatedKotlinVersion.version}")
-                    assertOutputContains("###LV:${latestStableKotlinVersion.version}")
-                }
-            }
-        }
-    }
 }

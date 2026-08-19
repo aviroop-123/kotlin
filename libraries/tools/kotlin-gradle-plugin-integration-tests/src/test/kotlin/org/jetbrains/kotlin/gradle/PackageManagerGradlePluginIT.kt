@@ -14,18 +14,16 @@ import org.jetbrains.kotlin.gradle.targets.js.npm.LockCopyTask.Companion.PACKAGE
 import org.jetbrains.kotlin.gradle.targets.js.npm.LockCopyTask.Companion.RESTORE_PACKAGE_LOCK_BASE_NAME
 import org.jetbrains.kotlin.gradle.targets.js.npm.LockCopyTask.Companion.STORE_PACKAGE_LOCK_BASE_NAME
 import org.jetbrains.kotlin.gradle.targets.js.npm.LockCopyTask.Companion.UPGRADE_PACKAGE_LOCK_BASE_NAME
-import org.jetbrains.kotlin.gradle.targets.js.npm.LockCopyTask.Companion.YARN_LOCK
 import org.jetbrains.kotlin.gradle.targets.js.npm.fromSrcPackageJson
 import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnPlugin
-import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
 import org.jetbrains.kotlin.gradle.testbase.*
+import org.jetbrains.kotlin.test.TestMetadata
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.condition.OS
 import kotlin.io.path.deleteRecursively
 import kotlin.io.path.notExists
 import kotlin.io.path.readText
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class NpmGradlePluginIT : PackageManagerGradlePluginIT() {
     override val yarn: Boolean = false
@@ -196,9 +194,7 @@ abstract class PackageManagerGradlePluginIT : KGPBaseTest() {
             jsOptions = super.defaultBuildOptions.jsOptions?.copy(
                 yarn = yarn
             ),
-            // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED,
-        )
+        ).disableIsolatedProjectsBecauseOfJsAndWasmKT75899()
 
     @DisplayName("js composite build works with lock file persistence")
     @GradleTest
@@ -222,15 +218,15 @@ abstract class PackageManagerGradlePluginIT : KGPBaseTest() {
         storeTask: String,
     ) {
         build(upgradeTask) {
-            assertTasksExecuted(":base:publicPackageJson")
-            assertTasksExecuted(":lib:lib-2:publicPackageJson")
+            assertTasksExecuted(":base:jsPublicPackageJson")
+            assertTasksExecuted(":lib:lib-2:jsPublicPackageJson")
             assertTasksExecuted(":kotlinNpmInstall")
             assertTasksExecuted(":$upgradeTask")
         }
 
-        build(":nodeTest") {
-            assertTasksUpToDate(":base:publicPackageJson")
-            assertTasksUpToDate(":lib:lib-2:publicPackageJson")
+        build(":jsNodeTest") {
+            assertTasksUpToDate(":base:jsPublicPackageJson")
+            assertTasksUpToDate(":lib:lib-2:jsPublicPackageJson")
             assertTasksUpToDate(":kotlinNpmInstall")
             assertTasksExecuted(":$storeTask")
         }
@@ -293,8 +289,14 @@ abstract class PackageManagerGradlePluginIT : KGPBaseTest() {
         buildGradleKts.modify {
             it + "\n" +
                     """
-                        dependencies {
-                            implementation(npm("decamelize", "6.0.0"))
+                        kotlin {
+                            sourceSets {
+                                jsMain {
+                                    dependencies {
+                                        implementation(npm("decamelize", "6.0.0"))
+                                    }
+                                }
+                            }
                         }
                             
                         rootProject.plugins.withType(org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin::class.java) {
@@ -352,8 +354,14 @@ abstract class PackageManagerGradlePluginIT : KGPBaseTest() {
         buildGradleKts.modify {
             it + "\n" +
                     """
-                        dependencies {
-                            implementation(npm("decamelize", "6.0.0"))
+                        kotlin {
+                            sourceSets {
+                                jsMain {
+                                    dependencies {
+                                        implementation(npm("decamelize", "6.0.0"))
+                                    }
+                                }
+                            }
                         }
                             
                         rootProject.plugins.withType(org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin::class.java) {
@@ -412,8 +420,14 @@ abstract class PackageManagerGradlePluginIT : KGPBaseTest() {
         buildGradleKts.modify {
             it + "\n" +
                     """
-                        dependencies {
-                            implementation(npm("decamelize", "6.0.0"))
+                        kotlin {
+                            sourceSets {
+                                jsMain {
+                                    dependencies {
+                                        implementation(npm("decamelize", "6.0.0"))
+                                    }
+                                }
+                            }
                         }
                             
                         rootProject.plugins.withType(org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin::class.java) {
@@ -520,8 +534,14 @@ abstract class PackageManagerGradlePluginIT : KGPBaseTest() {
         buildGradleKts.modify {
             it + "\n" +
                     """
-                        dependencies {
-                            implementation(npm("puppeteer", "11.0.0"))
+                        kotlin {
+                            sourceSets {
+                                jsMain {
+                                    dependencies {
+                                        implementation(npm("puppeteer", "11.0.0"))
+                                    }
+                                }
+                            }
                         }
                         """.trimIndent()
         }
@@ -610,6 +630,55 @@ abstract class PackageManagerGradlePluginIT : KGPBaseTest() {
                 assertTasksUpToDate(":rootPackageJson")
                 assertTasksExecuted(":kotlinNpmInstall")
                 assertRootPackageJsonVersion("foo")
+            }
+        }
+    }
+
+    @DisplayName("Ensure that gradle offline mode passes --offline argument to npm executable")
+    @GradleTest
+    @JsGradlePluginTests
+    fun testOfflineFlag(gradleVersion: GradleVersion) {
+        project("js-only-npm", gradleVersion, enableOfflineMode = true) {
+            buildScriptInjection {
+                this.project.tasks.named("kotlinNpmInstall") {
+                    val buildDir = this.project.layout.buildDirectory
+
+                    it.doFirst {
+                        val npmCache = buildDir.dir("npm-cache").get().asFile.also {
+                            it.mkdirs()
+                        }
+                        buildDir.file("js/.npmrc").get().asFile.writeText(
+                            """
+                                cache=${npmCache.invariantSeparatorsPath}
+                            """.trimIndent()
+                        )
+                        buildDir.file("js/.yarnrc").get().asFile.writeText(
+                            """
+                                cache-folder "${npmCache.invariantSeparatorsPath}"
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            // populate Gradle cache
+            build("kotlinNpmInstall", enableOfflineMode = false) {
+                assertTasksExecuted(":kotlinNpmInstall")
+            }
+
+            // clean everything including NPM cache
+            build("clean")
+
+            buildAndFail("kotlinNpmInstall") {
+                assertTasksFailed(":kotlinNpmInstall")
+            }
+
+            build("kotlinNpmInstall", "--rerun", enableOfflineMode = false) {
+                assertTasksExecuted(":kotlinNpmInstall")
+            }
+
+            build("kotlinNpmInstall", "--rerun") {
+                assertTasksExecuted(":kotlinNpmInstall")
             }
         }
     }

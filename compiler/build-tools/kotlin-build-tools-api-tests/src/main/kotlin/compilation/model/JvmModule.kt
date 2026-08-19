@@ -3,43 +3,42 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.buildtools.api.tests.compilation.model
+package org.jetbrains.kotlin.buildtools.tests.compilation.model
 
-import org.jetbrains.kotlin.buildtools.api.CompilationResult
-import org.jetbrains.kotlin.buildtools.api.ExecutionPolicy
-import org.jetbrains.kotlin.buildtools.api.KotlinToolchain
-import org.jetbrains.kotlin.buildtools.api.SourcesChanges
+import org.jetbrains.kotlin.buildtools.api.*
+import org.jetbrains.kotlin.buildtools.api.BaseIncrementalCompilationConfiguration.Companion.FORCE_RECOMPILATION
+import org.jetbrains.kotlin.buildtools.api.BaseIncrementalCompilationConfiguration.Companion.MODULE_BUILD_DIR
+import org.jetbrains.kotlin.buildtools.api.BaseIncrementalCompilationConfiguration.Companion.ROOT_PROJECT_DIR
 import org.jetbrains.kotlin.buildtools.api.arguments.JvmCompilerArguments.Companion.CLASSPATH
 import org.jetbrains.kotlin.buildtools.api.arguments.JvmCompilerArguments.Companion.MODULE_NAME
 import org.jetbrains.kotlin.buildtools.api.arguments.JvmCompilerArguments.Companion.NO_REFLECT
 import org.jetbrains.kotlin.buildtools.api.arguments.JvmCompilerArguments.Companion.NO_STDLIB
-import org.jetbrains.kotlin.buildtools.api.jvm.AccessibleClassSnapshot
+import org.jetbrains.kotlin.buildtools.api.jvm.JvmPlatformToolchain.Companion.jvm
 import org.jetbrains.kotlin.buildtools.api.jvm.JvmSnapshotBasedIncrementalCompilationConfiguration
-import org.jetbrains.kotlin.buildtools.api.jvm.JvmSnapshotBasedIncrementalCompilationOptions
-import org.jetbrains.kotlin.buildtools.api.jvm.JvmSnapshotBasedIncrementalCompilationOptions.Companion.FORCE_RECOMPILATION
-import org.jetbrains.kotlin.buildtools.api.jvm.JvmSnapshotBasedIncrementalCompilationOptions.Companion.MODULE_BUILD_DIR
-import org.jetbrains.kotlin.buildtools.api.jvm.JvmSnapshotBasedIncrementalCompilationOptions.Companion.ROOT_PROJECT_DIR
+import org.jetbrains.kotlin.buildtools.api.jvm.classpathSnapshottingOperation
+import org.jetbrains.kotlin.buildtools.api.jvm.jvmCompilationOperation
 import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmClasspathSnapshottingOperation
 import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmClasspathSnapshottingOperation.Companion.PARSE_INLINED_LOCAL_CLASSES
 import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmCompilationOperation
+import org.jetbrains.kotlin.buildtools.api.jvm.operations.snapshotBasedIcConfiguration
 import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.createParentDirectories
 import kotlin.io.path.pathString
-import kotlin.io.path.toPath
 import kotlin.io.path.walk
 
 class JvmModule(
-    private val kotlinToolchain: KotlinToolchain,
-    val buildSession: KotlinToolchain.BuildSession,
-    project: Project,
+    private val kotlinToolchain: KotlinToolchains,
+    val buildSession: KotlinToolchains.BuildSession,
+    project: JvmProject,
     moduleName: String,
     moduleDirectory: Path,
     dependencies: List<Dependency>,
     defaultStrategyConfig: ExecutionPolicy,
     private val snapshotConfig: SnapshotConfig,
-    moduleCompilationConfigAction: (JvmCompilationOperation) -> Unit = {},
-) : AbstractModule(
+    moduleCompilationConfigAction: (JvmCompilationOperation.Builder) -> Unit = {},
+    private val stdlibLocation: List<Path>,
+) : AbstractModule<JvmCompilationOperation, JvmCompilationOperation.Builder, JvmSnapshotBasedIncrementalCompilationConfiguration.Builder>(
     project,
     moduleName,
     moduleDirectory,
@@ -47,56 +46,61 @@ class JvmModule(
     defaultStrategyConfig,
     moduleCompilationConfigAction,
 ) {
-    private val stdlibLocation: Path =
-        KotlinVersion::class.java.protectionDomain.codeSource.location.toURI().toPath() // compile against the provided stdlib
+
 
     /**
      * It won't be a problem to cache [dependencyFiles] and [compileClasspath] currently,
      * but we might add tests where dependencies change between compilations
      */
     private val dependencyFiles: List<Path>
-        get() = dependencies.map { it.location }.plusElement(stdlibLocation)
-    private val compileClasspath: String
-        get() = dependencyFiles.joinToString(File.pathSeparator)
+        get() = dependencies.map { it.location }.plus(stdlibLocation)
+    val compileClasspath: List<Path>
+        get() = dependencyFiles
 
     override fun compileImpl(
         strategyConfig: ExecutionPolicy,
-        compilationConfigAction: (JvmCompilationOperation) -> Unit,
+        compilationConfigAction: (JvmCompilationOperation.Builder) -> Unit,
+        compilationAction: (JvmCompilationOperation) -> Unit,
         kotlinLogger: TestKotlinLogger
     ): CompilationResult {
-        val allowedExtensions = setOf("kt", "kts", "java")
+        val allowedExtensions = setOf("kt", "kts", "java", "greet")
 
-        val compilationOperation = kotlinToolchain.jvm.createJvmCompilationOperation(
+        val compilationOperation = kotlinToolchain.jvm.jvmCompilationOperation(
             sourcesDirectory.walk()
                 .filter { path -> path.pathString.run { allowedExtensions.any { endsWith(".$it") } } }
                 .toList(),
             outputDirectory
-        )
-        moduleCompilationConfigAction(compilationOperation) // apply module-wide configuration
-        compilationConfigAction(compilationOperation) // apply any overrides for this compilation only
-        compilationOperation.compilerArguments[NO_REFLECT] = true
-        compilationOperation.compilerArguments[NO_STDLIB] = true
-        compilationOperation.compilerArguments[CLASSPATH] = compileClasspath
-        compilationOperation.compilerArguments[MODULE_NAME] = moduleName
+        ) {
+            moduleCompilationConfigAction(this) // apply module-wide configuration
+            compilationConfigAction(this) // apply any overrides for this compilation only
+            this.compilerArguments[NO_REFLECT] = true
+            this.compilerArguments[NO_STDLIB] = true
+            this.compilerArguments[CLASSPATH] = compileClasspath
+            when (compilerArguments[MODULE_NAME]) {
+                null -> compilerArguments[MODULE_NAME] = moduleName
+                EXPLICIT_NULL_MODULE_NAME_MARKER -> compilerArguments[MODULE_NAME] = null
+                else -> {}
+            }
+        }
 
-        return buildSession.executeOperation(compilationOperation, strategyConfig, kotlinLogger)
+        return compilationOperation.let {
+            compilationAction(it)
+            buildSession.executeOperation(it, strategyConfig, kotlinLogger)
+        }
     }
 
     private fun generateClasspathSnapshot(dependency: Dependency): Path {
-        val snapshotOperation = kotlinToolchain.jvm.createClasspathSnapshottingOperation(
+        val snapshotOperation = kotlinToolchain.jvm.classpathSnapshottingOperation(
             dependency.location
-        )
-        snapshotOperation[JvmClasspathSnapshottingOperation.GRANULARITY] = snapshotConfig.granularity
-        snapshotOperation[PARSE_INLINED_LOCAL_CLASSES] = snapshotConfig.useInlineLambdaSnapshotting
-        val snapshotResult = buildSession.executeOperation(snapshotOperation)
-        val hash = snapshotResult.classSnapshots.values
-            .filterIsInstance<AccessibleClassSnapshot>()
-            .withIndex()
-            .sumOf { (index, snapshot) -> index * 31 + snapshot.classAbiHash }
+        ) {
+            this[JvmClasspathSnapshottingOperation.GRANULARITY] = snapshotConfig.granularity
+            this[PARSE_INLINED_LOCAL_CLASSES] = snapshotConfig.useInlineLambdaSnapshotting
+        }
+        val snapshot = buildSession.executeOperation(snapshotOperation)
         // see details in docs for `CachedClasspathSnapshotSerializer` for details why we can't use a fixed name
-        val snapshotFile = icWorkingDir.resolve("dep-$hash.snapshot")
+        val snapshotFile = icWorkingDir.resolve("dep-${snapshot.hashCode()}.snapshot")
         snapshotFile.createParentDirectories()
-        snapshotResult.saveSnapshot(snapshotFile.toFile())
+        snapshot.saveSnapshot(snapshotFile.toFile())
         return snapshotFile
     }
 
@@ -105,39 +109,37 @@ class JvmModule(
         strategyConfig: ExecutionPolicy,
         forceOutput: LogLevel?,
         forceNonIncrementalCompilation: Boolean,
-        compilationConfigAction: (JvmCompilationOperation) -> Unit,
-        icOptionsConfigAction: (JvmSnapshotBasedIncrementalCompilationOptions) -> Unit,
-        assertions: CompilationOutcome.(Module) -> Unit,
+        compilationConfigAction: (JvmCompilationOperation.Builder) -> Unit,
+        compilationAction: (JvmCompilationOperation) -> Unit,
+        icOptionsConfigAction: (JvmSnapshotBasedIncrementalCompilationConfiguration.Builder) -> Unit,
+        assertions: context(ModuleContext) CompilationOutcome.() -> Unit,
     ): CompilationResult {
         return compile(strategyConfig, forceOutput, { compilationOperation ->
             val snapshots = dependencies.map {
                 generateClasspathSnapshot(it).toFile()
             }
 
-            val snapshotIcOptions = compilationOperation.createSnapshotBasedIcOptions()
-            snapshotIcOptions[MODULE_BUILD_DIR] = buildDirectory
-            snapshotIcOptions[ROOT_PROJECT_DIR] = project.projectDirectory
-            snapshotIcOptions[FORCE_RECOMPILATION] = forceNonIncrementalCompilation
-
-            val incrementalConfiguration = JvmSnapshotBasedIncrementalCompilationConfiguration(
+            val snapshotIcConfig = compilationOperation.snapshotBasedIcConfiguration(
                 icCachesDir,
                 sourcesChanges,
-                snapshots.map { it.toPath() },
-                icWorkingDir.resolve("shrunk-classpath-snapshot.bin"),
-                snapshotIcOptions
-            )
+                snapshots.map { it.toPath() }
+            ) {
+                this[MODULE_BUILD_DIR] = buildDirectory
+                this[ROOT_PROJECT_DIR] = project.projectDirectory
+                this[FORCE_RECOMPILATION] = forceNonIncrementalCompilation
 
-            icOptionsConfigAction(incrementalConfiguration.options)
+                icOptionsConfigAction(this)
+            }
 
-            compilationOperation[JvmCompilationOperation.INCREMENTAL_COMPILATION] = incrementalConfiguration
+            compilationOperation[JvmCompilationOperation.INCREMENTAL_COMPILATION] = snapshotIcConfig
             compilationConfigAction(compilationOperation)
-        }, assertions)
+        }, compilationAction, assertions)
     }
 
     override fun prepareExecutionProcessBuilder(
         mainClassFqn: String
     ): ProcessBuilder {
-        val executionClasspath = "$compileClasspath${File.pathSeparator}${outputDirectory}"
+        val executionClasspath = "${compileClasspath.joinToString(File.pathSeparator)}${File.pathSeparator}${outputDirectory}"
 
         val builder = ProcessBuilder(
             javaExe.absolutePath, // it is possible to support jdk selection, but we don't need it yet

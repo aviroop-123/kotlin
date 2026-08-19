@@ -1,7 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// NI_EXPECTED_FILE
 
 interface Base {
     fun base() {}

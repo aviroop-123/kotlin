@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.serialization
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.contracts.description.*
 import org.jetbrains.kotlin.contracts.description.expressions.*
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
@@ -24,6 +25,7 @@ import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.Flags
 
+@K1Deprecation
 class ContractSerializer {
     fun serializeContractOfFunctionIfAny(
         functionDescriptor: FunctionDescriptor,
@@ -81,6 +83,11 @@ class ContractSerializer {
                     if (invocationKindProtobufEnum != null) {
                         builder.kind = invocationKindProtobufEnum
                     }
+                }
+
+                is ReturnsResultOfEffectDeclaration -> {
+                    builder.effectType = ProtoBuf.Effect.EffectType.RETURNS_RESULT_OF
+                    builder.addEffectConstructorArgument(contractExpressionProto(effectDeclaration.variableReference, contractDescription))
                 }
 
                 // TODO: Add else and do something like reporting issue?

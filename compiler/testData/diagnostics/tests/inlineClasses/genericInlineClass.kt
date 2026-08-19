@@ -1,8 +1,6 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// LANGUAGE: +InlineClasses, +GenericInlineClassParameter
+// LANGUAGE: +InlineClasses
 // DIAGNOSTICS: -INLINE_CLASS_DEPRECATED
-// SKIP_TXT
 
 inline class ICAny<T>(val value: T)
 

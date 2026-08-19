@@ -7,11 +7,11 @@ package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
-import org.jetbrains.kotlin.backend.jvm.originalForReflectiveCall
 import org.jetbrains.kotlin.backend.jvm.ir.*
 import org.jetbrains.kotlin.backend.jvm.lower.SyntheticAccessorLowering.Companion.isAccessible
+import org.jetbrains.kotlin.backend.jvm.originalForReflectiveCall
 import org.jetbrains.kotlin.backend.jvm.unboxInlineClass
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
@@ -58,10 +58,7 @@ import org.jetbrains.org.objectweb.asm.commons.Method
  * Super calls, private or not, are not allowed from outside the class hierarchy of the involved classes, so it's emulated in fragment
  * compilation by the use of `invokespecial` - see [generateInvokeSpecialForCall] below.
  */
-@PhaseDescription(
-    name = "SpecialAccess",
-    prerequisite = [JvmDefaultParameterCleaner::class]
-)
+@PhasePrerequisites(JvmDefaultParameterCleaner::class)
 internal class SpecialAccessLowering(
     val context: JvmBackendContext
 ) : IrElementTransformerVoidWithContext(), FileLoweringPass {
@@ -331,7 +328,7 @@ internal class SpecialAccessLowering(
 
     private fun generateReflectiveMethodInvocation(call: IrCall): IrExpression {
         val targetFunction = call.symbol.owner
-        val arguments = (targetFunction.parameters zip call.arguments).mapNotNull { (param, arg) ->
+        val arguments = (targetFunction.parameters zip call.arguments).mapNotNull { [param, arg] ->
             when {
                 param.kind != IrParameterKind.DispatchReceiver -> arg
                 targetFunction.origin == IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER -> arg
@@ -517,7 +514,7 @@ internal class SpecialAccessLowering(
             )
         }
 
-        val (fieldLocation, instance) = fieldLocationAndReceiver(call)
+        val [fieldLocation, instance] = fieldLocationAndReceiver(call)
         return generateReflectiveFieldGet(
             fieldLocation,
             realGetter.correspondingPropertySymbol!!.owner.name.asString(),
@@ -542,7 +539,7 @@ internal class SpecialAccessLowering(
             )
         }
 
-        val (fieldLocation, receiver) = fieldLocationAndReceiver(call)
+        val [fieldLocation, receiver] = fieldLocationAndReceiver(call)
         return generateReflectiveFieldSet(
             fieldLocation,
             realSetter.correspondingPropertySymbol!!.owner.name.asString(),

@@ -1,7 +1,8 @@
-// IGNORE_BACKEND_K1: ANY
 // LANGUAGE: +NestedTypeAliases
 
 // FILE: typealiases.kt
+
+package test
 
 class Foo<T> {
     inner class Inner(val p: T) {
@@ -16,9 +17,11 @@ class Foo<T> {
 
 // FILE: main.kt
 
-import Foo.TAtoInner
-import Foo.TAtoInner2
-import Foo.TAtoInnerInsideInner
+package test
+
+import test.Foo.TAtoInner
+import test.Foo.TAtoInner2
+import test.Foo.TAtoInnerInsideInner
 
 fun box(): String {
     val foo = Foo<String>()

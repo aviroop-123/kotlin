@@ -13,6 +13,7 @@ fun listTypeNameOf(typeParameter: TypeName): ParameterizedTypeName = List::class
 
 inline fun <reified T> arrayTypeNameOf(): ParameterizedTypeName = Array::class.parameterizedBy(T::class)
 inline fun <reified T> listTypeNameOf(): ParameterizedTypeName = List::class.parameterizedBy(T::class)
+inline fun <reified T> setTypeNameOf(): ParameterizedTypeName = Set::class.parameterizedBy(T::class)
 
 inline fun TypeSpec.Builder.function(name: String, funSpec: FunSpec.Builder.() -> Unit): TypeSpec.Builder = apply {
     addFunction(
@@ -53,3 +54,19 @@ inline fun <reified T : Annotation> FunSpec.Builder.annotation(
 
 inline fun FunSpec.Builder.annotation(typeName: ClassName, annotationSpec: AnnotationSpec.Builder.() -> Unit): FunSpec.Builder =
     addAnnotation(AnnotationSpec.builder(typeName).apply(annotationSpec).build())
+
+inline fun FileSpec.Builder.interfaceType(name: String, funSpec: TypeSpec.Builder.() -> Unit) {
+    addType(TypeSpec.interfaceBuilder(name).apply { this.funSpec() }.build())
+}
+
+inline fun TypeSpec.Builder.interfaceType(name: String, funSpec: TypeSpec.Builder.() -> Unit) {
+    addType(TypeSpec.interfaceBuilder(name).apply { this.funSpec() }.build())
+}
+
+inline fun FileSpec.Builder.classType(name: String, funSpec: TypeSpec.Builder.() -> Unit) {
+    addType(TypeSpec.classBuilder(name).apply { this.funSpec() }.build())
+}
+
+inline fun TypeSpec.Builder.classType(name: String, funSpec: TypeSpec.Builder.() -> Unit) {
+    addType(TypeSpec.classBuilder(name).apply { this.funSpec() }.build())
+}

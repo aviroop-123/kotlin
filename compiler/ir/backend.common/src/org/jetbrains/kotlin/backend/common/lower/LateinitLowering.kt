@@ -19,7 +19,6 @@ package org.jetbrains.kotlin.backend.common.lower
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.ir.PreSerializationSymbols
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.builders.*
@@ -38,9 +37,6 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.utils.atMostOne
 
-@PhaseDescription(
-    name = "LateinitLowering",
-)
 open class LateinitLowering(
     private val loweringContext: LoweringContext,
     private val uninitializedPropertyAccessExceptionThrower: UninitializedPropertyAccessExceptionThrower,
@@ -133,7 +129,7 @@ open class LateinitLowering(
         if (!isLateinitIsInitializedPropertyGetter(expression.symbol)) return expression
 
         return expression.arguments[0]!!.replaceTailExpression {
-            val (property, dispatchReceiver) = when (it) {
+            val [property, dispatchReceiver] = when (it) {
                 is IrPropertyReference -> it.getter?.owner?.resolveFakeOverride()?.correspondingPropertySymbol?.owner to it.dispatchReceiver
                 is IrRichPropertyReference -> (it.reflectionTargetSymbol as? IrPropertySymbol)?.owner?.resolveFakeOverride() to it.boundValues.atMostOne()
                 else -> error("Unsupported argument for KProperty::isInitialized call: ${it.render()}")

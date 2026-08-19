@@ -168,7 +168,7 @@ private fun unfoldValueParameters(expression: IrFunctionAccessExpression, enviro
 
         val callWithAllArgs = expression.shallowCopy() // just a copy of given call, but with all arguments in place
         callWithAllArgs.arguments.assignFrom(actualParameters.map { it?.createGetValue() } )
-        defaultFun.body = (actualParameters.filterIsInstance<IrVariable>() + defaultFun.createReturn(callWithAllArgs)).wrapWithBlockBody()
+        defaultFun.body = (actualParameters.filterIsInstance<IrVariable>() + defaultFun.createReturn(callWithAllArgs, environment.irBuiltIns.nothingType)).wrapWithBlockBody()
 
         val callToDefault = environment.setCachedFunction(
             expression.symbol, fromDelegatingCall = expression is IrDelegatingConstructorCall, newFunction = defaultFun.symbol
@@ -177,7 +177,7 @@ private fun unfoldValueParameters(expression: IrFunctionAccessExpression, enviro
     } else {
         callStack.pushSimpleInstruction(expression)
 
-        for ((param, arg) in (irFunction.parameters zip expression.arguments).asReversed()) {
+        for ([param, arg] in (irFunction.parameters zip expression.arguments).asReversed()) {
             callStack.pushSimpleInstruction(param)
             callStack.pushCompoundInstruction(arg)
         }
@@ -390,9 +390,14 @@ private fun unfoldStringConcatenation(expression: IrStringConcatenation, environ
             is Primitive -> {
                 // This block is not really needed, but this way it is easier to handle `toString` for JS.
                 callStack.popState()
+
+                if (state.isNull()) {
+                    return callStack.pushState(convertToPrimitive("null", environment.irBuiltIns.stringType))
+                }
+
                 val toStringCall = IrCallImpl.fromSymbolOwner(
                     UNDEFINED_OFFSET, UNDEFINED_OFFSET,
-                    if (state.isNull()) environment.irBuiltIns.extensionToString else environment.irBuiltIns.memberToString
+                    environment.toStringSymbol
                 )
                 callStack.pushSimpleInstruction(toStringCall)
                 callStack.pushState(state)
@@ -426,7 +431,7 @@ private fun unfoldComposite(element: IrComposite, callStack: CallStack) {
 
 private fun unfoldCallableReference(reference: IrCallableReference<*>, callStack: CallStack) {
     callStack.pushSimpleInstruction(reference)
-    reference.getArgumentsWithIr().forEach { (parameter, arg) ->
+    reference.getArgumentsWithIr().forEach { [parameter, arg] ->
         callStack.pushSimpleInstruction(parameter)
         callStack.pushCompoundInstruction(arg)
     }

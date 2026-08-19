@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -489,17 +489,7 @@ public class AtomicNativePtr(
      */
     @Deprecated("Use exchange(newValue: NativePtr) instead.", ReplaceWith("this.exchange(newValue)"), DeprecationLevel.ERROR)
     @Suppress("DEPRECATION_ERROR")
-    public fun getAndSet(newValue: NativePtr): NativePtr {
-        // Pointer types are allowed for atomicrmw xchg operand since LLVM 15.0,
-        // after LLVM version update, it may be implemented via getAndSetField intrinsic.
-        // Check: https://youtrack.jetbrains.com/issue/KT-57557
-        while (true) {
-            val old = value
-            if (this::value.compareAndSetField(old, newValue)) {
-                return old
-            }
-        }
-    }
+    public fun getAndSet(newValue: NativePtr): NativePtr = this::value.getAndSetField(newValue)
 
     /**
      * Returns the string representation of the underlying [NativePtr].
@@ -530,7 +520,7 @@ public actual inline fun AtomicInt.update(transform: (Int) -> Int): Unit {
     contract {
         callsInPlace(transform, InvocationKind.AT_LEAST_ONCE)
     }
-    fetchAndUpdate(transform)
+    val _ = fetchAndUpdate(transform)
 }
 
 /**
@@ -606,7 +596,7 @@ public actual inline fun AtomicLong.update(transform: (Long) -> Long): Unit {
     contract {
         callsInPlace(transform, InvocationKind.AT_LEAST_ONCE)
     }
-    fetchAndUpdate(transform)
+    val _ = fetchAndUpdate(transform)
 }
 
 /**
@@ -682,7 +672,7 @@ public actual inline fun <T> AtomicReference<T>.update(transform: (T) -> T): Uni
     contract {
         callsInPlace(transform, InvocationKind.AT_LEAST_ONCE)
     }
-    fetchAndUpdate(transform)
+    val _ = fetchAndUpdate(transform)
 }
 
 /**
@@ -756,7 +746,7 @@ public inline fun AtomicNativePtr.update(transform: (NativePtr) -> NativePtr): U
     contract {
         callsInPlace(transform, InvocationKind.AT_LEAST_ONCE)
     }
-    fetchAndUpdate(transform)
+    val _ = fetchAndUpdate(transform)
 }
 
 /**

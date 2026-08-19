@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.load.java
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiPackage
 import com.intellij.psi.search.GlobalSearchScope
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.load.java.structure.JavaClass
 import org.jetbrains.kotlin.load.java.structure.JavaPackage
 import org.jetbrains.kotlin.load.java.structure.impl.JavaPackageImpl
@@ -27,13 +28,18 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.jvm.KotlinJavaPsiFacade
 import javax.inject.Inject
 
-fun Project.createJavaClassFinder(scope: GlobalSearchScope): JavaClassFinder =
-    JavaClassFinderImpl().apply {
+@K1Deprecation
+fun Project.createJavaClassFinder(
+    scope: GlobalSearchScope,
+    annotationProvider: JavaAnnotationProvider?
+): JavaClassFinder =
+    JavaClassFinderImpl(annotationProvider).apply {
         setProjectInstance(this@createJavaClassFinder)
         setScope(scope)
     }
 
-class JavaClassFinderImpl : AbstractJavaClassFinder() {
+@K1Deprecation
+class JavaClassFinderImpl(private val annotationProvider: JavaAnnotationProvider?) : AbstractJavaClassFinder() {
     private lateinit var javaFacade: KotlinJavaPsiFacade
 
     @Inject
@@ -61,7 +67,12 @@ class JavaClassFinderImpl : AbstractJavaClassFinder() {
     ): JavaPackageImpl {
         val project = javaFacade.project
         val sourceFactory = JavaElementSourceFactory.getInstance(project)
-        return JavaPackageImpl(sourceFactory.createPsiSource(psiPackage), javaSearchScope, mayHaveAnnotations)
+        return JavaPackageImpl(
+            psiPackageSource = sourceFactory.createPsiSource(psiPackage),
+            scope = javaSearchScope,
+            mayHaveAnnotations = mayHaveAnnotations,
+            annotationsProvider = annotationProvider
+        )
     }
 
     override fun knownClassNamesInPackage(packageFqName: FqName): Set<String>? {

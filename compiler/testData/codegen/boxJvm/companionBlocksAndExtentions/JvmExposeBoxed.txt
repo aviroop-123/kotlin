@@ -1,0 +1,36 @@
+@kotlin.Metadata
+public final class K {
+    // source: 'k.kt'
+    private final static field compBlockVal: int
+    private final static field compBlockValR: int
+    static method <clinit>(): void
+    public method <init>(): void
+    public final static @kotlin.jvm.JvmExposeBoxed @org.jetbrains.annotations.NotNull method compBlockFun(@org.jetbrains.annotations.NotNull p0: kotlin.UInt): kotlin.UInt
+    public synthetic static method compBlockFun-IKrLr70$default(p0: int, p1: int, p2: java.lang.Object): int
+    public final static method compBlockFun-IKrLr70(p0: int): int
+    public final static @kotlin.jvm.JvmExposeBoxed @org.jetbrains.annotations.NotNull method getCompBlockVal(): kotlin.UInt
+    public final static method getCompBlockVal-pVg5ArA(): int
+    public final static method getCompBlockValR-pVg5ArA(): int
+    public final static @kotlin.jvm.JvmExposeBoxed(jvmName="getRenamed") @org.jetbrains.annotations.NotNull method getRenamed(): kotlin.UInt
+}
+
+@kotlin.Metadata
+public final class KKt {
+    // source: 'k.kt'
+    private final static field compExtVal: int
+    private final static field compExtValJ: int
+    static method <clinit>(): void
+    public final static @kotlin.jvm.JvmExposeBoxed(jvmName="JextValBoxed") @org.jetbrains.annotations.NotNull method JextValBoxed(): kotlin.UInt
+    public final static @kotlin.jvm.JvmExposeBoxed(jvmName="KextValBoxed") @org.jetbrains.annotations.NotNull method KextValBoxed(): kotlin.UInt
+    public final static @org.jetbrains.annotations.NotNull method box(): java.lang.String
+    public final static @kotlin.jvm.JvmExposeBoxed @org.jetbrains.annotations.NotNull method compExtFun(@org.jetbrains.annotations.NotNull p0: kotlin.UInt): kotlin.UInt
+    public synthetic static method compExtFun-WZ4Q5Ns$default(p0: int, p1: int, p2: java.lang.Object): int
+    public final static method compExtFun-WZ4Q5Ns(p0: int): int
+    public final static @kotlin.jvm.JvmExposeBoxed @org.jetbrains.annotations.NotNull method compExtFunJ(@org.jetbrains.annotations.NotNull p0: kotlin.UInt): kotlin.UInt
+    public synthetic static method compExtFunJ-WZ4Q5Ns$default(p0: int, p1: int, p2: java.lang.Object): int
+    public final static method compExtFunJ-WZ4Q5Ns(p0: int): int
+    public final static method getCompExtVal(): int
+    public final static method getCompExtValJ(): int
+    public final static @org.jetbrains.annotations.NotNull method testJ(): java.lang.String
+    public final static @org.jetbrains.annotations.NotNull method testK(): java.lang.String
+}

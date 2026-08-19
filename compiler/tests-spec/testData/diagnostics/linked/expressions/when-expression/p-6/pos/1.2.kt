@@ -1,5 +1,3 @@
-// LANGUAGE: +WarnAboutNonExhaustiveWhenOnAlgebraicTypes
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -14,8 +12,8 @@
 // TESTCASE NUMBER: 1
 fun case_1(value_1: SealedClass) = when (value_1) {
     !is SealedChild1 -> {}
-    !is SealedChild2 -> {}
-    !is SealedChild3 -> {}
+    <!IMPOSSIBLE_IS_CHECK_WARNING!>!is SealedChild2<!> -> {}
+    <!IMPOSSIBLE_IS_CHECK_WARNING!>!is SealedChild3<!> -> {}
 }
 
 /*
@@ -26,7 +24,7 @@ fun case_1(value_1: SealedClass) = when (value_1) {
 fun case_2(value_1: SealedClass?): String = when (value_1) {
     !is SealedChild2 -> "" // including null
     <!USELESS_IS_CHECK!>is SealedChild2<!> -> ""
-    null -> "" // redundant
+    <!SENSELESS_NULL_IN_WHEN!>null<!> -> "" // redundant
 }
 
 // TESTCASE NUMBER: 3
@@ -45,7 +43,7 @@ fun case_4(value_1: SealedClass?) {
     when (value_1) {
         !is SealedChild2 -> {} // including null
         <!USELESS_IS_CHECK!>is SealedChild2?<!> -> {} // redundant nullable type check
-        else -> {}
+        <!REDUNDANT_ELSE_IN_WHEN!>else<!> -> {}
     }
 }
 

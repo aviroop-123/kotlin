@@ -16,7 +16,9 @@
 
 package org.jetbrains.kotlin.psi2ir
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.backend.common.linkage.IrDeserializer
+import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.ir.IrProvider
@@ -34,21 +36,22 @@ import org.jetbrains.kotlin.psi2ir.generators.fragments.FragmentModuleGenerator
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.utils.SmartList
 
+@K1Deprecation
 fun interface Psi2IrPostprocessingStep {
     fun invoke(irModuleFragment: IrModuleFragment)
 }
 
+/**
+ * @property checkNoUnboundSymbols The checks that need to be performed to make sure that all symbols are bound.
+ *  Note: Some backends (like KLIB-based backends) actually support partial linkage. So, for such backends the value
+ *  of [checkNoUnboundSymbols] is `null`, which effectively means that the checks are postponed to the partial linkage phase.
+ */
+@K1Deprecation
 class Psi2IrTranslator(
     val languageVersionSettings: LanguageVersionSettings,
     val configuration: Psi2IrConfiguration,
-    private val checkNoUnboundSymbols: (SymbolTable, String) -> Unit
+    private val checkNoUnboundSymbols: ((SymbolTable, String) -> Unit)? = null,
 ) {
-    @Deprecated("Only for backward compatibility with older versions of IDE", level = DeprecationLevel.ERROR)
-    constructor(
-        languageVersionSettings: LanguageVersionSettings,
-        configuration: Psi2IrConfiguration
-    ) : this(languageVersionSettings, configuration, checkNoUnboundSymbols = { _, _ -> })
-
     private val postprocessingSteps = SmartList<Psi2IrPostprocessingStep>()
 
     fun addPostprocessingStep(step: Psi2IrPostprocessingStep) {
@@ -58,6 +61,7 @@ class Psi2IrTranslator(
     fun createGeneratorContext(
         moduleDescriptor: ModuleDescriptor,
         bindingContext: BindingContext,
+        compilerConfiguration: CompilerConfiguration,
         symbolTable: SymbolTable,
         extensions: GeneratorExtensions = GeneratorExtensions(),
         fragmentContext: FragmentContext? = null
@@ -68,6 +72,7 @@ class Psi2IrTranslator(
         )
         return GeneratorContext(
             configuration,
+            compilerConfiguration,
             moduleDescriptor,
             bindingContext,
             languageVersionSettings,
@@ -97,7 +102,7 @@ class Psi2IrTranslator(
 
         moduleGenerator.generateUnboundSymbolsAsDependencies(irProviders)
 
-        deserializers.forEach { it.postProcess(inOrAfterLinkageStep = true) }
+        deserializers.forEach { it.postProcess(context.irBuiltIns, inOrAfterLinkageStep = true) }
         context.checkNoUnboundSymbols { "after generation of IR module ${irModule.name.asString()}" }
 
         postprocessingSteps.forEach { it.invoke(irModule) }
@@ -105,14 +110,13 @@ class Psi2IrTranslator(
 
         // TODO: remove it once plugin API improved
         moduleGenerator.generateUnboundSymbolsAsDependencies(irProviders)
-        deserializers.forEach { it.postProcess(inOrAfterLinkageStep = true) }
+        deserializers.forEach { it.postProcess(context.irBuiltIns, inOrAfterLinkageStep = true) }
         context.checkNoUnboundSymbols { "after applying all post-processing steps for the generated IR module ${irModule.name.asString()}" }
 
         return irModule
     }
 
-    private fun GeneratorContext.checkNoUnboundSymbols(whenDetected: () -> String) {
-        if (!configuration.partialLinkageEnabled)
-            checkNoUnboundSymbols(symbolTable, whenDetected())
+    private inline fun GeneratorContext.checkNoUnboundSymbols(whenDetected: () -> String) {
+        checkNoUnboundSymbols?.invoke(symbolTable, whenDetected())
     }
 }

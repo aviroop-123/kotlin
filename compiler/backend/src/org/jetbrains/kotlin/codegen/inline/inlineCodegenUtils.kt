@@ -8,13 +8,11 @@ package org.jetbrains.kotlin.codegen.inline
 import com.intellij.openapi.vfs.VirtualFile
 import org.jetbrains.kotlin.analyzer.ModuleInfo
 import org.jetbrains.kotlin.codegen.*
-import org.jetbrains.kotlin.codegen.SamWrapperCodegen.SAM_WRAPPER_SUFFIX
 import org.jetbrains.kotlin.codegen.optimization.common.intConstant
 import org.jetbrains.kotlin.codegen.optimization.common.isMeaningful
 import org.jetbrains.kotlin.codegen.optimization.common.nodeType
 import org.jetbrains.kotlin.codegen.state.GenerationState
 import org.jetbrains.kotlin.codegen.state.KotlinTypeMapperBase
-import org.jetbrains.kotlin.codegen.`when`.WhenByEnumsMapping
 import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.load.kotlin.VirtualFileFinder
 import org.jetbrains.kotlin.name.ClassId
@@ -65,6 +63,8 @@ private const val INLINE_MARKER_AFTER_INLINE_SUSPEND_ID = 7
 private const val INLINE_MARKER_BEFORE_UNBOX_INLINE_CLASS = 8
 private const val INLINE_MARKER_AFTER_UNBOX_INLINE_CLASS = 9
 private const val INLINE_MARKER_SUSPEND_LAMBDA_PARAMETER = 10
+private const val INLINE_MARKER_BEFORE_SUSPEND_UNIT_CALL = 11
+private const val INLINE_MARKER_BEFORE_SUSPEND_GENERIC_CALL = 12
 
 internal inline fun getMethodNode(classData: ByteArray, classType: Type, crossinline match: (Method) -> Boolean): SMAPAndMethodNode? {
     var node: MethodNode? = null
@@ -112,6 +112,26 @@ internal fun findVirtualFileImprecise(state: GenerationState, internalClassName:
     return findVirtualFile(state, ClassId(packageFqName, Name.identifier(classNameWithDollars)))
 }
 
+fun classFileContainsMethod(classId: ClassId, state: GenerationState, method: Method): Boolean? {
+    val bytes = findVirtualFile(state, classId)?.contentsToByteArray() ?: return null
+    var found = false
+    ClassReader(bytes).accept(object : ClassVisitor(Opcodes.API_VERSION) {
+        override fun visitMethod(
+            access: Int,
+            name: String?,
+            descriptor: String?,
+            signature: String?,
+            exceptions: Array<out String>?
+        ): MethodVisitor? {
+            if (name == method.name && descriptor == method.descriptor) {
+                found = true
+            }
+            return super.visitMethod(access, name, descriptor, signature, exceptions)
+        }
+    }, ClassReader.SKIP_FRAMES)
+    return found
+}
+
 internal fun isInvokeOnLambda(owner: String, name: String): Boolean {
     return OperatorNameConventions.INVOKE.asString() == name && owner.isNumberedFunctionInternalName()
 }
@@ -125,7 +145,7 @@ internal fun isAnonymousConstructorCall(internalName: String, methodName: String
 private fun isConstructor(methodName: String) = "<init>" == methodName
 
 internal fun isWhenMappingAccess(internalName: String, fieldName: String): Boolean =
-    fieldName.startsWith(WhenByEnumsMapping.MAPPING_ARRAY_FIELD_PREFIX) && internalName.endsWith(WhenByEnumsMapping.MAPPINGS_CLASS_NAME_POSTFIX)
+    fieldName.startsWith("\$EnumSwitchMapping$") && internalName.endsWith("\$WhenMappings")
 
 internal fun isAnonymousSingletonLoad(internalName: String, fieldName: String): Boolean =
     JvmAbi.INSTANCE_FIELD == fieldName && isAnonymousClass(internalName)
@@ -145,7 +165,7 @@ private fun isOldSamWrapper(internalName: String) =
     internalName.contains("\$sam$") && internalName.substringAfter("\$i$", "").run { length == 8 && toLongOrNull(16) != null }
 
 internal fun isSamWrapper(internalName: String) =
-    (internalName.endsWith(SAM_WRAPPER_SUFFIX) && internalName.contains("\$sam\$i\$")) || isOldSamWrapper(internalName)
+    (internalName.endsWith("$0") && internalName.contains("\$sam\$i\$")) || isOldSamWrapper(internalName)
 
 
 internal fun isSamWrapperConstructorCall(internalName: String, methodName: String) =
@@ -173,7 +193,7 @@ inline fun newMethodNodeWithCorrectStackSize(block: (InstructionAdapter) -> Unit
 
 private fun String.isInteger(radix: Int = 10) = toIntOrNull(radix) != null
 
-internal fun isCapturedFieldName(fieldName: String): Boolean {
+fun isCapturedFieldName(fieldName: String): Boolean {
     // TODO: improve this heuristic
     return fieldName.startsWith(CAPTURED_FIELD_PREFIX) && !fieldName.startsWith(NON_CAPTURED_FIELD_PREFIX)
             && fieldName != ASSERTIONS_DISABLED_FIELD_NAME
@@ -306,10 +326,10 @@ fun AbstractInsnNode?.insnText(insnList: InsnList): String {
             "$insnOpcodeText ${label.labelText()}"
         is LookupSwitchInsnNode ->
             "$insnOpcodeText " +
-                    this.keys.zip(this.labels).joinToString(prefix = "[", postfix = "]") { (key, label) -> "$key:${label.labelText()}" }
+                    this.keys.zip(this.labels).joinToString(prefix = "[", postfix = "]") { [key, label] -> "$key:${label.labelText()}" }
         is TableSwitchInsnNode ->
             "$insnOpcodeText " +
-                    (min..max).zip(this.labels).joinToString(prefix = "[", postfix = "]") { (key, label) -> "$key:${label.labelText()}" }
+                    (min..max).zip(this.labels).joinToString(prefix = "[", postfix = "]") { [key, label] -> "$key:${label.labelText()}" }
         else ->
             insnText
     }
@@ -328,7 +348,7 @@ fun MethodNode.dumpBody(): String {
         pw.println("  TRYCATCHBLOCK start:${tcb.start.labelRef()} end:${tcb.end.labelRef()} handler:${tcb.handler.labelRef()}")
     }
 
-    for ((i, insn) in this.instructions.toArray().withIndex()) {
+    for ([i, insn] in this.instructions.toArray().withIndex()) {
         when (insn.nodeType) {
             AbstractInsnNode.INSN ->
                 pw.println("$i\t${Printer.OPCODES[insn.opcode]}")
@@ -548,6 +568,14 @@ fun addFakeContinuationMarker(v: InstructionAdapter) {
     v.aconst(null)
 }
 
+fun addBeforeSuspendUnitCallMarker(v: InstructionAdapter) {
+    v.emitInlineMarker(INLINE_MARKER_BEFORE_SUSPEND_UNIT_CALL)
+}
+
+fun addBeforeSuspendGenericCallMarker(v: InstructionAdapter) {
+    v.emitInlineMarker(INLINE_MARKER_BEFORE_SUSPEND_GENERIC_CALL)
+}
+
 private fun InstructionAdapter.emitInlineMarker(id: Int) {
     iconst(id)
     invokestatic(
@@ -561,7 +589,13 @@ fun isBeforeSuspendMarker(insn: AbstractInsnNode) = isSuspendMarker(insn, INLINE
 internal fun isAfterSuspendMarker(insn: AbstractInsnNode) = isSuspendMarker(insn, INLINE_MARKER_AFTER_SUSPEND_ID)
 fun isBeforeInlineSuspendMarker(insn: AbstractInsnNode) = isSuspendMarker(insn, INLINE_MARKER_BEFORE_INLINE_SUSPEND_ID)
 internal fun isAfterInlineSuspendMarker(insn: AbstractInsnNode) = isSuspendMarker(insn, INLINE_MARKER_AFTER_INLINE_SUSPEND_ID)
+// obsolete, not added anymore to new bytecode, but is left for backward compatibility
 internal fun isReturnsUnitMarker(insn: AbstractInsnNode) = isSuspendMarker(insn, INLINE_MARKER_RETURNS_UNIT)
+// set after suspend calls of Unit-returning functions. Used for detecting eligibility of tail-call optimization.
+internal fun isBeforeSuspendUnitCallMarker(insn: AbstractInsnNode) = isSuspendMarker(insn, INLINE_MARKER_BEFORE_SUSPEND_UNIT_CALL)
+// set after suspend calls of suspendCoroutineUninterceptedOrReturn of an unknown generic type if that type matches the caller's single type
+// parameter. Used for detecting eligibility of tail-call optimization.
+fun isBeforeSuspendGenericCallMarker(insn: AbstractInsnNode) = isSuspendMarker(insn, INLINE_MARKER_BEFORE_SUSPEND_GENERIC_CALL)
 internal fun isFakeContinuationMarker(insn: AbstractInsnNode) =
     insn.previous != null && isSuspendMarker(insn.previous, INLINE_MARKER_FAKE_CONTINUATION) && insn.opcode == Opcodes.ACONST_NULL
 
@@ -645,6 +679,11 @@ fun MethodNode.preprocessSuspendMarkers(forInline: Boolean, keepFakeContinuation
             if (isReturnsUnitMarker(beforeMarker)) {
                 instructions.remove(beforeMarker.previous)
                 instructions.remove(beforeMarker)
+            }
+            if (isBeforeInlineSuspendMarker(insn) && insn.next?.next?.let {
+                    isBeforeSuspendUnitCallMarker(it) || isBeforeSuspendGenericCallMarker(it) } == true) {
+                instructions.remove(insn.next.next)
+                instructions.remove(insn.next)
             }
             instructions.remove(insn.previous)
             instructions.remove(insn)

@@ -1,0 +1,53 @@
+<caret_1>:
+  KDocName(652,662): 'funWarning'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        /funWarning(): kotlin.Unit
+      ]
+
+<caret_2>:
+  KDocName(668,677): 'funHidden'
+    null
+
+<caret_3>:
+  KDocName(683,691): 'funError'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        /funError(): kotlin.Unit
+      ]
+
+<caret_4>:
+  KDocName(697,709): 'ClassWarning'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        /ClassWarning
+      ]
+
+<caret_5>:
+  KDocName(715,726): 'ClassHidden'
+    null
+
+<caret_6>:
+  KDocName(732,742): 'ClassError'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        /ClassError
+      ]
+
+<caret_7>:
+  KDocName(748,759): 'propWarning'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val propWarning: kotlin.Int
+      ]
+
+<caret_8>:
+  KDocName(765,775): 'propHidden'
+    null
+
+<caret_9>:
+  KDocName(781,790): 'propError'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val propError: kotlin.Int
+      ]

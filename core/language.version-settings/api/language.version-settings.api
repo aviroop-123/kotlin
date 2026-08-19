@@ -1,0 +1,298 @@
+public final class org/jetbrains/kotlin/config/AnalysisFlag {
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDefaultValue ()Ljava/lang/Object;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegate : kotlin/properties/ReadOnlyProperty {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Object;)V
+	public synthetic fun getValue (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Ljava/lang/Object;
+	public fun getValue (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lorg/jetbrains/kotlin/config/AnalysisFlag;
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegates {
+	public static final field INSTANCE Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegates;
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegates$ApiModeDisabledByDefault {
+	public static final field INSTANCE Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegates$ApiModeDisabledByDefault;
+	public final fun provideDelegate (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegate;
+}
+
+public class org/jetbrains/kotlin/config/AnalysisFlag$Delegates$Boolean {
+	public static final field Companion Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegates$Boolean$Companion;
+	public fun <init> (Z)V
+	public final fun getDefaultValue ()Z
+	public final fun provideDelegate (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegate;
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegates$Boolean$Companion : org/jetbrains/kotlin/config/AnalysisFlag$Delegates$Boolean {
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegates$HeaderModeTypeAnyByDefault {
+	public static final field INSTANCE Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegates$HeaderModeTypeAnyByDefault;
+	public final fun provideDelegate (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegate;
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegates$ListOfStrings {
+	public static final field INSTANCE Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegates$ListOfStrings;
+	public final fun provideDelegate (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegate;
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegates$ReturnValueCheckerDisabledByDefault {
+	public static final field INSTANCE Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegates$ReturnValueCheckerDisabledByDefault;
+	public final fun provideDelegate (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegate;
+}
+
+public final class org/jetbrains/kotlin/config/AnalysisFlag$Delegates$WarningLevelMap {
+	public static final field INSTANCE Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegates$WarningLevelMap;
+	public final fun provideDelegate (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lorg/jetbrains/kotlin/config/AnalysisFlag$Delegate;
+}
+
+public final class org/jetbrains/kotlin/config/ApiVersion : java/lang/Comparable, org/jetbrains/kotlin/config/LanguageOrApiVersion, org/jetbrains/kotlin/utils/DescriptionAware {
+	public static final field Companion Lorg/jetbrains/kotlin/config/ApiVersion$Companion;
+	public static final field FIRST_NON_DEPRECATED Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field FIRST_SUPPORTED Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_0 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_1 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_2 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_3 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_4 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_5 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_6 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_7 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_8 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_1_9 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_2_0 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_2_1 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_2_2 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_2_3 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_2_4 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_2_5 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field KOTLIN_2_6 Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field LATEST Lorg/jetbrains/kotlin/config/ApiVersion;
+	public static final field LATEST_STABLE Lorg/jetbrains/kotlin/config/ApiVersion;
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public fun compareTo (Lorg/jetbrains/kotlin/config/ApiVersion;)I
+	public static final fun createByLanguageVersion (Lorg/jetbrains/kotlin/config/LanguageVersion;)Lorg/jetbrains/kotlin/config/ApiVersion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getVersion ()Lorg/jetbrains/kotlin/config/MavenComparableVersion;
+	public fun getVersionString ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun isDeprecated ()Z
+	public fun isStable ()Z
+	public fun isUnsupported ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/kotlin/config/ApiVersion$Companion {
+	public final fun createByLanguageVersion (Lorg/jetbrains/kotlin/config/LanguageVersion;)Lorg/jetbrains/kotlin/config/ApiVersion;
+	public final fun parse (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/ApiVersion;
+}
+
+public final class org/jetbrains/kotlin/config/ExplicitApiMode : java/lang/Enum {
+	public static final field Companion Lorg/jetbrains/kotlin/config/ExplicitApiMode$Companion;
+	public static final field DISABLED Lorg/jetbrains/kotlin/config/ExplicitApiMode;
+	public static final field STRICT Lorg/jetbrains/kotlin/config/ExplicitApiMode;
+	public static final field WARNING Lorg/jetbrains/kotlin/config/ExplicitApiMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getState ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/ExplicitApiMode;
+	public static fun values ()[Lorg/jetbrains/kotlin/config/ExplicitApiMode;
+}
+
+public final class org/jetbrains/kotlin/config/ExplicitApiMode$Companion {
+	public final fun availableValues ()Ljava/lang/String;
+	public final fun fromString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/ExplicitApiMode;
+}
+
+public final class org/jetbrains/kotlin/config/HeaderMode : java/lang/Enum {
+	public static final field ANY Lorg/jetbrains/kotlin/config/HeaderMode;
+	public static final field COMPILATION Lorg/jetbrains/kotlin/config/HeaderMode;
+	public static final field Companion Lorg/jetbrains/kotlin/config/HeaderMode$Companion;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getState ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/HeaderMode;
+	public static fun values ()[Lorg/jetbrains/kotlin/config/HeaderMode;
+}
+
+public final class org/jetbrains/kotlin/config/HeaderMode$Companion {
+	public final fun availableValues ()Ljava/lang/String;
+	public final fun fromString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/HeaderMode;
+}
+
+public final class org/jetbrains/kotlin/config/LanguageFeature$Companion {
+	public final fun fromString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageFeature;
+}
+
+public final class org/jetbrains/kotlin/config/LanguageFeature$State : java/lang/Enum, org/jetbrains/kotlin/utils/DescriptionAware {
+	public static final field DISABLED Lorg/jetbrains/kotlin/config/LanguageFeature$State;
+	public static final field ENABLED Lorg/jetbrains/kotlin/config/LanguageFeature$State;
+	public fun getDescription ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageFeature$State;
+	public static fun values ()[Lorg/jetbrains/kotlin/config/LanguageFeature$State;
+}
+
+public abstract class org/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion {
+}
+
+public final class org/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion$CanStillBeDisabledForNow : org/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion$CanStillBeDisabledForNow;
+	public static synthetic fun copy$default (Lorg/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion$CanStillBeDisabledForNow;Ljava/lang/String;ILjava/lang/Object;)Lorg/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion$CanStillBeDisabledForNow;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRelevantTicketId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion$CannotBeDisabled : org/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion {
+	public static final field INSTANCE Lorg/jetbrains/kotlin/config/LanguageFeatureBehaviorAfterSinceVersion$CannotBeDisabled;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class org/jetbrains/kotlin/config/LanguageOrApiVersion : org/jetbrains/kotlin/utils/DescriptionAware {
+	public fun getDescription ()Ljava/lang/String;
+	public abstract fun getVersionString ()Ljava/lang/String;
+	public abstract fun isDeprecated ()Z
+	public abstract fun isStable ()Z
+	public abstract fun isUnsupported ()Z
+}
+
+public final class org/jetbrains/kotlin/config/LanguageVersion : java/lang/Enum, org/jetbrains/kotlin/config/LanguageOrApiVersion, org/jetbrains/kotlin/utils/DescriptionAware {
+	public static final field Companion Lorg/jetbrains/kotlin/config/LanguageVersion$Companion;
+	public static final field FIRST_API_SUPPORTED Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field FIRST_NON_DEPRECATED Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field FIRST_SUPPORTED Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_0 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_1 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_2 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_3 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_4 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_5 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_6 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_7 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_8 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_1_9 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_2_0 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_2_1 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_2_2 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_2_3 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_2_4 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_2_5 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field KOTLIN_2_6 Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final field LATEST_STABLE Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final fun fromFullVersionString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static final fun fromVersionString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getMajor ()I
+	public final fun getMinor ()I
+	public final fun getUsesK2 ()Z
+	public fun getVersionString ()Ljava/lang/String;
+	public fun isDeprecated ()Z
+	public fun isStable ()Z
+	public fun isUnsupported ()Z
+	public fun toString ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public static fun values ()[Lorg/jetbrains/kotlin/config/LanguageVersion;
+}
+
+public final class org/jetbrains/kotlin/config/LanguageVersion$Companion {
+	public final fun fromFullVersionString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public final fun fromVersionString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/LanguageVersion;
+}
+
+public abstract interface class org/jetbrains/kotlin/config/LanguageVersionSettings {
+	public static final field Companion Lorg/jetbrains/kotlin/config/LanguageVersionSettings$Companion;
+	public static final field RESOURCE_NAME_TO_ALLOW_READING_FROM_ENVIRONMENT Ljava/lang/String;
+	public abstract fun getApiVersion ()Lorg/jetbrains/kotlin/config/ApiVersion;
+	public abstract fun getCustomizedLanguageFeatures ()Ljava/util/Map;
+	public abstract fun getFeatureSupport (Lorg/jetbrains/kotlin/config/LanguageFeature;)Lorg/jetbrains/kotlin/config/LanguageFeature$State;
+	public abstract fun getFlag (Lorg/jetbrains/kotlin/config/AnalysisFlag;)Ljava/lang/Object;
+	public abstract fun getLanguageVersion ()Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public abstract fun isPreRelease ()Z
+	public fun supportsFeature (Lorg/jetbrains/kotlin/config/LanguageFeature;)Z
+}
+
+public final class org/jetbrains/kotlin/config/LanguageVersionSettings$Companion {
+	public static final field RESOURCE_NAME_TO_ALLOW_READING_FROM_ENVIRONMENT Ljava/lang/String;
+}
+
+public final class org/jetbrains/kotlin/config/LanguageVersionSettingsImpl : org/jetbrains/kotlin/config/LanguageVersionSettings {
+	public static final field Companion Lorg/jetbrains/kotlin/config/LanguageVersionSettingsImpl$Companion;
+	public static final field DEFAULT Lorg/jetbrains/kotlin/config/LanguageVersionSettingsImpl;
+	public fun <init> (Lorg/jetbrains/kotlin/config/LanguageVersion;Lorg/jetbrains/kotlin/config/ApiVersion;)V
+	public fun <init> (Lorg/jetbrains/kotlin/config/LanguageVersion;Lorg/jetbrains/kotlin/config/ApiVersion;Ljava/util/Map;)V
+	public fun <init> (Lorg/jetbrains/kotlin/config/LanguageVersion;Lorg/jetbrains/kotlin/config/ApiVersion;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Lorg/jetbrains/kotlin/config/LanguageVersion;Lorg/jetbrains/kotlin/config/ApiVersion;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getApiVersion ()Lorg/jetbrains/kotlin/config/ApiVersion;
+	public fun getCustomizedLanguageFeatures ()Ljava/util/Map;
+	public fun getFeatureSupport (Lorg/jetbrains/kotlin/config/LanguageFeature;)Lorg/jetbrains/kotlin/config/LanguageFeature$State;
+	public fun getFlag (Lorg/jetbrains/kotlin/config/AnalysisFlag;)Ljava/lang/Object;
+	public fun getLanguageVersion ()Lorg/jetbrains/kotlin/config/LanguageVersion;
+	public fun isPreRelease ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/kotlin/config/LanguageVersionSettingsImpl$Companion {
+}
+
+public final class org/jetbrains/kotlin/config/LanguageVersionSettingsKt {
+	public static final field NO_ISSUE_SPECIFIED Ljava/lang/String;
+	public static final fun forcesPreReleaseBinariesIfEnabled (Lorg/jetbrains/kotlin/config/LanguageFeature;Lorg/jetbrains/kotlin/config/LanguageVersion;)Z
+	public static final fun getCustomizedEffectivelyDisabledLanguageFeatures (Lorg/jetbrains/kotlin/config/LanguageVersionSettings;)Ljava/util/Set;
+	public static final fun getCustomizedEffectivelyEnabledLanguageFeatures (Lorg/jetbrains/kotlin/config/LanguageVersionSettings;)Ljava/util/Set;
+	public static final fun isEnabledByDefault (Lorg/jetbrains/kotlin/config/LanguageVersionSettings;Lorg/jetbrains/kotlin/config/LanguageFeature;)Z
+	public static final fun isPreRelease (Lorg/jetbrains/kotlin/config/LanguageVersion;)Z
+	public static final fun toKotlinVersion (Lorg/jetbrains/kotlin/config/LanguageVersion;)Lkotlin/KotlinVersion;
+	public static final fun toKotlinVersion (Lorg/jetbrains/kotlin/config/LanguageVersionSettings;)Lkotlin/KotlinVersion;
+}
+
+public class org/jetbrains/kotlin/config/MavenComparableVersion : java/lang/Comparable {
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public fun compareTo (Lorg/jetbrains/kotlin/config/MavenComparableVersion;)I
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCanonical ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun main ([Ljava/lang/String;)V
+	public final fun parseVersion (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/kotlin/config/ReturnValueCheckerMode : java/lang/Enum {
+	public static final field CHECKER Lorg/jetbrains/kotlin/config/ReturnValueCheckerMode;
+	public static final field Companion Lorg/jetbrains/kotlin/config/ReturnValueCheckerMode$Companion;
+	public static final field DISABLED Lorg/jetbrains/kotlin/config/ReturnValueCheckerMode;
+	public static final field FULL Lorg/jetbrains/kotlin/config/ReturnValueCheckerMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getState ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/ReturnValueCheckerMode;
+	public static fun values ()[Lorg/jetbrains/kotlin/config/ReturnValueCheckerMode;
+}
+
+public final class org/jetbrains/kotlin/config/ReturnValueCheckerMode$Companion {
+	public final fun availableValues ()Ljava/lang/String;
+	public final fun fromString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/ReturnValueCheckerMode;
+}
+
+public final class org/jetbrains/kotlin/config/WarningLevel : java/lang/Enum {
+	public static final field Companion Lorg/jetbrains/kotlin/config/WarningLevel$Companion;
+	public static final field Disabled Lorg/jetbrains/kotlin/config/WarningLevel;
+	public static final field Error Lorg/jetbrains/kotlin/config/WarningLevel;
+	public static final field Warning Lorg/jetbrains/kotlin/config/WarningLevel;
+	public final fun getCliOption ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/WarningLevel;
+	public static fun values ()[Lorg/jetbrains/kotlin/config/WarningLevel;
+}
+
+public final class org/jetbrains/kotlin/config/WarningLevel$Companion {
+	public final fun fromString (Ljava/lang/String;)Lorg/jetbrains/kotlin/config/WarningLevel;
+}
+

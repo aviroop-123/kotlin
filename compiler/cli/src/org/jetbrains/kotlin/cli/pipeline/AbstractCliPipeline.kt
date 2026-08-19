@@ -5,15 +5,19 @@
 
 package org.jetbrains.kotlin.cli.pipeline
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.analyzer.CompilationErrorException
 import org.jetbrains.kotlin.cli.common.*
 import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
 import org.jetbrains.kotlin.cli.common.environment.setIdeaIoUseFallback
+import org.jetbrains.kotlin.cli.common.fir.FirDiagnosticsCompilerResultsReporter
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollectorUtil
+import org.jetbrains.kotlin.cli.pipeline.CheckCompilationErrors.CheckDiagnosticCollector
+import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.Services
 import org.jetbrains.kotlin.config.phaser.CompilerPhase
 import org.jetbrains.kotlin.config.phaser.PhaseConfig
@@ -24,17 +28,32 @@ import org.jetbrains.kotlin.progress.ProgressIndicatorAndCompilationCanceledStat
 import org.jetbrains.kotlin.util.CompilerType
 import org.jetbrains.kotlin.util.PerformanceManager
 import org.jetbrains.kotlin.util.forEachStringMeasurement
-import java.io.File
+import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
 abstract class AbstractCliPipeline<A : CommonCompilerArguments> {
     fun execute(
         arguments: A,
         services: Services,
         originalMessageCollector: MessageCollector,
-    ): ExitCode {
+    ): ExitCode =
+        executeAndReturnPipeLineArtifact(arguments, services, originalMessageCollector).exitCode
+
+    /**
+     * Executes the pipeline and returns the artifact of the last phase if successful. Returns an `ExitCodeArtifact` with an appropriate
+     * `ExitCode` if an error occurs or compilation is cancelled.
+     *
+     * The caller can pass its own disposable through the `providedDisposable` parameter. In this case, it's the caller's responsibility to
+     * dispose of its disposable.
+     */
+    fun executeAndReturnPipeLineArtifact(
+        arguments: A,
+        services: Services,
+        originalMessageCollector: MessageCollector,
+        providedDisposable: Disposable? = null,
+    ): PipelineArtifactWithExitCode {
         val canceledStatus = services[CompilationCanceledStatus::class.java]
         ProgressIndicatorAndCompilationCanceledStatus.setCompilationCanceledStatus(canceledStatus)
-        val rootDisposable = Disposer.newDisposable("Disposable for ${CLICompiler::class.simpleName}.execImpl")
+        val rootDisposable = providedDisposable ?: Disposer.newDisposable("Disposable for ${CLICompiler::class.simpleName}.execImpl")
         setIdeaIoUseFallback() // TODO (KT-73573): probably could be removed
         val performanceManager = createPerformanceManager(arguments, services).apply { compilerType = CompilerType.K2 }
         if (arguments.reportPerf || arguments.dumpPerf != null) {
@@ -54,33 +73,39 @@ abstract class AbstractCliPipeline<A : CommonCompilerArguments> {
             performanceManager
         )
 
-        fun reportException(e: Throwable): ExitCode {
+        fun reportException(e: Throwable): ExitCodeArtifact {
             MessageCollectorUtil.reportException(messageCollector, e) // TODO (KT-73575): investigate reporting in case of OOM
-            return if (e is OutOfMemoryError || e.hasOOMCause()) ExitCode.OOM_ERROR else ExitCode.INTERNAL_ERROR
+            val code = if (e is OutOfMemoryError || e.hasOOMCause()) ExitCode.OOM_ERROR else ExitCode.INTERNAL_ERROR
+            return ExitCodeArtifact(code)
         }
 
-        fun reportCompilationCanceled(e: CompilationCanceledException): ExitCode {
+        fun reportCompilationCanceled(e: CompilationCanceledException): ExitCodeArtifact {
             messageCollector.reportCompilationCancelled(e)
-            return ExitCode.OK
+            return ExitCodeArtifact(ExitCode.OK)
         }
 
         return try {
-            val code = runPhasedPipeline(argumentsInput)
-            performanceManager.notifyCompilationFinished()
-            if (arguments.reportPerf) {
-                messageCollector.report(CompilerMessageSeverity.LOGGING, "PERF: " + performanceManager.getTargetInfo())
-                performanceManager.forEachStringMeasurement {
-                    messageCollector.report(CompilerMessageSeverity.LOGGING, "PERF: $it", null)
+            val result = runPhasedPipeline(argumentsInput)
+            // In the case of one-stage compilation, the performance manager is shared between
+            // 2 pipelines: src -> klib (this one) and klib -> binary (subsequent).
+            // In this case we are not yet finished with the performance measurement and will finalize it
+            // after the subsequent pipeline finishes.
+            if (!isNativeOneStage) {
+                performanceManager.notifyCompilationFinished()
+                if (arguments.reportPerf) {
+                    messageCollector.report(CompilerMessageSeverity.LOGGING, "PERF: " + performanceManager.getTargetInfo())
+                    performanceManager.forEachStringMeasurement {
+                        messageCollector.report(CompilerMessageSeverity.LOGGING, "PERF: $it", null)
+                    }
+                }
+
+                if (arguments.dumpPerf != null) {
+                    performanceManager.dumpPerformanceReport(arguments.dumpPerf!!)
                 }
             }
-
-            if (arguments.dumpPerf != null) {
-                performanceManager.dumpPerformanceReport(arguments.dumpPerf!!)
-            }
-
-            if (messageCollector.hasErrors()) ExitCode.COMPILATION_ERROR else code
+            if (messageCollector.hasErrors()) ExitCodeArtifact(ExitCode.COMPILATION_ERROR) else result
         } catch (_: CompilationErrorException) {
-            ExitCode.COMPILATION_ERROR
+            ExitCodeArtifact(ExitCode.COMPILATION_ERROR)
         } catch (e: RuntimeException) {
             when (val cause = e.cause) {
                 is CompilationCanceledException -> reportCompilationCanceled(cause)
@@ -90,19 +115,19 @@ abstract class AbstractCliPipeline<A : CommonCompilerArguments> {
             reportException(t)
         } finally {
             messageCollector.flush()
-            disposeRootInWriteAction(rootDisposable)
+            if (providedDisposable == null) {
+                // Dispose the rootDisposable only if it has been created by this function.
+                disposeRootInWriteAction(rootDisposable)
+            }
         }
     }
 
-    private fun runPhasedPipeline(input: ArgumentsPipelineArtifact<A>): ExitCode {
+    private fun runPhasedPipeline(input: ArgumentsPipelineArtifact<A>): PipelineArtifactWithExitCode {
         val compoundPhase = createCompoundPhase(input.arguments)
 
         val phaseConfig = PhaseConfig()
         val context = PipelineContext(
-            input.messageCollector,
-            input.diagnosticCollector,
             input.performanceManager,
-            renderDiagnosticInternalName = input.arguments.renderInternalDiagnosticNames,
             kaptMode = isKaptMode(input.arguments)
         )
         return try {
@@ -112,23 +137,35 @@ abstract class AbstractCliPipeline<A : CommonCompilerArguments> {
                 input
             )
             when (result) {
-                is PipelineArtifactWithExitCode -> result.exitCode
-                else -> ExitCode.OK
+                is PipelineArtifactWithExitCode -> result
+                else -> ExitCodeArtifact(ExitCode.OK)
             }
         } catch (e: PipelineStepException) {
             /**
              * There might be a case when the pipeline is not executed fully, but it's not considered as a compilation error:
              *   if `-version` flag was passed
              */
-            if (e.definitelyCompilationError || input.messageCollector.hasErrors() || input.diagnosticCollector.hasErrors) {
-                ExitCode.COMPILATION_ERROR
+            val configuration = input.configuration
+            if (e.definitelyCompilationError || CheckDiagnosticCollector.checkHasErrors(configuration)) {
+                ExitCodeArtifact(ExitCode.COMPILATION_ERROR)
             } else {
-                ExitCode.OK
+                ExitCodeArtifact(ExitCode.OK)
             }
         } catch (_: SuccessfulPipelineExecutionException) {
-            ExitCode.OK
+            ExitCodeArtifact(ExitCode.OK)
         } finally {
-            CheckCompilationErrors.CheckDiagnosticCollector.reportDiagnosticsToMessageCollector(context)
+            val configuration = input.configuration
+            FirDiagnosticsCompilerResultsReporter.reportToMessageCollector(configuration.diagnosticsCollector, configuration)
+        }
+    }
+
+    data class ExitCodeArtifact(override val exitCode: ExitCode) : PipelineArtifactWithExitCode() {
+        override val configuration: CompilerConfiguration
+            get() = shouldNotBeCalled("No Configuration available from this artifact.")
+
+        @CliPipelineInternals(OPT_IN_MESSAGE)
+        override fun withCompilerConfiguration(newConfiguration: CompilerConfiguration): PipelineArtifact {
+            return this
         }
     }
 
@@ -145,4 +182,9 @@ abstract class AbstractCliPipeline<A : CommonCompilerArguments> {
     }
 
     protected open fun isKaptMode(arguments: A): Boolean = false
+
+    /**
+     * In Native CLI there is a one-stage compilation mode, which is used when producing a binary from sources directly.
+     */
+    protected open val isNativeOneStage = false
 }

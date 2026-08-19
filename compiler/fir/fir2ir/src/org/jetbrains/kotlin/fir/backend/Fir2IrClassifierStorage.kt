@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.fir.backend
 
-import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.backend.generators.isExternalParent
@@ -19,18 +18,15 @@ import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyClass
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.resolve.toClassSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirReplSnippetSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag
-import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
 import org.jetbrains.kotlin.ir.symbols.*
-import org.jetbrains.kotlin.ir.symbols.impl.*
+import org.jetbrains.kotlin.ir.symbols.impl.IrClassSymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrEnumEntrySymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrTypeAliasSymbolImpl
+import org.jetbrains.kotlin.ir.symbols.impl.IrTypeParameterSymbolImpl
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
@@ -88,7 +84,7 @@ class Fir2IrClassifierStorage(
 
     // Note: declareTypeParameters should be called before!
     internal fun preCacheTypeParameters(owner: FirTypeParameterRefsOwner) {
-        for ((index, typeParameter) in owner.typeParameters.withIndex()) {
+        for ([index, typeParameter] in owner.typeParameters.withIndex()) {
             val original = typeParameter.symbol.fir
             getCachedIrTypeParameter(original)
                 ?: createAndCacheIrTypeParameter(original, index)
@@ -143,31 +139,23 @@ class Fir2IrClassifierStorage(
     ): IrTypeParameterSymbol {
         val firTypeParameter = firTypeParameterSymbol.fir
 
-        val cachedSymbol = getCachedIrTypeParameter(firTypeParameter, typeOrigin)?.symbol
-            ?: typeParameterCache[firTypeParameter]?.symbol // We can try to use default cache because setter can use parent type parameters
-
-        if (cachedSymbol != null) {
-            return cachedSymbol
+        fun getCachedIrTypeParameterIfAny(): IrTypeParameterSymbol? {
+            return getCachedIrTypeParameter(firTypeParameter, typeOrigin)?.symbol
+                ?: typeParameterCache[firTypeParameter]?.symbol // We can try to use default cache because setter can use parent type parameters
         }
 
+        getCachedIrTypeParameterIfAny()?.let { return it }
+
         if (c.configuration.allowNonCachedDeclarations) {
-            return createIrTypeParameterForNonCachedDeclaration(firTypeParameter)
+            when (val containerSymbol = firTypeParameter.containingDeclarationSymbol) {
+                is FirRegularClassSymbol -> getIrClassSymbol(containerSymbol)
+                is FirNamedFunctionSymbol -> declarationStorage.getIrFunctionSymbol(containerSymbol)
+                is FirPropertySymbol -> declarationStorage.getIrPropertySymbol(containerSymbol)
+            }
+            getCachedIrTypeParameterIfAny()?.let { return it }
         }
 
         error("Cannot find cached type parameter by FIR symbol: ${firTypeParameterSymbol.name} of the owner: ${firTypeParameter.containingDeclarationSymbol}")
-    }
-
-    private fun createIrTypeParameterForNonCachedDeclaration(firTypeParameter: FirTypeParameter): IrTypeParameterSymbol {
-        val firTypeParameterOwnerSymbol = firTypeParameter.containingDeclarationSymbol
-        val firTypeParameterOwner = firTypeParameterOwnerSymbol.fir as FirTypeParameterRefsOwner
-        val index = firTypeParameterOwner.typeParameters.indexOf(firTypeParameter).also { check(it >= 0) }
-
-        val isSetter = firTypeParameterOwner is FirPropertyAccessor && firTypeParameterOwner.isSetter
-        val conversionTypeOrigin = if (isSetter) ConversionTypeOrigin.SETTER else ConversionTypeOrigin.DEFAULT
-
-        return createAndCacheIrTypeParameter(firTypeParameter, index, conversionTypeOrigin).also {
-            classifiersGenerator.initializeTypeParameterBounds(firTypeParameter, it)
-        }.symbol
     }
 
     // ------------------------------------ classes ------------------------------------
@@ -284,30 +272,6 @@ class Fir2IrClassifierStorage(
         return getIrClass(lookupTag)?.symbol
     }
 
-    // TODO(KT-72994) remove when context receivers are removed
-    fun getFieldsWithContextReceiversForClass(irClass: IrClass, klass: FirClass): List<IrField> {
-        if (klass !is FirRegularClass || klass.contextParameters.isEmpty()) return emptyList()
-
-        return fieldsForContextReceivers.getOrPut(irClass) {
-            klass.contextParameters.withIndex().map { (index, contextReceiver) ->
-                IrFactoryImpl.createField(
-                    startOffset = UNDEFINED_OFFSET,
-                    endOffset = UNDEFINED_OFFSET,
-                    origin = IrDeclarationOrigin.FIELD_FOR_CLASS_CONTEXT_RECEIVER,
-                    name = Name.identifier("contextReceiverField$index"),
-                    visibility = DescriptorVisibilities.PRIVATE,
-                    symbol = IrFieldSymbolImpl(),
-                    type = contextReceiver.returnTypeRef.toIrType(),
-                    isFinal = true,
-                    isStatic = false,
-                    isExternal = false,
-                ).also {
-                    it.parent = irClass
-                }
-            }
-        }
-    }
-
     fun getIrClassForNotFoundClass(classLikeLookupTag: ConeClassLikeLookupTag): IrClass {
         return notFoundClassCache.getOrPut(classLikeLookupTag) {
             classifiersGenerator.createIrClassForNotFoundClass(classLikeLookupTag)
@@ -333,7 +297,7 @@ class Fir2IrClassifierStorage(
         // After the call of this function, members of local classes may be processed immediately
         // Before the call it's not possible, because f/o binding for regular classes isn't done yet
         processMembersOfClassesOnTheFlyImmediately = true
-        for ((klass, irClass) in localClassesCreatedOnTheFly) {
+        for ([klass, irClass] in localClassesCreatedOnTheFly) {
             conversionScope.withContainingFirClass(klass) {
                 classifiersGenerator.processClassHeader(klass, irClass)
                 converter.processClassMembers(klass, irClass)

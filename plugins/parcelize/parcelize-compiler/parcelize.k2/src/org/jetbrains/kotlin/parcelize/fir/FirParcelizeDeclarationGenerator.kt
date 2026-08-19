@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationPredicateRegistrar
@@ -86,7 +86,7 @@ class FirParcelizeDeclarationGenerator(
         if (name != WRITE_TO_PARCEL_NAME) return false
         val parameterSymbols = valueParameterSymbols
         if (parameterSymbols.size != 2) return false
-        val (destSymbol, flagsSymbol) = parameterSymbols
+        val [destSymbol, flagsSymbol] = parameterSymbols
         if (destSymbol.resolvedReturnTypeRef.coneType.classId != PARCEL_ID) return false
         if (!flagsSymbol.resolvedReturnTypeRef.coneType.isInt) return false
         return true
@@ -97,7 +97,7 @@ class FirParcelizeDeclarationGenerator(
         name: Name,
         returnType: ConeKotlinType,
         crossinline init: SimpleFunctionBuildingContext.() -> Unit = {}
-    ): FirSimpleFunction {
+    ): FirNamedFunction {
         return createMemberFunction(owner, key, name, returnType) {
             modality = if (owner.modality == Modality.FINAL) Modality.FINAL else Modality.OPEN
             init()

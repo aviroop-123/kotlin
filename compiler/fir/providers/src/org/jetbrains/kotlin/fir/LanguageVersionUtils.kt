@@ -5,9 +5,40 @@
 
 package org.jetbrains.kotlin.fir
 
+import org.jetbrains.kotlin.config.AnalysisFlag
 import org.jetbrains.kotlin.config.LanguageFeature
 
 context(c: SessionHolder)
 fun LanguageFeature.isEnabled(): Boolean {
     return c.session.languageVersionSettings.supportsFeature(this)
 }
+
+context(c: SessionHolder)
+fun AnalysisFlag<Boolean>.isSet(): Boolean = c.session.languageVersionSettings.getFlag(this)
+
+context(c: SessionHolder)
+fun LanguageFeature.isDisabled(): Boolean = !isEnabled()
+
+context(c: SessionHolder)
+fun enableWarningsForIdentitySensitiveOperationsOnValueClassesAndPrimitives(): Boolean =
+    LanguageFeature.DisableWarningsForIdentitySensitiveOperationsOnValueClassesAndPrimitives.isDisabled()
+
+context(c: SessionHolder)
+fun enableWarningsForValueBasedJavaClasses(): Boolean =
+    LanguageFeature.DisableWarningsForValueBasedJavaClasses.isDisabled()
+
+context(c: SessionHolder)
+fun disableWarningsForValueBasedJavaClasses(): Boolean =
+    LanguageFeature.DisableWarningsForValueBasedJavaClasses.isEnabled()
+
+context(c: SessionHolder)
+fun enableCompatibilityModeForNewInference(): Boolean =
+    LanguageFeature.DisableCompatibilityModeForNewInference.isDisabled()
+
+context(c: SessionHolder)
+fun disableCompatibilityModeForNewInference(): Boolean =
+    LanguageFeature.DisableCompatibilityModeForNewInference.isEnabled()
+
+context(c: SessionHolder)
+fun useArrayLiteralResolution(): Boolean =
+    LanguageFeature.CollectionLiterals.isDisabled() && LanguageFeature.CollectionLiteralsBasedAnnotationResolution.isDisabled()

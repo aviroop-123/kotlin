@@ -5,12 +5,15 @@
 
 package org.jetbrains.kotlin.analysis.api.standalone
 
+import com.intellij.core.CoreApplicationEnvironment
 import com.intellij.mock.MockApplication
 import com.intellij.mock.MockProject
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.Application
+import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -51,7 +54,6 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreApplicationEnvironmentMod
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreProjectEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.setupIdeaStandaloneExecution
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.extensions.ProjectExtensionDescriptor
 import org.jetbrains.kotlin.load.kotlin.PackagePartProvider
 import org.jetbrains.kotlin.psi.KtFile
 import kotlin.contracts.ExperimentalContracts
@@ -82,7 +84,7 @@ public class StandaloneAnalysisAPISessionBuilder(
     init {
         val application = kotlinCoreProjectEnvironment.environment.application
         ApplicationServiceRegistration.registerWithCustomRegistration(application, serviceRegistrars) {
-            registerApplicationServices(application, data = Unit)
+            registerApplicationServices(application, kotlinCoreProjectEnvironment.environment.parentDisposable, data = Unit)
         }
     }
 
@@ -92,7 +94,11 @@ public class StandaloneAnalysisAPISessionBuilder(
 
     private lateinit var projectStructureProvider: KotlinStaticProjectStructureProvider
 
+    @OptIn(ExperimentalContracts::class)
     public fun buildKtModuleProvider(init: KtModuleProviderBuilder.() -> Unit) {
+        contract {
+            callsInPlace(init, InvocationKind.EXACTLY_ONCE)
+        }
         projectStructureProvider = buildProjectStructureProvider(kotlinCoreProjectEnvironment.environment, project, init)
     }
 
@@ -123,12 +129,17 @@ public class StandaloneAnalysisAPISessionBuilder(
         }
     }
 
-    public fun <T : Any> registerProjectExtensionPoint(extensionDescriptor: ProjectExtensionDescriptor<T>) {
-        extensionDescriptor.registerExtensionPoint(project)
+    public fun <T : Any> registerProjectExtensionPoint(extensionPointName: ExtensionPointName<T>, extensionClass: Class<T>) {
+        CoreApplicationEnvironment.registerExtensionPoint(
+            project.extensionArea,
+            extensionPointName,
+            extensionClass,
+        )
     }
 
     private fun registerProjectServices(
         sourceKtFiles: List<KtFile>,
+        libraryRoots: List<VirtualFile>,
         packagePartProvider: (GlobalSearchScope) -> PackagePartProvider,
     ) {
         val project = kotlinCoreProjectEnvironment.project
@@ -152,7 +163,11 @@ public class StandaloneAnalysisAPISessionBuilder(
             registerService(KotlinDeclarationProviderMerger::class.java, KotlinStandaloneDeclarationProviderMerger(this))
             registerService(
                 KotlinPackageProviderFactory::class.java,
-                KotlinStandalonePackageProviderFactory(project, sourceKtFiles + declarationProviderFactory.getAdditionalCreatedKtFiles())
+                KotlinStandalonePackageProviderFactory(
+                    project,
+                    sourceKtFiles + declarationProviderFactory.getAdditionalCreatedKtFiles(),
+                    libraryRoots
+                )
             )
             registerService(KotlinPackageProviderMerger::class.java, KotlinStandalonePackageProviderMerger(this))
 
@@ -219,7 +234,7 @@ public class StandaloneAnalysisAPISessionBuilder(
         )
 
         val createPackagePartProvider = StandaloneProjectFactory.createPackagePartsProvider(libraryRoots)
-        registerProjectServices(sourceKtFiles, createPackagePartProvider)
+        registerProjectServices(sourceKtFiles, libraryRoots.map { it.file }, createPackagePartProvider)
 
         return StandaloneAnalysisAPISession(kotlinCoreProjectEnvironment) {
             projectStructureProvider.allModules.mapNotNull { ktModule ->
@@ -238,12 +253,13 @@ public class StandaloneAnalysisAPISessionBuilder(
  * When using this service registrar in tests, make sure that `AnalysisApiIdeModeTestServiceRegistrar` isn't configured at the same time.
  */
 internal object StandaloneSessionServiceRegistrar : AnalysisApiSimpleServiceRegistrar() {
-    override fun registerApplicationServices(application: MockApplication) {
+    override fun registerApplicationServices(application: MockApplication, disposable: Disposable) {
         application.apply {
             registerService(KotlinAnalysisPermissionOptions::class.java, KotlinStandaloneAnalysisPermissionOptions::class.java)
         }
     }
 
+    @OptIn(KaImplementationDetail::class)
     override fun registerProjectServices(project: MockProject) {
         project.apply {
             registerService(KotlinLifetimeTokenFactory::class.java, KotlinAlwaysAccessibleLifetimeTokenFactory::class.java)

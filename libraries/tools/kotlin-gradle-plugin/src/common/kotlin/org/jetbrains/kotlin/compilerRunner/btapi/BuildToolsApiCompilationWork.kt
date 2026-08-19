@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2023 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,44 +7,63 @@ package org.jetbrains.kotlin.compilerRunner.btapi
 
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.workers.WorkAction
 import org.gradle.workers.WorkParameters
-import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporter
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
-import org.jetbrains.kotlin.buildtools.api.*
-import org.jetbrains.kotlin.buildtools.api.jvm.ClasspathSnapshotBasedIncrementalCompilationApproachParameters
+import org.jetbrains.kotlin.build.report.metrics.*
+import org.jetbrains.kotlin.buildtools.api.CompilationResult
+import org.jetbrains.kotlin.buildtools.api.KotlinLogger
+import org.jetbrains.kotlin.buildtools.api.KotlinToolchains
+import org.jetbrains.kotlin.buildtools.api.SharedApiClassesClassLoader
+import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmCompilationOperation
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWorkArguments
+import org.jetbrains.kotlin.compilerRunner.KotlinCompilerArgumentsLogLevel
 import org.jetbrains.kotlin.compilerRunner.asFinishLogMessage
+import org.jetbrains.kotlin.compilerRunner.btapi.js.JsKlibBuildOperationFactory
+import org.jetbrains.kotlin.compilerRunner.btapi.js.JsKlibIncrementalConfigurationStrategy
+import org.jetbrains.kotlin.compilerRunner.btapi.js.JsLinkingBuildOperationFactory
+import org.jetbrains.kotlin.compilerRunner.btapi.jvm.JvmBuildOperationFactory
+import org.jetbrains.kotlin.compilerRunner.btapi.jvm.JvmIncrementalConfigurationStrategy
+import org.jetbrains.kotlin.compilerRunner.btapi.metadata.MetadataKlibBuildOperationFactory
+import org.jetbrains.kotlin.compilerRunner.btapi.wasm.WasmKlibBuildOperationFactory
+import org.jetbrains.kotlin.compilerRunner.btapi.wasm.WasmKlibIncrementalConfigurationStrategy
+import org.jetbrains.kotlin.compilerRunner.btapi.wasm.WasmLinkingBuildOperationFactory
 import org.jetbrains.kotlin.gradle.internal.ClassLoadersCachingBuildService
 import org.jetbrains.kotlin.gradle.internal.ParentClassLoaderProvider
+import org.jetbrains.kotlin.gradle.logging.*
 import org.jetbrains.kotlin.gradle.plugin.BuildFinishedListenerService
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.CompilerDiagnosticsProblemsReporter
 import org.jetbrains.kotlin.gradle.plugin.internal.BuildIdService
+import org.jetbrains.kotlin.gradle.plugin.internal.state.TaskExecutionResults
 import org.jetbrains.kotlin.gradle.plugin.internal.state.getTaskLogger
+import org.jetbrains.kotlin.gradle.report.TaskExecutionInfo
+import org.jetbrains.kotlin.gradle.report.TaskExecutionResult
+import org.jetbrains.kotlin.gradle.report.collectIcTags
 import org.jetbrains.kotlin.gradle.tasks.*
-import org.jetbrains.kotlin.gradle.tasks.FailedCompilationException
-import org.jetbrains.kotlin.gradle.tasks.TaskOutputsBackup
-import org.jetbrains.kotlin.incremental.ClasspathChanges
+import org.jetbrains.kotlin.gradle.utils.stackTraceAsString
+import org.jetbrains.kotlin.util.removeSuffixIfPresent
 import java.io.File
 import javax.inject.Inject
 
-private const val LOGGER_PREFIX = "[KOTLIN] "
-
 internal abstract class BuildToolsApiCompilationWork @Inject constructor(
     private val fileSystemOperations: FileSystemOperations,
+    private val objects: ObjectFactory,
 ) :
     WorkAction<BuildToolsApiCompilationWork.BuildToolsApiCompilationParameters> {
     internal interface BuildToolsApiCompilationParameters : WorkParameters {
+        val buildSessionService: Property<BuildSessionService>
         val buildIdService: Property<BuildIdService>
         val buildFinishedListenerService: Property<BuildFinishedListenerService>
         val classLoadersCachingService: Property<ClassLoadersCachingBuildService>
         val compilerWorkArguments: Property<GradleKotlinCompilerWorkArguments>
         val taskOutputsToRestore: ListProperty<File>
         val snapshotsDir: DirectoryProperty
-        val metricsReporter: Property<BuildMetricsReporter<GradleBuildTime, GradleBuildPerformanceMetric>>
+        val metricsReporter: Property<BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>>
+        val compilerDiagnosticsProblemsReporterFactory: Property<CompilerDiagnosticsProblemsReporter.Factory>
+        val warningModeIsAll: Property<Boolean>
     }
 
     private val workArguments
@@ -53,77 +72,17 @@ internal abstract class BuildToolsApiCompilationWork @Inject constructor(
     private val taskPath
         get() = workArguments.taskPath
 
-    private val log: KotlinLogger = getTaskLogger(taskPath, LOGGER_PREFIX, BuildToolsApiCompilationWork::class.java.simpleName, true)
+    private val compilerDiagnosticsProblemsReporter: CompilerDiagnosticsProblemsReporter
+        get() = parameters.compilerDiagnosticsProblemsReporterFactory.get().getInstance(objects)
 
-    private fun performCompilation(): CompilationResult {
-        val executionStrategy = workArguments.compilerExecutionSettings.strategy
-        try {
-            val classLoader = parameters.classLoadersCachingService.get()
-                .getClassLoader(workArguments.compilerFullClasspath, SharedApiClassesClassLoaderProvider)
-            val compilationService = CompilationService.loadImplementation(classLoader)
-            val buildId = ProjectId.ProjectUUID(parameters.buildIdService.get().buildId)
-            parameters.buildFinishedListenerService.get().onCloseOnceByKey(buildId.toString()) {
-                compilationService.finishProjectCompilation(buildId)
-            }
-            val executionConfig = compilationService.makeCompilerExecutionStrategyConfiguration().apply {
-                when (executionStrategy) {
-                    KotlinCompilerExecutionStrategy.DAEMON -> useDaemonStrategy(
-                        workArguments.compilerExecutionSettings.daemonJvmArgs ?: emptyList()
-                    )
-                    KotlinCompilerExecutionStrategy.IN_PROCESS -> useInProcessStrategy()
-                    else -> error("The \"$executionStrategy\" execution strategy is not supported by the Build Tools API")
-                }
-            }
-            val jvmCompilationConfig = compilationService.makeJvmCompilationConfiguration()
-                .useLogger(log)
-                .useKotlinScriptFilenameExtensions(workArguments.kotlinScriptExtensions.toList())
-            val icEnv = workArguments.incrementalCompilationEnvironment
-            val classpathChanges = icEnv?.classpathChanges
-            if (classpathChanges is ClasspathChanges.ClasspathSnapshotEnabled) {
-                // important detail: by using primitive-type single-field setters,
-                // we maintain compatibility of this KGP code with future BuildToolsApi implementations
-                val classpathSnapshotsConfig = jvmCompilationConfig.makeClasspathSnapshotBasedIncrementalCompilationConfiguration()
-                    .setRootProjectDir(icEnv.rootProjectDir)
-                    .setBuildDir(icEnv.buildDir)
-                    .usePreciseJavaTracking(icEnv.icFeatures.usePreciseJavaTracking)
-                    .usePreciseCompilationResultsBackup(icEnv.icFeatures.preciseCompilationResultsBackup)
-                    .keepIncrementalCompilationCachesInMemory(icEnv.icFeatures.keepIncrementalCompilationCachesInMemory)
-                    .useOutputDirs(workArguments.outputFiles)
-                    .forceNonIncrementalMode(classpathChanges !is ClasspathChanges.ClasspathSnapshotEnabled.IncrementalRun)
-                    .useFirRunner(icEnv.useJvmFirRunner)
-
-                val classpathSnapshotsParameters = ClasspathSnapshotBasedIncrementalCompilationApproachParameters(
-                    classpathChanges.classpathSnapshotFiles.currentClasspathEntrySnapshotFiles,
-                    classpathChanges.classpathSnapshotFiles.shrunkPreviousClasspathSnapshotFile,
-                )
-                when (classpathChanges) {
-                    is ClasspathChanges.ClasspathSnapshotEnabled.IncrementalRun.NoChanges -> classpathSnapshotsConfig.assureNoClasspathSnapshotsChanges()
-                    is ClasspathChanges.ClasspathSnapshotEnabled.NotAvailableForNonIncrementalRun -> classpathSnapshotsConfig.forceNonIncrementalMode()
-                    else -> {}
-                }
-                jvmCompilationConfig.useIncrementalCompilation(
-                    icEnv.workingDir,
-                    icEnv.changedFiles,
-                    classpathSnapshotsParameters,
-                    classpathSnapshotsConfig,
-                )
-            }
-            return compilationService.compileJvm(
-                buildId,
-                executionConfig,
-                jvmCompilationConfig,
-                emptyList(),
-                workArguments.compilerArgs.toList(),
-            )
-        } catch (e: Throwable) {
-            wrapAndRethrowCompilationException(executionStrategy, e)
-        } finally {
-            log.info(executionStrategy.asFinishLogMessage)
-        }
+    private val metrics = if (workArguments.reportingSettings.buildReportOutputs.isNotEmpty()) {
+        BuildMetricsReporterImpl()
+    } else {
+        DoNothingBuildMetricsReporter
     }
 
     // the files are backed up in the task action before any changes to the outputs
-    private fun initializeBackup(): TaskOutputsBackup? = if (parameters.snapshotsDir.isPresent) {
+    private fun initializeBackup(log: KotlinLogger): TaskOutputsBackup? = if (parameters.snapshotsDir.isPresent) {
         TaskOutputsBackup(
             fileSystemOperations,
             parameters.snapshotsDir,
@@ -134,35 +93,246 @@ internal abstract class BuildToolsApiCompilationWork @Inject constructor(
         null
     }
 
-    override fun execute() {
-        val backup = initializeBackup()
-        val executionStrategy = workArguments.compilerExecutionSettings.strategy
-        try {
-            val result = performCompilation()
-            if (result == CompilationResult.COMPILATION_OOM_ERROR || result == CompilationResult.COMPILATION_ERROR) {
-                backup?.restoreOutputs()
+    /**
+     * Fallback to in-process on any unexpected problem, like daemon communication exception or uncaught compiler exception.
+     * Normally, valid [CompilationResult] does not lead to a fallback except [CompilationResult.COMPILER_INTERNAL_ERROR].
+     */
+    private fun compileInDaemon(
+        buildSession: KotlinToolchains.BuildSession,
+        runner: BtaCompilerRunner<*>,
+        log: KotlinLogger,
+        tryFallback: Boolean,
+        compilerMessageRenderer: ProblemsApiCompilerMessageRenderer,
+    ): Pair<CompilationResult, KotlinCompilerExecutionStrategy> {
+        val fallback: (Throwable?) -> Pair<CompilationResult, KotlinCompilerExecutionStrategy> = { t ->
+            if (t != null) {
+                log.error("Daemon compilation failed", t)
             }
-            throwExceptionIfCompilationFailed(result.asExitCode, executionStrategy)
+            val recommendation = """
+                        Try ./gradlew --stop if this issue persists
+                        If it does not look related to your configuration, please file an issue with logs to https://kotl.in/issue
+                    """.trimIndent()
+            if (!tryFallback) {
+                throw RuntimeException(
+                    """
+                            |Failed to compile with Kotlin daemon.
+                            |Fallback strategy (compiling without Kotlin daemon) is turned off.
+                            |$recommendation
+                            """.trimMargin(),
+                    t
+                )
+            }
+            val failDetails = t?.stackTraceAsString()?.removeSuffixIfPresent("\n")?.let { ": $it" } ?: ""
+            log.warn(
+                """
+                    |Failed to compile with Kotlin daemon$failDetails
+                    |Using fallback strategy: Compile without Kotlin daemon
+                    |$recommendation
+                    """.trimMargin()
+            )
+            runner.performCompilation(
+                buildSession,
+                KotlinCompilerExecutionStrategy.IN_PROCESS,
+                log,
+                compilerMessageRenderer,
+            ) to KotlinCompilerExecutionStrategy.IN_PROCESS
+        }
+        return try {
+            val daemonCompilationResult = runner.performCompilation(
+                buildSession,
+                KotlinCompilerExecutionStrategy.DAEMON,
+                log,
+                compilerMessageRenderer,
+            )
+            if (daemonCompilationResult != CompilationResult.COMPILER_INTERNAL_ERROR) {
+                daemonCompilationResult to KotlinCompilerExecutionStrategy.DAEMON
+            } else {
+                fallback(null)
+            }
+        } catch (t: Throwable) {
+            fallback(t)
+        }
+    }
+
+    override fun execute() {
+        metrics.addTimeMetric(START_WORKER_EXECUTION)
+        metrics.startMeasure(RUN_COMPILATION_IN_WORKER)
+        val exceptionReportingKotlinLogger = ExceptionReportingKotlinLogger()
+        val printingLogger =
+            CapturingDelegatingKotlinLogger(
+                getTaskLogger(taskPath, "${workArguments.taskPath} ", BuildToolsApiCompilationWork::class.java.simpleName, true),
+                workArguments.reportingSettings.buildReportMode,
+            )
+        val log: KotlinLogger = CompositeKotlinLogger(
+            setOf(
+                printingLogger,
+                exceptionReportingKotlinLogger,
+            )
+        )
+        val compilerMessageRenderer = ProblemsApiCompilerMessageRenderer(
+            suppressLogForProblemsApi = parameters.warningModeIsAll.getOrElse(false),
+        )
+        val runner = createRunner(workArguments.btaToolchain ?: error("btaToolchain is not set for task ${workArguments.taskPath}"), workArguments, metrics)
+        val backup = initializeBackup(log)
+        val buildSession = obtainBuildSession()
+
+        try {
+            with(log) {
+                kotlinDebug { "Kotlin compiler class: ${workArguments.compilerClassName}" }
+                kotlinDebug {
+                    val compilerClasspath =
+                        workArguments.compilerFullClasspath.joinToString(File.pathSeparator) { it.normalize().absolutePath }
+                    "Kotlin compiler classpath: $compilerClasspath"
+                }
+            }
+
+            val executionStrategy = workArguments.compilerExecutionSettings.strategy
+            val (compilationResult, effectiveExecutionStrategy) = when (executionStrategy) {
+                KotlinCompilerExecutionStrategy.DAEMON -> {
+                    val tryFallback = workArguments.compilerExecutionSettings.useDaemonFallbackStrategy
+                    compileInDaemon(buildSession, runner, log, tryFallback, compilerMessageRenderer)
+                }
+                KotlinCompilerExecutionStrategy.IN_PROCESS -> runner.performCompilation(
+                    buildSession,
+                    KotlinCompilerExecutionStrategy.IN_PROCESS,
+                    log,
+                    compilerMessageRenderer,
+                ) to KotlinCompilerExecutionStrategy.IN_PROCESS
+            }
+            log.info(effectiveExecutionStrategy.asFinishLogMessage)
+
+            throwExceptionIfCompilationFailed(compilationResult.asExitCode, executionStrategy)
         } catch (e: FailedCompilationException) {
+            // Restore outputs only for CompilationErrorException or OOMErrorException (see GradleKotlinCompilerWorkAction.execute)
             backup?.tryRestoringOnRecoverableException(e) { restoreAction ->
-                log.info(DEFAULT_BACKUP_RESTORE_MESSAGE)
-                restoreAction()
+                metrics.measure(RESTORE_OUTPUT_FROM_BACKUP) {
+                    log.info(DEFAULT_BACKUP_RESTORE_MESSAGE)
+                    restoreAction()
+                }
             }
             throw e
         } finally {
+            // Replay buffered compiler diagnostics on the worker thread (see ProblemsApiCompilerMessageRenderer).
+            compilerMessageRenderer.replayTo(compilerDiagnosticsProblemsReporter)
+
+            val taskInfo = TaskExecutionInfo(
+                kotlinLanguageVersion = workArguments.kotlinLanguageVersion,
+                changedFiles = workArguments.incrementalCompilationEnvironment?.changedFiles,
+                compilerArguments = if (workArguments.reportingSettings.includeCompilerArguments) workArguments.compilerArgs else emptyArray(),
+                tags = workArguments.incrementalCompilationEnvironment?.collectIcTags().orEmpty(),
+            )
+            workArguments.errorsFiles?.let {
+                /*
+                 * Use `printingLogger` here intentionally (not `log`) to avoid accidentally writing
+                 * to the exception-reporting logger.
+                 * After we extract messages from
+                 * `exceptionReportingKotlinLogger`, it should remain silent.
+                 * The extractor asserts this
+                 * and will flag any further writes as misuse.
+                 */
+                exceptionReportingKotlinLogger.extractExceptionMessages()
+                    .reportToIde(it, workArguments.kotlinPluginVersion, logger = printingLogger)
+            }
+            metrics.endMeasure(RUN_COMPILATION_IN_WORKER)
+            val result =
+                TaskExecutionResult(buildMetrics = metrics.getMetrics(), taskInfo = taskInfo, icLogLines = printingLogger.capturedLines)
+            TaskExecutionResults[workArguments.taskPath] = result
             backup?.deleteSnapshot()
         }
     }
 
-    // temporary adapter property
-    private val CompilationResult.asExitCode
-        get() = when (this) {
-            CompilationResult.COMPILATION_ERROR -> ExitCode.COMPILATION_ERROR
-            CompilationResult.COMPILER_INTERNAL_ERROR -> ExitCode.INTERNAL_ERROR
-            CompilationResult.COMPILATION_OOM_ERROR -> ExitCode.OOM_ERROR
-            else -> ExitCode.OK
-        }
+    private fun obtainBuildSession(): KotlinToolchains.BuildSession = parameters.buildSessionService.get().getOrCreateBuildSession(
+        parameters.classLoadersCachingService.get(),
+        workArguments.compilerFullClasspath
+    )
+
 }
+
+private fun createRunner(
+    toolchain: BtaToolchain,
+    workArguments: GradleKotlinCompilerWorkArguments,
+    metrics: BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>,
+): BtaCompilerRunner<*> {
+    val icEnv = workArguments.incrementalCompilationEnvironment
+    val outputDirs = workArguments.outputFiles.map(File::toPath)
+    val compilerArgs = workArguments.compilerArgs.toList()
+    val daemonJvmArgs = workArguments.compilerExecutionSettings.daemonJvmArgs ?: emptyList()
+    val compilerArgumentsLogLevel = workArguments.compilerArgumentsLogLevel.toBtaCompilerArgumentsLogLevel()
+    val generateCompilerRefIndex = workArguments.compilerExecutionSettings.generateCompilerRefIndex
+
+    return when (toolchain) {
+        BtaToolchain.JVM -> BtaCompilerRunner(
+            metrics,
+            JvmBuildOperationFactory(compilerArgs, workArguments.kotlinScriptExtensions.toList()),
+            icEnv?.let {
+                JvmIncrementalConfigurationStrategy(icEnv, outputDirs)
+            } ?: IncrementalConfigurationStrategy.Default,
+            daemonJvmArgs,
+            compilerArgumentsLogLevel,
+            generateCompilerRefIndex,
+        )
+        BtaToolchain.JS_COMPILATION -> BtaCompilerRunner(
+            metrics,
+            JsKlibBuildOperationFactory(compilerArgs),
+            icEnv?.let {
+                JsKlibIncrementalConfigurationStrategy(icEnv, workArguments.incrementalModuleInfo, outputDirs)
+            } ?: IncrementalConfigurationStrategy.Default,
+            daemonJvmArgs,
+            compilerArgumentsLogLevel,
+            generateCompilerRefIndex,
+        )
+        BtaToolchain.JS_LINKING -> BtaCompilerRunner(
+            metrics,
+            JsLinkingBuildOperationFactory(compilerArgs),
+            IncrementalConfigurationStrategy.Default,
+            daemonJvmArgs,
+            compilerArgumentsLogLevel,
+            generateCompilerRefIndex,
+        )
+        BtaToolchain.WASM_COMPILATION -> BtaCompilerRunner(
+            metrics,
+            WasmKlibBuildOperationFactory(compilerArgs),
+            icEnv?.let {
+                WasmKlibIncrementalConfigurationStrategy(icEnv, workArguments.incrementalModuleInfo, outputDirs)
+            } ?: IncrementalConfigurationStrategy.Default,
+            daemonJvmArgs,
+            compilerArgumentsLogLevel,
+            generateCompilerRefIndex,
+        )
+        BtaToolchain.WASM_LINKING -> BtaCompilerRunner(
+            metrics,
+            WasmLinkingBuildOperationFactory(compilerArgs),
+            IncrementalConfigurationStrategy.Default,
+            daemonJvmArgs,
+            compilerArgumentsLogLevel,
+            generateCompilerRefIndex,
+        )
+        BtaToolchain.METADATA -> BtaCompilerRunner(
+            metrics,
+            MetadataKlibBuildOperationFactory(compilerArgs),
+            IncrementalConfigurationStrategy.Default,
+            daemonJvmArgs,
+            compilerArgumentsLogLevel,
+            generateCompilerRefIndex,
+        )
+    }
+}
+
+private val CompilationResult.asExitCode
+    get() = when (this) {
+        CompilationResult.COMPILATION_ERROR -> ExitCode.COMPILATION_ERROR
+        CompilationResult.COMPILER_INTERNAL_ERROR -> ExitCode.INTERNAL_ERROR
+        CompilationResult.COMPILATION_OOM_ERROR -> ExitCode.OOM_ERROR
+        else -> ExitCode.OK
+    }
+
+private fun KotlinCompilerArgumentsLogLevel.toBtaCompilerArgumentsLogLevel() =
+    when (this) {
+        KotlinCompilerArgumentsLogLevel.ERROR -> JvmCompilationOperation.CompilerArgumentsLogLevel.ERROR
+        KotlinCompilerArgumentsLogLevel.WARNING -> JvmCompilationOperation.CompilerArgumentsLogLevel.WARNING
+        KotlinCompilerArgumentsLogLevel.INFO -> JvmCompilationOperation.CompilerArgumentsLogLevel.INFO
+        KotlinCompilerArgumentsLogLevel.DEBUG -> JvmCompilationOperation.CompilerArgumentsLogLevel.DEBUG
+    }
 
 internal object SharedApiClassesClassLoaderProvider : ParentClassLoaderProvider {
     override fun getClassLoader() = SharedApiClassesClassLoader()

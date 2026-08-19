@@ -5,25 +5,29 @@
 
 package org.jetbrains.kotlin.library.metadata
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.serialization.SerializableStringTable
 
+@K1Deprecation
 fun buildKlibPackageFragment(
     packageProto: ProtoBuf.Package,
     classesProto: List<Pair<ProtoBuf.Class, Int>>,
     fqName: FqName,
     isEmpty: Boolean,
     stringTable: SerializableStringTable,
+    fileAnnotations: List<ProtoBuf.Annotation> = emptyList(),
 ): ProtoBuf.PackageFragment {
 
-    val (stringTableProto, nameTableProto) = stringTable.buildProto()
+    val [stringTableProto, nameTableProto] = stringTable.buildProto()
 
     return ProtoBuf.PackageFragment.newBuilder()
         .setPackage(packageProto)
         .addAllClass_(classesProto.map { it.first })
         .setStrings(stringTableProto)
         .setQualifiedNames(nameTableProto)
+        .addAllFileAnnotation(fileAnnotations)
         .also { packageFragment ->
             classesProto.forEach {
                 packageFragment.addExtension(KlibMetadataProtoBuf.className, it.second )

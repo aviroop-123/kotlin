@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,12 +7,13 @@ package org.jetbrains.kotlin.analysis.api.components
 
 import org.jetbrains.kotlin.analysis.api.KaContextParameterApi
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
+import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
 import org.jetbrains.kotlin.psi.KtExpression
 
-@SubclassOptInRequired(KaImplementationDetail::class)
+@KaSessionComponentImplementationDetail
+@SubclassOptInRequired(KaSessionComponentImplementationDetail::class)
 public interface KaEvaluator : KaSessionComponent {
     /**
      * Attempts to evaluate the given [KtExpression] to a [compile-time constant value][KaConstantValue], or returns `null` if this is not
@@ -29,20 +30,28 @@ public interface KaEvaluator : KaSessionComponent {
 }
 
 /**
- * @see KaEvaluator.evaluate
+ * Attempts to evaluate the given [KtExpression] to a [compile-time constant value][KaConstantValue], or returns `null` if this is not
+ * possible.
  */
+// Auto-generated bridge. DO NOT EDIT MANUALLY!
 @KaContextParameterApi
-context(context: KaEvaluator)
+context(session: KaSession)
 public fun KtExpression.evaluate(): KaConstantValue? {
-    return with(context) { evaluate() }
+    return with(session) {
+        evaluate()
+    }
 }
 
 /**
- * @see KaEvaluator.evaluateAsAnnotationValue
+ * Attempts to evaluate the given [KtExpression] to an [annotation value][KaAnnotationValue] (a constant value which can be used as an
+ * annotation argument), or returns `null` if this is not possible.
  */
-@KaContextParameterApi
+// Auto-generated bridge. DO NOT EDIT MANUALLY!
 @KaExperimentalApi
-context(context: KaEvaluator)
+@KaContextParameterApi
+context(session: KaSession)
 public fun KtExpression.evaluateAsAnnotationValue(): KaAnnotationValue? {
-    return with(context) { evaluateAsAnnotationValue() }
+    return with(session) {
+        evaluateAsAnnotationValue()
+    }
 }

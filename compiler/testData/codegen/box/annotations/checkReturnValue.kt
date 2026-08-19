@@ -1,9 +1,8 @@
 // LANGUAGE: +UnnamedLocalVariables
 // RETURN_VALUE_CHECKER_MODE: FULL
-// IGNORE_BACKEND_K1: ANY
 // WITH_STDLIB
 
-@file:MustUseReturnValue
+@file:MustUseReturnValues
 
 fun mustUseReturnValueFun(): Int = 123
 

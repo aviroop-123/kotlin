@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_EXPRESSION -UNUSED_PARAMETER -UNUSED_VARIABLE -UNUSED_VALUE -VARIABLE_WITH_REDUNDANT_INITIALIZER
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (POSITIVE)
@@ -19,8 +18,8 @@ class Case1 {
     init {
         var y: String? = "xyz"
         if (y != null) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>y<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?"), SMARTCAST_IMPOSSIBLE!>y<!>.length
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
         }
     }
     constructor()
@@ -31,8 +30,8 @@ class Case2 {
     init {
         var y: String? = "xyz"
         if (y != null) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?")!>y<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?"), DEBUG_INFO_SMARTCAST!>y<!>.length
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
         }
     }
 }
@@ -42,8 +41,8 @@ class Case3 {
     init {
         var y: String? = "xyz"
         if (y != null) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?")!>y<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?"), DEBUG_INFO_SMARTCAST!>y<!>.length
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
         }
     }
     init { }
@@ -58,8 +57,8 @@ class Case4 {
     init {
         var y: String? = "xyz"
         if (y != null) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>y<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?"), SMARTCAST_IMPOSSIBLE!>y<!>.length
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
         }
     }
     constructor(y: Int?) {
@@ -72,8 +71,8 @@ class Case5() {
     init {
         var y: String? = "xyz"
         if (y != null) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?")!>y<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?"), DEBUG_INFO_SMARTCAST!>y<!>.length
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
         }
     }
     constructor(y: Int?) : this() {
@@ -86,8 +85,8 @@ class Case6() {
     init {
         var y: String? = "xyz"
         if (y != null) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?")!>y<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?"), DEBUG_INFO_SMARTCAST!>y<!>.length
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
         }
     }
 }
@@ -97,8 +96,8 @@ class Case7() {
     init {
         var y: String? = "xyz"
         if (y != null) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?")!>y<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String & kotlin.String?"), DEBUG_INFO_SMARTCAST!>y<!>.length
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
         }
     }
     constructor(y: Int?) : this() {
@@ -118,8 +117,8 @@ class Case8 {
     init {
         var y: String? = "xyz"
         y!!
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>y<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?"), SMARTCAST_IMPOSSIBLE!>y<!>.length
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
     }
     constructor()
 }
@@ -133,8 +132,8 @@ class Case9 {
     init {
         var y: String? = "xyz"
         if (y == null) throw Exception()
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>y<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?"), SMARTCAST_IMPOSSIBLE!>y<!>.length
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
     }
     constructor()
 }
@@ -148,8 +147,8 @@ class Case10 {
     init {
         var y: String? = "xyz"
         y ?: throw Exception()
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>y<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?"), SMARTCAST_IMPOSSIBLE!>y<!>.length
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
     }
     constructor()
 }
@@ -163,10 +162,10 @@ val case_12: Nothing? get() = null
 class Case11 {
     init {
         var y: String? = "xyz"
-        if (y == <!DEBUG_INFO_CONSTANT!>case_12<!>)
+        if (y == case_12)
             throw Exception()
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>y<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?"), SMARTCAST_IMPOSSIBLE!>y<!>.length
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>y<!>.length
     }
     constructor()
 }

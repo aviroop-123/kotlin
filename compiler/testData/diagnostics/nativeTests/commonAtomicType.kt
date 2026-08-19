@@ -1,5 +1,5 @@
+// RUN_PIPELINE_TILL: FRONTEND
 // WITH_STDLIB
-// FIR_IDENTICAL
 import kotlin.concurrent.atomics.AtomicIntArray
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 

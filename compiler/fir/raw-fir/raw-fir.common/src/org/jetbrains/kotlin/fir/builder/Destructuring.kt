@@ -59,7 +59,7 @@ fun <T> AbstractRawFirBuilder<*>.addDestructuringVariables(
     if (isTmpVariable) {
         destination += container
     }
-    for ((index, entry) in entries.withIndex()) {
+    for ([index, entry] in entries.withIndex()) {
         destination += buildDestructuringVariable(
             moduleData,
             container,
@@ -123,10 +123,12 @@ fun <T> AbstractRawFirBuilder<*>.buildDestructuringVariable(
             this.isVar = entry.isVar
             source = entry.source
             status = FirDeclarationStatusImpl(if (localEntries) Visibilities.Local else Visibilities.Public, Modality.FINAL)
-            entry.extractAnnotationsTo(this, context.containerSymbol)
+            isLocal = localEntries
+            context.containerSymbolIfAny?.let { entry.extractAnnotationsTo(this, it) }
             if (!localEntries) {
+                dispatchReceiverType = currentDispatchReceiverType()
                 getter = FirDefaultPropertyGetter(
-                    source = source?.fakeElement(KtFakeSourceElementKind.DefaultAccessor),
+                    source = source?.fakeElement(KtFakeSourceElementKind.DefaultAccessor.Getter),
                     moduleData = moduleData,
                     origin = FirDeclarationOrigin.Source,
                     propertyTypeRef = returnTypeRef,
@@ -136,7 +138,7 @@ fun <T> AbstractRawFirBuilder<*>.buildDestructuringVariable(
                 )
                 if (entry.isVar) {
                     setter = FirDefaultPropertySetter(
-                        source = source?.fakeElement(KtFakeSourceElementKind.DefaultAccessor),
+                        source = source?.fakeElement(KtFakeSourceElementKind.DefaultAccessor.Setter),
                         moduleData = moduleData,
                         origin = FirDeclarationOrigin.Source,
                         propertyTypeRef = returnTypeRef,

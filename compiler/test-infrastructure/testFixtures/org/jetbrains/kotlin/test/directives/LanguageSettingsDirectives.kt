@@ -5,12 +5,10 @@
 
 package org.jetbrains.kotlin.test.directives
 
-import org.jetbrains.kotlin.config.ApiVersion
-import org.jetbrains.kotlin.config.ExplicitApiMode
-import org.jetbrains.kotlin.config.JvmDefaultMode
-import org.jetbrains.kotlin.config.LanguageVersion
-import org.jetbrains.kotlin.config.ReturnValueCheckerMode
+import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.test.builders.LanguageVersionSettingsBuilder
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
+import org.jetbrains.kotlin.test.testInfraError
 
 object LanguageSettingsDirectives : SimpleDirectivesContainer() {
     val LANGUAGE by stringDirective(
@@ -44,6 +42,31 @@ object LanguageSettingsDirectives : SimpleDirectivesContainer() {
         """.trimIndent()
     )
 
+    val ALLOW_MULTIPLE_API_VERSIONS_SETTING by directive(
+        description = """
+            Disables the failure in the ${LanguageVersionSettingsBuilder::class} in case if there
+            several values specified for the $API_VERSION. In this case the latest version will be used.
+            
+            Please note that having several API versions specified is most likely an error prone
+            situation, so it's not recommended to use this directive.
+       """.trimIndent()
+    )
+
+    val LANGUAGE_FEATURE_TOGGLED_IDENTICAL by directive(
+        description = "Diagnostics are the same with the given language feature enabled/disabled."
+    )
+
+    val LANGUAGE_FEATURE_TOGGLED by enumDirective<LanguageFeature>(
+        description = """
+            If diagnostics differ when the given LanguageFeature is enabled/disabled,
+            a separate file with the extension `disabled.kt` is created.
+            Otherwise, $LANGUAGE_FEATURE_TOGGLED_IDENTICAL must be declared.
+            """.trimIndent()
+    )
+
+    val TESTED_LANGUAGE_FEATURE_DISABLED by directive(
+        description = "The LF specified by $LANGUAGE_FEATURE_TOGGLED is disabled."
+    )
 
     // --------------------- Analysis Flags ---------------------
 
@@ -72,10 +95,6 @@ object LanguageSettingsDirectives : SimpleDirectivesContainer() {
 
     val ALLOW_KOTLIN_PACKAGE by directive(
         description = "Allow compiling code in package 'kotlin' and allow not requiring kotlin.stdlib in module-info (AnalysisFlags.allowKotlinPackage)"
-    )
-
-    val EXPECT_BUILTINS_AS_PART_OF_STDLIB by directive(
-        description = "Emulate kotlin-stdlib compilation"
     )
 
     val PREFER_IN_TEST_OVER_STDLIB by directive(
@@ -132,6 +151,7 @@ object LanguageSettingsDirectives : SimpleDirectivesContainer() {
     )
 
     val ENABLE_JVM_PREVIEW by directive("Enable JVM preview features")
+    val JVM_EXPOSE_BOXED by directive("Implicitly expose inline classes API")
     val EMIT_JVM_TYPE_ANNOTATIONS by directive("Enable emitting jvm type annotations")
     val DISABLE_PARAM_ASSERTIONS by directive("Disable assertions on parameters")
     val DISABLE_CALL_ASSERTIONS by directive("Disable assertions on calls")
@@ -142,6 +162,8 @@ object LanguageSettingsDirectives : SimpleDirectivesContainer() {
     val LINK_VIA_SIGNATURES_K1 by directive("Use linkage via signatures instead of descriptors on the K1 frontend")
     val USE_INLINE_SCOPES_NUMBERS by directive("Use inline scopes numbers for inline marker variables")
     val DONT_WARN_ON_ERROR_SUPPRESSION by directive("Don't emit warning when an error is suppressed")
+    val HEADER_MODE by directive("Enable header mode")
+    val IDE_MODE by directive("Enable ide mode")
 
 
     // --------------------- Utils ---------------------
@@ -149,11 +171,11 @@ object LanguageSettingsDirectives : SimpleDirectivesContainer() {
     fun parseApiVersion(versionString: String): ApiVersion = when (versionString) {
         "LATEST" -> ApiVersion.LATEST
         "LATEST_STABLE" -> ApiVersion.LATEST_STABLE
-        else -> ApiVersion.parse(versionString) ?: error("Unknown API version: $versionString")
+        else -> ApiVersion.parse(versionString) ?: testInfraError("Unknown API version: $versionString")
     }
 
     fun parseLanguageVersion(versionString: String): LanguageVersion = when (versionString) {
         "LATEST_STABLE" -> LanguageVersion.LATEST_STABLE
-        else -> LanguageVersion.fromVersionString(versionString) ?: error("Unknown language version: $versionString")
+        else -> LanguageVersion.fromVersionString(versionString) ?: testInfraError("Unknown language version: $versionString")
     }
 }

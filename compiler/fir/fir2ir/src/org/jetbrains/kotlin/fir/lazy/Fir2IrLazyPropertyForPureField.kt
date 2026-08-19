@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
 import org.jetbrains.kotlin.ir.util.isFakeOverride
@@ -37,12 +38,12 @@ class Fir2IrLazyPropertyForPureField(
 
         val baseFieldsWithDispatchReceiverTag =
             lazyFakeOverrideGenerator.computeFakeOverrideKeys(containingClass, field.fir.symbol)
-        baseFieldsWithDispatchReceiverTag.map { (symbol, dispatchReceiverLookupTag) ->
+        baseFieldsWithDispatchReceiverTag.map { [symbol, dispatchReceiverLookupTag] ->
             declarationStorage.getIrSymbolForField(symbol, dispatchReceiverLookupTag) as IrPropertySymbol
         }
     }
 
-    override var annotations: List<IrConstructorCall>
+    override var annotations: List<IrAnnotation>
         get() = emptyList()
         set(_) = mutationNotSupported()
 

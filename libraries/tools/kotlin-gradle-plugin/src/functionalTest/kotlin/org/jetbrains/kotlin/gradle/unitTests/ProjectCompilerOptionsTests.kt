@@ -18,10 +18,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile as KotlinJvmCompileTas
 import org.jetbrains.kotlin.gradle.tasks.withType
 import org.jetbrains.kotlin.gradle.util.*
 import org.jetbrains.kotlin.gradle.utils.named
-import org.jetbrains.kotlin.test.util.JUnit4Assertions.assertTrue
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ProjectCompilerOptionsTests {
 
@@ -35,6 +34,7 @@ class ProjectCompilerOptionsTests {
                     }
                 }
 
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64 {
                     compilerOptions {
                         suppressWarnings.set(true)
@@ -246,6 +246,7 @@ class ProjectCompilerOptionsTests {
         val project = buildProjectWithMPP {
             with(multiplatformExtension) {
                 linuxX64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 iosArm64()
 
@@ -275,6 +276,7 @@ class ProjectCompilerOptionsTests {
 
             with(multiplatformExtension) {
                 linuxX64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 iosArm64()
 
@@ -531,6 +533,72 @@ class ProjectCompilerOptionsTests {
                 )
             )
         }
+    }
+
+    @Test
+    fun multiTargetCompilerOptionsAreIsolated() {
+        // Config-phase port of KGP `CompilerOptionsProjectIT.mppCompilerOptionsDsl`: jvm, js and native are
+        // configured simultaneously, and each compile task must end up with exactly its own options — top-level
+        // values where the target didn't override them, the target's own value where it did, and nothing leaking
+        // from a sibling target.
+        //
+        // `languageVersion`/`apiVersion` use two versions kept monotonic across the source-set hierarchy
+        // (top-level is the lowest, jvm raises it) so the override is observable without tripping the source-set
+        // consistency check. `progressiveMode`/`jvmTarget`/`friendModulesDisabled` are each set on a single target
+        // and double as cross-target leak probes.
+        val topLevelVersion = LanguageVersion.FIRST_NON_DEPRECATED.asKotlinVersion()
+        val jvmVersion = LanguageVersion.LATEST_STABLE.asKotlinVersion()
+        val project = buildProjectWithMPP {
+            with(multiplatformExtension) {
+                compilerOptions {
+                    languageVersion.set(topLevelVersion)
+                    apiVersion.set(topLevelVersion)
+                }
+                jvm {
+                    compilerOptions {
+                        languageVersion.set(jvmVersion)
+                        apiVersion.set(jvmVersion)
+                        jvmTarget.set(JvmTarget.JVM_11)
+                        javaParameters.set(true)
+                    }
+                }
+                js {
+                    compilerOptions {
+                        friendModulesDisabled.set(true)
+                    }
+                }
+                linuxX64 {
+                    compilerOptions {
+                        progressiveMode.set(true)
+                    }
+                }
+
+                applyDefaultHierarchyTemplate()
+            }
+        }
+
+        project.evaluate()
+
+        // The top-level options reach the common metadata compilation (restored from `mppCompilerOptionsDsl`).
+        val common = project.kotlinCommonTask("compileCommonMainKotlinMetadata").compilerOptions
+        assertEquals(topLevelVersion, common.languageVersion.orNull)
+        assertEquals(topLevelVersion, common.apiVersion.orNull)
+
+        val jvm = project.kotlinJvmTask("compileKotlinJvm").compilerOptions
+        assertEquals(JvmTarget.JVM_11, jvm.jvmTarget.orNull)
+        assertEquals(true, jvm.javaParameters.get())
+        assertEquals(jvmVersion, jvm.languageVersion.orNull) // jvm's own value overrides the top-level one
+        assertEquals(jvmVersion, jvm.apiVersion.orNull) // jvm's own value overrides the top-level one
+        assertEquals(false, jvm.progressiveMode.get()) // native's progressiveMode must not leak here
+
+        val js = project.kotlinJsTask("compileKotlinJs").compilerOptions
+        assertEquals(true, js.friendModulesDisabled.get())
+        assertEquals(topLevelVersion, js.languageVersion.orNull) // inherits top-level; jvm's override must not leak here
+        assertEquals(false, js.progressiveMode.get()) // native's progressiveMode must not leak here
+
+        val native = project.kotlinNativeTask("compileKotlinLinuxX64").compilerOptions
+        assertEquals(topLevelVersion, native.languageVersion.orNull) // inherits top-level; jvm's override must not leak here
+        assertEquals(true, native.progressiveMode.get())
     }
 
     private fun Project.kotlinNativeTask(name: String): KotlinCompilationTask<KotlinNativeCompilerOptions> = tasks

@@ -10,12 +10,13 @@ import org.jetbrains.kotlin.js.engine.ScriptEngine
 import org.jetbrains.kotlin.js.engine.ScriptEngineV8
 import org.jetbrains.kotlin.js.engine.loadFiles
 import org.jetbrains.kotlin.js.test.utils.KOTLIN_TEST_INTERNAL
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.test.utils.withSuffixAndExtension
 import org.junit.Assert
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
-internal const val TEST_DATA_DIR_PATH = "js/js.translator/testData/"
+internal const val TEST_DATA_DIR_PATH = "js/js.translator/testData"
 private const val ESM_EXTENSION = ".mjs"
 
 fun createScriptEngine(): ScriptEngine = ScriptEngineV8()
@@ -26,7 +27,7 @@ private fun String.escapePath(): String {
 
 fun ScriptEngine.runTestFunction(
     testModuleName: String?,
-    testPackageName: String?,
+    testPackageName: FqName,
     testFunctionName: String,
     withModuleSystem: Boolean,
     testFunctionArgs: String = "",
@@ -44,7 +45,7 @@ fun ScriptEngine.runTestFunction(
         else -> "this['$testModuleName']"
     }
 
-    if (testPackageName !== null) {
+    if (!testPackageName.isRoot) {
         script += ".$testPackageName"
     }
 
@@ -57,7 +58,7 @@ object V8JsTestChecker {
     fun check(
         files: List<String>,
         testModuleName: String?,
-        testPackageName: String?,
+        testPackageName: FqName,
         testFunctionName: String,
         expectedResult: String,
         withModuleSystem: Boolean,
@@ -70,7 +71,7 @@ object V8JsTestChecker {
     fun checkWithTestFunctionArgs(
         files: List<String>,
         testModuleName: String?,
-        testPackageName: String?,
+        testPackageName: FqName,
         testFunctionName: String,
         testFunctionArgs: String,
         expectedResult: String,
@@ -84,7 +85,7 @@ object V8JsTestChecker {
     private fun run(
         files: List<String>,
         testModuleName: String?,
-        testPackageName: String?,
+        testPackageName: FqName,
         testFunctionName: String,
         testFunctionArgs: String,
         withModuleSystem: Boolean,

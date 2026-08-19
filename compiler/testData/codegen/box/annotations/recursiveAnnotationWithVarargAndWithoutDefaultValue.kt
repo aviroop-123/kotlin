@@ -1,0 +1,11 @@
+// ISSUE: KT-80871
+
+@Target(AnnotationTarget.TYPE)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Ann(vararg val arg: @Ann("a") String)
+
+fun box(): String {
+    val a = Ann("O", "K")
+    val arg = a.arg
+    return arg[0] + arg[1]
+}

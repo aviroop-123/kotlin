@@ -21,6 +21,9 @@ import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.default
 import kotlinx.cli.required
+import kotlinx.metadata.klib.ChunkedKlibModuleFragmentWriteStrategy
+import kotlinx.metadata.klib.KlibMetadataVersion
+import org.jetbrains.kotlin.config.KlibAbiCompatibilityLevel
 import org.jetbrains.kotlin.konan.ForeignExceptionMode
 import org.jetbrains.kotlin.konan.TempFiles
 import org.jetbrains.kotlin.konan.exec.Command
@@ -32,14 +35,16 @@ import org.jetbrains.kotlin.konan.util.DefFile
 import org.jetbrains.kotlin.library.*
 import org.jetbrains.kotlin.utils.KotlinNativePaths
 import org.jetbrains.kotlin.utils.usingNativeMemoryAllocator
-import org.jetbrains.kotlin.library.metadata.resolver.TopologicalLibraryOrder
 import org.jetbrains.kotlin.library.metadata.resolver.impl.KotlinLibraryResolverImpl
 import org.jetbrains.kotlin.library.metadata.resolver.impl.libraryResolver
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.isSubpackageOf
 import org.jetbrains.kotlin.native.interop.gen.*
 import org.jetbrains.kotlin.native.interop.indexer.*
 import org.jetbrains.kotlin.native.interop.tool.*
 import org.jetbrains.kotlin.util.removeSuffixIfPresent
 import org.jetbrains.kotlin.util.suffixIfNot
+import org.jetbrains.kotlin.util.toCInteropKlibMetadataVersion
 import java.io.File
 import java.nio.file.*
 import java.util.*
@@ -169,7 +174,7 @@ private fun selectNativeLanguage(config: DefFile.DefFileConfig): Language {
 }
 
 private fun parseImports(dependencies: List<KotlinLibrary>): ImportsImpl =
-        dependencies.filterIsInstance<KonanLibrary>().mapNotNull { library ->
+        dependencies.mapNotNull { library ->
             // TODO: handle missing properties?
             library.packageFqName?.let { packageFqName ->
                 val headerIds = library.includedHeaders
@@ -198,7 +203,7 @@ fun getCompilerFlagsForVfsOverlay(headerFilterPrefix: Array<String>, def: DefFil
 
     val virtualRoot = Paths.get(System.getProperty("java.io.tmpdir")).resolve("konanSystemInclude")
 
-    val virtualPathToReal = relativeToRoot.map { (relativePath, realRoot) ->
+    val virtualPathToReal = relativeToRoot.map { [relativePath, realRoot] ->
         virtualRoot.resolve(relativePath) to realRoot.resolve(relativePath)
     }.toMap()
 
@@ -238,7 +243,7 @@ private fun findFilesByGlobs(roots: List<Path>, includeGlobs: List<String>, excl
 private fun processCLibSafe(flavor: KotlinPlatform, cinteropArguments: CInteropArguments,
                             additionalArgs: InternalInteropOptions, runFromDaemon: Boolean) =
         usingNativeMemoryAllocator {
-            usingJvmCInteropCallbacks {
+            usingJvmCInteropCallbacks(cinteropArguments.konanHome) {
                 processCLib(flavor, cinteropArguments, additionalArgs, runFromDaemon)
             }
         }
@@ -258,11 +263,19 @@ private fun processCLib(
         cinteropArguments.argParser.printError("-def or -pkg should be provided!")
     }
 
-    val tool = prepareTool(cinteropArguments.target, flavor, runFromDaemon, parseKeyValuePairs(cinteropArguments.overrideKonanProperties), konanDataDir = cinteropArguments.konanDataDir)
+    val tool = prepareTool(
+            cinteropArguments.target,
+            flavor,
+            runFromDaemon,
+            parseKeyValuePairs(cinteropArguments.overrideKonanProperties),
+            konanDataDir = cinteropArguments.konanDataDir,
+            cinteropArguments.konanHome,
+    )
 
-    val def = DefFile(defFile, tool.substitutions)
+    val def = DefFile(defFile, tool.target)
 
     checkCCallModeCompatibility(cinteropArguments, def)
+    checkKlibAbiCompatibilityLevel(cinteropArguments)
 
     val isLinkerOptsSetByUser = (cinteropArguments.linkerOpts.valueOrigin == ArgParser.ValueOrigin.SET_BY_USER) ||
             (cinteropArguments.linkerOptions.valueOrigin == ArgParser.ValueOrigin.SET_BY_USER) ||
@@ -288,10 +301,11 @@ private fun processCLib(
             it
         else Paths.get(projectDir, it).absolutePathString()
     }
+
     val fqParts = (cinteropArguments.pkg ?: def.config.packageName)?.split('.')
             ?: defFile!!.name.split('.').reversed().drop(1)
-
     val outKtPkg = fqParts.joinToString(".")
+    checkPackageName(outKtPkg)
 
     val resolver = getLibraryResolver(cinteropArguments, tool.target)
 
@@ -300,7 +314,7 @@ private fun processCLib(
         else -> listOf()
     }
 
-    val libName = additionalArgs.cstubsName ?: fqParts.joinToString("") + "stubs"
+    val libName = additionalArgs.cstubsName ?: (fqParts.joinToString("") + "stubs")
 
     val tempFiles = TempFiles(cinteropArguments.tempDir)
 
@@ -309,7 +323,15 @@ private fun processCLib(
     val library = buildNativeLibrary(tool, def, cinteropArguments, imports)
 
     // when this tool does not compile native library, make the generated source consumable by external compiler (i.e. do not strip includes)
-    val (nativeIndex, compilation) = buildNativeIndexImpl(library, verbose, allowPrecompiledHeaders = nativeLibsDir != null)
+    (
+        val nativeIndex = index, val compilation
+    ) =
+        buildNativeIndexImpl(
+            library,
+            verbose,
+            allowPrecompiledHeaders = nativeLibsDir != null,
+            macroNamesCollectingMode = cinteropArguments.macroCollectionImpl
+        )
 
     val target = tool.target
 
@@ -347,7 +369,17 @@ private fun processCLib(
         KotlinPlatform.NATIVE -> GenerationMode.METADATA
     }
     // when this tool does not compile native library, make the generated source consumable by external compiler (i.e. do not strip includes)
-    val stubIrContext = StubIrContext(logger, configuration, nativeIndex, imports, flavor, mode, libName, allowPrecompiledHeaders = nativeLibsDir != null)
+    val stubIrContext = StubIrContext(
+            logger,
+            configuration,
+            nativeIndex,
+            imports,
+            flavor,
+            mode,
+            libName,
+            allowPrecompiledHeaders = nativeLibsDir != null,
+            KlibMetadataVersion(cinteropArguments.klibAbiCompatibilityLevel.toCInteropKlibMetadataVersion().toArray())
+    )
     val stubIrOutput = run {
         val outKtFileCreator = {
             val outKtFileName = fqParts.last() + ".kt"
@@ -456,8 +488,12 @@ private fun processCLib(
                 if (nopack) it.removeSuffixIfPresent(suffix) else it.suffixIfNot(suffix)
             }
 
+            val serializedMetadata = stubIrOutput.metadata.write(ChunkedKlibModuleFragmentWriteStrategy(topLevelClassifierDeclarationsPerFile = 128)).run {
+                SerializedMetadata(header, fragments, fragmentNames, metadataVersion.toArray())
+            }
+
             createInteropLibrary(
-                    metadata = stubIrOutput.metadata,
+                    serializedMetadata = serializedMetadata,
                     nativeBitcodeFiles = compiledFiles + listOfNotNull(nativeOutputPath),
                     target = tool.target,
                     moduleName = moduleName,
@@ -466,10 +502,20 @@ private fun processCLib(
                     dependencies = stdlibDependency + imports.requiredLibraries.toList(),
                     nopack = nopack,
                     shortName = cinteropArguments.shortModuleName,
-                    staticLibraries = resolveLibraries(staticLibraries, libraryPaths)
+                    staticLibraries = resolveLibraries(staticLibraries, libraryPaths),
+                    klibAbiCompatibilityLevel = cinteropArguments.klibAbiCompatibilityLevel,
             )
             return null
         }
+    }
+}
+
+fun checkPackageName(outKtPkg: String) {
+    val pkgFqName = FqName(outKtPkg)
+    // See KT-85765
+    check(!pkgFqName.isSubpackageOf(FqName("kotlin")) && !pkgFqName.isSubpackageOf(FqName("kotlinx.cinterop"))) {
+        "Bindings cannot be placed under a package \"kotlin\" or \"kotlinx.cinterop\", as they are reserved for the Kotlin standard library. " +
+                "Please specify a different package via a \"-pkg\" CLI option or a \"package\" directive in the .def file."
     }
 }
 
@@ -490,12 +536,36 @@ private fun checkCCallModeCompatibility(
     Additionally, regardless of the bitcode inclusion, the compiler also doesn't support generating direct CCalls to
     functions defined through `compileSource`.
     */
+    val flag = "-$CCALL_MODE ${CCallMode.INDIRECT.name.lowercase()}"
     check(def.config.entryPoints.isEmpty()) {
-        "entryPoint= in the .def file is only supported with -$CCALL_MODE ${CCallMode.INDIRECT.name.lowercase()}"
+        "entryPoint= in the .def file is only supported with the legacy mode flag $flag.\n" +
+                "See https://youtrack.jetbrains.com/issue/KT-79747 for more details."
     }
 
     check(cinteropArguments.compileSource.isEmpty()) {
-        "-$COMPILE_SOURCES is only supported with -$CCALL_MODE ${CCallMode.INDIRECT.name.lowercase()}"
+        "-$COMPILE_SOURCES is only supported with the legacy mode flag $flag.\n" +
+                "See https://youtrack.jetbrains.com/issue/KT-79749 for more details."
+    }
+}
+
+// TODO (KT-84721): Reconsider how exactly the export in P.V. feature should work in further versions (ex: 2.5.0) if we decide to upgrade LLVM.
+private fun checkKlibAbiCompatibilityLevel(cinteropArguments: CInteropArguments) {
+    val klibAbiCompatibilityLevel = cinteropArguments.klibAbiCompatibilityLevel
+    val cCallMode = cinteropArguments.cCallMode
+
+    when (klibAbiCompatibilityLevel) {
+        KlibAbiCompatibilityLevel.ABI_LEVEL_2_3 -> {
+            check(cCallMode == CCallMode.DIRECT) {
+                "-$CCALL_MODE ${cCallMode.name.lowercase()} is not supported in combination with -$KLIB_ABI_COMPATIBILITY_LEVEL ${klibAbiCompatibilityLevel}\n" +
+                        "Please use -$KLIB_ABI_COMPATIBILITY_LEVEL ${KlibAbiCompatibilityLevel.LATEST_STABLE} or specify -$CCALL_MODE ${CCallMode.DIRECT.name.lowercase()}"
+            }
+
+            warn("-$KLIB_ABI_COMPATIBILITY_LEVEL $klibAbiCompatibilityLevel will trigger generating KLIB compatible with KLIB ABI version $klibAbiCompatibilityLevel. This is an experimental feature.")
+        }
+
+        KlibAbiCompatibilityLevel.ABI_LEVEL_2_4 -> {
+            // No specific restrictions for now.
+        }
     }
 }
 
@@ -515,16 +585,16 @@ private fun compileSources(
 
 private fun getLibraryResolver(
         cinteropArguments: CInteropArguments, target: KonanTarget
-): KotlinLibraryResolverImpl<KonanLibrary> {
+): KotlinLibraryResolverImpl<KotlinLibrary> {
     return defaultResolver(
         directLibs = cinteropArguments.library,
         target,
-        Distribution(KotlinNativePaths.homePath.absolutePath, konanDataDir = cinteropArguments.konanDataDir)
-    ).libraryResolver()
+        Distribution(cinteropArguments.konanHome ?: KotlinNativePaths.homePath.absolutePath, konanDataDir = cinteropArguments.konanDataDir)
+    ).libraryResolver(resolveManifestDependenciesLenient = true)
 }
 
 private fun resolveDependencies(
-        resolver: KotlinLibraryResolverImpl<KonanLibrary>, cinteropArguments: CInteropArguments
+        resolver: KotlinLibraryResolverImpl<KotlinLibrary>, cinteropArguments: CInteropArguments
 ): List<KotlinLibrary> {
     val noDefaultLibs = cinteropArguments.nodefaultlibs || cinteropArguments.nodefaultlibsDeprecated
     val noEndorsedLibs = cinteropArguments.noendorsedlibs
@@ -533,15 +603,22 @@ private fun resolveDependencies(
         noStdLib = false,
         noDefaultLibs = noDefaultLibs,
         noEndorsedLibs = noEndorsedLibs
-    ).getFullList(TopologicalLibraryOrder)
+    ).getFullList()
     validateNoLibrariesWerePassedViaCliByUniqueName(cinteropArguments.library, resolvedLibraries, resolver.logger)
     return resolvedLibraries
 }
 
-internal fun prepareTool(target: String?, flavor: KotlinPlatform, runFromDaemon: Boolean, propertyOverrides: Map<String, String> = emptyMap(), konanDataDir: String? = null) =
-        ToolConfig(target, flavor, propertyOverrides, konanDataDir).also {
-            if (!runFromDaemon) it.prepare() // Daemon prepares the tool himself. (See KonanToolRunner.kt)
-        }
+internal fun prepareTool(
+        target: String?,
+        flavor: KotlinPlatform,
+        runFromDaemon: Boolean,
+        propertyOverrides: Map<String, String> = emptyMap(),
+        konanDataDir: String? = null,
+        konanHome: String? = null,
+) = ToolConfig(target, flavor, propertyOverrides, konanDataDir, konanHome).also {
+    if (!runFromDaemon) it.prepare() // Daemon prepares the tool himself. (See KonanToolRunner.kt)
+    else require(konanHome == null) { "custom konanHome cannot be specified when running from daemon" }
+}
 
 internal val predefinedObjCClassesIncludingCategories: Set<String> by lazy { setOf("NSView", "UIView") }
 
@@ -599,7 +676,7 @@ internal fun buildNativeLibrary(
         require(headerFiles.isEmpty()) { "cinterop doesn't support having headers and modules specified at the same time" }
         require(def.config.headerFilter.isEmpty()) { "cinterop doesn't support 'headerFilter' with 'modules'" }
 
-        val modulesInfo = getModulesInfo(compilation, modules)
+        val modulesInfo = getModulesInfo(compilation, modules, def.config.skipNonImportableModules)
 
         headerFilter = NativeLibraryHeaderFilter.Predefined(modulesInfo.ownHeaders, modulesInfo.modules)
         includes = modulesInfo.topLevelHeaders

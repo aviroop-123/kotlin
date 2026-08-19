@@ -17,12 +17,13 @@ import org.jetbrains.kotlin.gradle.targets.js.NpmVersions
 import org.jetbrains.kotlin.gradle.targets.js.RequiredKotlinJsDependency
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrCompilation
 import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProjectModules
-import org.jetbrains.kotlin.gradle.targets.js.npm.RequiresNpmDependencies
+import org.jetbrains.kotlin.gradle.targets.js.npm.RequiresNpmDependenciesTask
 import org.jetbrains.kotlin.gradle.targets.js.npm.npmProject
-import org.jetbrains.kotlin.gradle.targets.js.webTargetVariant
-import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsPlugin
+import org.jetbrains.kotlin.gradle.targets.js.npm.npmToolingDir
+import org.jetbrains.kotlin.gradle.targets.wasm.internal.isWasm
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension
-import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootPlugin
+import org.jetbrains.kotlin.gradle.targets.web.nodejs.nodeJsEnvSpec
+import org.jetbrains.kotlin.gradle.targets.web.nodejs.nodeJsRoot
 import org.jetbrains.kotlin.gradle.tasks.registerTask
 import org.jetbrains.kotlin.gradle.utils.getFile
 import org.jetbrains.kotlin.gradle.utils.newFileProperty
@@ -35,7 +36,7 @@ constructor(
     @Internal
     @Transient
     final override val compilation: KotlinJsIrCompilation,
-) : AbstractExecTask<NodeJsExec>(NodeJsExec::class.java), RequiresNpmDependencies {
+) : AbstractExecTask<NodeJsExec>(NodeJsExec::class.java), RequiresNpmDependenciesTask {
 
     @get:Internal
     internal abstract val versions: Property<NpmVersions>
@@ -110,28 +111,11 @@ constructor(
         ): TaskProvider<NodeJsExec> {
             val target = compilation.target
             val project = target.project
-            val nodeJsRoot = compilation.webTargetVariant(
-                { NodeJsRootPlugin.apply(project.rootProject) },
-                { WasmNodeJsRootPlugin.apply(project.rootProject) },
-            )
-            val nodeJsEnvSpec = compilation.webTargetVariant(
-                { NodeJsPlugin.apply(project) },
-                { WasmNodeJsPlugin.apply(project) },
-            )
+            val nodeJsRoot = compilation.nodeJsRoot
+            val nodeJsEnvSpec = compilation.nodeJsEnvSpec
 
             val npmProject = compilation.npmProject
-
-            val npmToolingDir: DirectoryProperty = project.objects.directoryProperty().fileProvider(
-                compilation.webTargetVariant(
-                    { npmProject.dir.map { it.asFile } },
-                    { (nodeJsRoot as WasmNodeJsRootExtension).npmTooling.map { it.dir } },
-                )
-            )
-
-            val isWasm: Boolean = compilation.webTargetVariant(
-                jsVariant = false,
-                wasmVariant = true,
-            )
+            val npmToolingDir = compilation.npmToolingDir
 
             return project.registerTask(
                 name,
@@ -146,12 +130,13 @@ constructor(
                         nodeJsRoot.npmInstallTaskProvider,
                     )
                     it.dependsOn(nodeJsRoot.packageManagerExtension.map { it.postInstallTasks })
+
+                    if (compilation.isWasm) {
+                        it.dependsOn((nodeJsRoot as WasmNodeJsRootExtension).toolingInstallTaskProvider)
+                    }
                 }
 
-                it.npmToolingEnvDir.value(npmToolingDir).disallowChanges()
-                if (isWasm) {
-                    it.dependsOn((nodeJsRoot as WasmNodeJsRootExtension).toolingInstallTaskProvider)
-                }
+                it.npmToolingEnvDir.fileProvider(npmToolingDir).disallowChanges()
 
                 with(nodeJsEnvSpec) {
                     it.dependsOn(project.nodeJsSetupTaskProvider)
@@ -162,8 +147,9 @@ constructor(
         }
 
         @Deprecated(
-            "Use create(KotlinJsIrCompilation, name, configuration). Scheduled for removal in Kotlin 2.4.",
+            "Use create(KotlinJsIrCompilation, name, configuration). Scheduled for removal in Kotlin 2.5.",
             replaceWith = ReplaceWith("create(compilation, name, configuration)"),
+            // KT-85179 Used by kotlinx-benchmark https://github.com/Kotlin/kotlinx-benchmark/issues/355
             level = DeprecationLevel.HIDDEN
         )
         fun create(
@@ -178,8 +164,10 @@ constructor(
             )
 
         @Deprecated(
-            "Use register instead. Scheduled for removal in Kotlin 2.4.",
-            ReplaceWith("register(compilation, name, configuration)")
+            "Use register instead. Scheduled for removal in Kotlin 2.5.",
+            ReplaceWith("register(compilation, name, configuration)"),
+            level = DeprecationLevel.HIDDEN
+            // KT-85179 Used by kotlinx-benchmark https://github.com/Kotlin/kotlinx-benchmark/issues/355
         )
         fun create(
             compilation: KotlinJsIrCompilation,

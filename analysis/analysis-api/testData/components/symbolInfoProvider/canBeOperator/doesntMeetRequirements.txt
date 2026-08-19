@@ -9,6 +9,7 @@ FUNCTION:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -62,5 +63,7 @@ FUNCTION:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 CAN_BE_OPERATOR:
   false

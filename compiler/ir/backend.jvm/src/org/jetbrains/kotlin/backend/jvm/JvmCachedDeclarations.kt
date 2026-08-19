@@ -25,10 +25,10 @@ import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.load.java.JavaDescriptorVisibilities
 import org.jetbrains.kotlin.load.java.JvmAbi
+import org.jetbrains.kotlin.load.java.JvmAnnotationNames
 import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_DEFAULT_WITHOUT_COMPATIBILITY_FQ_NAME
 import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_DEFAULT_WITH_COMPATIBILITY_FQ_NAME
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
 import org.jetbrains.kotlin.utils.addToStdlib.getOrSetIfNull
 
 private var IrEnumEntry.declaringField: IrField? by irAttribute(copyByDefault = false)
@@ -83,19 +83,16 @@ class JvmCachedDeclarations(
                 val hasJvmField = oldField.hasAnnotation(JvmAbi.JVM_FIELD_ANNOTATION_FQ_NAME)
                 val shouldMoveFields = oldParent.isCompanion && (!oldParent.parentAsClass.isJvmInterface || hasJvmField)
                 if (shouldMoveFields) {
-                   parent = oldParent.parentAsClass
-                   val isPrivate = DescriptorVisibilities.isPrivate(oldField.visibility)
-                   val parentIsPrivate = DescriptorVisibilities.isPrivate(oldParent.visibility)
-                   annotations = if (parentIsPrivate && !isPrivate) {
-                       context.createJvmIrBuilder(this.symbol).run {
-                           filterOutAnnotations(
-                               DeprecationResolver.JAVA_DEPRECATED,
-                               oldField.annotations
-                           ) + irCall(irSymbols.javaLangDeprecatedConstructorWithDeprecatedFlag)
-                       }
-                   } else {
-                       oldField.annotations
-                   }
+                    parent = oldParent.parentAsClass
+                    val isPrivate = DescriptorVisibilities.isPrivate(oldField.visibility)
+                    val parentIsPrivate = DescriptorVisibilities.isPrivate(oldParent.visibility)
+                    if (parentIsPrivate && !isPrivate) {
+                        with(context.createJvmIrBuilder(this.symbol)) {
+                            copyAnnotationsAndAddJavaLangDeprecated(oldField)
+                        }
+                    } else {
+                        annotations = oldField.annotations
+                    }
                 } else {
                     parent = oldParent
                     annotations = oldField.annotations
@@ -117,13 +114,12 @@ class JvmCachedDeclarations(
                 val staticExternal = context.irFactory.buildFun {
                     updateFrom(jvmStaticFunction)
                     name = jvmStaticFunction.name
-                    returnType = jvmStaticFunction.returnType
                 }.apply {
                     parent = companion.parent
                     copyAttributes(jvmStaticFunction)
                     copyAnnotationsFrom(jvmStaticFunction)
                     copyCorrespondingPropertyFrom(jvmStaticFunction)
-                    copyValueAndTypeParametersFrom(jvmStaticFunction)
+                    copyFunctionSignatureFrom(jvmStaticFunction)
                     parameters = nonDispatchParameters
                     metadata = jvmStaticFunction.metadata
                 }
@@ -230,10 +226,8 @@ class JvmCachedDeclarations(
                 it.copyCorrespondingPropertyFrom(interfaceFun)
 
                 if (forCompatibilityMode && !interfaceFun.resolveFakeOverrideOrFail().origin.isSynthetic) {
-                    context.createJvmIrBuilder(it.symbol).run {
-                        it.annotations = it.annotations
-                            .filterNot { it.symbol.owner.constructedClass.hasEqualFqName(DeprecationResolver.JAVA_DEPRECATED) }
-                            .plus(irCall(irSymbols.javaLangDeprecatedConstructorWithDeprecatedFlag))
+                    with(context.createJvmIrBuilder(it.symbol)) {
+                        it.addJavaLangDeprecatedAnnotation()
                     }
                 }
 
@@ -249,6 +243,10 @@ class JvmCachedDeclarations(
                 endOffset = interfaceClass.endOffset
                 origin = JvmLoweredDeclarationOrigin.DEFAULT_IMPLS
                 name = Name.identifier(JvmAbi.DEFAULT_IMPLS_CLASS_NAME)
+                // The DefaultImpls class shall have visibility at least of the original interface, but
+                // it also should not be protected or internal as a nested class of an interface. So,
+                // the safest option is to make it public.
+                visibility = DescriptorVisibilities.PUBLIC
             }.apply {
                 parent = interfaceClass
                 createThisReceiverParameter()
@@ -349,10 +347,11 @@ class JvmCachedDeclarations(
             containerClass.annotations = annotationClass.annotations
                 .filter {
                     it.isAnnotationWithEqualFqName(StandardNames.FqNames.retention) ||
-                            it.isAnnotationWithEqualFqName(StandardNames.FqNames.target)
+                            it.isAnnotationWithEqualFqName(StandardNames.FqNames.target) ||
+                            it.isAnnotationWithEqualFqName(JvmAnnotationNames.INHERITED_ANNOTATION)
                 }
                 .map { it.deepCopyWithSymbols(containerClass) } +
-                    context.createJvmIrBuilder(containerClass.symbol).irCall(context.symbols.repeatableContainer.constructors.single())
+                    context.createJvmIrBuilder(containerClass.symbol).irAnnotation(context.symbols.repeatableContainer.constructors.single())
 
             containerClass
         }

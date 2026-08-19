@@ -14,14 +14,16 @@ import com.intellij.psi.PsiJavaFile
 import org.jetbrains.kotlin.build.report.BuildReporter
 import org.jetbrains.kotlin.build.report.info
 import org.jetbrains.kotlin.build.report.metrics.BuildAttribute
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.BuildPerformanceMetric
+import org.jetbrains.kotlin.build.report.metrics.BuildTimeMetric
 import org.jetbrains.kotlin.cli.common.messages.FilteringMessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.cli.create
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.config.configureJdkClasspathRoots
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.MessageCollectorAccess
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.config.messageCollector
 import org.jetbrains.kotlin.incremental.*
@@ -35,7 +37,7 @@ import org.jetbrains.kotlin.name.Name
 import java.io.File
 
 private class CoarseJavaInteropCoordinator(
-    reporter: BuildReporter<GradleBuildTime, GradleBuildPerformanceMetric>,
+    reporter: BuildReporter<BuildTimeMetric, BuildPerformanceMetric>,
     messageCollector: MessageCollector,
 ) : JavaInteropCoordinator(messageCollector) {
     private val javaFilesProcessor =
@@ -61,7 +63,7 @@ private class CoarseJavaInteropCoordinator(
 }
 
 private class PreciseJavaInteropCoordinator(
-    private val reporter: BuildReporter<GradleBuildTime, GradleBuildPerformanceMetric>,
+    private val reporter: BuildReporter<BuildTimeMetric, BuildPerformanceMetric>,
     messageCollector: MessageCollector,
 ) : JavaInteropCoordinator(messageCollector) {
     private val changedUntrackedJavaClasses = mutableSetOf<ClassId>()
@@ -137,7 +139,8 @@ internal sealed class JavaInteropCoordinator(
 ) {
     protected val compilerConfiguration: CompilerConfiguration by lazy {
         val filterMessageCollector = FilteringMessageCollector(messageCollector) { !it.isError }
-        CompilerConfiguration().apply {
+        CompilerConfiguration.create().apply {
+            @OptIn(MessageCollectorAccess::class) // write access
             this.messageCollector = filterMessageCollector
             configureJdkClasspathRoots()
         }
@@ -177,7 +180,7 @@ internal sealed class JavaInteropCoordinator(
     companion object {
         fun getImplementation(
             usePreciseJavaTracking: Boolean,
-            reporter: BuildReporter<GradleBuildTime, GradleBuildPerformanceMetric>,
+            reporter: BuildReporter<BuildTimeMetric, BuildPerformanceMetric>,
             messageCollector: MessageCollector,
         ): JavaInteropCoordinator {
             return if (usePreciseJavaTracking) {

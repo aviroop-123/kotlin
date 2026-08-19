@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.resolve.calls.inference.components
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.resolve.calls.components.candidate.SimpleResolutionCandidate
@@ -22,6 +23,7 @@ import org.jetbrains.kotlin.types.model.*
 import org.jetbrains.kotlin.types.typeUtil.asTypeProjection
 import org.jetbrains.kotlin.utils.addIfNotNull
 
+@K1Deprecation
 class KotlinConstraintSystemCompleter(
     private val resultTypeResolver: ResultTypeResolver,
     val variableFixationFinder: VariableFixationFinder,
@@ -117,6 +119,7 @@ class KotlinConstraintSystemCompleter(
             if (completionMode == ConstraintSystemCompletionMode.FULL) {
                 // Stage 3: fix variables for parameter types of all postponed arguments
                 for (argument in postponedArguments) {
+                    @OptIn(K1Deprecation::class)
                     val variableWasFixed = postponedArgumentsInputTypesResolver.fixNextReadyVariableForParameterTypeIfNeeded(
                         argument,
                         postponedArguments,
@@ -142,6 +145,7 @@ class KotlinConstraintSystemCompleter(
             }
 
             // Stage 5: analyze the next ready postponed argument
+            @OptIn(K1Deprecation::class)
             if (analyzeNextReadyPostponedArgument(postponedArguments, completionMode, analyze))
                 continue
 

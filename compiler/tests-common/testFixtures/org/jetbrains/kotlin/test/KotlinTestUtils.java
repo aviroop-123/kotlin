@@ -10,7 +10,6 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.CharsetToolkit;
 import com.intellij.psi.PsiElement;
 import com.intellij.testFramework.TestDataFile;
 import com.intellij.util.lang.JavaVersion;
@@ -25,6 +24,7 @@ import org.jetbrains.kotlin.analyzer.AnalysisResult;
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
 import org.jetbrains.kotlin.checkers.CompilerTestLanguageVersionSettingsKt;
+import org.jetbrains.kotlin.cli.CompilerConfigurationCreationKt;
 import org.jetbrains.kotlin.cli.common.config.ContentRootsKt;
 import org.jetbrains.kotlin.cli.common.config.KotlinSourceRoot;
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity;
@@ -45,21 +45,18 @@ import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.psi.KtPsiFactory;
 import org.jetbrains.kotlin.resolve.lazy.JvmResolveUtil;
 import org.jetbrains.kotlin.storage.LockBasedStorageManager;
-import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase;
 import org.jetbrains.kotlin.test.util.KtTestUtil;
-import org.jetbrains.kotlin.test.util.StringUtilsKt;
 import org.jetbrains.kotlin.utils.ExceptionUtilsKt;
 import org.junit.Assert;
-import org.opentest4j.AssertionFailedError;
-import org.opentest4j.FileInfo;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -125,9 +122,8 @@ public class KotlinTestUtils {
 
     @NotNull
     public static CompilerConfiguration newConfiguration() {
-        CompilerConfiguration configuration = new CompilerConfiguration();
+        CompilerConfiguration configuration = CompilerConfigurationCreationKt.create(CompilerConfiguration.Companion);;
         configuration.put(CommonConfigurationKeys.MODULE_NAME, TEST_MODULE_NAME);
-
         configuration.put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, new MessageCollector() {
             @Override
             public void clear() {
@@ -232,108 +228,6 @@ public class KotlinTestUtils {
             }
         }
         JvmResolveUtil.analyze(ktFiles, environment);
-    }
-
-    public static void assertEqualsToFile(@NotNull Path expectedFile, @NotNull String actual) {
-        assertEqualsToFile(expectedFile.toFile(), actual);
-    }
-
-    public static void assertEqualsToFile(@NotNull File expectedFile, @NotNull String actual) {
-        assertEqualsToFile(expectedFile, actual, s -> s);
-    }
-
-    public static void assertEqualsToFile(@NotNull String message, @NotNull File expectedFile, @NotNull String actual) {
-        assertEqualsToFile(message, expectedFile, actual, s -> s);
-    }
-
-    public static void assertEqualsToFile(@NotNull File expectedFile, @NotNull String actual, @NotNull Function1<String, String> sanitizer) {
-        assertEqualsToFile(ACTUAL_DATA_DIFFERS_FROM_FILE_CONTENT, expectedFile, actual, sanitizer);
-    }
-
-    public static void assertValueAgnosticEqualsToFile(File expectedFile, @NotNull String actual) {
-        ValueAgnosticSanitizer sanitizer = new ValueAgnosticSanitizer(actual);
-
-        String expectedText = tryLoadExpectedFile(expectedFile, sanitizer::generateExpectedText);
-        String expectedSanitizedText = applyDefaultAndCustomSanitizer(expectedText, s -> s);
-
-        String sanitizedActualBasedOnExpectPlaceholders =
-                applyDefaultAndCustomSanitizer(
-                        sanitizer.generateSanitizedActualTextBasedOnExpectPlaceholders(expectedSanitizedText), s -> s);
-
-        KotlinTestUtils.FileComparisonResult comparisonResult = new KotlinTestUtils.FileComparisonResult(
-                expectedFile,
-                expectedText,
-                expectedSanitizedText,
-                sanitizedActualBasedOnExpectPlaceholders
-        );
-
-        failIfNotEqual(ACTUAL_DATA_DIFFERS_FROM_FILE_CONTENT, comparisonResult);
-    }
-
-    public static FileComparisonResult compareExpectFileWithActualText(@NotNull File expectedFile, @NotNull String actual, @NotNull Function1<String, String> sanitizer) {
-        Function0<String> getActualSanitizedText = () -> applyDefaultAndCustomSanitizer(actual, sanitizer);
-
-        String expectedText = tryLoadExpectedFile(expectedFile, getActualSanitizedText);
-        String expectedSanitizedText = applyDefaultAndCustomSanitizer(expectedText, sanitizer);
-
-        return new FileComparisonResult(expectedFile, expectedText, expectedSanitizedText, getActualSanitizedText.invoke());
-    }
-
-    public static String tryLoadExpectedFile(@NotNull File expectedFile, @NotNull Function0<String> getSanitizedActualText) {
-        try {
-            if (!expectedFile.exists()) {
-                if (KtUsefulTestCase.IS_UNDER_TEAMCITY) {
-                    Assert.fail("Expected data file " + expectedFile + " did not exist");
-                } else {
-                    FileUtil.writeToFile(expectedFile, getSanitizedActualText.invoke());
-                    Assert.fail("Expected data file did not exist. Generating: " + expectedFile);
-                }
-            }
-            return FileUtil.loadFile(expectedFile, CharsetToolkit.UTF8, true);
-        }
-        catch (IOException e) {
-            throw ExceptionUtilsKt.rethrow(e);
-        }
-    }
-
-    public static class FileComparisonResult {
-        public final @NotNull File expectedFile;
-        public final @NotNull String expectedText;
-        public final @NotNull String expectedSanitizedText;
-        public final @NotNull String actualSanitizedText;
-        public final boolean doesEqual;
-
-        public FileComparisonResult(
-                @NotNull File expectedFile,
-                @NotNull String expectedText,
-                @NotNull String expectedSanitizedText,
-                @NotNull String actualSanitizedText
-        ) {
-            this.expectedFile = expectedFile;
-            this.expectedText = expectedText;
-            this.expectedSanitizedText = expectedSanitizedText;
-            this.actualSanitizedText = actualSanitizedText;
-            this.doesEqual = Objects.equals(expectedSanitizedText, actualSanitizedText);
-        }
-    }
-
-    public static String applyDefaultAndCustomSanitizer(String text, @NotNull Function1<String, String> sanitizer) {
-        String textAfterDefaultSanitizer = StringUtilsKt.trimTrailingWhitespacesAndAddNewlineAtEOF(StringUtil.convertLineSeparators(text.trim()));
-        return sanitizer.invoke(textAfterDefaultSanitizer);
-    }
-
-    public static void assertEqualsToFile(@NotNull String message, @NotNull File expectedFile, @NotNull String actual, @NotNull Function1<String, String> sanitizer) {
-        failIfNotEqual(message, compareExpectFileWithActualText(expectedFile, actual, sanitizer));
-    }
-
-    public static void failIfNotEqual(@NotNull String message, FileComparisonResult fileComparisonResult) {
-        if (!fileComparisonResult.doesEqual) {
-            throw new AssertionFailedError(
-                    message + ": " + fileComparisonResult.expectedFile.getName(),
-                    new FileInfo(fileComparisonResult.expectedFile.getAbsolutePath(), fileComparisonResult.expectedText.getBytes(StandardCharsets.UTF_8)),
-                    fileComparisonResult.actualSanitizedText
-            );
-        }
     }
 
     public static JavaCompilationResult compileKotlinWithJava(
@@ -499,10 +393,7 @@ public class KotlinTestUtils {
     // * sometimes, for too common/general names, it shows many variants to navigate
     // * it adds an additional step for navigation -- you must choose an exact file to navigate
     public static void runTest0(DoTest test, TargetBackend targetBackend, String testDataFilePath) {
-        String[] prefixes = test.getClass().getSimpleName().startsWith("Fir")
-                            ? new String[] { IGNORE_BACKEND_DIRECTIVE_PREFIX, IGNORE_BACKEND_K2_DIRECTIVE_PREFIX }
-                            : IGNORE_BACKEND_DIRECTIVE_PREFIXES;
-        runTestImpl(testWithCustomIgnoreDirective(test, targetBackend, prefixes), null, testDataFilePath);
+        runTestImpl(testWithCustomIgnoreDirective(test, targetBackend, IGNORE_BACKEND_DIRECTIVE_PREFIXES), null, testDataFilePath);
     }
 
     private static void runTestImpl(@NotNull DoTest test, @Nullable TestCase testCase, String testDataFilePath) {

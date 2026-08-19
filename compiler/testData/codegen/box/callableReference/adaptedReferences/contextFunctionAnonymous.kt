@@ -1,4 +1,3 @@
-// IGNORE_BACKEND_K1: ANY
 // LANGUAGE: +ContextParameters
 
 val a = context(x: String) fun (): String { return x }

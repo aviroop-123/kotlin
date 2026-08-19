@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// LANGUAGE: +VariableDeclarationInWhenSubject
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER -UNUSED_VALUE
 
 fun foo() {}
@@ -26,7 +25,7 @@ fun test2() {
 fun test3() {
     when (val x = 1) {
         1 ->
-            when (val <!NAME_SHADOWING!>x<!> = 2) {
+            when (val x = 2) {
                 2 -> foo()
             }
     }

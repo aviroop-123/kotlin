@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.resolve.calls.inference.components.ConstraintSystemC
 import org.jetbrains.kotlin.resolve.calls.inference.components.TrivialConstraintTypeInferenceOracle
 import org.jetbrains.kotlin.resolve.calls.inference.model.Constraint
 import org.jetbrains.kotlin.resolve.calls.inference.model.VariableWithConstraints
+import org.jetbrains.kotlin.resolve.calls.model.CollectionLiteralAtomMarker
 import org.jetbrains.kotlin.types.AbstractTypeChecker
 import org.jetbrains.kotlin.types.model.*
 import org.jetbrains.kotlin.utils.newLinkedHashMapWithExpectedSize
@@ -29,6 +30,10 @@ fun Candidate.computeCompletionMode(
     return when {
         // Expected type is present or call is being resolved in independent context
         resolutionMode.forceFullCompletion -> ConstraintSystemCompletionMode.FULL
+
+        callInfo.isNonTrivialCollectionLiteralCall -> {
+            error("Should not run completion for collection literal")
+        }
 
         // This is questionable as null return type can be only for error call
         currentReturnType == null -> ConstraintSystemCompletionMode.PARTIAL
@@ -93,7 +98,8 @@ private class CalculatorForNestedCall(
         computeDirections()
 
         // If all variables have required proper constraint, run full completion
-        if (directionRequirementsForVariablesHold())
+        // TODO: KT-84145 (regarding collection literals)
+        if (directionRequirementsForVariablesHold() && postponedAtoms.none { it is CollectionLiteralAtomMarker && !it.analyzed })
             return ConstraintSystemCompletionMode.FULL
 
         return ConstraintSystemCompletionMode.PARTIAL
@@ -128,7 +134,7 @@ private class CalculatorForNestedCall(
     }
 
     private fun CsCompleterContext.directionRequirementsForVariablesHold(): Boolean {
-        for ((variable, fixationDirection) in fixationDirectionsForVariables) {
+        for ([variable, fixationDirection] in fixationDirectionsForVariables) {
             if (!hasProperConstraint(variable, fixationDirection))
                 return false
         }
@@ -136,7 +142,7 @@ private class CalculatorForNestedCall(
     }
 
     private fun updateDirection(directionForVariable: FixationDirectionForVariable) {
-        val (variable, newDirection) = directionForVariable
+        (val variable, val newDirection = direction) = directionForVariable
         fixationDirectionsForVariables[variable]?.let { oldDirection ->
             if (oldDirection != FixationDirection.EQUALITY && oldDirection != newDirection)
                 fixationDirectionsForVariables[variable] = FixationDirection.EQUALITY

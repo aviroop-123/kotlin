@@ -14,10 +14,11 @@ class MultiplatformResourcesPublicationIT : KGPBaseTest() {
 
     override val defaultBuildOptions: BuildOptions
         // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-        get() = super.defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED)
+        get() = super.defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899()
 
     @DisplayName("Multiplatform resources publication for Android target with release build type")
     @GradleAndroidTest
+    @AndroidTestVersions(maxVersion = TestVersions.AGP.AGP_813)
     fun testAndroidReleaseResourcesPublicationInNewerAgpVersions(
         gradleVersion: GradleVersion,
         androidVersion: String,

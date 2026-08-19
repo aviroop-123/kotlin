@@ -5,29 +5,30 @@
 
 package org.jetbrains.kotlin.test.runners
 
+import org.jetbrains.kotlin.codegen.forTestCompile.JavaForeignAnnotationType
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
+import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TestJdkKind
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
-import org.jetbrains.kotlin.test.builders.classicFrontendHandlersStep
-import org.jetbrains.kotlin.test.builders.classicFrontendStep
-import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives.SKIP_TXT
+import org.jetbrains.kotlin.test.builders.firHandlersStep
 import org.jetbrains.kotlin.test.directives.ForeignAnnotationsDirectives.ANNOTATIONS_PATH
 import org.jetbrains.kotlin.test.directives.ForeignAnnotationsDirectives.ENABLE_FOREIGN_ANNOTATIONS
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.JDK_KIND
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.PROVIDE_JAVA_AS_BINARIES
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.USE_PSI_CLASS_FILES_READING
-import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.WITH_FOREIGN_ANNOTATIONS
-import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.WITH_JAKARTA_ANNOTATIONS
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.WITH_JSR305_TEST_ANNOTATIONS
-import org.jetbrains.kotlin.test.frontend.classic.handlers.ClassicDiagnosticsHandler
-import org.jetbrains.kotlin.test.frontend.classic.handlers.DeclarationsDumpHandler
-import org.jetbrains.kotlin.test.frontend.classic.handlers.FirTestDataConsistencyHandler
-import org.jetbrains.kotlin.test.frontend.classic.handlers.OldNewInferenceMetaInfoProcessor
+import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.WITH_THIRD_PARTY_ANNOTATIONS
+import org.jetbrains.kotlin.test.directives.configureFirParser
+import org.jetbrains.kotlin.test.frontend.fir.FirFailingTestSuppressor
+import org.jetbrains.kotlin.test.frontend.fir.FirFrontendFacade
+import org.jetbrains.kotlin.test.frontend.fir.handlers.*
 import org.jetbrains.kotlin.test.model.DependencyKind
 import org.jetbrains.kotlin.test.model.FrontendKinds
 import org.jetbrains.kotlin.test.preprocessors.ExternalAnnotationsSourcePreprocessor
-import org.jetbrains.kotlin.test.services.TestServices
-import org.jetbrains.kotlin.test.services.configuration.*
+import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.ExternalAnnotationsEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.JvmEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.JvmForeignAnnotationsConfigurator
 import org.jetbrains.kotlin.test.services.jvm.ForeignAnnotationAgainstCompiledJavaTestSuppressor
 import org.jetbrains.kotlin.test.services.jvm.PsiClassFilesReadingForCompiledJavaTestSuppressor
 import org.jetbrains.kotlin.test.services.sourceProviders.AdditionalDiagnosticsSourceFilesProvider
@@ -39,24 +40,29 @@ enum class ForeignAnnotationsTestKind(val compiledJava: Boolean, val psiClassLoa
     COMPILED_JAVA_WITH_PSI_CLASS_LOADING(true, true)
 }
 
-abstract class AbstractForeignAnnotationsTestBase(private val kind: ForeignAnnotationsTestKind) : AbstractKotlinCompilerTest() {
+abstract class AbstractForeignAnnotationsTestBase(
+    private val kind: ForeignAnnotationsTestKind,
+    private val parser: FirParser,
+) : AbstractKotlinCompilerTest() {
     override fun configure(builder: TestConfigurationBuilder) = with(builder) {
         globalDefaults {
+            frontend = FrontendKinds.FIR
             targetPlatform = JvmPlatforms.defaultJvmPlatform
             dependencyKind = DependencyKind.Source
         }
 
         defaultDirectives {
-            +WITH_FOREIGN_ANNOTATIONS
             if (kind.compiledJava) {
                 +PROVIDE_JAVA_AS_BINARIES
-                +SKIP_TXT
             }
             if (kind.psiClassLoading) {
                 +USE_PSI_CLASS_FILES_READING
             }
             +ENABLE_FOREIGN_ANNOTATIONS
+            +WITH_THIRD_PARTY_ANNOTATIONS
         }
+
+        configureFirParser(parser)
 
         enableMetaInfoHandler()
 
@@ -81,7 +87,21 @@ abstract class AbstractForeignAnnotationsTestBase(private val kind: ForeignAnnot
             ::CoroutineHelpersSourceFilesProvider,
         )
 
-        configureFrontend()
+        facadeStep(::FirFrontendFacade)
+        firHandlersStep {
+            useHandlers(
+                ::FirDiagnosticsHandler,
+                ::FirDumpHandler,
+                ::FirCfgDumpHandler,
+                ::FirCfgConsistencyHandler,
+                ::FirResolvedTypesVerifier,
+                ::FirDistinctSourceElementsHandler,
+            )
+        }
+
+        useFailureSuppressors(::FirFailingTestSuppressor)
+
+        useMetaInfoProcessors(::PsiLightTreeMetaInfoProcessor)
 
         forTestsMatching("compiler/testData/diagnostics/foreignAnnotationsTests/tests/*") {
             defaultDirectives {
@@ -92,7 +112,6 @@ abstract class AbstractForeignAnnotationsTestBase(private val kind: ForeignAnnot
 
         forTestsMatching("compiler/testData/diagnostics/foreignAnnotationsTests/tests/jakarta/*") {
             defaultDirectives {
-                +WITH_JAKARTA_ANNOTATIONS
                 JDK_KIND with TestJdkKind.FULL_JDK_11
             }
         }
@@ -110,43 +129,24 @@ abstract class AbstractForeignAnnotationsTestBase(private val kind: ForeignAnnot
             }
         }
     }
-
-    abstract fun TestConfigurationBuilder.configureFrontend()
 }
 
-private class FirForeignDiagnosticsTestDataConsistencyHandler(testServices: TestServices) :
-    FirTestDataConsistencyHandler(testServices) {
+abstract class AbstractFirPsiForeignAnnotationsSourceJavaTest :
+    AbstractForeignAnnotationsTestBase(ForeignAnnotationsTestKind.SOURCE, FirParser.Psi) {
+    override fun configure(builder: TestConfigurationBuilder) {
+        super.configure(builder)
 
-    override fun correspondingFirTest(): AbstractKotlinCompilerTest =
-        object : AbstractFirPsiForeignAnnotationsSourceJavaTest() {}
-}
-
-abstract class AbstractOldFrontendForeignAnnotationsTestBase(kind: ForeignAnnotationsTestKind) :
-    AbstractForeignAnnotationsTestBase(kind) {
-
-    override fun TestConfigurationBuilder.configureFrontend() {
-        globalDefaults {
-            frontend = FrontendKinds.ClassicFrontend
+        with(builder) {
+            firHandlersStep {
+                // Can only be applied to either SOURCE of COMPILED as parameter names are not preserved when compiled.
+                useHandlers(::FirScopeDumpHandler)
+            }
         }
-
-        useMetaInfoProcessors(::OldNewInferenceMetaInfoProcessor)
-        classicFrontendStep()
-        classicFrontendHandlersStep {
-            useHandlers(
-                ::DeclarationsDumpHandler,
-                ::ClassicDiagnosticsHandler,
-            )
-        }
-
-        useAfterAnalysisCheckers(::FirForeignDiagnosticsTestDataConsistencyHandler)
     }
 }
 
-abstract class AbstractForeignAnnotationsSourceJavaTest :
-    AbstractOldFrontendForeignAnnotationsTestBase(ForeignAnnotationsTestKind.SOURCE)
+abstract class AbstractFirPsiForeignAnnotationsCompiledJavaTest :
+    AbstractForeignAnnotationsTestBase(ForeignAnnotationsTestKind.COMPILED_JAVA, FirParser.Psi)
 
-abstract class AbstractForeignAnnotationsCompiledJavaTest :
-    AbstractOldFrontendForeignAnnotationsTestBase(ForeignAnnotationsTestKind.COMPILED_JAVA)
-
-abstract class AbstractForeignAnnotationsCompiledJavaWithPsiClassReadingTest :
-    AbstractOldFrontendForeignAnnotationsTestBase(ForeignAnnotationsTestKind.COMPILED_JAVA_WITH_PSI_CLASS_LOADING)
+abstract class AbstractFirPsiForeignAnnotationsCompiledJavaWithPsiClassReadingTest :
+    AbstractForeignAnnotationsTestBase(ForeignAnnotationsTestKind.COMPILED_JAVA_WITH_PSI_CLASS_LOADING, FirParser.Psi)

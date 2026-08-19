@@ -18,12 +18,14 @@ import org.jetbrains.kotlin.fir.resolve.calls.ImplicitExtensionReceiverValue
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.scopes.collectAllProperties
 import org.jetbrains.kotlin.fir.scopes.impl.declaredMemberScope
+import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
-import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirReceiverParameterSymbol
-import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
+import org.jetbrains.kotlin.fir.types.classId
+import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 
@@ -32,19 +34,15 @@ class DataFrameLikeReturnTypeInjector(session: FirSession) : FirExpressionResolu
         val DF_CLASS_ID: ClassId = ClassId.topLevel(FqName.fromSegments(listOf("DataFrame")))
     }
 
-    private object Key : GeneratedDeclarationKey() {
-        override fun toString(): String {
-            return "DataFrameLikeReturnTypeInjectorGeneratorKey"
-        }
-    }
+    private data object DataFrameLikeReturnTypeInjectorGeneratorKey : GeneratedDeclarationKey()
 
-    private val dataFrameLikeOrigin = FirDeclarationOrigin.Plugin(Key)
+    private val dataFrameLikeOrigin = FirDeclarationOrigin.Plugin(DataFrameLikeReturnTypeInjectorGeneratorKey)
 
     @OptIn(SymbolInternals::class)
     override fun addNewImplicitReceivers(
         functionCall: FirFunctionCall,
         sessionHolder: SessionAndScopeSessionHolder,
-        containingCallableSymbol: FirCallableSymbol<*>,
+        containingCallableSymbol: FirBasedSymbol<*>,
     ): List<ImplicitExtensionReceiverValue> {
         val callReturnType = functionCall.resolvedType
         if (callReturnType.classId != DF_CLASS_ID) return emptyList()

@@ -1,7 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +MixedNamedArgumentsInTheirOwnPosition
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// SKIP_TXT
 
 fun foo(
     p1: Int = 1,
@@ -22,10 +20,10 @@ fun main() {
 
     foo()
     foo(1, p2 = "")
-    foo(p3 = 4.0, <!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>'4'<!>)
+    foo(p3 = 4.0, <!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>'4'<!>)
 
-    foo(1, p3 = 2.0, <!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>""<!>)
-    foo(1, p3 = 2.0, <!MIXING_NAMED_AND_POSITIONED_ARGUMENTS!>3.0<!>)
+    foo(1, p3 = 2.0, <!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>""<!>)
+    foo(1, p3 = 2.0, <!MIXING_NAMED_AND_POSITIONAL_ARGUMENTS!>3.0<!>)
 }
 
 /* GENERATED_FIR_TAGS: functionDeclaration, integerLiteral, stringLiteral */

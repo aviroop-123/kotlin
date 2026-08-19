@@ -12,13 +12,14 @@ import org.jetbrains.kotlin.test.directives.DumpCfgOption
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.DUMP_CFG
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.USE_LATEST_LANGUAGE_VERSION
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.TESTED_LANGUAGE_FEATURE_DISABLED
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
+import org.jetbrains.kotlin.test.isTeamCityBuild
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.assertions
 import org.jetbrains.kotlin.test.services.moduleStructure
-import org.jetbrains.kotlin.test.utils.FirIdenticalCheckerHelper.Companion.isTeamCityBuild
 
 // TODO: adapt to multifile and multimodule tests
 class FirCfgDumpHandler(testServices: TestServices) : FirAnalysisHandler(testServices) {
@@ -32,7 +33,7 @@ class FirCfgDumpHandler(testServices: TestServices) : FirAnalysisHandler(testSer
         if (alreadyDumped || DUMP_CFG !in module.directives) return
         val options = module.directives[DUMP_CFG].map { it.uppercase() }
 
-        val file = info.mainFirFiles.values.first()
+        val file = info.mainFirFilesByTestFile.values.first()
         val renderLevels = DumpCfgOption.LEVELS in options
         val renderFlow = DumpCfgOption.FLOW in options
         file.renderControlFlowGraphTo(builder, ControlFlowGraphRenderOptions(renderLevels, renderFlow))
@@ -45,11 +46,15 @@ class FirCfgDumpHandler(testServices: TestServices) : FirAnalysisHandler(testSer
         val basicExpectedFile = testDataFile.parentFile.resolve("$nameWithoutExtension.dot")
 
         val expectedFile =
-            if (USE_LATEST_LANGUAGE_VERSION in testServices.moduleStructure.allDirectives)
-                testDataFile.parentFile.resolve("$nameWithoutExtension.latestLV.dot").takeIf { it.exists() }
-                    ?: basicExpectedFile
-            else
-                basicExpectedFile
+            when {
+                USE_LATEST_LANGUAGE_VERSION in testServices.moduleStructure.allDirectives ->
+                    testDataFile.parentFile.resolve("$nameWithoutExtension.latestLV.dot").takeIf { it.exists() }
+                        ?: basicExpectedFile
+                TESTED_LANGUAGE_FEATURE_DISABLED in testServices.moduleStructure.allDirectives ->
+                    testDataFile.parentFile.resolve("$nameWithoutExtension.disabled.dot").takeIf { it.exists() }
+                        ?: basicExpectedFile
+                else -> basicExpectedFile
+            }
 
         if (!alreadyDumped) {
             assertions.assertFileDoesntExist(expectedFile, DUMP_CFG)

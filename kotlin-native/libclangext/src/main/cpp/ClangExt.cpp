@@ -15,13 +15,35 @@
  */
 
 #include <cassert>
+#include <cstdlib>
+#include <cstring>
+#include <functional>
+
+#include <llvm/ADT/StringRef.h>
+#include <clang/Basic/LLVM.h>
+#include "clang-c/ext.h"
+
+#if LIBCLANGEXT_ENABLE
 
 #include <clang/AST/Attr.h>
 #include <clang/AST/DeclObjC.h>
 #include <clang/Frontend/ASTUnit.h>
-#include "clang-c/ext.h"
+
+#endif // LIBCLANGEXT_ENABLE
 
 using namespace clang;
+
+namespace {
+  // Hash combine function derived from boost.
+  // Copyright 2005-2014 Daniel James.
+  // https://github.com/boostorg/container_hash/blob/b2e3beea3f44ac783765503eea133df29d11c8e8/include/boost/container_hash/hash.hpp#L159
+
+  template <class T>
+  void hash_combine(std::size_t& seed, const T& v) {
+      std::hash<T> hasher;
+      seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  }
+}  // namespace
 
 #if LIBCLANGEXT_ENABLE
 
@@ -71,7 +93,18 @@ static CXTypeAttributes makeCXTypeAttributes() {
 
 #endif // LIBCLANGEXT_ENABLE
 
+static CString createCString(llvm::StringRef str) {
+  return CString { strdup(str.str().c_str()) };
+}
+
+static CString nullCString() {
+  return CString { nullptr };
+}
+
 extern "C" {
+  void clang_disposeCString(CString str) {
+    free(str.data);
+  }
 
   const char* clang_Cursor_getAttributeSpelling(CXCursor cursor) {
 #if LIBCLANGEXT_ENABLE
@@ -155,6 +188,17 @@ extern "C" {
 #endif
   }
 
+  CString clang_Cursor_getObjCProtocolRuntimeName(CXCursor cursor) {
+#if LIBCLANGEXT_ENABLE
+    if (cursor.kind == CXCursor_ObjCProtocolDecl) {
+      if (const ObjCProtocolDecl *decl = dyn_cast_or_null<ObjCProtocolDecl>(getCursorDecl(cursor))) {
+        return createCString(decl->getObjCRuntimeNameAsString());
+      }
+    }
+#endif
+    return nullCString();
+  }
+
   unsigned clang_Cursor_isObjCInitMethod(CXCursor cursor) {
 #if LIBCLANGEXT_ENABLE
     if (cursor.kind == CXCursor_ObjCInstanceMethodDecl) {
@@ -191,4 +235,66 @@ extern "C" {
     return 0;
   }
 
+  CString clang_Cursor_getSwiftName(CXCursor cursor) {
+#if LIBCLANGEXT_ENABLE
+    if (clang_isDeclaration(cursor.kind)) {
+      const Decl *decl = getCursorDecl(cursor);
+      if (decl) {
+        if (const auto *attr = decl->getAttr<SwiftNameAttr>()) {
+          return createCString(attr->getName());
+        }
+      }
+    }
+#endif
+    return nullCString();
+  }
+
+  unsigned clang_visitObjectLikeMacroDefinitions(
+    CXTranslationUnit translationUnit,
+    bool excludeSystemHeaders,
+    MacroVisitor visitor,
+    CXClientData client_data
+    ) {
+    struct VisitMacro {
+      bool excludeSystemHeaders;
+      MacroVisitor visitor;
+      CXClientData clientData;
+    };
+
+    auto parent = clang_getTranslationUnitCursor(translationUnit);
+    auto data = VisitMacro { excludeSystemHeaders, visitor, client_data };
+    return clang_visitChildren(parent, [](CXCursor cursor, CXCursor parent, CXClientData data) {
+      if (cursor.kind != CXCursor_MacroDefinition || clang_Cursor_isMacroFunctionLike(cursor)) {
+        return CXChildVisit_Continue;
+      }
+      auto* visitMacroData = reinterpret_cast<VisitMacro*>(data);
+      auto location = clang_getCursorLocation(cursor);
+      if (visitMacroData->excludeSystemHeaders && clang_Location_isInSystemHeader(location)) {
+        return CXChildVisit_Continue;
+      }
+      CXFile file;
+      clang_getFileLocation(location, &file, nullptr, nullptr, nullptr);
+      if (!file) {
+        return CXChildVisit_Continue;
+      }
+      auto spelling = clang_getCursorSpelling(cursor);
+      auto spellingCStr = clang_getCString(spelling);
+      visitMacroData->visitor(visitMacroData->clientData, spellingCStr, location, file);
+      clang_disposeString(spelling);
+      return CXChildVisit_Continue;
+    }, &data);
+  }
+
+  int32_t clang_getFileUniqueIDHash(CXFile file) {
+    CXFileUniqueID id;
+    if (clang_getFileUniqueID(file, &id) != 0) {
+      return 0;
+    }
+    std::size_t hash = 0;
+    for (auto part : id.data) {
+      hash_combine(hash, part);
+    }
+    static_assert(sizeof(hash) == 8);
+    return static_cast<int32_t>(hash ^ (hash >> 32));
+  }
 }

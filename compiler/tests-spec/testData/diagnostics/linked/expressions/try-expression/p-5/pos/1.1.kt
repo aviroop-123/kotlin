@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -18,9 +17,9 @@ fun case1(): String {
     try {
         flag = true
     } catch (e: Exception) {
-       <!UNREACHABLE_CODE!>return<!> "foo"
+       return "foo"
     } finally {
         return "FINALLY"
     }
-    <!UNREACHABLE_CODE!>return "return"<!>
+    return "return"
 }

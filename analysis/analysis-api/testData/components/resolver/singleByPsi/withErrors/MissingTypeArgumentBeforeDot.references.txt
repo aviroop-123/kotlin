@@ -1,3 +1,0 @@
-KtNameReferenceExpression(42,49): 'Generic'
-  KtSimpleNameReference:
-    (in ROOT) class Generic<T>

@@ -1,11 +1,7 @@
-/*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
- * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
- */
 // KT-66088
 // IGNORE_BACKEND: JS_IR, JS_IR_ES6
 // KT-66089
-// IGNORE_BACKEND: WASM
+// IGNORE_BACKEND: WASM_JS, WASM_WASI
 // WITH_STDLIB
 
 import kotlin.test.*

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
+ * Copyright 2010-2026 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,10 @@ object PathUtil {
     const val JS_LIB_JAR_NAME = "$JS_LIB_NAME.jar"
 
     const val JS_LIB_10_JAR_NAME = "kotlin-jslib.jar"
+
+    const val WASM_JS_LIB_NAME = "kotlin-stdlib-wasm-js"
+    const val WASM_WASI_LIB_NAME = "kotlin-stdlib-wasm-wasi"
+
     const val ALLOPEN_PLUGIN_NAME = "allopen-compiler-plugin"
     const val ALLOPEN_PLUGIN_JAR_NAME = "$ALLOPEN_PLUGIN_NAME.jar"
     const val NOARG_PLUGIN_NAME = "noarg-compiler-plugin"
@@ -37,7 +41,6 @@ object PathUtil {
     const val SERIALIZATION_PLUGIN_NAME = "kotlinx-serialization-compiler-plugin"
     const val SERIALIZATION_PLUGIN_JAR_NAME = "$SERIALIZATION_PLUGIN_NAME.jar"
     const val LOMBOK_PLUGIN_NAME = "lombok-compiler-plugin"
-    const val ANDROID_EXTENSIONS_RUNTIME_PLUGIN_JAR_NAME = "android-extensions-runtime.jar"
     const val PARCELIZE_RUNTIME_PLUGIN_JAR_NAME = "parcelize-runtime.jar"
     const val JS_LIB_SRC_JAR_NAME = "kotlin-stdlib-js-sources.jar"
 
@@ -114,14 +117,24 @@ object PathUtil {
         else
             KotlinPathsFromHomeDir(compilerPathForIdeaPlugin)
 
+    /**
+     * Auto-detection/self-discovery for command-line kotlinc:
+     * - Try to get a base path to JAR `kotlin-compiler*.jar`
+     * - If not found, failover to dist (with the assumption it only happens in test)
+     *
+     * If the check failed, likely a non-standard layout is used and `-kotlin-home` should be passed explicitly
+     */
     @JvmStatic
     val kotlinPathsForCompiler: KotlinPaths
-        get() = if (!pathUtilJar.isFile || !pathUtilJar.name.startsWith(KOTLIN_COMPILER_NAME)) {
-            // PathUtil.class is located not in the kotlin-compiler*.jar, so it must be a test and we'll take KotlinPaths from "dist/"
+        get() = if (pathUtilJar.isFile && pathUtilJar.name.startsWith(KOTLIN_COMPILER_NAME)) {
+            KotlinPathsFromHomeDir(compilerPathForCompilerJar)
+        } else {
+            // PathUtil.class is located not in the kotlin-compiler*.jar, so it must be a test, and we'll take KotlinPaths from "dist/"
             // (when running tests, PathUtil.class is in its containing module's artifact, i.e. util-{version}.jar)
-            kotlinPathsForDistDirectory
+            // Use "kotlin.dist.path" if set by test infrastructure (via withDist()) to avoid relying on the working directory
+            System.getProperty("kotlin.dist.path")?.let { KotlinPathsFromHomeDir(File(it, HOME_FOLDER_NAME)) }
+                ?: kotlinPathsForDistDirectory
         }
-        else KotlinPathsFromHomeDir(compilerPathForCompilerJar)
 
     @JvmStatic
     val kotlinPathsForDistDirectory: KotlinPaths
@@ -155,8 +168,7 @@ object PathUtil {
             return NO_PATH
         }
 
-    val pathUtilJar: File
-        get() = getResourcePathForClass(PathUtil::class.java)
+    val pathUtilJar: File by lazy { getResourcePathForClass(PathUtil::class.java) }
 
     @JvmStatic
     fun getResourcePathForClass(aClass: Class<*>): File {

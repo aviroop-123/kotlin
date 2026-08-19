@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -30,7 +29,7 @@ fun case2() {
 fun fooCase2(): Case1 {
     val x = ""
     return Case1()
-    <!UNREACHABLE_CODE!>val y = ""<!>
+    val y = ""
 }
 
 // TESTCASE NUMBER: 3
@@ -38,8 +37,8 @@ fun case3() {
     val x = object : Case13 {
         override fun fooCase3(): Int {
             return 1
-            <!UNREACHABLE_CODE!>"str"<!>
-            <!UNREACHABLE_CODE!>3<!>
+            "str"
+            3
         }
     }.fooCase3()
 

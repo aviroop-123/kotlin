@@ -10,8 +10,8 @@ import org.jetbrains.kotlin.backend.common.lower.*
 import org.jetbrains.kotlin.backend.konan.*
 import org.jetbrains.kotlin.backend.konan.Context
 import org.jetbrains.kotlin.backend.konan.ir.buildSimpleAnnotation
-import org.jetbrains.kotlin.backend.konan.llvm.IntrinsicType
-import org.jetbrains.kotlin.backend.konan.llvm.tryGetIntrinsicType
+import org.jetbrains.kotlin.backend.konan.IntrinsicType
+import org.jetbrains.kotlin.backend.konan.ir.tryGetIntrinsicType
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
@@ -29,7 +29,6 @@ import org.jetbrains.kotlin.ir.visitors.*
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.*
 import org.jetbrains.kotlin.utils.addToStdlib.getOrSetIfNull
-import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
 val IR_DECLARATION_ORIGIN_VOLATILE = IrDeclarationOriginImpl("VOLATILE")
 
@@ -54,6 +53,7 @@ internal class VolatileFieldsLowering(val context: Context) : FileLoweringPass {
     ))
     private val convertedBooleanFields = mutableSetOf<IrFieldSymbol>()
     private fun IrField.requiresBooleanConversion() = (type == irBuiltins.booleanType && hasAnnotation(KonanFqNames.volatile)) || symbol in convertedBooleanFields
+    private fun IrField.effectiveFieldType(): IrType = if (requiresBooleanConversion()) irBuiltins.byteType else this.type
 
     private fun buildIntrinsicFunction(irField: IrField, intrinsicType: IntrinsicType, builder: IrSimpleFunction.() -> Unit) = context.irFactory.buildFun {
         isExternal = true
@@ -87,13 +87,13 @@ internal class VolatileFieldsLowering(val context: Context) : FileLoweringPass {
                     startOffset = irField.startOffset
                     endOffset = irField.endOffset
                     name = Name.identifier("expectedValue")
-                    type = irField.type
+                    type = irField.effectiveFieldType()
                 }
                 addValueParameter {
                     startOffset = irField.startOffset
                     endOffset = irField.endOffset
                     name = Name.identifier("newValue")
-                    type = irField.type
+                    type = irField.effectiveFieldType()
                 }
             }
 
@@ -104,7 +104,7 @@ internal class VolatileFieldsLowering(val context: Context) : FileLoweringPass {
                     startOffset = irField.startOffset
                     endOffset = irField.endOffset
                     name = Name.identifier("value")
-                    type = irField.type
+                    type = irField.effectiveFieldType()
                 }
             }
 
@@ -246,7 +246,7 @@ internal class VolatileFieldsLowering(val context: Context) : FileLoweringPass {
                     dispatchReceiver = reference.boundValues.singleOrNull()
                     val replacementParams = function.parameters.filter { it.kind == IrParameterKind.Regular }
                     val originalParams = expression.symbol.owner.parameters.filter { it.kind == IrParameterKind.Regular }
-                    for ((from, to) in originalParams.zip(replacementParams)) {
+                    for ([from, to] in originalParams.zip(replacementParams)) {
                         arguments[to] = expression.arguments[from]
                     }
                 }.let {

@@ -6,18 +6,18 @@
 package org.jetbrains.kotlin.ir.backend.js.transformers.irToJs
 
 import org.jetbrains.kotlin.backend.common.serialization.cityHash64String
-import org.jetbrains.kotlin.ir.backend.js.tsexport.TypeScriptFragment
 import org.jetbrains.kotlin.ir.backend.js.ic.IrICModule
 import org.jetbrains.kotlin.ir.backend.js.ic.IrICProgramFragment
 import org.jetbrains.kotlin.ir.backend.js.ic.IrICProgramFragments
+import org.jetbrains.kotlin.ir.backend.js.tsexport.TypeScriptFragment
 import org.jetbrains.kotlin.ir.backend.js.utils.serialization.serializeTo
 import org.jetbrains.kotlin.ir.backend.js.utils.toJsIdentifier
 import org.jetbrains.kotlin.js.backend.ast.*
+import org.jetbrains.kotlin.js.config.ModuleKind
 import java.io.File
-import org.jetbrains.kotlin.serialization.js.ModuleKind
 import java.io.OutputStream
 
-class JsIrProgramFragments(override val mainFragment: JsIrProgramFragment, override val exportFragment: JsIrProgramFragment? = null) :
+class JsIrProgramFragments(val mainFragment: JsIrProgramFragment, val exportFragment: JsIrProgramFragment? = null) :
     IrICProgramFragments() {
     override fun serialize(stream: OutputStream) {
         serializeTo(stream)
@@ -63,7 +63,7 @@ class JsIrModule(
             if (!fragment.exports.isEmpty) hasDeclarationsToReexport = true
             if (fragment.hasEffect) hasAnEffectInside = true
 
-            for ((tag, name) in fragment.nameBindings.entries) {
+            for ([tag, name] in fragment.nameBindings.entries) {
                 nameBindings[tag] = name.toString()
             }
             definitions += fragment.definitions
@@ -96,10 +96,10 @@ class JsIrModuleHeader(
 }
 
 class JsIrProgram(private var modules: List<JsIrModule>) {
-    fun asCrossModuleDependencies(moduleKind: ModuleKind, relativeRequirePath: Boolean): List<Pair<JsIrModule, CrossModuleReferences>> {
+    fun asCrossModuleDependencies(moduleKind: ModuleKind): List<Pair<JsIrModule, CrossModuleReferences>> {
         val resolver = CrossModuleDependenciesResolver(moduleKind, modules.map { it.makeModuleHeader() })
         modules = emptyList()
-        val crossModuleReferences = resolver.resolveCrossModuleDependencies(relativeRequirePath)
+        val crossModuleReferences = resolver.resolveCrossModuleDependencies()
         return crossModuleReferences.entries.map {
             val module = it.key.associatedModule ?: error("Internal error: module ${it.key.moduleName} is not loaded")
             it.value.initJsImportsForModule(module)
@@ -115,14 +115,13 @@ class JsIrProgram(private var modules: List<JsIrModule>) {
 }
 
 class CrossModuleDependenciesResolver(private val moduleKind: ModuleKind, private val headers: List<JsIrModuleHeader>) {
-    fun resolveCrossModuleDependencies(relativeRequirePath: Boolean): Map<JsIrModuleHeader, CrossModuleReferences> {
+    fun resolveCrossModuleDependencies(): Map<JsIrModuleHeader, CrossModuleReferences> {
         val reexportModuleToHeader = headers.groupBy { it.reexportedInModuleWithName }
         val importedInModuleWithEffect = headers.groupBy { it.importedWithEffectInModuleWithName }
         val headerToBuilder = headers.associateWith {
             JsIrModuleCrossModuleReferenceBuilder(
                 moduleKind,
                 it,
-                relativeRequirePath,
                 reexportModuleToHeader[it.moduleName] ?: emptyList(),
                 importedInModuleWithEffect[it.moduleName] ?: emptyList(),
             )
@@ -166,7 +165,6 @@ private class CrossModuleRef(val module: JsIrModuleCrossModuleReferenceBuilder, 
 private class JsIrModuleCrossModuleReferenceBuilder(
     val moduleKind: ModuleKind,
     val header: JsIrModuleHeader,
-    val relativeRequirePath: Boolean,
     val transitiveExportFrom: List<JsIrModuleHeader>,
     val importWithEffectFrom: List<JsIrModuleHeader>,
 ) {
@@ -209,7 +207,7 @@ private class JsIrModuleCrossModuleReferenceBuilder(
 
         val transitiveExport = transitiveExportFrom.mapNotNull {
             it.reexportedInModuleWithName?.run {
-                CrossModuleTransitiveExport(import(it).internalName, relativeRequirePath(it) ?: it.externalModuleName)
+                CrossModuleTransitiveExport(import(it).internalName, relativeRequirePath(it))
             }
         }
 
@@ -237,9 +235,7 @@ private class JsIrModuleCrossModuleReferenceBuilder(
         )
     }
 
-    private fun relativeRequirePath(moduleHeader: JsIrModuleHeader): String? {
-        if (!this.relativeRequirePath) return null
-
+    private fun relativeRequirePath(moduleHeader: JsIrModuleHeader): String {
         val parentMain = File(header.externalModuleName).parentFile ?: return "./${moduleHeader.externalModuleName}"
 
         val relativePath = File(moduleHeader.externalModuleName)
@@ -299,7 +295,7 @@ class CrossModuleReferences(
 
     private fun CrossModuleImport.generateImportVariableDeclaration(importedAs: JsName): JsStatement {
         val exportRef = JsNameRef(exportedAs, ReservedJsNames.makeCrossModuleNameRef(moduleExporter.internalName))
-        return JsVars(JsVars.JsVar(importedAs, exportRef))
+        return JsVars(JsVars.Variant.Var, JsVars.JsVar(importedAs, exportRef))
     }
 
     private fun CrossModuleImport.generateJsImportStatement(importedAs: JsName): JsStatement {
@@ -317,7 +313,7 @@ class CrossModuleReferences(
 fun JsStatement.renameImportedSymbolInternalName(newName: JsName): JsStatement {
     return when (this) {
         is JsImport -> JsImport(module, JsImport.Element((target as JsImport.Target.Elements).elements.single().name, newName.makeRef()))
-        is JsVars -> JsVars(JsVars.JsVar(newName, vars.single().initExpression))
+        is JsVars -> JsVars(JsVars.Variant.Var, JsVars.JsVar(newName, vars.single().initExpression))
         else -> error("Unexpected cross-module import statement ${this::class.qualifiedName}")
     }
 }

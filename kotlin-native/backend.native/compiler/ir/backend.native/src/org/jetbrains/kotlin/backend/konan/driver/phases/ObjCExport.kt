@@ -8,7 +8,8 @@ package org.jetbrains.kotlin.backend.konan.driver.phases
 import org.jetbrains.kotlin.backend.common.phaser.createSimpleNamedCompilerPhase
 import org.jetbrains.kotlin.backend.konan.LinkKlibsContext
 import org.jetbrains.kotlin.backend.konan.OutputFiles
-import org.jetbrains.kotlin.backend.konan.driver.PhaseContext
+import org.jetbrains.kotlin.config.nativeBinaryOptions.BinaryOptions
+import org.jetbrains.kotlin.backend.konan.driver.NativeBackendPhaseContext
 import org.jetbrains.kotlin.backend.konan.objcexport.ObjCExportCodeSpec
 import org.jetbrains.kotlin.backend.konan.objcexport.ObjCExportedInterface
 import org.jetbrains.kotlin.backend.konan.objcexport.createCodeSpec
@@ -20,7 +21,7 @@ import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 /**
  * Create internal representation of Objective-C wrapper.
  */
-internal val ProduceObjCExportInterfacePhase = createSimpleNamedCompilerPhase<PhaseContext, FrontendPhaseOutput.Full, ObjCExportedInterface>(
+internal val ProduceObjCExportInterfacePhase = createSimpleNamedCompilerPhase<NativeBackendPhaseContext, FrontendPhaseOutput.Full, ObjCExportedInterface>(
         "ObjCExportInterface",
         outputIfNotEnabled = { _, _, _, _ -> error("Cannot disable `ObjCExportInterface` phase when producing ObjC framework") }
 ) { context, input ->
@@ -35,12 +36,17 @@ internal data class CreateObjCFrameworkInput(
 /**
  * Create Objective-C framework in the given directory without binary.
  */
-internal val CreateObjCFrameworkPhase = createSimpleNamedCompilerPhase<PhaseContext, CreateObjCFrameworkInput>(
+internal val CreateObjCFrameworkPhase = createSimpleNamedCompilerPhase<NativeBackendPhaseContext, CreateObjCFrameworkInput>(
         "CreateObjCFramework",
 ) { context, input ->
     val config = context.config
     // TODO: Share this instance between multiple contexts (including NativeGenerationState)?
-    val outputFiles = OutputFiles(config.outputPath, config.target, config.produce)
+    val outputFiles = OutputFiles(
+            config.outputPath,
+            config.target,
+            config.produce,
+            objcExportCacheEnabled = config.objcExportCacheEnabled
+    )
     createObjCFramework(config, input.moduleDescriptor, input.exportedInterface, outputFiles.mainFile)
 }
 
@@ -53,7 +59,7 @@ internal val CreateObjCExportCodeSpecPhase = createSimpleNamedCompilerPhase<Link
 ) { context, input ->
     input.createCodeSpec(context.symbolTable!!).also {
         context.config.dumpObjcSelectorToSignatureMapping?.let { path ->
-            it.dumpSelectorToSignatureMapping(path)
+            it.dumpSelectorToSignatureMapping(path, context.symbolTable!!.signaturer!!, input.mapper)
         }
     }
 }

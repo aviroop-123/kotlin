@@ -28,19 +28,26 @@ import org.jetbrains.kotlin.name.Name
  */
 class GenerateMainFunctionWrappers(private val backendContext: WasmBackendContext) : ModuleLoweringPass {
     override fun lower(irModule: IrModuleFragment) {
-        val mainFunction = JsMainFunctionDetector(backendContext).getMainFunctionOrNull(irModule) ?: return
-        val generateArgv = mainFunction.parameters.firstOrNull()?.isStringArrayParameter() ?: false
-        val generateContinuation = mainFunction.isLoweredSuspendFunction(backendContext)
+        if (backendContext.irModuleFragment != irModule) return
 
-        if (!generateArgv && !generateContinuation) {
-            backendContext.getFileContext(mainFunction.file).mainFunctionWrapper = mainFunction
-            return
-        }
+        val detector = JsMainFunctionDetector(backendContext)
+        for (file in irModule.files) {
+            val mainFunction = detector.getMainFunctionOrNull(file) ?: continue
+            val generateArgv = mainFunction.parameters.firstOrNull()?.isStringArrayParameter() ?: false
+            val generateContinuation = mainFunction.isLoweredSuspendFunction(backendContext)
 
-        val wrapper = backendContext.irFactory.stageController.restrictTo(mainFunction) {
-            mainFunction.createMainFunctionWrapper(backendContext, generateArgv, generateContinuation)
+            val fileContext = backendContext.getFileContext(file)
+
+            if (!generateArgv && !generateContinuation) {
+                fileContext.mainFunctionWrapper = mainFunction
+                continue
+            }
+
+            val wrapper = backendContext.irFactory.stageController.restrictTo(mainFunction) {
+                mainFunction.createMainFunctionWrapper(backendContext, generateArgv, generateContinuation)
+            }
+            fileContext.mainFunctionWrapper = wrapper
         }
-        backendContext.getFileContext(mainFunction.file).mainFunctionWrapper = wrapper
     }
 }
 
@@ -57,7 +64,7 @@ private fun IrSimpleFunction.createMainFunctionWrapper(
         visibility = visibility,
         isInline = false,
         isExpect = false,
-        returnType = returnType,
+        returnType = backendContext.irBuiltIns.unitType,
         modality = modality,
         symbol = IrSimpleFunctionSymbolImpl(),
         isTailrec = false,

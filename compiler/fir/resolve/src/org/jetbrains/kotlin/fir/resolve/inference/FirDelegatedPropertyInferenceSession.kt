@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.fir.render
 import org.jetbrains.kotlin.fir.resolve.BodyResolveComponents
 import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.calls.ConeAtomWithCandidate
+import org.jetbrains.kotlin.fir.resolve.calls.ConePostponedResolvedAtom
 import org.jetbrains.kotlin.fir.resolve.calls.ConeResolutionAtom
 import org.jetbrains.kotlin.fir.resolve.calls.InferenceError
 import org.jetbrains.kotlin.fir.resolve.calls.ResolutionContext
@@ -19,6 +20,7 @@ import org.jetbrains.kotlin.fir.resolve.calls.candidate.candidate
 import org.jetbrains.kotlin.fir.resolve.calls.candidate.processPostponedAtoms
 import org.jetbrains.kotlin.fir.resolve.initialTypeOfCandidate
 import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
+import org.jetbrains.kotlin.fir.resolve.substitution.asCone
 import org.jetbrains.kotlin.fir.resolve.transformers.FirCallCompletionResultsWriterTransformer
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.BodyResolveContext
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
@@ -33,7 +35,7 @@ import org.jetbrains.kotlin.utils.addIfNotNull
 class FirDelegatedPropertyInferenceSession(
     private val resolutionContext: ResolutionContext,
     private val callCompleter: FirCallCompleter,
-    private val delegateExpression: FirExpression,
+    private val delegateExpression: FirExpression?,
 ) : FirInferenceSession() {
 
     private val partiallyResolvedCalls: MutableList<Pair<FirResolvable, Candidate>> = mutableListOf()
@@ -125,7 +127,7 @@ class FirDelegatedPropertyInferenceSession(
             integrateChildSession(
                 buildList {
                     addIfNotNull(ConeResolutionAtom.createRawAtom(delegateExpression))
-                    partiallyResolvedCalls.mapTo(this) { (expression, candidate) ->
+                    partiallyResolvedCalls.mapTo(this) { [expression, candidate] ->
                         ConeAtomWithCandidate(expression as FirExpression, candidate)
                     }
                 },
@@ -138,7 +140,7 @@ class FirDelegatedPropertyInferenceSession(
         val completedCalls = completeCandidatesForRootSession()
 
         val finalSubstitutor = parentConstraintSystem.asReadOnlyStorage()
-            .buildAbstractResultingSubstitutor(components.session.typeContext) as ConeSubstitutor
+            .buildAbstractResultingSubstitutor(components.session.typeContext).asCone()
 
         val callCompletionResultsWriter = callCompleter.createCompletionResultsWriter(
             finalSubstitutor,
@@ -162,34 +164,47 @@ class FirDelegatedPropertyInferenceSession(
                     add(ConeAtomWithCandidate(delegateExpression, delegateCandidate))
                 }
             }
-            partiallyResolvedCalls.mapNotNullTo(this) { (partiallyResolvedCall, _) ->
+            partiallyResolvedCalls.mapNotNullTo(this) { [partiallyResolvedCall, _] ->
                 val candidate = partiallyResolvedCall.candidate() ?: return@mapNotNullTo null
                 ConeAtomWithCandidate(partiallyResolvedCall as FirExpression, candidate)
             }
         }
 
         resolutionContext.bodyResolveContext.withInferenceSession(DEFAULT) {
+            val postponedAtomAnalyzer = object : ConstraintSystemCompleter.PostponedAtomAnalyzer {
+                override fun analyze(
+                    postponedResolvedAtom: ConePostponedResolvedAtom,
+                    withPCLASession: Boolean,
+                    precalculatedBoundsForCL: CollectionLiteralBounds?,
+                ) {
+                    callCompleter.createPostponedArgumentsAnalyzer(resolutionContext).analyze(
+                        parentSystem,
+                        postponedResolvedAtom,
+                        getCurrentCandidate(postponedResolvedAtom),
+                        withPCLASession,
+                        precalculatedBoundsForCL,
+                    )
+                }
+
+                private fun getCurrentCandidate(postponedResolvedAtom: ConePostponedResolvedAtom): Candidate {
+                    // Reversed here bc we want top-most call to avoid exponential visit
+                    return notCompletedCalls.asReversed().first {
+                        var found = false
+                        it.processPostponedAtoms { atom ->
+                            found = found || atom == postponedResolvedAtom
+                        }
+                        found
+                    }.candidate
+                }
+            }
             components.callCompleter.completer.complete(
                 parentSystem.asConstraintSystemCompleterContext(),
                 ConstraintSystemCompletionMode.FULL,
                 notCompletedCalls,
-                unitType, resolutionContext
-            ) { lambdaAtom, withPCLASession ->
-                // Reversed here bc we want top-most call to avoid exponential visit
-                val containingCandidateForLambda = notCompletedCalls.asReversed().first {
-                    var found = false
-                    it.processPostponedAtoms { postponedAtom ->
-                        found = found || postponedAtom == lambdaAtom
-                    }
-                    found
-                }.candidate
-                callCompleter.createPostponedArgumentsAnalyzer(resolutionContext).analyze(
-                    parentSystem,
-                    lambdaAtom,
-                    containingCandidateForLambda,
-                    withPCLASession
-                )
-            }
+                unitType, resolutionContext,
+                postponedAtomAnalyzer,
+                isUntilFirstLambda = false,
+            )
         }
 
         for (candidate in notCompletedCalls.mapNotNull { (it.expression as FirResolvable).candidate() }) {

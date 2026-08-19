@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -35,6 +36,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaScriptModule "Script simpleScript.kts"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.testFunction
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -44,8 +47,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -62,6 +69,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: null
     getContainingModule: KaScriptModule "Script simpleScript.kts"
     deprecationStatus: null
+    importableFqName: null
   callableId: test/testValue
   compilerVisibility: Public
   contextParameters: []
@@ -73,8 +81,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -92,13 +102,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: null
     getContainingModule: KaScriptModule "Script simpleScript.kts"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaConstantInitializerValue(2)
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -123,11 +135,10 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: null
   getContainingModule: KaScriptModule "Script simpleScript.kts"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getTestValue
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: test.testValue
 
 KaNamedClassSymbol:
   annotations: []
@@ -159,6 +170,7 @@ KaNamedClassSymbol:
   getContainingModule: KaScriptModule "Script simpleScript.kts"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.C
 
 KaNamedClassSymbol:
   annotations: []
@@ -190,6 +202,7 @@ KaNamedClassSymbol:
   getContainingModule: KaScriptModule "Script simpleScript.kts"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.I
 
 KaNamedClassSymbol:
   annotations: []
@@ -221,3 +234,4 @@ KaNamedClassSymbol:
   getContainingModule: KaScriptModule "Script simpleScript.kts"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.O

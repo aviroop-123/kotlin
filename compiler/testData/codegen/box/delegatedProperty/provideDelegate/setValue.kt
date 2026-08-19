@@ -1,6 +1,5 @@
 // DIAGNOSTICS: -UNUSED_PARAMETER
 // ISSUE: KT-61077
-// IGNORE_BACKEND_K1: ANY
 // WITH_STDLIB
 
 data class Delegate<T>(val data: T)

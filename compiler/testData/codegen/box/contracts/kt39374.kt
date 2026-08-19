@@ -1,6 +1,5 @@
 // WITH_STDLIB
 // WITH_COROUTINES
-// JVM_ABI_K1_K2_DIFF: KT-62845
 
 import kotlin.contracts.*
 import kotlin.coroutines.*
@@ -26,7 +25,10 @@ sealed class S {
 
 val z: S = S.Z()
 
+@OptIn(ExperimentalContracts::class)
+fun box(): String = test()
+
 @ExperimentalContracts
-fun box(): String = when (val w = z) {
+fun test(): String = when (val w = z) {
     is S.Z -> runBlocking { w.f() }
 }

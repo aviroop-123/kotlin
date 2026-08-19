@@ -1,15 +1,18 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.test.backend.handlers
 
+import org.jetbrains.kotlin.test.backend.ir.DeserializedFromKlibBackendInput
 import org.jetbrains.kotlin.test.backend.ir.DumpSyntheticAccessors
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
-import org.jetbrains.kotlin.test.model.*
-import org.jetbrains.kotlin.test.services.*
+import org.jetbrains.kotlin.test.model.TestModule
+import org.jetbrains.kotlin.test.services.TestServices
+import org.jetbrains.kotlin.test.services.moduleStructure
 import org.jetbrains.kotlin.test.utils.MultiModuleInfoDumper
+import org.jetbrains.kotlin.test.checkTestInfrastructure
 import java.io.File
 
 class SyntheticAccessorsDumpHandler(
@@ -18,7 +21,7 @@ class SyntheticAccessorsDumpHandler(
     private val dumper = MultiModuleInfoDumper("")
 
     override fun processModule(module: TestModule, info: IrBackendInput) {
-        require(info is IrBackendInput.DeserializedFromKlib) {
+        checkTestInfrastructure(info is DeserializedFromKlibBackendInput<*>) {
             "SyntheticAccessorsDumpHandler works only with DeserializedFromKlib, but got ${info::class.simpleName}"
         }
         val dump = DumpSyntheticAccessors.dump(info.irModuleFragment).removeSuffix("\n")

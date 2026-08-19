@@ -5,10 +5,12 @@
 
 package org.jetbrains.kotlin.sir.providers.impl
 
-import org.jetbrains.kotlin.analysis.api.export.utilities.getJvmNameOrNull
 import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.sir.providers.SirDeclarationNamer
+import org.jetbrains.kotlin.sir.providers.utils.objCNameAnnotation
+import org.jetbrains.kotlin.utils.filterIsInstanceAnd
 
 public class SirDeclarationNamerImpl : SirDeclarationNamer {
 
@@ -17,6 +19,7 @@ public class SirDeclarationNamerImpl : SirDeclarationNamer {
     }
 
     private fun KaDeclarationSymbol.getName(): String? {
+        objCNameAnnotation?.name?.let { return it }
         return when (this) {
             is KaNamedClassSymbol -> this.classId?.shortClassName?.asString()
             is KaPropertySymbol -> this.name.asString()
@@ -27,7 +30,6 @@ public class SirDeclarationNamerImpl : SirDeclarationNamer {
 
     private fun KaCallableSymbol.mangleCallableName(): String? {
         this.mangleFactoryNameClashingWithClassLikeSymbol()?.let { return it }
-        this.getJvmNameOrNull()?.let { return it }
 
         return callableId?.callableName?.asString()
     }
@@ -58,10 +60,24 @@ public class SirDeclarationNamerImpl : SirDeclarationNamer {
         // It is a top-level function, and its name starts with an uppercase.
 
         val returnType = this.returnType.abbreviation ?: this.returnType
-        val classId = returnType.symbol?.takeIf { it.isTopLevel }?.classId ?: return null
+        val classIds = generateSequence(returnType.symbol) { symbol ->
+            when (symbol) {
+                is KaTypeAliasSymbol -> symbol.expandedType.symbol
+                is KaClassSymbol -> {
+                    val classKind = symbol.classKind.takeIf { it == KaClassKind.INTERFACE } ?: KaClassKind.CLASS
+                    symbol.superTypes.filterIsInstanceAnd<KaClassType> {
+                        var superSymbol: KaClassLikeSymbol? = it.symbol
+                        while (superSymbol is KaTypeAliasSymbol) {
+                            superSymbol = superSymbol.expandedType.symbol
+                        }
+                        (superSymbol as? KaClassSymbol)?.classKind == classKind
+                    }.firstOrNull()?.symbol as KaClassSymbol?
+                }
+            }
+        }.takeWhile { it.isTopLevel }.mapNotNull { it.classId }
         // The return type is based on a top-level class or typealias with `classId`.
 
-        return if (callableId.packageName == classId.packageFqName && callableId.callableName == classId.shortClassName) {
+        return if (classIds.any { callableId.packageName == it.packageFqName && callableId.callableName == it.shortClassName }) {
             // They match ⇒ mangle the function name by lowercasing the first latter.
             callableId.callableName.asString().replaceFirstChar { it.lowercase() }
         } else {

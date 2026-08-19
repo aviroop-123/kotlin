@@ -21,6 +21,17 @@ import org.jetbrains.kotlin.fir.visitors.FirTransformer
 import org.jetbrains.kotlin.fir.visitors.FirVisitor
 
 /**
+ * Represents an anonymous object declaration created by an `object` expression.
+ * Unlike [FirRegularClass], it has no name and is always declared as a part of an expression at the usage site.
+ *
+ * Notable properties:
+ * - [classKind] — always [ClassKind.OBJECT]. 
+ * - [symbol] — the symbol which serves as a pointer to this anonymous object.
+ * - [superTypeRefs] — explicitly declared supertypes of the object literal, or [kotlin.Any] by default.
+ * - [isLocal] — always true for anonymous object. 
+ * - [declarations] — member declarations inside the anonymous object.
+ * - [annotations] — annotations present on the object literal, if any.
+ *
  * Generated from: [org.jetbrains.kotlin.fir.tree.generator.FirTree.anonymousObject]
  */
 abstract class FirAnonymousObject : FirClass() {
@@ -30,9 +41,9 @@ abstract class FirAnonymousObject : FirClass() {
     abstract override val attributes: FirDeclarationAttributes
     abstract override val typeParameters: List<FirTypeParameterRef>
     abstract override val status: FirDeclarationStatus
+    abstract override val isLocal: Boolean
     abstract override val deprecationsProvider: DeprecationsProvider
     abstract override val scopeProvider: FirScopeProvider
-    abstract override val isLocal: Boolean
     abstract override val controlFlowGraphReference: FirControlFlowGraphReference?
     abstract override val classKind: ClassKind
     abstract override val superTypeRefs: List<FirTypeRef>
@@ -55,6 +66,8 @@ abstract class FirAnonymousObject : FirClass() {
     abstract override fun replaceControlFlowGraphReference(newControlFlowGraphReference: FirControlFlowGraphReference?)
 
     abstract override fun replaceSuperTypeRefs(newSuperTypeRefs: List<FirTypeRef>)
+
+    abstract override fun replaceDeclarations(newDeclarations: List<FirDeclaration>)
 
     abstract override fun replaceAnnotations(newAnnotations: List<FirAnnotation>)
 

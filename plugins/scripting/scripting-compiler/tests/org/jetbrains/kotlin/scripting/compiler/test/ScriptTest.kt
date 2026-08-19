@@ -13,18 +13,19 @@ import org.jetbrains.kotlin.cli.common.messages.*
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.codegen.CompilationException
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
+import org.jetbrains.kotlin.config.MessageCollectorAccess
 import org.jetbrains.kotlin.config.messageCollector
 import org.jetbrains.kotlin.load.java.JvmAnnotationNames
 import org.jetbrains.kotlin.script.loadScriptingPlugin
 import org.jetbrains.kotlin.scripting.compiler.plugin.updateWithBaseCompilerArguments
 import org.jetbrains.kotlin.scripting.configuration.ScriptingConfigurationKeys
-import org.jetbrains.kotlin.scripting.definitions.KotlinScriptDefinition
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
-import org.jetbrains.kotlin.scripting.definitions.StandardScriptDefinition
 import org.jetbrains.kotlin.test.ConfigurationKind
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.TestJdkKind
+import org.jetbrains.kotlin.testFederation.SmokeTest
 import org.jetbrains.kotlin.utils.tryConstructClassFromStringArgs
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -33,10 +34,11 @@ import kotlin.script.experimental.host.toScriptSource
 import kotlin.script.experimental.jvm.defaultJvmScriptingHostConfiguration
 import kotlin.test.*
 
+@SmokeTest
 class ScriptTest {
     @Test
     fun testStandardScriptWithParams() {
-        val aClass = compileScript("fib_std.kts", StandardScriptDefinition)
+        val aClass = compileScript("fib_std.kts")
         assertNotNull(aClass)
         val out = captureOut {
             val anObj = tryConstructClassFromStringArgs(aClass, listOf("4", "comment"))
@@ -47,7 +49,7 @@ class ScriptTest {
 
     @Test
     fun testStandardScriptWithoutParams() {
-        val aClass = compileScript("fib_std.kts", StandardScriptDefinition)
+        val aClass = compileScript("fib_std.kts")
         assertNotNull(aClass)
         val out = captureOut {
             val anObj = tryConstructClassFromStringArgs(aClass, emptyList())
@@ -58,7 +60,7 @@ class ScriptTest {
 
     @Test
     fun testStandardScriptWithSaving(@TempDir tmpdir: File) {
-        val aClass = compileScript("fib_std.kts", StandardScriptDefinition, saveClassesDir = tmpdir)
+        val aClass = compileScript("fib_std.kts", saveClassesDir = tmpdir)
         assertNotNull(aClass)
         val out1 = captureOut {
             val anObj = tryConstructClassFromStringArgs(aClass, emptyList())
@@ -77,7 +79,7 @@ class ScriptTest {
 
     @Test
     fun testUseCompilerInternals() {
-        val scriptClass = compileScript("use_compiler_internals.kts", StandardScriptDefinition)!!
+        val scriptClass = compileScript("use_compiler_internals.kts")!!
         assertEquals("OK", captureOut {
             tryConstructClassFromStringArgs(scriptClass, emptyList())!!
         })
@@ -85,7 +87,7 @@ class ScriptTest {
 
     @Test
     fun testKt42530() {
-        val aClass = compileScript("kt42530.kts", StandardScriptDefinition)
+        val aClass = compileScript("kt42530.kts")
         assertNotNull(aClass)
         val out = captureOut {
             val anObj = tryConstructClassFromStringArgs(aClass, emptyList())
@@ -104,7 +106,7 @@ class ScriptTest {
             return (extraInt(metadata) as Int) and JvmAnnotationNames.METADATA_SCRIPT_FLAG != 0
         }
 
-        val scriptClass = compileScript("metadata_flag.kts", StandardScriptDefinition) ?: throw AssertionError("compilation failed")
+        val scriptClass = compileScript("metadata_flag.kts") ?: throw AssertionError("compilation failed")
         assertTrue(scriptClass.isFlagSet(), "Script class SHOULD have the metadata flag set")
         assertFalse(
             scriptClass.classLoader.loadClass("Metadata_flag\$RandomClass").isFlagSet(),
@@ -114,26 +116,19 @@ class ScriptTest {
 
     private fun compileScript(
         scriptPath: String,
-        scriptDefinition: KotlinScriptDefinition,
-        runIsolated: Boolean = true,
-        suppressOutput: Boolean = false,
-        saveClassesDir: File? = null
+        saveClassesDir: File? = null,
     ): Class<*>? {
-        val messageCollector =
-            if (suppressOutput) MessageCollector.NONE
-            else PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
+        val messageCollector = PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
 
         val rootDisposable = Disposer.newDisposable("Disposable for ${ScriptTest::class.simpleName}")
         try {
             val configuration = KotlinTestUtils.newConfiguration(ConfigurationKind.ALL, TestJdkKind.FULL_JDK)
             configuration.updateWithBaseCompilerArguments()
+            @OptIn(MessageCollectorAccess::class) // write access
             configuration.messageCollector = messageCollector
             configuration.add(
                 ScriptingConfigurationKeys.SCRIPT_DEFINITIONS,
-                ScriptDefinition.FromLegacy(
-                    defaultJvmScriptingHostConfiguration,
-                    scriptDefinition
-                )
+                ScriptDefinition.getDefault(defaultJvmScriptingHostConfiguration)
             )
             if (saveClassesDir != null) {
                 configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, saveClassesDir)
@@ -145,9 +140,8 @@ class ScriptTest {
 
             try {
                 return compileScript(
-                    File("plugins/scripting/scripting-compiler/testData/compiler/$scriptPath").toScriptSource(),
+                    ForTestCompileRuntime.transformTestDataPath("plugins/scripting/scripting-compiler/testData/compiler/$scriptPath").toScriptSource(),
                     environment,
-                    this::class.java.classLoader.takeUnless { runIsolated }
                 ).first?.java
             } catch (e: CompilationException) {
                 messageCollector.report(

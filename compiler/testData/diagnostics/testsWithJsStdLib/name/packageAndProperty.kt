@@ -1,11 +1,10 @@
-// FIR_DIFFERENCE
-// This case can't be checked using FIR. It is checked later on klib serialization.
+// RUN_PIPELINE_TILL: BACKEND
 
 // FILE: foo.kt
 
 package foo
 
-<!JS_NAME_CLASH!>val bar<!> = 23
+val bar = 23
 
 // FILE: foobar.kt
 

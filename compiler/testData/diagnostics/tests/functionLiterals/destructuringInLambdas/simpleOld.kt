@@ -44,14 +44,14 @@ fun bar() {
     }
 
     foo { (<!COMPONENT_FUNCTION_RETURN_TYPE_MISMATCH!>a: String<!>, b) ->
-        a checkType { _<Int>() }
+        a checkType { <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>_<!><Int>() }
         b checkType { _<String>() }
     }
 
-    foo <!TYPE_MISMATCH!>{ <!EXPECTED_PARAMETER_TYPE_MISMATCH!>(a, b): B<!> ->
+    foo { <!EXPECTED_PARAMETER_TYPE_MISMATCH!>(a, b): B<!> ->
         a checkType { _<Double>() }
         b checkType { _<Short>() }
-    }<!>
+    }
 }
 
 /* GENERATED_FIR_TAGS: classDeclaration, data, funWithExtensionReceiver, functionDeclaration, functionalType, infix,

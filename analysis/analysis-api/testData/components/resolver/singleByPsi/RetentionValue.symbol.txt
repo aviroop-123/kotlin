@@ -1,0 +1,7 @@
+KtNameReferenceExpression(31,37): 'SOURCE'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/annotation/AnnotationRetention.SOURCE
+    ]

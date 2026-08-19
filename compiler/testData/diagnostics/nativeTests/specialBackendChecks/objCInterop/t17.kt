@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // WITH_PLATFORM_LIBS
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.darwin.*

@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // OPT_IN: kotlin.native.internal.InternalForKotlinNative
 // OPT_IN: kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.*

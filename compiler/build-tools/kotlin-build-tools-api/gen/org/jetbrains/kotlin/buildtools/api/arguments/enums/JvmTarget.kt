@@ -29,5 +29,7 @@ public enum class JvmTarget(
   JVM_22("22"),
   JVM_23("23"),
   JVM_24("24"),
+  JVM_25("25"),
+  JVM_26("26"),
   ;
 }

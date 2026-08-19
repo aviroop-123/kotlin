@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.stubs.KotlinClassStub
+import org.jetbrains.kotlin.psi.stubs.KotlinStubElement
 import org.jetbrains.kotlin.psi.stubs.elements.KotlinValueClassRepresentation
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
@@ -23,20 +24,17 @@ class KotlinClassStubImpl(
     private val name: StringRef?,
     private val superNameRefs: Array<StringRef>,
     override val isInterface: Boolean,
-    override val isEnumEntry: Boolean,
     override val isClsStubCompiledToJvmDefaultImplementation: Boolean,
     override val isLocal: Boolean,
     override val isTopLevel: Boolean,
+    override val kdocText: String?,
     val valueClassRepresentation: KotlinValueClassRepresentation?,
 ) : KotlinStubBaseImpl<KtClass>(
     parent = parent,
-    elementType = if (isEnumEntry) KtStubElementTypes.ENUM_ENTRY else KtStubElementTypes.CLASS,
+    elementType = KtStubElementTypes.CLASS,
 ), KotlinClassStub {
     override val fqName: FqName?
-        get() {
-            val stringRef = StringRef.toString(qualifiedName) ?: return null
-            return FqName(stringRef)
-        }
+        get() = qualifiedName?.string?.let(::FqName)
 
     override fun getName(): String? = StringRef.toString(name)
 
@@ -51,10 +49,24 @@ class KotlinClassStubImpl(
         name = name,
         superNameRefs = superNameRefs,
         isInterface = isInterface,
-        isEnumEntry = isEnumEntry,
         isClsStubCompiledToJvmDefaultImplementation = isClsStubCompiledToJvmDefaultImplementation,
         isLocal = isLocal,
         isTopLevel = isTopLevel,
         valueClassRepresentation = valueClassRepresentation,
+        kdocText = kdocText,
     )
+
+    @KtImplementationDetail
+    override fun isEquivalentTo(other: KotlinStubElement<*>): Boolean =
+        other is KotlinClassStubImpl &&
+                other.name == name &&
+                other.classId == classId &&
+                other.isClsStubCompiledToJvmDefaultImplementation == isClsStubCompiledToJvmDefaultImplementation &&
+                other.isLocal == isLocal &&
+                other.isTopLevel == isTopLevel &&
+                other.qualifiedName == qualifiedName &&
+                other.isInterface == isInterface &&
+                other.kdocText == kdocText &&
+                other.valueClassRepresentation == valueClassRepresentation &&
+                other.superNameRefs.contentEquals(superNameRefs)
 }

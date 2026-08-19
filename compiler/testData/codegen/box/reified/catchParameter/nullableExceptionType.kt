@@ -1,6 +1,6 @@
 // LANGUAGE: +AllowReifiedTypeInCatchClause
-// IGNORE_BACKEND_K1: ANY
 
+// FILE: lib.kt
 inline fun <reified E : Throwable?> throwAndCatch(): String {
     try {
         throw AssertionError("Fail")
@@ -9,4 +9,5 @@ inline fun <reified E : Throwable?> throwAndCatch(): String {
     }
 }
 
+// FILE: main.kt
 fun box(): String = throwAndCatch<AssertionError?>()

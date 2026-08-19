@@ -60,6 +60,36 @@ class Arrays {
             val sameArray = nonEmptyArray.ifEmpty { arrayOf(2) }
             assertTrue(nonEmptyArray === sameArray)
         }
+
+        @Sample
+        fun getOrElse() {
+            val emptyArray: Array<Any> = emptyArray()
+            assertPrints(emptyArray.getOrElse(0) { "default" }, "default")
+
+            val array = arrayOf(1)
+            assertPrints(array.getOrElse(0) { 0 }, "1")
+            assertPrints(array.getOrElse(-1) { 0 }, "0")
+            assertPrints(array.getOrElse(0) { "default" }, "1")
+            assertPrints(array.getOrElse(-1) { "default" }, "default")
+
+            // arrays of primitive types
+            val intArray = intArrayOf(1, 2, 3)
+            assertPrints(intArray.getOrElse(0) { 0 }, "1")
+            assertPrints(intArray.getOrElse(-1) { 0 }, "0")
+
+            val booleanArray = booleanArrayOf(true, false)
+            assertPrints(booleanArray.getOrElse(0) { false }, "true")
+            assertPrints(booleanArray.getOrElse(-1) { false }, "false")
+
+            val charArray = charArrayOf('a', 'b', 'c')
+            assertPrints(charArray.getOrElse(0) { 'z' }, "a")
+            assertPrints(charArray.getOrElse(-1) { 'z' }, "z")
+
+            // arrays of unsigned types
+            val uIntArray = uintArrayOf(1u, 2u, 3u)
+            assertPrints(uIntArray.getOrElse(0) { 10u }, "1")
+            assertPrints(uIntArray.getOrElse(-1) { 10u }, "10")
+        }
     }
 
     class Transformations {
@@ -150,7 +180,7 @@ class Arrays {
         @Sample
         fun partitionArrayOfPrimitives() {
             val array = intArrayOf(1, 2, 3, 4, 5)
-            val (even, odd) = array.partition { it % 2 == 0 }
+            val [even, odd] = array.partition { it % 2 == 0 }
             assertPrints(even, "[2, 4]")
             assertPrints(odd, "[1, 3, 5]")
         }
@@ -502,6 +532,92 @@ class Arrays {
             assertPrints(people.joinToString(), "Bjorn Ironside, Ragnar Lodbrok, Sweyn Forkbeard")
         }
 
+    }
+
+    class Constructors {
+        @Sample
+        fun arrayOfSample() {
+            val emptyArray = arrayOf<Any>()
+            assertPrints(emptyArray.contentToString(), "[]")
+
+            val strings = arrayOf("Hello", "world")
+            assertPrints(strings.contentToString(), "[Hello, world]")
+
+            val numbers: Array<Number> = arrayOf(3.14, 42L, 0.123f)
+            assertPrints(numbers.contentToString(), "[3.14, 42, 0.123]")
+        }
+
+        @Sample
+        fun doubleArrayOfSample() {
+            val emptyDoubleArray = doubleArrayOf()
+            assertPrints(emptyDoubleArray.contentToString(), "[]")
+
+            val doubleArray = doubleArrayOf(1.0, 2.5, 3.14)
+            assertPrints(doubleArray.contentToString(), "[1.0, 2.5, 3.14]")
+        }
+
+        @Sample
+        fun floatArrayOfSample() {
+            val emptyFloatArray = floatArrayOf()
+            assertPrints(emptyFloatArray.contentToString(), "[]")
+
+            val floatArray = floatArrayOf(1.0f, 2.5f, 3.14f)
+            assertPrints(floatArray.contentToString(), "[1.0, 2.5, 3.14]")
+        }
+
+        @Sample
+        fun longArrayOfSample() {
+            val emptyLongArray = longArrayOf()
+            assertPrints(emptyLongArray.contentToString(), "[]")
+
+            val longArray = longArrayOf(1L, 2L, 3L)
+            assertPrints(longArray.contentToString(), "[1, 2, 3]")
+        }
+
+        @Sample
+        fun intArrayOfSample() {
+            val emptyIntArray = intArrayOf()
+            assertPrints(emptyIntArray.contentToString(), "[]")
+
+            val intArray = intArrayOf(1, 2, 3)
+            assertPrints(intArray.contentToString(), "[1, 2, 3]")
+        }
+
+        @Sample
+        fun charArrayOfSample() {
+            val emptyCharArray = charArrayOf()
+            assertPrints(emptyCharArray.contentToString(), "[]")
+
+            val charArray = charArrayOf('a', 'b', 'c')
+            assertPrints(charArray.contentToString(), "[a, b, c]")
+        }
+
+        @Sample
+        fun shortArrayOfSample() {
+            val emptyShortArray = shortArrayOf()
+            assertPrints(emptyShortArray.contentToString(), "[]")
+
+            val shortArray = shortArrayOf(1, 2, 3)
+            assertPrints(shortArray.contentToString(), "[1, 2, 3]")
+        }
+
+        @Sample
+        fun byteArrayOfSample() {
+            val emptyByteArray = byteArrayOf()
+            assertPrints(emptyByteArray.contentToString(), "[]")
+
+            val byteArray = byteArrayOf(1, 2, 3)
+            assertPrints(byteArray.contentToString(), "[1, 2, 3]")
+        }
+
+        @Sample
+        fun booleanArrayOfSample() {
+            val emptyBooleanArray = booleanArrayOf()
+            assertPrints(emptyBooleanArray.contentToString(), "[]")
+
+            val booleanArray = booleanArrayOf(true, false, true)
+            assertPrints(booleanArray.contentToString(), "[true, false, true]")
+        }
     }
 
 }

@@ -5,13 +5,15 @@
 
 package org.jetbrains.kotlin.psi2ir.lazy
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.lazy.lazyVar
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
 import org.jetbrains.kotlin.ir.symbols.IrValueParameterSymbol
 import org.jetbrains.kotlin.ir.types.IrType
@@ -21,10 +23,12 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.KotlinType
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
+@K1Deprecation
 class IrLazyValueParameter(
     override var startOffset: Int,
     override var endOffset: Int,
     override var origin: IrDeclarationOrigin,
+    override var kind: IrParameterKind,
     override val symbol: IrValueParameterSymbol,
     override val descriptor: ValueParameterDescriptor,
     override var name: Name,
@@ -39,7 +43,7 @@ class IrLazyValueParameter(
 ) : IrValueParameter(), Psi2IrLazyDeclarationBase {
     override var defaultValue: IrExpressionBody? = null
 
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+    override var annotations: List<IrAnnotation> by createLazyAnnotations()
 
     override var type: IrType by lazyVar(stubGenerator.lock) {
         kotlinType.toIrType()

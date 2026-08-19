@@ -6,14 +6,16 @@
 package org.jetbrains.kotlin.ir.validation
 
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.config.IrVerificationMode
+import org.jetbrains.kotlin.diagnostics.KtSourcelessDiagnosticFactory
 import org.jetbrains.kotlin.ir.IrBuiltIns
+import org.jetbrains.kotlin.ir.IrDiagnosticReporter
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrReplSnippet
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.types.IrType
@@ -28,12 +30,25 @@ import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
-typealias ReportIrValidationError = (IrFile?, IrElement, String, List<IrElement>) -> Unit
+class IrValidationError(
+    val file: IrFile?,
+    val element: IrElement,
+    val cause: Cause,
+    val message: String,
+    val parentChain: List<IrElement>,
+) {
+    interface Cause {
+        object IrTreeInconsistency : Cause
+        object UnboundSymbol : Cause
+    }
+}
+
+open class IrValidationException(message: String? = null, cause: Throwable? = null) : IllegalStateException(message, cause)
 
 private class IrValidator(
     val validatorConfig: IrValidatorConfig,
     val irBuiltIns: IrBuiltIns,
-    val reportError: ReportIrValidationError,
+    val reportError: (IrValidationError) -> Unit,
 ) : IrVisitorVoid() {
     override fun visitElement(element: IrElement) =
         throw IllegalStateException("IR validation must start from files, modules, or declarations")
@@ -61,27 +76,30 @@ private class IrFileValidator(
     private val elementCheckers: List<IrElementChecker<*>> = config.checkers.filterIsInstance<IrElementChecker<*>>()
     private val symbolCheckers: List<IrSymbolChecker> = config.checkers.filterIsInstance<IrSymbolChecker>()
     private val typeCheckers: List<IrTypeChecker> = config.checkers.filterIsInstance<IrTypeChecker>()
+    private val typeContextUpdaters: List<ContextUpdater> = typeCheckers.flatMap { it.requiredContextUpdaters }
 
-    private val checkersPerElement = object : ClassValue<List<IrElementChecker<*>>>() {
-        override fun computeValue(type: Class<*>): List<IrElementChecker<*>> =
-            elementCheckers.filter { it.elementClass.isAssignableFrom(type) }
+    private val checkersPerElementCache = hashMapOf<Class<out IrElement>, List<IrElementChecker<*>>>()
+
+    private fun List<ContextUpdater>.runWithContextUpdaters(element: IrElement, block: () -> Unit) {
+        this.fold(block) { currentBlock, updater -> { updater.runInNewContext(context, element, currentBlock) } }.invoke()
+    }
+
+    private fun getCheckersFor(type: Class<out IrElement>) = checkersPerElementCache.computeIfAbsent(type) {
+        elementCheckers.filter { it.elementClass.isAssignableFrom(type) }
     }
 
     override fun visitElement(element: IrElement) {
-        var block = { element.acceptChildrenVoid(this) }
-        for (contextUpdater in contextUpdaters) {
-            val currentBlock = block
-            block = { contextUpdater.runInNewContext(context, element, currentBlock) }
-        }
-        block()
+        // We use all context updaters for the `IrElement`, not only those required for `IrElementChecker`.
+        // This is because the children of a given element may have their own properties that need context-specific validation.
+        contextUpdaters.runWithContextUpdaters(element) { element.acceptChildrenVoid(this) }
 
-        for (checker in checkersPerElement.get(element.javaClass)) {
+        for (checker in getCheckersFor(element.javaClass)) {
             @Suppress("UNCHECKED_CAST")
             (checker as IrElementChecker<IrElement>).check(element, context)
         }
     }
 
-    override fun visitAnnotationUsage(annotationUsage: IrConstructorCall) {
+    override fun visitAnnotationUsage(annotationUsage: IrAnnotation) {
         context.withinAnnotationUsageSubTree {
             super.visitAnnotationUsage(annotationUsage)
         }
@@ -94,28 +112,36 @@ private class IrFileValidator(
     }
 
     override fun visitType(container: IrElement, type: IrType) {
-        super.visitType(container, type)
-        for (checker in typeCheckers) {
-            checker.check(type, container, context)
+        // Types might be visited before their containing element's `visitElement` function is called and the type is added to the context.
+        // This is an expected outcome because the type, even though introduced by the element, is its property, not its child.
+        // Although it's expected, we still need to work around it by adding type's container to the context while running the following checkers;
+        // otherwise the type would be seen as out-of-scope.
+        typeContextUpdaters.runWithContextUpdaters(container) {
+            super.visitType(container, type)
+            for (checker in typeCheckers) {
+                checker.check(type, container, context)
+            }
         }
     }
 }
 
 /**
- * Verifies common IR invariants that should hold in all the backends.
+ * Verifies IR invariants, invokes [reportError] callback for each validation errors.
+ *
+ * Tries to finish gracefully, even if the IR tree is severely broken, but that is not guaranteed.
  */
-private fun performBasicIrValidation(
+fun validateIr(
     element: IrElement,
     irBuiltIns: IrBuiltIns,
     validatorConfig: IrValidatorConfig,
-    reportError: ReportIrValidationError,
+    reportError: (IrValidationError) -> Unit,
 ) {
     // Phase 1: Traverse the IR tree to check for structural consistency.
     // If any issues are detected, validation stops here to avoid problems like infinite recursion during the next phase.
     if (validatorConfig.checkTreeConsistency || validatorConfig.checkUnboundSymbols) {
         try {
             element.checkTreeConsistency(reportError, validatorConfig)
-        } catch (_: TreeConsistencyError) {
+        } catch (_: IrTreeConsistencyException) {
             return
         }
     }
@@ -127,130 +153,98 @@ private fun performBasicIrValidation(
     }
 }
 
-/**
- * [IrValidationContext] is responsible for collecting validation errors, logging them and optionally throwing [IrValidationError]
- * (if the verification mode passed to [validateIr] is [IrVerificationMode.ERROR])
- */
-sealed interface IrValidationContext {
-
-    /**
-     * A string that each validation error will begin with.
-     */
-    var customMessagePrefix: String?
-
-    /**
-     * Logs the validation error into the underlying [MessageCollector].
-     */
-    fun reportIrValidationError(
-        file: IrFile?,
-        element: IrElement,
-        message: String,
-        phaseName: String,
-        parentChain: List<IrElement> = emptyList(),
-    )
-
-    /**
-     * Allows to abort the compilation process if after or during validating the IR there were errors and the verification mode is
-     * [IrVerificationMode.ERROR].
-     */
-    fun throwValidationErrorIfNeeded()
-
-    /**
-     * Verifies common IR invariants that should hold in all the backends.
-     *
-     * Reports errors to [CommonBackendContext.messageCollector].
-     *
-     * **Note:** this method does **not** throw [IrValidationError]. Use [throwValidationErrorIfNeeded] for checking for errors and throwing
-     * [IrValidationError]. This gives the caller the opportunity to perform additional (for example, backend-specific) validation before
-     * aborting. The caller decides when it's time to abort.
-     */
-    fun performBasicIrValidation(
-        fragment: IrElement,
-        irBuiltIns: IrBuiltIns,
-        phaseName: String,
-        config: IrValidatorConfig,
-    ) {
-        performBasicIrValidation(fragment, irBuiltIns, config) { file, element, message, parentChain ->
-            reportIrValidationError(file, element, message, phaseName, parentChain)
-        }
-    }
-}
-
-private class IrValidationContextImpl(
-    private val messageCollector: MessageCollector,
-    private val mode: IrVerificationMode,
-) : IrValidationContext {
-
-    override var customMessagePrefix: String? = null
-
-    private var hasValidationErrors: Boolean = false
-
-    override fun reportIrValidationError(
-        file: IrFile?,
-        element: IrElement,
-        message: String,
-        phaseName: String,
-        parentChain: List<IrElement>,
-    ) {
-        val severity = when (mode) {
-            IrVerificationMode.WARNING -> CompilerMessageSeverity.WARNING
-            IrVerificationMode.ERROR -> CompilerMessageSeverity.ERROR
-            IrVerificationMode.NONE -> return
-        }
-        hasValidationErrors = true
-        val phaseMessage = if (phaseName.isNotEmpty()) "$phaseName: " else ""
-        messageCollector.report(
-            severity,
-            buildString {
-                val customMessagePrefix = customMessagePrefix
-                if (customMessagePrefix == null) {
-                    append("[IR VALIDATION] ")
-                    append(phaseMessage)
-                } else {
-                    append(customMessagePrefix)
-                    append(" ")
-                }
-                appendLine(message)
-                append(element.render())
-                for ((i, parent) in parentChain.asReversed().withIndex()) {
-                    appendLine()
-                    append("  ".repeat(i + 1))
-                    append("inside ")
-                    append(parent.render())
-                }
-            },
-            file?.let {
-                val sourceRangeInfo = it.fileEntry.getSourceRangeInfo(element.startOffset, element.endOffset)
-                CompilerMessageLocation.create(
-                    path = sourceRangeInfo.filePath,
-                    line = sourceRangeInfo.startLineNumber + 1,
-                    column = sourceRangeInfo.startColumnNumber + 1,
-                    lineContent = null
-                )
-            },
-        )
-    }
-
-    override fun throwValidationErrorIfNeeded() {
-        if (hasValidationErrors && mode == IrVerificationMode.ERROR) {
-            throw IrValidationError()
-        }
-    }
+enum class IrValidationSeverity(val factory: KtSourcelessDiagnosticFactory) {
+    WARNING(IrValidationDiagnostics.IR_VALIDATION_WARNING),
+    ERROR(IrValidationDiagnostics.IR_VALIDATION_ERROR),
 }
 
 /**
- * Logs validation errors encountered during the execution of the [runValidationRoutines] closure into [messageCollector].
+ * Verifies IR invariants, logs validation errors into [diagnosticReporter].
  *
- * If [mode] is [IrVerificationMode.ERROR], throws [IrValidationError] after [runValidationRoutines] has finished,
+ * If any error with [IrValidationSeverity.ERROR] severity is found, throws [IrValidationException] at the end,
  * thus allowing to collect as many errors as possible instead of aborting after the first one.
  */
 fun validateIr(
-    messageCollector: MessageCollector,
+    element: IrElement,
+    irBuiltIns: IrBuiltIns,
+    validatorConfig: IrValidatorConfig,
+    diagnosticReporter: IrDiagnosticReporter,
+    getSeverity: (IrValidationError) -> IrValidationSeverity?,
+    phaseName: String? = null,
+    customMessagePrefix: String? = null,
+): Boolean {
+    var hasAnyViolations = false
+    validateIr(element, irBuiltIns, validatorConfig) { error ->
+        val severity = getSeverity(error)
+        if (severity != null) {
+            diagnosticReporter.report(error, severity, phaseName, customMessagePrefix)
+            hasAnyViolations = true
+        }
+    }
+
+    return hasAnyViolations
+}
+
+/**
+ * Verifies IR invariants, logs validation errors into [diagnosticReporter].
+ *
+ * If [mode] is [IrVerificationMode.ERROR], throws [IrValidationException] at the end,
+ * thus allowing to collect as many errors as possible instead of aborting after the first one.
+ */
+fun validateIr(
+    element: IrElement,
+    irBuiltIns: IrBuiltIns,
+    validatorConfig: IrValidatorConfig,
+    diagnosticReporter: IrDiagnosticReporter,
     mode: IrVerificationMode,
-    runValidationRoutines: IrValidationContext.() -> Unit,
+    phaseName: String? = null,
+    customMessagePrefix: String? = null,
+): Boolean {
+    val severity = when (mode) {
+        IrVerificationMode.NONE -> return false
+        IrVerificationMode.WARNING -> IrValidationSeverity.WARNING
+        IrVerificationMode.ERROR -> IrValidationSeverity.ERROR
+    }
+    return validateIr(element, irBuiltIns, validatorConfig, diagnosticReporter, { severity }, phaseName, customMessagePrefix)
+}
+
+fun IrDiagnosticReporter.report(
+    error: IrValidationError,
+    severity: IrValidationSeverity,
+    phaseName: String?,
+    customMessagePrefix: String?,
 ) {
-    if (mode == IrVerificationMode.NONE) return
-    val validationContext = IrValidationContextImpl(messageCollector, mode)
-    validationContext.runValidationRoutines()
-    validationContext.throwValidationErrorIfNeeded()
+    report(
+        severity.factory,
+        error.render(phaseName, customMessagePrefix),
+        error.file?.let {
+            val sourceRangeInfo = it.fileEntry.getSourceRangeInfo(error.element.startOffset, error.element.endOffset)
+            CompilerMessageLocation.create(
+                path = sourceRangeInfo.filePath,
+                line = sourceRangeInfo.startLineNumber + 1,
+                column = sourceRangeInfo.startColumnNumber + 1,
+                lineContent = null
+            )
+        },
+    )
+}
+
+fun IrValidationError.render(phaseName: String?, customMessagePrefix: String?): String = buildString {
+    val phaseMessage = if (!phaseName.isNullOrEmpty()) "$phaseName: " else ""
+    val customMessagePrefix = customMessagePrefix
+    if (customMessagePrefix == null) {
+        append("[IR VALIDATION] ")
+        append(phaseMessage)
+    } else {
+        append(customMessagePrefix)
+        append(" ")
+    }
+    appendLine(message)
+    append(element.render())
+    for ([i, parent] in parentChain.asReversed().withIndex()) {
+        appendLine()
+        append("  ".repeat(i + 1))
+        append("inside ")
+        append(parent.render())
+    }
 }

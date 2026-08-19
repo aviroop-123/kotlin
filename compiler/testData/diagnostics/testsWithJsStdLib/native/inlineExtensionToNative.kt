@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // DIAGNOSTICS: -NOTHING_TO_INLINE
 external class A {
     class B

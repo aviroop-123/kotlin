@@ -24,7 +24,6 @@ import androidx.compose.compiler.plugins.kotlin.lower.hiddenfromobjc.AddHiddenFr
 import com.intellij.openapi.progress.ProgressManager
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.annotations.KotlinRetention
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
@@ -49,9 +48,7 @@ class ComposeIrGenerationExtension(
     private val descriptorSerializerContext: ComposeDescriptorSerializerContext? = null,
     private val featureFlags: FeatureFlags,
     private val skipIfRuntimeNotFound: Boolean = false,
-    private val indyJvmLambdasEnabled: Boolean = true,
     private val targetRuntimeVersion: ComposeRuntimeVersion? = null,
-    private val messageCollector: MessageCollector,
 ) : IrGenerationExtension {
     var metrics: ModuleMetrics = EmptyModuleMetrics
         private set
@@ -61,11 +58,12 @@ class ComposeIrGenerationExtension(
         pluginContext: IrPluginContext,
     ) {
         val isKlibTarget = !pluginContext.platform.isJvm()
-        if (VersionChecker(pluginContext, messageCollector).check(skipIfRuntimeNotFound) == VersionCheckerResult.NOT_FOUND) {
+        if (VersionChecker(pluginContext).check(skipIfRuntimeNotFound) == VersionCheckerResult.NOT_FOUND) {
             return
         }
 
         val stabilityInferencer = StabilityInferencer(
+            pluginContext.platform.isJvm(),
             pluginContext.moduleDescriptor,
             stableTypeMatchers,
         )
@@ -77,8 +75,8 @@ class ComposeIrGenerationExtension(
         if (moduleMetricsFactory != null) {
             metrics = moduleMetricsFactory.invoke(stabilityInferencer, featureFlags)
         } else if (metricsDestination != null || reportsDestination != null) {
-            metrics = ModuleMetricsImpl(moduleFragment.name.asString(), featureFlags) {
-                stabilityInferencer.stabilityOf(it)
+            metrics = ModuleMetricsImpl(moduleFragment.name.asString(), featureFlags) { type, fileContainingDependent ->
+                stabilityInferencer.stabilityOf(type, fileContainingDependent)
             }
         }
 
@@ -102,7 +100,7 @@ class ComposeIrGenerationExtension(
                     !pluginContext.platform.isJvm()
                 },
             featureFlags,
-            messageCollector
+            pluginContext.diagnosticReporter,
         ).lower(moduleFragment)
 
         ProgressManager.checkCanceled()
@@ -135,6 +133,10 @@ class ComposeIrGenerationExtension(
         if (!useK2) {
             CopyDefaultValuesFromExpectLowering(pluginContext).lower(moduleFragment)
         }
+
+        ProgressManager.checkCanceled()
+
+        ComposableVersionOverloadsLowering(pluginContext).lower(moduleFragment)
 
         ProgressManager.checkCanceled()
 
@@ -189,10 +191,11 @@ class ComposeIrGenerationExtension(
             stabilityInferencer,
             sourceInformationEnabled,
             traceMarkersEnabled,
-            indyEnabled = indyJvmLambdasEnabled && pluginContext.platform.isJvm(),
             targetRuntimeVersion,
             featureFlags,
         ).lower(moduleFragment)
+
+        ComposableAnnotationRemover().lower(moduleFragment)
 
         if (isKlibTarget) {
             KlibAssignableParamTransformer(
@@ -227,7 +230,7 @@ class ComposeIrGenerationExtension(
     }
 
     private val IrPluginContext.keyMetaAnnotation: IrClass?
-        get() = referenceClass(ComposeClassIds.FunctionKeyMeta)?.owner
+        get() = finderForBuiltins().findClass(ComposeClassIds.FunctionKeyMeta)?.owner
 
     private fun IrClass?.hasRuntimeRetention(): Boolean {
         return this?.getAnnotationRetention()?.let { it == KotlinRetention.RUNTIME } ?: true

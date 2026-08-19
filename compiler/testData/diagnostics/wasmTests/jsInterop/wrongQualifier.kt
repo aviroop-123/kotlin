@@ -1,3 +1,4 @@
+// RUN_PIPELINE_TILL: FRONTEND
 // OPT_IN: kotlin.js.ExperimentalWasmJsInterop
 
 // FILE: a.kt
@@ -22,4 +23,4 @@
 typealias JsQ = JsQualifier
 
 // FILE: h.kt
-@file:JsQ(<!WRONG_JS_QUALIFIER!>value = "%^&"<!>)
+@file:JsQ(value = <!WRONG_JS_QUALIFIER!>"%^&"<!>)

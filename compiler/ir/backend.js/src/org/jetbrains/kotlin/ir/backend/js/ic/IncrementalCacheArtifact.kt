@@ -49,7 +49,7 @@ internal sealed class SourceFileCacheArtifact(val srcFile: KotlinSourceFile, val
 
 internal class IncrementalCacheArtifact(
     private val artifactsDir: File,
-    private val forceRebuildJs: Boolean,
+    private val forceRebuild: Boolean,
     private val srcCacheActions: List<SourceFileCacheArtifact>,
     private val externalModuleName: String?,
 ) {
@@ -77,6 +77,6 @@ internal class IncrementalCacheArtifact(
             val rebuiltFileFragment = rebuiltFileFragments[srcFileAction.srcFile]
             icContext.createSrcFileArtifact(srcFileAction.srcFile.path, rebuiltFileFragment, srcFileAction.binaryAstFile)
         }
-        return icContext.createModuleArtifact(moduleName, fileArtifacts, artifactsDir, forceRebuildJs, externalModuleName)
+        return icContext.createModuleArtifact(moduleName, fileArtifacts, artifactsDir, forceRebuild, externalModuleName)
     }
 }

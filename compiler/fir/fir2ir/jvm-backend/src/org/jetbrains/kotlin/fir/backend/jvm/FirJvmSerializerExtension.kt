@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.fir.backend.jvm
 
-import org.jetbrains.kotlin.backend.jvm.localClassType
 import org.jetbrains.kotlin.codegen.ClassBuilderMode
 import org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings
 import org.jetbrains.kotlin.codegen.serialization.JvmSignatureSerializer
@@ -16,23 +15,18 @@ import org.jetbrains.kotlin.constant.KClassValue
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
-import org.jetbrains.kotlin.fir.FirAnnotationContainer
-import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.backend.ConstValueProviderImpl
+import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.backend.Fir2IrComponents
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.java.hasJvmFieldAnnotation
-import org.jetbrains.kotlin.fir.languageVersionSettings
-import org.jetbrains.kotlin.fir.render
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.providers.getRegularClassSymbolByClassId
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.serialization.*
-import org.jetbrains.kotlin.fir.serialization.constant.ConstValueProvider
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.types.*
-import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.load.kotlin.NON_EXISTENT_CLASS_NAME
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
@@ -64,7 +58,6 @@ open class FirJvmSerializerExtension(
     override val metadataVersion: BinaryVersion,
     private val jvmDefaultMode: JvmDefaultMode,
     final override val stringTable: FirElementAwareStringTable,
-    override val constValueProvider: ConstValueProvider?,
     override val additionalMetadataProvider: FirAdditionalMetadataProvider?,
 ) : FirSerializerExtension() {
     private val signatureSerializer = FirJvmSignatureSerializer(stringTable)
@@ -91,16 +84,14 @@ open class FirJvmSerializerExtension(
         state.config.metadataVersion,
         state.config.jvmDefaultMode,
         stringTable,
-        ConstValueProviderImpl(components),
         components.annotationsFromPluginRegistrar.createAdditionalMetadataProvider()
     )
 
     override val localClassIdOracle: LocalClassIdOracle
         get() = object : LocalClassIdOracle() {
             override fun getLocalClassId(klass: KClassValue.Value.LocalClass): ClassId? {
-                val irClass = klass.irClass as? IrClass ?: return null
-                val type = irClass.localClassType ?: return null
-                val fqName = FqName(type.internalName.replace('/', '.'))
+                val classSymbol = klass.firClassSymbol as? FirClassSymbol<*> ?: return null
+                val fqName = classSymbol.localClassJvmType ?: return null
                 // Note that this ClassId cannot be used for anything other than mapping it back to the JVM type, which is exactly the only
                 // way it's being used -- kotlin-reflect uses it to find the java.lang.Class object if requested.
                 // For this reason, the relative class name in this ClassId does not make sense, and for example, in case of an inner class
@@ -221,14 +212,14 @@ open class FirJvmSerializerExtension(
 
     override fun serializeTypeAnnotations(annotations: List<FirAnnotation>, proto: ProtoBuf.Type.Builder) {
         for (annotation in annotations) {
-            proto.addExtensionOrNull(JvmProtoBuf.typeAnnotation, annotationSerializer.serializeAnnotation(annotation))
+            annotationSerializer.serializeAnnotation(annotation)?.let { proto.addAnnotation(it) }
         }
     }
 
 
     override fun serializeTypeParameter(typeParameter: FirTypeParameter, proto: ProtoBuf.TypeParameter.Builder) {
         for (annotation in typeParameter.nonSourceAnnotations(session)) {
-            proto.addExtensionOrNull(JvmProtoBuf.typeParameterAnnotation, annotationSerializer.serializeAnnotation(annotation))
+            annotationSerializer.serializeAnnotation(annotation)?.let { proto.addAnnotation(it) }
         }
     }
 
@@ -254,7 +245,7 @@ open class FirJvmSerializerExtension(
     ) {
         val method = getBinding(METHOD_FOR_FIR_FUNCTION, function)
         if (method != null) {
-            val signature = signatureSerializer.methodSignature(function, (function as? FirSimpleFunction)?.name, method)
+            val signature = signatureSerializer.methodSignature(function, (function as? FirNamedFunction)?.name, method)
             if (signature != null) {
                 proto.setExtension(JvmProtoBuf.methodSignature, signature)
             }
@@ -277,7 +268,7 @@ open class FirJvmSerializerExtension(
     }
 
     private fun FirFunction.needsInlineParameterNullCheckRequirement(): Boolean =
-        this is FirSimpleFunction && isInline && !isSuspend && !isParamAssertionsDisabled &&
+        this is FirNamedFunction && isInline && !isSuspend && !isParamAssertionsDisabled &&
                 !Visibilities.isPrivate(visibility) &&
                 (valueParameters.any { it.returnTypeRef.coneType.isSomeFunctionType(session) } ||
                         receiverParameter?.typeRef?.coneType?.isSomeFunctionType(session) == true)

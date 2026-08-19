@@ -24,7 +24,9 @@ import java.io.File
  */
 fun ProjectTestsExtension.nativeTestTaskWithExternalDependencies(
     taskName: String,
+    tag: String? = null,
     requirePlatformLibs: Boolean = false,
+    allowUnsafe: Boolean = false,
     configure: Test.() -> Unit = {}
 ) : TaskProvider<Test> {
     /* Configuration to resolve klibs for the current host */
@@ -64,27 +66,29 @@ fun ProjectTestsExtension.nativeTestTaskWithExternalDependencies(
                 testDependencyLibraryKlibs("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
                 testDependencyLibraryKlibs("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
                 testDependencyLibraryKlibs("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-                implicitDependencies("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3") {
+                "implicitDependencies"("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3") {
                     because("workaround for KTIJ-30065, remove after its resolution")
                 }
-                implicitDependencies("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0") {
+                "implicitDependencies"("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3") {
                     because("workaround for KTIJ-30065, remove after its resolution")
                 }
-                implicitDependencies("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1") {
+                "implicitDependencies"("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0") {
                     because("workaround for KTIJ-30065, remove after its resolution")
                 }
-                implicitDependencies("org.jetbrains.kotlinx:kotlinx-coroutines-debug:1.8.1") {
+                "implicitDependencies"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1") {
+                    because("workaround for KTIJ-30065, remove after its resolution")
+                }
+                "implicitDependencies"("org.jetbrains.kotlinx:kotlinx-coroutines-debug:1.8.1") {
                     because("workaround for KTIJ-30065, remove after its resolution")
                 }
             }
         }
 
-    val testTags = project.findProperty("kotlin.native.tests.tags")?.toString()
-
     return nativeTestTask(
         taskName = taskName,
-        tag = "$testTags|none()",
+        tag = tag,
         requirePlatformLibs = requirePlatformLibs,
+        allowUnsafe = allowUnsafe,
     ) {
         /**
          * Setup klib dependencies that can be used in tests:
@@ -117,9 +121,13 @@ fun ProjectTestsExtension.nativeTestTaskWithExternalDependencies(
 fun ProjectTestsExtension.objCExportHeaderGeneratorTestTask(
     taskName: String,
     testDisplayNameTag: String? = null,
+    allowUnsafe: Boolean = false,
     configure: Test.() -> Unit = {},
 ): TaskProvider<Test> {
-    return nativeTestTaskWithExternalDependencies(taskName = taskName) {
+    return nativeTestTaskWithExternalDependencies(
+        taskName = taskName,
+        allowUnsafe = allowUnsafe,
+    ) {
         useJUnitPlatform()
         enableJunit5ExtensionsAutodetection()
 

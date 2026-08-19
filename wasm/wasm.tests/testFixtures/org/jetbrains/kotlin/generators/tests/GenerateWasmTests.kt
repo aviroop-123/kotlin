@@ -5,16 +5,20 @@
 
 package org.jetbrains.kotlin.generators.tests
 
-import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
+import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil
+import org.jetbrains.kotlin.incremental.AbstractFirWasmInvalidationMultiModuleTest
+import org.jetbrains.kotlin.incremental.AbstractFirWasmInvalidationSingleModuleTest
 import org.jetbrains.kotlin.incremental.AbstractFirWasmInvalidationTest
+import org.jetbrains.kotlin.incremental.AbstractFirWasmInvalidationWithPLMultiModuleTest
+import org.jetbrains.kotlin.incremental.AbstractFirWasmInvalidationWithPLSingleModuleTest
 import org.jetbrains.kotlin.incremental.AbstractFirWasmInvalidationWithPLTest
-import org.jetbrains.kotlin.wasm.test.AbstractWasmPartialLinkageWithICTestCase
-import org.jetbrains.kotlin.test.TargetBackend
+import org.jetbrains.kotlin.test.utils.CUSTOM_TEST_DATA_EXTENSION_PATTERN
 import org.jetbrains.kotlin.wasm.test.*
 import org.jetbrains.kotlin.wasm.test.diagnostics.*
 
 fun main(args: Array<String>) {
+    val testsRoot = args[0]
     System.setProperty("java.awt.headless", "true")
 
     // Common configuration shared between K1 and K2 tests:
@@ -32,34 +36,56 @@ fun main(args: Array<String>) {
     // TODO: Remove excludedPattern below after fix of KT-78960 (it's simpler to exclude temporarily than to split test `boxInline/innerClasses/kt12126.kt`)
     val excludedPatternForBoxInlineTestsWithInliner = "kt12126.kt"
 
-
     generateTestGroupSuiteWithJUnit5(args) {
-        testGroup("wasm/wasm.tests/tests-gen", "compiler/testData") {
+        testGroup(testsRoot, "compiler/testData/klib/partial-linkage") {
             testClass<AbstractWasmPartialLinkageNoICTestCase> {
-                model("klib/partial-linkage/", pattern = "^([^_](.+))$", targetBackend = TargetBackend.WASM, recursive = false)
+                model(pattern = "^([^_](.+))$", recursive = false)
             }
-        }
-
-        testGroup("wasm/wasm.tests/tests-gen", "compiler/testData") {
             testClass<AbstractWasmPartialLinkageWithICTestCase> {
-                model("klib/partial-linkage/", pattern = "^([^_](.+))$", targetBackend = TargetBackend.WASM, recursive = false)
+                model(pattern = "^([^_](.+))$", recursive = false)
             }
         }
 
-        testGroup("wasm/wasm.tests/tests-gen", "js/js.translator/testData") {
+        testGroup(testsRoot, "js/js.translator/testData/incremental") {
             testClass<AbstractFirWasmInvalidationTest> {
                 model(
-                    "incremental/invalidation/",
+                    "invalidation/",
                     pattern = "^([^_](.+))$",
-                    targetBackend = TargetBackend.WASM,
+                    recursive = false,
+                )
+            }
+            testClass<AbstractFirWasmInvalidationMultiModuleTest> {
+                model(
+                    "invalidation/",
+                    pattern = "^([^_](.+))$",
+                    recursive = false,
+                )
+            }
+            testClass<AbstractFirWasmInvalidationSingleModuleTest> {
+                model(
+                    "invalidation/",
+                    pattern = "^([^_](.+))$",
                     recursive = false,
                 )
             }
             testClass<AbstractFirWasmInvalidationWithPLTest> {
                 model(
-                    "incremental/invalidationWithPL/",
+                    "invalidationWithPL/",
                     pattern = "^([^_](.+))$",
-                    targetBackend = TargetBackend.WASM,
+                    recursive = false,
+                )
+            }
+            testClass<AbstractFirWasmInvalidationWithPLMultiModuleTest> {
+                model(
+                    "invalidationWithPL/",
+                    pattern = "^([^_](.+))$",
+                    recursive = false,
+                )
+            }
+            testClass<AbstractFirWasmInvalidationWithPLSingleModuleTest> {
+                model(
+                    "invalidationWithPL/",
+                    pattern = "^([^_](.+))$",
                     recursive = false,
                 )
             }
@@ -67,42 +93,55 @@ fun main(args: Array<String>) {
     }
 
     generateTestGroupSuiteWithJUnit5(args) {
-        testGroup("wasm/wasm.tests/tests-gen", "compiler/testData") {
-            testClass<AbstractDiagnosticsWasmTest> {
-                model("diagnostics/wasmTests", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+        testGroup(testsRoot, "compiler/testData/diagnostics") {
+            testClass<AbstractWasmJsDiagnosticTest> {
+                model("wasmTests", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
+                model("wasmDiagnosticsKlibTests", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+                model("testsWithAnyBackend", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
             }
 
-            testClass<AbstractDiagnosticsFirWasmTest> {
-                model("diagnostics/wasmTests", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+            testClass<AbstractWasmJsDiagnosticWithIrInlinerTest> {
+                model("wasmTests", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
+                model("wasmDiagnosticsKlibTests", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+                model("irInliner", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+                model("testsWithAnyBackend", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
             }
 
-            testClass<AbstractDiagnosticsWasmWasiTest> {
-                model("diagnostics/wasmWasiTests", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+            testClass<AbstractWasmWasiDiagnosticTest> {
+                model("wasmWasiTests", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
+                model("wasmDiagnosticsKlibTests/wasmExport", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
             }
 
-            testClass<AbstractDiagnosticsFirWasmWasiTest> {
-                model("diagnostics/wasmWasiTests", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
-            }
-
-            testClass<AbstractDiagnosticsFirWasmKlibTest> {
-                model("diagnostics/wasmDiagnosticsKlibTests", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+            testClass<AbstractWasmWasiDiagnosticWithIrInlinerTestBase> {
+                model("wasmWasiTests", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
+                model("wasmDiagnosticsKlibTests/wasmExport", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+                model("irInliner", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
+                model("testsWithAnyBackend", excludedPattern = TestGeneratorUtil.KT_OR_KTS_WITH_FIR_PREFIX)
             }
         }
 
-        testGroup("wasm/wasm.tests/tests-gen", "js/js.translator/testData", testRunnerMethodName = "runTest0") {
+        testGroup(testsRoot, "js/js.translator/testData/box", testRunnerMethodName = "runTest0") {
             testClass<AbstractFirWasmJsTranslatorTest> {
-                model("box/main", pattern = jsTranslatorTestPattern)
-                model("box/native/", pattern = jsTranslatorTestPattern)
-                model("box/esModules/", pattern = jsTranslatorTestPattern, excludeDirs = jsTranslatorEsModulesExcludedDirs)
-                model("box/jsQualifier/", pattern = jsTranslatorTestPattern)
-                model("box/reflection/", pattern = jsTranslatorReflectionPattern)
-                model("box/kotlin.test/", pattern = jsTranslatorTestPattern)
+                model("main", pattern = jsTranslatorTestPattern)
+                model("native/", pattern = jsTranslatorTestPattern)
+                model("esModules/", pattern = jsTranslatorTestPattern, excludeDirs = jsTranslatorEsModulesExcludedDirs)
+                model("jsQualifier/", pattern = jsTranslatorTestPattern)
+                model("reflection/", pattern = jsTranslatorReflectionPattern)
+                model("kotlin.test/", pattern = jsTranslatorTestPattern)
             }
         }
 
-        testGroup("wasm/wasm.tests/tests-gen", "compiler/testData", testRunnerMethodName = "runTest0") {
-            testClass<AbstractFirWasmJsCodegenBoxTest> {
+        testGroup(testsRoot, "compiler/testData", testRunnerMethodName = "runTest0") {
+            testClass<AbstractFirWasmJsCodegenSingleModuleBoxTest> {
                 model("codegen/box", pattern = jsTranslatorTestPattern, excludeDirs = jvmOnlyBoxTests + k1BoxTestDir)
+            }
+
+            testClass<AbstractFirWasmJsCodegenMultiModuleBoxTest> {
+                model("codegen/box", pattern = jsTranslatorTestPattern, excludeDirs = jvmOnlyBoxTests + k1BoxTestDir + "size")
+            }
+
+            testClass<AbstractFirWasmJsCodegenBoxTest> {
+                model("codegen/box", pattern = jsTranslatorTestPattern, excludeDirs = jvmOnlyBoxTests + k1BoxTestDir, smokeTest = true)
             }
 
             testClass<AbstractFirWasmJsCodegenBoxWithInlinedFunInKlibTest> {
@@ -123,29 +162,89 @@ fun main(args: Array<String>) {
                 model("codegen/boxWasmJsInterop")
             }
 
+            testClass<AbstractFirWasmJsCodegenSingleModuleInteropTest> {
+                model("codegen/boxWasmJsInterop")
+            }
+
+            testClass<AbstractFirWasmJsCodegenMultiModuleInteropTest> {
+                model("codegen/boxWasmJsInterop")
+            }
+
             testClass<AbstractFirWasmWasiCodegenBoxTest> {
                 model("codegen/boxWasmWasi")
+                model("codegen/box", pattern = jsTranslatorTestPattern, excludeDirs = jvmOnlyBoxTests + k1BoxTestDir)
+                model("codegen/boxInline")
             }
 
             testClass<AbstractFirWasmWasiCodegenBoxWithInlinedFunInKlibTest> {
                 model("codegen/boxWasmWasi")
+                model("codegen/box", pattern = jsTranslatorTestPattern, excludeDirs = jvmOnlyBoxTests + k1BoxTestDir)
+                model("codegen/boxInline")
             }
 
             testClass<AbstractFirWasmJsSteppingTest> {
                 model("debug/stepping")
             }
+            testClass<AbstractFirWasmJsSteppingSingleModuleTest> {
+                model("debug/stepping")
+            }
+            testClass<AbstractFirWasmJsMultiModuleSteppingTest> {
+                model("debug/stepping")
+            }
+            testClass<AbstractFirWasmJsSteppingWithInlinedFunInKlibTest> {
+                model("debug/stepping")
+            }
+            testClass<AbstractFirWasmJsSteppingSplitTest> {
+                model("debug/stepping")
+            }
+            testClass<AbstractFirWasmJsSteppingSplitWithInlinedFunInKlibTest> {
+                model("debug/stepping")
+            }
+
+            testClass<AbstractFirWasmJsLocalVariableTest> {
+                model("debug/localVariables")
+            }
         }
-        testGroup("wasm/wasm.tests/tests-gen", "js/js.translator/testData", testRunnerMethodName = "runTest0") {
+        testGroup(testsRoot, "js/js.translator/testData", testRunnerMethodName = "runTest0") {
             testClass<AbstractFirWasmTypeScriptExportTest> {
                 model("typescript-export/wasm/")
             }
         }
+        testGroup(testsRoot, "js/js.translator/testData", testRunnerMethodName = "runTest0") {
+            testClass<AbstractFirWasmTypeScriptExportSingleModuleTest> {
+                model("typescript-export/wasm/")
+            }
+        }
 
-        testGroup("wasm/wasm.tests/tests-gen", "compiler/testData/klib/syntheticAccessors", testRunnerMethodName = "runTest0") {
-            testClass<AbstractFirWasmJsCodegenBoxWithInlinedFunInKlibTest>(
+        testGroup(testsRoot, "js/js.translator/testData", testRunnerMethodName = "runTest0") {
+            testClass<AbstractFirWasmTypeScriptExportMultiModuleTest> {
+                model("typescript-export/wasm/")
+            }
+        }
+
+        testGroup(testsRoot, "compiler/testData/klib/syntheticAccessors", testRunnerMethodName = "runTest0") {
+            testClass<AbstractFirWasmJsSyntheticAccessorsTest>(
                 suiteTestClassName = "WasmJsSynthAccBoxTestGenerated"
             ) {
                 model()
+            }
+            testClass<AbstractWasmJsKlibSyntheticAccessorTest>(
+                suiteTestClassName = "WasmJsSynthAccTestGenerated"
+            ) {
+                model()
+            }
+        }
+        testGroup(testsRoot, "compiler/testData/ir/irText", testRunnerMethodName = "runTest0") {
+            testClass<AbstractWasmJsIrTextTest> {
+                model(
+                    excludeDirs = listOf("declarations/multiplatform/k1")
+                )
+            }
+        }
+        testGroup(testsRoot, "compiler/testData/loadJava", testRunnerMethodName = "runTest0") {
+            testClass<AbstractWasmJsLoadCompiledKotlinTest> {
+                model("compiledKotlin", extension = "kt")
+                model("compiledKotlinWithStdlib", extension = "kt")
             }
         }
     }

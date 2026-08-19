@@ -10,6 +10,7 @@ import com.intellij.mock.MockProject
 import com.intellij.openapi.util.Ref
 import com.intellij.util.diff.FlyweightCapableTreeStructure
 import org.jetbrains.kotlin.cli.common.fir.SequentialPositionFinder
+import org.jetbrains.kotlin.cli.create
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment.Companion.createForTests
@@ -27,7 +28,7 @@ class LightTreeParsingTest : KtPlatformLiteFixture() {
     override fun setUp() {
         super.setUp()
         myEnvironment = createForTests(
-            testRootDisposable, CompilerConfiguration.EMPTY,
+            testRootDisposable, CompilerConfiguration.create(),
             EnvironmentConfigFiles.JVM_CONFIG_FILES
         )
         myProject = myEnvironment!!.project as MockProject
@@ -51,7 +52,7 @@ class LightTreeParsingTest : KtPlatformLiteFixture() {
         }
 
         fun String.makeCodeMappingAndPositions() = run {
-            val (code, mapping) = ByteArrayInputStream(toByteArray()).reader().readSourceFileWithMapping()
+            val [code, mapping] = ByteArrayInputStream(toByteArray()).reader().readSourceFileWithMapping()
             val positionFinder = SequentialPositionFinder(ByteArrayInputStream(toByteArray()).reader())
             val linePositions =
                 KotlinLightParser.buildLightTree(code, sourceFile = null, errorListener = null).getChildrenAsArray()
@@ -63,12 +64,12 @@ class LightTreeParsingTest : KtPlatformLiteFixture() {
             Triple(code.toString(), mapping, linePositions)
         }
 
-        val (codeLf, mappingLf, positionsLf) = MULTILINE_SOURCE.makeCodeMappingAndPositions()
+        val [codeLf, mappingLf, positionsLf] = MULTILINE_SOURCE.makeCodeMappingAndPositions()
 
-        val (codeCrLf, mappingCrLf, positionsCrLf) =
+        val [codeCrLf, mappingCrLf, positionsCrLf] =
             MULTILINE_SOURCE.replace("\n", "\r\n").makeCodeMappingAndPositions()
 
-        val (codeCrLfMixed, mappingCrLfMixed, positionsCrLfMixed) =
+        val [codeCrLfMixed, mappingCrLfMixed, positionsCrLfMixed] =
             MULTILINE_SOURCE.let {
                 var toReplace = false
                 buildString {
@@ -84,7 +85,7 @@ class LightTreeParsingTest : KtPlatformLiteFixture() {
             }.makeCodeMappingAndPositions()
 
         // classic MacOS line endings are probably not to be found in the wild, but checking the support nevertheless
-        val (codeCr, mappingCr, positionsCr) =
+        val [codeCr, mappingCr, positionsCr] =
             MULTILINE_SOURCE.replace("\n", "\r").makeCodeMappingAndPositions()
 
         Assert.assertEquals(codeLf, codeCrLf)

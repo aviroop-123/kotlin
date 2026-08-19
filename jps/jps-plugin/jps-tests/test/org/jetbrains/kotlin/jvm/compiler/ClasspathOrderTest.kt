@@ -24,11 +24,11 @@ import java.io.File
 class ClasspathOrderTest : TestCaseWithTmpdir() {
     companion object {
         private val sourceDir
-            get() = File(AbstractKotlinJpsBuildTestCase.TEST_DATA_PATH + "/../../../compiler/testData/classpathOrder").absoluteFile
+            get() = File(AbstractKotlinJpsBuildTestCase.TEST_DATA_PATH + "/classpathOrder").absoluteFile
     }
 
     fun testClasspathOrderForCLI() {
-        MockLibraryUtil.compileKotlin(sourceDir.path, tmpdir)
+        MockLibraryUtil.compileKotlinSources(sourceDir.path, tmpdir)
     }
 
     fun testClasspathOrderForModuleScriptBuild() {

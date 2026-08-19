@@ -34,6 +34,7 @@ sealed class ClangArgs(
     // TODO: Should be dropped in favor of real MSVC target.
     private val argsForWindowsJni = forJni && target == KonanTarget.MINGW_X64
 
+    @Deprecated("args for building runtime moved to runtime building code")
     val clangArgsSpecificForKonanSources: List<String>
         get() {
             val konanOptions = listOfNotNull(
@@ -104,7 +105,18 @@ sealed class ClangArgs(
             when (configurables) {
                 // isysroot and sysroot on darwin are _almost_ synonyms.
                 // The first one parses SDKSettings.json while second one is not.
-                is AppleConfigurables -> add(listOf("-isysroot", absoluteTargetSysRoot))
+                is AppleConfigurables -> {
+                    add(listOf("-isysroot", absoluteTargetSysRoot))
+                    if (targetTriple.isMacabi) {
+                        add(
+                            listOf(
+                                "-L$absoluteTargetSysRoot/System/iOSSupport/usr/lib",
+                                "-L$absoluteTargetToolchain/lib/swift/maccatalyst",
+                                "-F$absoluteTargetSysRoot/System/iOSSupport/System/Library/Frameworks",
+                            )
+                        )
+                    }
+                }
                 else -> add(listOf("--sysroot=$absoluteTargetSysRoot"))
             }
         }
@@ -168,12 +180,18 @@ sealed class ClangArgs(
     }
 
     // Kept for compatibility, remove later.
+    @Deprecated("args for building runtime moved to runtime building code")
+    @Suppress("DEPRECATION")
     val clangArgsForKonanSources =
             clangXXArgs + clangArgsSpecificForKonanSources
 
+    @Deprecated("args for building runtime moved to runtime building code")
+    @Suppress("DEPRECATION")
     val clangArgsForKonanCxxSources =
             (clangXXArgs + clangArgsSpecificForKonanSources).asList()
 
+    @Deprecated("args for building runtime moved to runtime building code")
+    @Suppress("DEPRECATION")
     val clangArgsForKonanCSources =
             (clangArgs + clangArgsSpecificForKonanSources).asList()
 
@@ -220,14 +238,18 @@ sealed class ClangArgs(
     /**
      * Should be used when compiling library for JNI.
      * For example, it is used for Kotlin/Native's Clang and LLVM libraries.
+     *
+     * Keep in sync with NativePlugin.kt
      */
     class Jni(configurables: Configurables) : ClangArgs(configurables, forJni = true) {
         private val jdkDir by lazy {
-            val home = File.javaHome.absoluteFile
-            if (home.child("include").exists)
-                home.absolutePath
-            else
-                home.parentFile.absolutePath
+            val home = File(System.getProperty("java.home")).canonicalFile
+            val parent = home.parentFile
+            val javaHome = System.getenv("JAVA_HOME")?.let(::File)
+
+            listOfNotNull(home, parent, javaHome)
+                .firstOrNull { it.child("include").exists }?.absolutePath
+                ?: error("JNI headers not found")
         }
 
         val hostCompilerArgsForJni: Array<String> by lazy {

@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.codegen
 
 import com.intellij.openapi.util.text.StringUtil
 import org.jetbrains.kotlin.backend.common.output.OutputFileCollection
+import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.org.objectweb.asm.*
 import org.junit.Assert
 import java.io.File
@@ -17,6 +18,12 @@ import java.util.regex.Pattern
  * Test correctness of written local variables in class file for specified method
  */
 abstract class AbstractCheckLocalVariablesTableTest : CodegenTestCase() {
+    override val useFir: Boolean
+        get() = true
+
+    override val firParser: FirParser
+        get() = FirParser.LightTree
+
     private inline fun <T> loggingExceptions(wholeFile: File, body: () -> T): T = try {
         body()
     } catch (e: Throwable) {
@@ -62,33 +69,13 @@ abstract class AbstractCheckLocalVariablesTableTest : CodegenTestCase() {
         Assert.assertEquals(expected, actual)
     }
 
-    private fun getActualVariablesAsString(list: List<LocalVariable>) = if (backend.isIR) {
-        // Ignore local index.
+    private fun getActualVariablesAsString(list: List<LocalVariable>): String =
         list.map {
-            it.toString().replaceFirst("INDEX=\\d+".toRegex(), "INDEX=*")
-                .replaceFirst("<name for destructuring parameter [0-9]+>".toRegex(), "<destruct>") // use FIR name for it
-        }
-            .sorted()
-            .joinToString("\n")
-    } else {
-        list.joinToString("\n")
-    }
+            it.toString().replaceFirst("<name for destructuring parameter [0-9]+>".toRegex(), "<destruct>") // use FIR name for it
+        }.sorted().joinToString("\n")
 
-    private fun getExpectedVariablesAsString(testFileLines: List<String>): String {
-        val variableLines = testFileLines.asSequence().filter { line -> line.startsWith("// VARIABLE ") }
-        return if (backend.isIR) {
-            // Ignore local index.
-            variableLines
-                .map {
-                    it.replaceFirst("INDEX=\\d+".toRegex(), "INDEX=*")
-                        .replaceFirst("<name for destructuring parameter [0-9]+>".toRegex(), "<destruct>") // use FIR name for it
-                }
-                .sorted()
-                .joinToString("\n")
-        } else {
-            variableLines.joinToString("\n")
-        }
-    }
+    private fun getExpectedVariablesAsString(testFileLines: List<String>): String =
+        testFileLines.asSequence().filter { line -> line.startsWith("// VARIABLE ") }.joinToString("\n")
 
     private class LocalVariable(
         val name: String,
@@ -97,7 +84,7 @@ abstract class AbstractCheckLocalVariablesTableTest : CodegenTestCase() {
         val startLabelNumber: Int,
         val endLabelNumber: Int
     ) {
-        override fun toString(): String = "// VARIABLE : NAME=$name TYPE=$type INDEX=$index"
+        override fun toString(): String = "// VARIABLE : NAME=$name TYPE=$type"
     }
 
     private fun parseClassAndMethodSignature(testFileLines: List<String>): String {
@@ -373,7 +360,7 @@ abstract class AbstractCheckLocalVariablesTableTest : CodegenTestCase() {
                         val currentBlock = worklist.removeAt(0)
                         val currentLocals = currentBlock.localsAtEntry.toMutableMap()
                         // Check consistency with the local table.
-                        for ((index, type) in currentBlock.localsTable) {
+                        for ([index, type] in currentBlock.localsTable) {
                             currentLocals[index]?.let {
                                 checkCompatible(index, type, it)
                             } ?: throw Exception("Uninitialized local in locals table: index: $index type: $type")
@@ -396,7 +383,7 @@ abstract class AbstractCheckLocalVariablesTableTest : CodegenTestCase() {
                         // blocks for reprocessing if the type of the locals at entry changed.
                         for (succ in currentBlock.successors) {
                             if (!succ.localsAtEntry.equals(currentLocals)) {
-                                for ((index, type) in currentLocals) {
+                                for ([index, type] in currentLocals) {
                                     succ.localsAtEntry[index]?.let {
                                         // If conflicting types flow to the same block for a local
                                         // slot that is OK as long as the type is never used. Such

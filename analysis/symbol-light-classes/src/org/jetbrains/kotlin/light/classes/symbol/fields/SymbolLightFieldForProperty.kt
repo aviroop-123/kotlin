@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.load.java.structure.impl.NotEvaluatedConstAware
 import org.jetbrains.kotlin.name.JvmStandardClassIds.TRANSIENT_ANNOTATION_CLASS_ID
 import org.jetbrains.kotlin.name.JvmStandardClassIds.VOLATILE_ANNOTATION_CLASS_ID
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtCallableDeclaration
 import org.jetbrains.kotlin.psi.KtProperty
 
@@ -61,7 +62,7 @@ internal class SymbolLightFieldForProperty private constructor(
 
     private val _returnedType: PsiType by lazyPub {
         withPropertySymbol { propertySymbol ->
-            val isDelegated = (propertySymbol as? KaKotlinPropertySymbol)?.isDelegatedProperty == true
+            val isDelegated = (propertySymbol as? KaKotlinPropertySymbol)?.isDelegated == true
             val ktType = if (isDelegated)
                 (kotlinOrigin as? KtProperty)?.delegateExpression?.expressionType
             else
@@ -104,7 +105,7 @@ internal class SymbolLightFieldForProperty private constructor(
                 return@withPropertySymbol propertyName.asString()
             }
 
-            val baseFieldName = propertyName.asString() + if (symbol.isDelegatedProperty) {
+            val baseFieldName = propertyName.asString() + if (symbol.isDelegated) {
                 JvmAbi.DELEGATED_PROPERTY_NAME_SUFFIX
             } else {
                 ""
@@ -113,24 +114,35 @@ internal class SymbolLightFieldForProperty private constructor(
             val containingClass = this@SymbolLightFieldForProperty.containingClass as? SymbolLightClassForNamedClassLike
                 ?: return@withPropertySymbol baseFieldName
 
-            containingClass.withClassSymbol { classSymbol ->
-                val hasClash = if (isStatic) {
-                    // Class fields are preferred to the companion ones only in the case of JvmField
-                    classSymbol.declaredMemberScope
-                        .callables(propertyName)
-                        .filterIsInstance<KaPropertySymbol>()
-                        .any(KaPropertySymbol::isJvmField)
-                } else {
-                    // Companion object fields are preferred to the class ones
-                    classSymbol.companionObject
-                        ?.declaredMemberScope
-                        ?.callables(propertyName)
-                        ?.filterIsInstance<KaPropertySymbol>()
-                        .orEmpty()
-                        .any()
-                }
+            if (hasClash(propertyName, containingClass)) "$baseFieldName$1" else baseFieldName
+        }
+    }
 
-                if (hasClash) "$baseFieldName$1" else baseFieldName
+    /**
+     * Checks if the property name clashes with a higher-priority member in the containing class.
+     */
+    private fun hasClash(propertyName: Name, containingClass: SymbolLightClassForNamedClassLike): Boolean {
+        return containingClass.withClassSymbol { classSymbol ->
+            if (isStatic) {
+                // Class fields are preferred to the companion ones only in the case of JvmField
+                classSymbol.declaredMemberScope
+                    .callables(propertyName)
+                    .filterIsInstance<KaPropertySymbol>()
+                    .any(KaPropertySymbol::isJvmField) ||
+                        // Enum entries are always preferred to the companion fields
+                        (containingClass.isEnum &&
+                                classSymbol.staticDeclaredMemberScope
+                                    .callables(propertyName)
+                                    .filterIsInstance<KaEnumEntrySymbol>()
+                                    .any())
+            } else {
+                // Companion object fields are preferred to the class ones
+                classSymbol.companionObject
+                    ?.declaredMemberScope
+                    ?.callables(propertyName)
+                    ?.filterIsInstance<KaPropertySymbol>()
+                    .orEmpty()
+                    .any()
             }
         }
     }
@@ -154,7 +166,7 @@ internal class SymbolLightFieldForProperty private constructor(
         }
         in GranularModifiersBox.MODALITY_MODIFIERS -> {
             val modality = withPropertySymbol { propertySymbol ->
-                if (propertySymbol.isVal || propertySymbol.isDelegatedProperty) {
+                if (propertySymbol.isVal || propertySymbol.isDelegated) {
                     PsiModifier.FINAL
                 } else {
                     propertySymbol.computeSimpleModality()?.takeIf { it != PsiModifier.FINAL }
@@ -197,7 +209,7 @@ internal class SymbolLightFieldForProperty private constructor(
                 additionalAnnotationsProvider = NullabilityAnnotationsProvider {
                     withPropertySymbol { propertySymbol ->
                         when {
-                            propertySymbol.isDelegatedProperty -> NullabilityAnnotation.NON_NULLABLE
+                            propertySymbol.isDelegated -> NullabilityAnnotation.NON_NULLABLE
                             !(propertySymbol is KaKotlinPropertySymbol && propertySymbol.isLateInit) -> getRequiredNullabilityAnnotation(propertySymbol.returnType)
                             else -> NullabilityAnnotation.NOT_REQUIRED
                         }

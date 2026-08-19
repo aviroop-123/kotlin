@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.classNameOverride
 import org.jetbrains.kotlin.backend.jvm.createJvmFileFacadeClass
@@ -22,7 +21,6 @@ import org.jetbrains.kotlin.load.kotlin.FacadeClassSource
 /**
  * Replaces parent from package fragment to FileKt class for top-level callables (K2 only).
  */
-@PhaseDescription(name = "ExternalPackageParentPatcherLowering")
 internal class ExternalPackageParentPatcherLowering(val context: JvmBackendContext) : FileLoweringPass {
     override fun lower(irFile: IrFile) {
         if (context.config.useFir) {
@@ -57,17 +55,10 @@ internal class ExternalPackageParentPatcherLowering(val context: JvmBackendConte
                 if (deserializedSource.facadeClassName != null) IrDeclarationOrigin.JVM_MULTIFILE_CLASS else IrDeclarationOrigin.FILE_CLASS,
                 facadeName.fqNameForTopLevelClassMaybeWithDollars.shortName(),
                 deserializedSource,
-                deserializeIr = { irClass -> deserializeTopLevelClass(irClass) }
             ).also {
                 it.createThisReceiverParameter()
                 it.classNameOverride = facadeName
             }
-        }
-
-        private fun deserializeTopLevelClass(irClass: IrClass): Boolean {
-            return context.irDeserializer.deserializeTopLevelClass(
-                irClass, context.irBuiltIns, context.symbolTable, context.irProviders, context.generatorExtensions
-            )
         }
 
         private fun handleProperty(property: IrProperty, newParent: IrClass) {

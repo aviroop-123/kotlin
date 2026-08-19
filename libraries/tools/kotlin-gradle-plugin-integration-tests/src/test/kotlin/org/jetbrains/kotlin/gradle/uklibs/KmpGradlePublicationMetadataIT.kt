@@ -5,16 +5,14 @@
 
 package org.jetbrains.kotlin.gradle.uklibs
 
+import com.android.build.gradle.LibraryExtension
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.gradle.testing.prettyPrinted
-import org.jetbrains.kotlin.gradle.uklibs.KmpGradlePublicationMetadataIT.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.condition.OS
 import kotlin.test.assertEquals
@@ -29,32 +27,7 @@ class KmpGradlePublicationMetadataIT : KGPBaseTest() {
         ignoreUnknownKeys = true
     }
 
-    @Serializable
-    data class GradleMetadata(
-        val variants: Set<Variant>,
-    )
-
-    @Serializable
-    data class Variant(
-        val name: String,
-        val attributes: Map<String, String>,
-        @SerialName("available-at")
-        val availableAt: ComponentPointer? = null,
-        val files: List<VariantFile> = emptyList(),
-    )
-
-    @Serializable
-    data class ComponentPointer(
-        val url: String,
-    )
-
-    @Serializable
-    data class VariantFile(
-        val name: String,
-        val url: String,
-    )
-
-    // FIXME: Test publication with Android - KT-76700
+    // FIXME: Test standard publication with Android - KT-76700
 
     @GradleTest
     fun `standard kmp publication`(version: GradleVersion) {
@@ -108,16 +81,107 @@ class KmpGradlePublicationMetadataIT : KGPBaseTest() {
         )
     }
 
+    @GradleAndroidTest
+    @AndroidTestVersions(
+        minVersion = TestVersions.AGP.AGP_88,
+        maxVersion = TestVersions.AGP.AGP_813,
+    )
+    fun `kmp publication with uklibs - with stub jvm target - with KMP android library target`(
+        version: GradleVersion,
+        androidVersion: String,
+    ) {
+        val producer = kmpProducer(
+            version,
+            withJvm = false,
+            androidVersion = androidVersion,
+            enableLegacyAgpDsl = false,
+        ) {
+            project.setUklibPublicationStrategy()
+            project.plugins.apply("com.android.kotlin.multiplatform.library")
+            project.applyMultiplatform {
+                val target = targets.getByName("android")
+                val klass = target::class.java.classLoader.loadClass("com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryExtension")
+                val compileSdk = klass.getMethod("setCompileSdk", Int::class.javaObjectType)
+                compileSdk.invoke(target, 31)
+                val namespace = klass.getMethod("setNamespace", String::class.java)
+                namespace.invoke(target, "foo")
+            }
+        }.publish()
+        assertEquals(
+            GradleMetadata(
+                variants = rootVariantsSharedByAllPublications
+                        + uklibCompatibilityMetadataVariants
+                        + uklibVariants
+                        + uklibJvmStubVariants
+                        + kmpAndroidLibraryVariants,
+            ).prettyPrinted,
+            producer.rootComponent.gradleMetadata.inputStream().use { input ->
+                json.decodeFromStream<GradleMetadata>(input).prettyPrinted
+            }
+        )
+    }
+
+    @GradleAndroidTest
+    fun `kmp publication with uklibs - with stub jvm target - with legacy android library target`(
+        version: GradleVersion,
+        androidVersion: String,
+    ) {
+        val producer = kmpProducer(
+            version,
+            withJvm = false,
+            androidVersion = androidVersion,
+        ) {
+            project.setUklibPublicationStrategy()
+            project.plugins.apply("com.android.library")
+            (project.extensions.getByName("android") as LibraryExtension).apply {
+                compileSdk = 31
+                namespace = "foo"
+            }
+            project.applyMultiplatform {
+                @Suppress("DEPRECATION")
+                androidTarget {
+                    publishLibraryVariants("debug", "release")
+                }
+            }
+        }.publish()
+        assertEquals(
+            GradleMetadata(
+                variants = rootVariantsSharedByAllPublications
+                        + uklibCompatibilityMetadataVariants
+                        + uklibVariants
+                        + uklibJvmStubVariants
+                        + androidLibraryDebugVariants
+                        + androidLibraryReleaseVariants,
+            ).prettyPrinted,
+            producer.rootComponent.gradleMetadata.inputStream().use { input ->
+                json.decodeFromStream<GradleMetadata>(input).prettyPrinted
+            }
+        )
+    }
+
     private fun kmpProducer(
         version: GradleVersion,
         withJvm: Boolean,
+        androidVersion: String? = null,
+        enableLegacyAgpDsl: Boolean = true,
         configuration: GradleProjectBuildScriptInjectionContext.() -> Unit = {},
-    ) = project("empty", version) {
+    ) = project(
+        "empty",
+        version,
+        buildOptions = defaultBuildOptions.copy(
+            androidVersion = androidVersion,
+            enableLegacyAgpDsl = enableLegacyAgpDsl,
+        ),
+    ).apply {
+        if (androidVersion != null) {
+            addAgpToBuildScriptCompilationClasspath(androidVersion)
+        }
         addKgpToBuildScriptCompilationClasspath()
         buildScriptInjection {
             configuration()
             project.applyMultiplatform {
                 iosArm64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 linuxArm64()
                 linuxX64()
@@ -561,6 +625,7 @@ private val uklibJvmStubVariants = mutableSetOf(
         attributes = mutableMapOf(
             "org.gradle.category" to "library",
             "org.gradle.usage" to "java-api",
+            "org.gradle.jvm.environment" to "standard-jvm",
         ),
         availableAt = null,
         files = mutableListOf(
@@ -575,6 +640,7 @@ private val uklibJvmStubVariants = mutableSetOf(
         attributes = mutableMapOf(
             "org.gradle.category" to "library",
             "org.gradle.usage" to "java-runtime",
+            "org.gradle.jvm.environment" to "standard-jvm",
         ),
         availableAt = null,
         files = mutableListOf(
@@ -587,61 +653,7 @@ private val uklibJvmStubVariants = mutableSetOf(
     ),
 )
 
-private val uklibJvmVariants = mutableSetOf(
-    Variant(
-        attributes = mutableMapOf(
-            "org.gradle.category" to "library",
-            "org.gradle.jvm.environment" to "standard-jvm",
-            "org.gradle.libraryelements" to "jar",
-            "org.gradle.usage" to "java-api",
-            "org.jetbrains.kotlin.platform.type" to "jvm",
-        ),
-        availableAt = null,
-        files = mutableListOf(
-            VariantFile(
-                name = "empty-jvm-1.0.jar",
-                url = "empty-1.0.jar",
-            ),
-        ),
-        name = "jvmApiElements",
-    ),
-    Variant(
-        attributes = mutableMapOf(
-            "org.gradle.category" to "library",
-            "org.gradle.jvm.environment" to "standard-jvm",
-            "org.gradle.libraryelements" to "jar",
-            "org.gradle.usage" to "java-runtime",
-            "org.jetbrains.kotlin.platform.type" to "jvm",
-        ),
-        availableAt = null,
-        files = mutableListOf(
-            VariantFile(
-                name = "empty-jvm-1.0.jar",
-                url = "empty-1.0.jar",
-            ),
-        ),
-        name = "jvmRuntimeElements",
-    ),
-    Variant(
-        attributes = mutableMapOf(
-            "org.gradle.category" to "documentation",
-            "org.gradle.dependency.bundling" to "external",
-            "org.gradle.docstype" to "sources",
-            "org.gradle.jvm.environment" to "standard-jvm",
-            "org.gradle.libraryelements" to "jar",
-            "org.gradle.usage" to "java-runtime",
-            "org.jetbrains.kotlin.platform.type" to "jvm",
-        ),
-        availableAt = null,
-        files = mutableListOf(
-            VariantFile(
-                name = "empty-jvm-1.0-sources.jar",
-                url = "empty-1.0-sources.jar",
-            ),
-        ),
-        name = "jvmSourcesElements",
-    ),
-)
+private val uklibJvmVariants = jvmSubcomponentVariants
 
 private val uklibCompatibilityMetadataVariants = mutableSetOf(
     Variant(
@@ -677,5 +689,154 @@ private val uklibCompatibilityMetadataVariants = mutableSetOf(
             ),
         ),
         name = "metadataSourcesElements",
+    ),
+)
+
+private val kmpAndroidLibraryVariants = mutableSetOf(
+    Variant(
+        attributes = mutableMapOf(
+            "org.gradle.category" to "library",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.libraryelements" to "aar",
+            "org.gradle.usage" to "java-api",
+            "org.jetbrains.kotlin.platform.type" to "jvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android/1.0/empty-android-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "androidApiElements-published",
+    ),
+    Variant(
+        attributes = mutableMapOf(
+            "org.gradle.category" to "library",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.libraryelements" to "aar",
+            "org.gradle.usage" to "java-runtime",
+            "org.jetbrains.kotlin.platform.type" to "jvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android/1.0/empty-android-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "androidRuntimeElements-published",
+    ),
+    Variant(
+        attributes = mutableMapOf(
+            "org.gradle.category" to "documentation",
+            "org.gradle.dependency.bundling" to "external",
+            "org.gradle.docstype" to "sources",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.libraryelements" to "jar",
+            "org.gradle.usage" to "java-runtime",
+            "org.jetbrains.kotlin.platform.type" to "jvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android/1.0/empty-android-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "androidSourcesElements-published",
+    ),
+)
+
+private val androidLibraryDebugVariants = mutableSetOf(
+    Variant(
+        attributes = mutableMapOf(
+            "com.android.build.api.attributes.BuildTypeAttr" to "debug",
+            "org.gradle.category" to "library",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.usage" to "java-api",
+            "org.jetbrains.kotlin.platform.type" to "androidJvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android-debug/1.0/empty-android-debug-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "debugApiElements-published",
+    ),
+    Variant(
+        attributes = mutableMapOf(
+            "com.android.build.api.attributes.BuildTypeAttr" to "debug",
+            "org.gradle.category" to "library",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.usage" to "java-runtime",
+            "org.jetbrains.kotlin.platform.type" to "androidJvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android-debug/1.0/empty-android-debug-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "debugRuntimeElements-published",
+    ),
+    Variant(
+        attributes = mutableMapOf(
+            "com.android.build.api.attributes.BuildTypeAttr" to "debug",
+            "org.gradle.category" to "documentation",
+            "org.gradle.dependency.bundling" to "external",
+            "org.gradle.docstype" to "sources",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.libraryelements" to "jar",
+            "org.gradle.usage" to "java-runtime",
+            "org.jetbrains.kotlin.platform.type" to "androidJvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android-debug/1.0/empty-android-debug-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "debugSourcesElements-published",
+    ),
+)
+
+private val androidLibraryReleaseVariants = mutableSetOf(
+    Variant(
+        attributes = mutableMapOf(
+            "org.gradle.category" to "library",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.usage" to "java-api",
+            "org.jetbrains.kotlin.platform.type" to "androidJvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android/1.0/empty-android-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "releaseApiElements-published",
+    ),
+    Variant(
+        attributes = mutableMapOf(
+            "org.gradle.category" to "library",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.usage" to "java-runtime",
+            "org.jetbrains.kotlin.platform.type" to "androidJvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android/1.0/empty-android-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "releaseRuntimeElements-published",
+    ),
+    Variant(
+        attributes = mutableMapOf(
+            "org.gradle.category" to "documentation",
+            "org.gradle.dependency.bundling" to "external",
+            "org.gradle.docstype" to "sources",
+            "org.gradle.jvm.environment" to "android",
+            "org.gradle.libraryelements" to "jar",
+            "org.gradle.usage" to "java-runtime",
+            "org.jetbrains.kotlin.platform.type" to "androidJvm",
+        ),
+        availableAt = ComponentPointer(
+            url = "../../empty-android/1.0/empty-android-1.0.module",
+        ),
+        files = mutableListOf(
+        ),
+        name = "releaseSourcesElements-published",
     ),
 )

@@ -5,32 +5,23 @@
 
 package org.jetbrains.kotlin.gradle.tasks.internal
 
-import org.jetbrains.kotlin.gradle.tasks.CleanDataTask
 import java.io.Serializable
 import java.time.Instant
 
 /**
- * Store of tracked directories that can be cleaned with [CleanDataTask].
- * All directories that was not marked as used at least [CleanDataTask.timeToLiveInDays] days will be removed.
+ * Store of tracked directories that can be cleaned with [org.jetbrains.kotlin.gradle.tasks.CleanDataTask].
+ * All directories that was not marked as used at least [org.jetbrains.kotlin.gradle.tasks.CleanDataTask.timeToLiveInDays] days will be removed.
  *
  * To register store call `CleanableStore["/path/to/dir"]`.
  * Now you will be able to access files via `CleanableStore["/path/to/dir"]["file/name"].use()`
  * and it would update usage of th store.
  */
+@Deprecated("Removed in Kotlin 2.4", level = DeprecationLevel.ERROR)
+@Suppress("DEPRECATION_ERROR")
 interface CleanableStore : Serializable {
     fun cleanDir(expirationDate: Instant)
 
     operator fun get(fileName: String): DownloadedFile
 
     fun markUsed()
-
-    companion object {
-        private val mutableStores = mutableMapOf<String, CleanableStore>()
-
-        val stores: Map<String, CleanableStore>
-            get() = mutableStores.toMap()
-
-        operator fun get(path: String): CleanableStore =
-            mutableStores.getOrPut(path) { CleanableStoreImpl(path) }
-    }
 }

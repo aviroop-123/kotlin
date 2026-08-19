@@ -1,8 +1,7 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
 // WITH_STDLIB
 // DIAGNOSTICS: -DEBUG_INFO_SMARTCAST
-// LANGUAGE: +CustomEqualsInValueClasses +ValueClasses
+// LANGUAGE: +CustomEqualsInValueClasses +JvmInlineMultiFieldValueClasses
 
 @JvmInline
 value class MFVC1(val x: Int, val y: Int) {

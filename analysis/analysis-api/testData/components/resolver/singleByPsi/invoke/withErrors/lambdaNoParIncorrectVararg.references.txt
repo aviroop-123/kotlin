@@ -1,3 +1,0 @@
-KtCallExpression(67,71): 'f {}'
-  KtInvokeFunctionReference:
-    (in Foo) fun invoke(vararg a: kotlin.Any)

@@ -5,10 +5,12 @@
 
 package kotlin.wasm.internal
 
+import kotlin.internal.UsedFromCompilerGeneratedCode
+
 /**
  * Contains wasm module-dependent services, like associated object getter.
  */
-internal class WasmModuleDescriptor(val associatedObjectGetter: kotlin.wasm.internal.reftypes.funcref)
+internal class WasmModuleDescriptor(val associatedObjectGetter: kotlin.wasm.internal.reftypes.anyref)
 
 /**
  * List of wasm modules-dependent services.
@@ -18,7 +20,8 @@ internal val moduleDescriptors = mutableListOf<WasmModuleDescriptor>()
 /**
  * Register new wasm module-dependent descriptor [kotlin.wasm.internal.WasmModuleDescriptor].
  */
-internal fun registerModuleDescriptor(associatedObjectGetter: kotlin.wasm.internal.reftypes.funcref) {
+@UsedFromCompilerGeneratedCode
+internal fun registerModuleDescriptor(associatedObjectGetter: kotlin.wasm.internal.reftypes.anyref) {
     moduleDescriptors.add(WasmModuleDescriptor(associatedObjectGetter))
 }
 
@@ -27,5 +30,6 @@ internal fun registerModuleDescriptor(associatedObjectGetter: kotlin.wasm.intern
  */
 @ExcludedFromCodegen
 @Suppress("UNUSED_PARAMETER")
-internal fun callAssociatedObjectGetter(param1: Long, param2: Long, funcRef: kotlin.wasm.internal.reftypes.funcref): Any? =
+@UsedFromCompilerGeneratedCode
+internal fun callAssociatedObjectGetter(param1: Long, param2: Long, funcRefWrapper: kotlin.wasm.internal.reftypes.anyref): Any? =
     implementedAsIntrinsic

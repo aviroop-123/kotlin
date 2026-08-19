@@ -5,9 +5,11 @@
 
 package org.jetbrains.kotlin.gradle.native
 
+import org.gradle.kotlin.dsl.kotlin
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinToolingDiagnostics
 import org.jetbrains.kotlin.gradle.testbase.*
+import org.jetbrains.kotlin.gradle.uklibs.applyMultiplatform
 import org.jetbrains.kotlin.gradle.util.replaceText
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.condition.OS
@@ -178,6 +180,44 @@ class AppleFrameworkIT : KGPBaseTest() {
         }
     }
 
+    @DisplayName("embedAndSign builds only requested iOS simulator framework")
+    @OptIn(EnvironmentalVariablesOverride::class)
+    @GradleTest
+    fun shouldBuildOnlyRequestedIosSimulatorFrameworkForEmbedAndSign(
+        gradleVersion: GradleVersion,
+    ) {
+
+        nativeProject(
+            "sharedAppleFramework",
+            gradleVersion,
+        ) {
+            fun environmentVariables(configuration: String) = EnvironmentalVariables(
+                "CONFIGURATION" to configuration,
+                "SDK_NAME" to "iphonesimulator",
+                "ARCHS" to "arm64",
+                "TARGET_BUILD_DIR" to projectPath.absolutePathString(),
+                "FRAMEWORKS_FOLDER_PATH" to "build/xcode-derived",
+                "BUILT_PRODUCTS_DIR" to iosBuildProductsDir().absolutePathString(),
+            )
+
+            build(":shared:embedAndSignAppleFrameworkForXcode", environmentVariables = environmentVariables("Debug")) {
+                assertTasksExecuted(
+                    ":shared:linkDebugFrameworkIosSimulatorArm64",
+                    ":shared:assembleDebugAppleFrameworkForXcodeIosSimulatorArm64",
+                )
+                assertTasksAreNotInTaskGraph(":shared:linkReleaseFrameworkIosSimulatorArm64")
+            }
+
+            build(":shared:embedAndSignAppleFrameworkForXcode", environmentVariables = environmentVariables("Release")) {
+                assertTasksExecuted(
+                    ":shared:linkReleaseFrameworkIosSimulatorArm64",
+                    ":shared:assembleReleaseAppleFrameworkForXcodeIosSimulatorArm64",
+                )
+                assertTasksAreNotInTaskGraph(":shared:linkDebugFrameworkIosSimulatorArm64")
+            }
+        }
+    }
+
     @DisplayName("embedAndSign task does not copy dSYM to Xcode frameworks folder")
     @OptIn(EnvironmentalVariablesOverride::class)
     @GradleTest
@@ -214,6 +254,42 @@ class AppleFrameworkIT : KGPBaseTest() {
             buildAndFail(":shared:embedAndSignAppleFrameworkForXcode") {
                 assertOutputContains("Please run the embedAndSignAppleFrameworkForXcode task from Xcode")
                 assertOutputDoesNotContain("ConfigurationCacheProblemsException: Configuration cache problems found in this build")
+            }
+        }
+    }
+
+    @DisplayName("embedAndSignAppleFrameworkForXcode fails for missing configured architecture")
+    @OptIn(EnvironmentalVariablesOverride::class)
+    @GradleTest
+    fun shouldFailWhenXcodeRequestsArchitectureNotConfiguredInGradle(
+        gradleVersion: GradleVersion,
+    ) {
+        project("empty", gradleVersion) {
+            plugins {
+                kotlin("multiplatform")
+            }
+            buildScriptInjection {
+                project.applyMultiplatform {
+                    iosSimulatorArm64().binaries.framework()
+                }
+            }
+
+            val environmentVariables = EnvironmentalVariables(
+                "CONFIGURATION" to "Debug",
+                "SDK_NAME" to "iphonesimulator",
+                "ARCHS" to "arm64 x86_64",
+                "TARGET_BUILD_DIR" to projectPath.absolutePathString(),
+                "FRAMEWORKS_FOLDER_PATH" to "build/xcode-derived",
+                "BUILT_PRODUCTS_DIR" to iosBuildProductsDir().absolutePathString(),
+            )
+
+            buildAndFail(
+                ":embedAndSignAppleFrameworkForXcode",
+                environmentVariables = environmentVariables,
+            ) {
+                assertTasksFailed(":validateArchitecturesForEmbedAndSignAppleFrameworkForXcode")
+                assertHasDiagnostic(KotlinToolingDiagnostics.XcodeArchitectureNotConfiguredInGradle)
+                assertOutputContains("ios_x64")
             }
         }
     }
@@ -558,58 +634,6 @@ class AppleFrameworkIT : KGPBaseTest() {
                 environmentVariables = environmentVariables
             ) {
                 assertOutputContains("/sharedAppleFramework/shared/src/commonMain/kotlin/com/github/jetbrains/myapplication/Greeting.kt:7:2: error: Syntax error: Expecting a top level declaration")
-            }
-        }
-    }
-
-    @DisplayName("Frameworks can be consumed from other gradle project")
-    @GradleTest
-    fun shouldCheckFrameworksCanBeConsumedFromOtherGradleProjects(gradleVersion: GradleVersion) {
-        nativeProject("consumableAppleFrameworks", gradleVersion) {
-            build(":consumer:help") {
-                assertOutputContains("RESOLUTION_SUCCESS")
-                assertOutputDoesNotContain("RESOLUTION_FAILURE")
-            }
-        }
-    }
-
-    @DisplayName("Smoke test with apple gradle plugin")
-    @GradleTest
-    fun smokeTestWithAppleGradlePlugin(gradleVersion: GradleVersion) {
-        nativeProject(
-            "appleGradlePluginConsumesAppleFrameworks",
-            gradleVersion,
-            buildJdk = jdk11Info.javaHome,
-            buildOptions = defaultBuildOptions.copy(
-                // Apple plugin doesn't support configuration cache
-                configurationCache = BuildOptions.ConfigurationCacheValue.DISABLED,
-            ).suppressDeprecationWarningsSinceGradleVersion(
-                TestVersions.Gradle.G_8_0,
-                gradleVersion,
-                "ApplePlugin produces Gradle deprecations"
-            )
-        ) {
-            fun dependencyInsight(configuration: String) = arrayOf(
-                ":iosApp:dependencyInsight", "--configuration", configuration, "--dependency", "iosLib"
-            )
-
-            subProject("iosApp").buildGradleKts.replaceText("<applePluginTestVersion>", "\"${TestVersions.AppleGradlePlugin.V222_0_21}\"")
-
-            build(*dependencyInsight("iosAppIosX64DebugImplementation")) {
-                assertOutputContainsNativeFrameworkVariant("mainDynamicDebugFrameworkIos", gradleVersion)
-            }
-
-            build(*dependencyInsight("iosAppIosX64ReleaseImplementation")) {
-                assertOutputContainsNativeFrameworkVariant("mainDynamicReleaseFrameworkIos", gradleVersion)
-            }
-
-            // NB: '0' is required at the end since dependency is added with custom attribute, and it creates new configuration
-            build(*dependencyInsight("iosAppIosX64DebugImplementation0"), "-PmultipleFrameworks") {
-                assertOutputContainsNativeFrameworkVariant("mainStaticDebugFrameworkIos", gradleVersion)
-            }
-
-            build(*dependencyInsight("iosAppIosX64ReleaseImplementation0"), "-PmultipleFrameworks") {
-                assertOutputDoesNotContain("mainStaticReleaseFrameworkIos")
             }
         }
     }

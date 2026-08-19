@@ -1,3 +1,0 @@
-KtOperationReferenceExpression(58,65): 'infixOp'
-  KtSimpleNameReference:
-    (in ROOT) infix fun kotlin.Int.infixOp(rhs: kotlin.String)

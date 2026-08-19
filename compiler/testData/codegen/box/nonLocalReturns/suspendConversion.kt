@@ -1,15 +1,20 @@
 // ISSUE: KT-72464
+// IGNORE_KLIB_BACKEND_ERRORS_WITH_CUSTOM_FIRST_STAGE: Native:1.9,2.0,2.1,2.2
+// IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE: JS,Wasm-JS:1.9,2.0,2.1,2.2
+// KT-72464: Supported in 2.2.20-Beta1
 
 // WITH_STDLIB
 // WITH_COROUTINES
-
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.startCoroutine
-
+// NO_CHECK_LAMBDA_INLINING
+// FILE: lib.kt
 suspend inline fun foo(f: suspend () -> String) = f()
 
 suspend inline fun bar(f: () -> String) = foo(f)
+
+// FILE: main.kt
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.startCoroutine
 
 suspend fun test(): String {
     bar { return "OK" }

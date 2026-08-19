@@ -10,6 +10,7 @@ import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.logging.Logging
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.workers.WorkAction
 import org.gradle.workers.WorkParameters
 import org.gradle.workers.WorkQueue
@@ -28,16 +29,16 @@ internal class GradleCompilerRunnerWithWorkers(
     taskProvider: GradleCompileTaskProvider,
     jdkToolsJar: File?,
     compilerExecutionSettings: CompilerExecutionSettings,
-    buildMetrics: BuildMetricsReporter<GradleBuildTime, GradleBuildPerformanceMetric>,
+    buildMetrics: BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>,
     private val workerExecutor: WorkerExecutor,
-    fusMetricsConsumer: StatisticsValuesConsumer?,
+    fusMetricsConsumer: Provider<StatisticsValuesConsumer>,
 ) : GradleCompilerRunner(taskProvider, jdkToolsJar, compilerExecutionSettings, buildMetrics, fusMetricsConsumer) {
     override fun runCompilerAsync(
         workArgs: GradleKotlinCompilerWorkArguments,
         taskOutputsBackup: TaskOutputsBackup?,
     ): WorkQueue {
 
-        buildMetrics.addTimeMetric(GradleBuildPerformanceMetric.CALL_WORKER)
+        buildMetrics.addTimeMetric(CALL_WORKER)
         val workQueue = workerExecutor.noIsolation()
         workQueue.submit(GradleKotlinCompilerWorkAction::class.java) { params ->
             params.compilerWorkArguments.set(workArgs)
@@ -80,7 +81,7 @@ internal class GradleCompilerRunnerWithWorkers(
                 // Otherwise, the next build(s) will likely fail in exactly the same way as this build because their inputs and outputs are
                 // the same.
                 taskOutputsBackup?.tryRestoringOnRecoverableException(e) { restoreAction ->
-                    parameters.metricsReporter.get().measure(GradleBuildTime.RESTORE_OUTPUT_FROM_BACKUP) {
+                    parameters.metricsReporter.get().measure(RESTORE_OUTPUT_FROM_BACKUP) {
                         logger.info(DEFAULT_BACKUP_RESTORE_MESSAGE)
                         restoreAction()
                     }
@@ -96,6 +97,6 @@ internal class GradleCompilerRunnerWithWorkers(
         val compilerWorkArguments: Property<GradleKotlinCompilerWorkArguments>
         val taskOutputsToRestore: ListProperty<File>
         val snapshotsDir: DirectoryProperty
-        val metricsReporter: Property<BuildMetricsReporter<GradleBuildTime, GradleBuildPerformanceMetric>>
+        val metricsReporter: Property<BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>>
     }
 }

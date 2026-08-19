@@ -7,12 +7,15 @@ bin/kotlinc-js
 bin/kotlinc-js.bat
 bin/kotlinc-jvm
 bin/kotlinc-jvm.bat
+bin/kotlinc-wasm
+bin/kotlinc-wasm.bat
 bin/kotlinc.bat
 build.txt
 lib/allopen-compiler-plugin.jar
 lib/annotations-13.0.jar
 lib/assignment-compiler-plugin.jar
 lib/compose-compiler-plugin.jar
+lib/jklib-compiler.jar
 lib/jvm-abi-gen.jar
 lib/kotlin-annotation-processing-cli.jar
 lib/kotlin-annotation-processing-runtime.jar
@@ -43,6 +46,8 @@ lib/kotlin-stdlib-jdk8.jar
 lib/kotlin-stdlib-js-sources.jar
 lib/kotlin-stdlib-js.klib
 lib/kotlin-stdlib-sources.jar
+lib/kotlin-stdlib-wasm-js.klib
+lib/kotlin-stdlib-wasm-wasi.klib
 lib/kotlin-stdlib.jar
 lib/kotlin-test-js-sources.jar
 lib/kotlin-test-js.klib
@@ -71,6 +76,7 @@ license/NOTICE.txt
 license/README.md
 license/third_party/aalto_xml_licence.txt
 license/third_party/aether_license.txt
+license/third_party/antlr_js_grammar_license.txt
 license/third_party/aosp_license.txt
 license/third_party/args4j_LICENSE.txt
 license/third_party/asm_license.txt
@@ -99,6 +105,7 @@ license/third_party/mocha-teamcity-reporter_LICENSE.txt
 license/third_party/okhttp_license.txt
 license/third_party/opentelemetry_license.txt
 license/third_party/power_assert_license.txt
+license/third_party/protobuf_license.txt
 license/third_party/prototype_license.txt
 license/third_party/rhino_LICENSE.txt
 license/third_party/scala_license.txt

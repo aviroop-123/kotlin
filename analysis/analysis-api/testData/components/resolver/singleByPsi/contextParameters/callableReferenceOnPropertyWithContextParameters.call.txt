@@ -1,7 +1,7 @@
 KtCallableReferenceExpression(87,92): '::foo'
-  KaSuccessCallInfo:
-    call = KaSimpleVariableAccessCall:
-      partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
+  KaCallResolutionError:
+    candidateCalls = [
+      KaCallableReferenceCall:
         contextArguments = []
         dispatchReceiver = null
         extensionReceiver = null
@@ -27,5 +27,6 @@ KtCallableReferenceExpression(87,92): '::foo'
               callableId = null
           ]
           callableId = /foo
-      simpleAccess = Read
-      typeArgumentsMapping = {}
+        typeArgumentsMapping = {}
+    ]
+    diagnostic = ERROR<NO_CONTEXT_ARGUMENT: No context argument for 'param1: Int' found.>

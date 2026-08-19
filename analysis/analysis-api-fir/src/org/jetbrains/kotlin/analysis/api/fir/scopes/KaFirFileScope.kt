@@ -8,9 +8,9 @@ package org.jetbrains.kotlin.analysis.api.fir.scopes
 import org.jetbrains.kotlin.analysis.api.fir.KaSymbolByFirBuilder
 import org.jetbrains.kotlin.analysis.api.fir.symbols.KaFirFileSymbol
 import org.jetbrains.kotlin.analysis.api.fir.utils.cached
+import org.jetbrains.kotlin.analysis.api.impl.base.scopes.KaBaseScope
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
 import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
-import org.jetbrains.kotlin.analysis.api.scopes.KaScope
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassifierSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
@@ -18,14 +18,14 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaPackageSymbol
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.FirTypeAlias
 import org.jetbrains.kotlin.name.Name
 
 internal class KaFirFileScope(
     private val owner: KaFirFileSymbol,
     private val builder: KaSymbolByFirBuilder
-) : KaScope {
+) : KaBaseScope() {
     override val token: KaLifetimeToken get() = builder.token
 
     private val allNamesCached by cached {
@@ -40,7 +40,7 @@ internal class KaFirFileScope(
         owner.firSymbol.fir.declarations
             .mapNotNullTo(result) { firDeclaration ->
                 when (firDeclaration) {
-                    is FirSimpleFunction -> firDeclaration.name
+                    is FirNamedFunction -> firDeclaration.name
                     is FirProperty -> firDeclaration.name
                     else -> null
                 }
@@ -69,7 +69,7 @@ internal class KaFirFileScope(
         sequence {
             owner.firSymbol.fir.declarations.forEach { firDeclaration ->
                 val callableDeclaration = when (firDeclaration) {
-                    is FirSimpleFunction -> firDeclaration.takeIf { nameFilter(firDeclaration.name) }
+                    is FirNamedFunction -> firDeclaration.takeIf { nameFilter(firDeclaration.name) }
                     is FirProperty -> firDeclaration.takeIf { nameFilter(firDeclaration.name) }
                     else -> null
                 }

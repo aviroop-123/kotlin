@@ -21,9 +21,10 @@ KaTypeAliasSymbol:
         typeArguments: []
         type: kotlin/Any?
     ]
-    type: @ExtensionFunctionType kotlin/coroutines/SuspendFunction2<kotlin/DeepRecursiveScope<*, *>, kotlin/Any?, kotlin/Any?>
+    type: suspend kotlin/DeepRecursiveScope<*, *>.(kotlin/Any?) -> kotlin/Any?
   isActual: false
   isExpect: false
+  isExternal: false
   location: TOP_LEVEL
   modality: FINAL
   name: DeepRecursiveFunctionBlock
@@ -33,3 +34,4 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: null
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  importableFqName: kotlin.DeepRecursiveFunctionBlock

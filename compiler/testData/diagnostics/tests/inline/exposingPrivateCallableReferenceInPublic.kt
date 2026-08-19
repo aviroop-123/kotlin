@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -NOTHING_TO_INLINE
 // LANGUAGE: +ForbidExposingLessVisibleTypesInInline
@@ -11,12 +10,21 @@ private class PC {
     val p = 1
 }
 
+class A private constructor() {
+    public inline fun publicInlineFunction() = ::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>A<!>
+}
+
+private fun Int.privateExtensionFun() {}
+
+private val String.privateVal: String
+    get() = this
+
 inline fun test() {
     ::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>f<!>
     ::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>p<!>
 
-    PC::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>f<!>
-    PC::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>p<!>
+    <!LESS_VISIBLE_TYPE_ACCESS_IN_INLINE_ERROR!>PC<!>::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>f<!>
+    <!LESS_VISIBLE_TYPE_ACCESS_IN_INLINE_ERROR!>PC<!>::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>p<!>
 
     val o = object {
         private fun f() {}
@@ -27,6 +35,9 @@ inline fun test() {
             ::p
         }
     }
+
+    Int::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>privateExtensionFun<!>
+    String::<!NON_PUBLIC_CALL_FROM_PUBLIC_INLINE!>privateVal<!>
 }
 
 class C {
@@ -47,8 +58,8 @@ class C {
         ::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>protectedF<!>
         ::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>protectedP<!>
 
-        PC::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>f<!>
-        PC::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>p<!>
+        <!LESS_VISIBLE_TYPE_ACCESS_IN_INLINE_ERROR!>PC<!>::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>f<!>
+        <!LESS_VISIBLE_TYPE_ACCESS_IN_INLINE_ERROR!>PC<!>::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>p<!>
     }
 
     @PublishedApi
@@ -58,8 +69,8 @@ class C {
         ::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>protectedF<!>
         ::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>protectedP<!>
 
-        PC::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>f<!>
-        PC::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>p<!>
+        <!LESS_VISIBLE_TYPE_ACCESS_IN_INLINE_ERROR!>PC<!>::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>f<!>
+        <!LESS_VISIBLE_TYPE_ACCESS_IN_INLINE_ERROR!>PC<!>::<!PROTECTED_CALL_FROM_PUBLIC_INLINE_ERROR!>p<!>
     }
 }
 

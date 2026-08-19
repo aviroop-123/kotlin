@@ -1,10 +1,12 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
+    id("require-explicit-types")
 }
 
 dependencies {
     implementation(project(":core:compiler.common"))
+    implementation(project(":core:descriptors"))
+    implementation(project(":core:deserialization"))
     implementation(project(":compiler:fir:fir-deserialization"))
     implementation(project(":core:metadata"))
     implementation(project(":compiler:serialization"))
@@ -26,3 +28,5 @@ sourceSets {
     "main" { projectDefault() }
     "test" { none() }
 }
+
+optInToK1Deprecation()

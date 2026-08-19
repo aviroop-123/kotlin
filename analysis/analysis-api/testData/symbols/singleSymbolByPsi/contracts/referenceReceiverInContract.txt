@@ -18,8 +18,11 @@ KaNamedFunctionSymbol:
               compilerVisibility: Public
               contextReceivers: []
               isActual: false
+              isCompanion: false
+              isDelegated: false
               isExpect: false
               isExtension: false
+              isExternal: false
               isVal: true
               location: LOCAL
               modality: FINAL
@@ -35,17 +38,19 @@ KaNamedFunctionSymbol:
                     typeArguments: []
                     type: kotlin/Unit
                 ]
-                type: kotlin/Function0<kotlin/Unit>
+                type: () -> kotlin/Unit
               visibility: PUBLIC
               getContainingFileSymbol: KaFileSymbol(referenceReceiverInContract.kt)
               getContainingJvmClassName: ReferenceReceiverInContractKt
               getContainingModule: KaSourceModule "Sources of main"
               deprecationStatus: null
+              importableFqName: null
       occurrencesRange: EXACTLY_ONCE
   ]
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: true
   isExternal: false
@@ -66,8 +71,11 @@ KaNamedFunctionSymbol:
     compilerVisibility: Public
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isVal: true
     location: LOCAL
     modality: FINAL
@@ -83,12 +91,13 @@ KaNamedFunctionSymbol:
           typeArguments: []
           type: kotlin/Unit
       ]
-      type: kotlin/Function0<kotlin/Unit>
+      type: () -> kotlin/Unit
     visibility: PUBLIC
     getContainingFileSymbol: KaFileSymbol(referenceReceiverInContract.kt)
     getContainingJvmClassName: ReferenceReceiverInContractKt
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   returnType: KaUsualClassType:
     annotations: []
     typeArguments: []
@@ -101,3 +110,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: referenceReceiverInContract

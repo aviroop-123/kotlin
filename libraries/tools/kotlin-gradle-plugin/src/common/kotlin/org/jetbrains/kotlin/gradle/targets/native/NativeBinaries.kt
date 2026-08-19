@@ -11,7 +11,6 @@ import org.gradle.api.Action
 import org.gradle.api.Named
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Dependency
-import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.HasAttributes
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
@@ -20,14 +19,15 @@ import org.gradle.api.tasks.AbstractExecTask
 import org.gradle.api.tasks.TaskProvider
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.KotlinGradlePluginPublicDsl
+import org.jetbrains.kotlin.gradle.targets.native.DisableNativeCacheSettings
+import org.jetbrains.kotlin.gradle.targets.native.toKotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
-import org.jetbrains.kotlin.gradle.utils.attributeOf
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import org.jetbrains.kotlin.gradle.utils.maybeCreateResolvable
 import org.jetbrains.kotlin.gradle.utils.property
 import org.jetbrains.kotlin.konan.target.KonanTarget
-import org.jetbrains.kotlin.util.capitalizeDecapitalize.toUpperCaseAsciiOnly
 import java.io.File
+import java.net.URI
 
 /**
  * A base class representing a final binary produced by the Kotlin/Native compiler
@@ -49,6 +49,8 @@ sealed class NativeBinary(
 
     internal val konanTarget: KonanTarget
         get() = compilation.konanTarget
+
+    internal val disableCacheSettings = mutableListOf<DisableNativeCacheSettings>()
 
     val target: KotlinNativeTarget
         get() = compilation.target
@@ -73,6 +75,27 @@ sealed class NativeBinary(
     /** Additional options passed to the linker by the Kotlin/Native compiler. */
     fun linkerOpts(options: Iterable<String>) {
         linkerOpts.addAll(options)
+    }
+
+    /**
+     * Disables the Kotlin/Native compiler caches for a specific Kotlin version and provides a reason for the action.
+     * Optionally, a related issue tracker URL can be specified to provide more context.
+     *
+     * @param version The Kotlin version for which the compiler caches should be disabled.
+     *                Only predefined versions available in `DisableCacheInKotlinVersion` are supported.
+     * @param reason A descriptive explanation clarifying why the compiler caches are being disabled.
+     * @param issueUrl An optional issue tracker URL that provides additional context or links to a documented issue.
+     */
+    @Suppress("unused")
+    @KotlinNativeCacheApi
+    fun disableNativeCache(version: DisableCacheInKotlinVersion, reason: String, issueUrl: URI? = null) {
+        disableCacheSettings.add(
+            DisableNativeCacheSettings(
+                version.toKotlinVersion(),
+                reason,
+                issueUrl
+            )
+        )
     }
 
     var binaryOptions: MutableMap<String, String> = mutableMapOf()
@@ -288,40 +311,14 @@ class Framework(
     compilation: KotlinNativeCompilation
 ) : AbstractNativeLibrary(name, baseName, buildType, compilation), HasAttributes {
 
-    private val attributeContainer = HierarchyAttributeContainer(parent = compilation.attributes)
+    private val attributeContainer = HierarchyAttributeContainer(parent = compilation.attributes, compilation.project.objects)
 
     override fun getAttributes() = attributeContainer
 
     override val outputKind: NativeOutputKind
         get() = NativeOutputKind.FRAMEWORK
 
-    // Embedding bitcode.
-    /**
-     * Embed bitcode for the framework or not. See [BitcodeEmbeddingMode].
-     */
-    @Suppress("DEPRECATION_ERROR")
-    @Deprecated(BITCODE_EMBEDDING_DEPRECATION_MESSAGE, level = DeprecationLevel.ERROR)
-    val embedBitcodeMode = project.objects.property(org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode::class.java)
-
-    @Suppress("DEPRECATION_ERROR")
-    @Deprecated(BITCODE_EMBEDDING_DEPRECATION_MESSAGE, level = DeprecationLevel.ERROR)
-    var embedBitcode: org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode = org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode.DISABLE
-
-    /**
-     * Enable or disable embedding bitcode for the framework. See [BitcodeEmbeddingMode].
-     */
-    @Suppress("DEPRECATION_ERROR")
-    @Deprecated(BITCODE_EMBEDDING_DEPRECATION_MESSAGE, level = DeprecationLevel.ERROR, replaceWith = ReplaceWith(""))
-    fun embedBitcode(mode: org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode) {
-        embedBitcodeMode.set(mode)
-    }
-
-    /**
-     * [embedBitcode] is deprecated and has no effect
-     */
-    @Suppress("DEPRECATION_ERROR")
-    @Deprecated(BITCODE_EMBEDDING_DEPRECATION_MESSAGE, level = DeprecationLevel.ERROR, replaceWith = ReplaceWith(""))
-    fun embedBitcode(mode: String) = embedBitcode(org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode.valueOf(mode.toUpperCaseAsciiOnly()))
+    // Embedding bitcode DSL is removed as bitcode is no longer supported.
 
     /**
      * Specifies if the framework is linked as a static library (false by default).
@@ -333,18 +330,4 @@ class Framework(
      */
     @ExperimentalKotlinGradlePluginApi
     val exportKdoc: Property<Boolean> = project.objects.property(true)
-
-    @Suppress("DEPRECATION_ERROR")
-    @Deprecated(BITCODE_EMBEDDING_DEPRECATION_MESSAGE, level = DeprecationLevel.ERROR)
-    object BitcodeEmbeddingMode {
-        val DISABLE = org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode.DISABLE
-        val BITCODE = org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode.BITCODE
-        val MARKER = org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode.MARKER
-    }
-
-    companion object {
-        val frameworkTargets: Attribute<Set<String>> = attributeOf<Set<String>>(
-            "org.jetbrains.kotlin.native.framework.targets"
-        )
-    }
 }

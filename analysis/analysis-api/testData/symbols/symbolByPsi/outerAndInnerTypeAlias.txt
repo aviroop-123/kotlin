@@ -3,6 +3,7 @@ KaTypeParameterSymbol:
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   isReified: false
   location: CLASS
   modality: FINAL
@@ -14,6 +15,7 @@ KaTypeParameterSymbol:
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -45,6 +47,7 @@ KaNamedClassSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: CLASS
       modality: FINAL
@@ -56,12 +59,14 @@ KaNamedClassSymbol:
       getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: X
 
 KaTypeAliasSymbol:
   annotations: []
@@ -78,6 +83,7 @@ KaTypeAliasSymbol:
     type: X<kotlin/Int>
   isActual: false
   isExpect: false
+  isExternal: false
   location: TOP_LEVEL
   modality: FINAL
   name: TopLevelAlias
@@ -87,6 +93,7 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: TopLevelAlias
 
 KaTypeAliasSymbol:
   annotations: []
@@ -103,6 +110,7 @@ KaTypeAliasSymbol:
     type: X<kotlin/String>
   isActual: false
   isExpect: false
+  isExternal: false
   location: CLASS
   modality: FINAL
   name: NestedLevelAlias
@@ -112,6 +120,7 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: A.NestedLevelAlias
 
 KaTypeAliasSymbol:
   annotations: []
@@ -128,6 +137,7 @@ KaTypeAliasSymbol:
     type: X<kotlin/String>
   isActual: false
   isExpect: false
+  isExternal: false
   location: LOCAL
   modality: FINAL
   name: LocalTypeAlias
@@ -137,6 +147,7 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaTypeAliasSymbol:
   annotations: []
@@ -153,6 +164,7 @@ KaTypeAliasSymbol:
     type: X<kotlin/String>
   isActual: false
   isExpect: false
+  isExternal: false
   location: CLASS
   modality: FINAL
   name: NestedLevelAliasInLocalClass
@@ -162,6 +174,7 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaTypeAliasSymbol:
   annotations: []
@@ -178,6 +191,7 @@ KaTypeAliasSymbol:
     type: X<kotlin/String>
   isActual: false
   isExpect: false
+  isExternal: false
   location: LOCAL
   modality: FINAL
   name: LocalTypeAlias
@@ -187,6 +201,7 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaTypeAliasSymbol:
   annotations: []
@@ -203,6 +218,7 @@ KaTypeAliasSymbol:
     type: X<kotlin/String>
   isActual: false
   isExpect: false
+  isExternal: false
   location: CLASS
   modality: FINAL
   name: NestedLevelAliasInLocalClass
@@ -212,6 +228,7 @@ KaTypeAliasSymbol:
   getContainingFileSymbol: KaFileSymbol(outerAndInnerTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -223,6 +240,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -254,6 +272,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -285,6 +305,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -296,6 +317,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -327,6 +349,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -358,6 +382,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -369,6 +394,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -400,6 +426,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -431,3 +459,4 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: A

@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: FRONTEND
 annotation class NoArg
 
 class Outer {
@@ -13,3 +13,6 @@ fun local() {
         inner class <!NOARG_ON_INNER_CLASS_ERROR!>InnerLocal<!>(val x: Any)
     }
 }
+
+/* GENERATED_FIR_TAGS: annotationDeclaration, classDeclaration, functionDeclaration, inner, localClass,
+primaryConstructor, propertyDeclaration */

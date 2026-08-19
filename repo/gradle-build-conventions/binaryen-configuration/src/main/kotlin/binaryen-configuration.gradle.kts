@@ -1,6 +1,4 @@
 @file:OptIn(ExperimentalWasmDsl::class)
-// because imports are deprecated
-@file:Suppress("DEPRECATION")
 
 import org.jetbrains.kotlin.build.binaryen.BinaryenExtension
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -16,5 +14,5 @@ val binaryenKotlinBuild = extensions.create<BinaryenExtension>(
 )
 
 with(binaryenKotlinBuild) {
-    binaryenEnvSpec.version.set(project.binaryenVersion)
+    binaryenEnvSpec.version.set(binaryenVersion)
 }

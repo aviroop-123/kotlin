@@ -1,0 +1,77 @@
+/*
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ */
+
+package org.jetbrains.kotlin.konan.test.dump
+
+import org.jetbrains.kotlin.konan.test.Fir2IrCliNativeFacade
+import org.jetbrains.kotlin.konan.test.FirCliNativeFacade
+import org.jetbrains.kotlin.konan.test.KlibSerializerNativeCliFacade
+import org.jetbrains.kotlin.konan.test.NativePreSerializationLoweringCliFacade
+import org.jetbrains.kotlin.konan.test.converters.NativeDeserializerFacade
+import org.jetbrains.kotlin.platform.konan.NativePlatforms
+import org.jetbrains.kotlin.test.FirMetadataLoadingTestSuppressor
+import org.jetbrains.kotlin.test.FirParser
+import org.jetbrains.kotlin.test.TargetBackend
+import org.jetbrains.kotlin.test.backend.ir.IrDiagnosticsHandler
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+import org.jetbrains.kotlin.test.builders.firHandlersStep
+import org.jetbrains.kotlin.test.builders.klibArtifactsHandlersStep
+import org.jetbrains.kotlin.test.builders.loweredIrHandlersStep
+import org.jetbrains.kotlin.test.configuration.commonIrHandlersForCodegenTest
+import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
+import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
+import org.jetbrains.kotlin.test.directives.configureFirParser
+import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
+import org.jetbrains.kotlin.test.model.ArtifactKind
+import org.jetbrains.kotlin.test.model.DependencyKind
+import org.jetbrains.kotlin.test.model.FrontendKinds
+import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
+import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.NativeFirstStageEnvironmentConfigurator
+
+abstract class AbstractNativeLoadCompiledKotlinTest :
+    AbstractKotlinCompilerWithTargetBackendTest(TargetBackend.NATIVE)
+{
+    override fun configure(builder: TestConfigurationBuilder) = with(builder) {
+        useConfigurators(
+            ::CommonEnvironmentConfigurator,
+            ::NativeFirstStageEnvironmentConfigurator,
+        )
+        globalDefaults {
+            frontend = FrontendKinds.FIR
+            targetPlatform = NativePlatforms.unspecifiedNativePlatform
+            targetBackend = TargetBackend.NATIVE
+            artifactKind = ArtifactKind.NoArtifact
+            dependencyKind = DependencyKind.Binary
+        }
+        defaultDirectives {
+            +WITH_STDLIB
+        }
+
+        configureFirParser(FirParser.LightTree)
+        facadeStep(::FirCliNativeFacade)
+        firHandlersStep {
+            useHandlers(::FirDiagnosticsHandler)
+        }
+
+        facadeStep(::Fir2IrCliNativeFacade)
+        facadeStep(::NativePreSerializationLoweringCliFacade)
+
+        loweredIrHandlersStep {
+            commonIrHandlersForCodegenTest()
+            useHandlers(::IrDiagnosticsHandler)
+        }
+
+        facadeStep(::KlibSerializerNativeCliFacade)
+        facadeStep(::NativeDeserializerFacade)
+
+        klibArtifactsHandlersStep {
+            useHandlers(::KlibNativeLoadedMetadataDumpHandler)
+        }
+        useFailureSuppressors(
+            { testServices -> FirMetadataLoadingTestSuppressor(testServices, CodegenTestDirectives.IGNORE_FIR_METADATA_LOADING_K2) }
+        )
+    }
+}

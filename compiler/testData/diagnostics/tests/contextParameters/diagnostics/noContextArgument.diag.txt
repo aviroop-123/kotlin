@@ -1,0 +1,15 @@
+/noContextArgument.kt:16:9: error: Context parameters must be named. Use '_' to declare an anonymous context parameter.
+
+/noContextArgument.kt:20:5: error: No context argument for 's: String' found.
+
+/noContextArgument.kt:21:17: error: No context argument for 't: String' found.
+
+/noContextArgument.kt:22:5: error: Cannot infer type for type parameter 'T'. Specify it explicitly.
+
+/noContextArgument.kt:22:5: error: No context argument for 't: T' found.
+
+/noContextArgument.kt:23:5: error: No context argument for 't: T' found.
+
+/noContextArgument.kt:24:5: error: No context argument for 'p1: String' found.
+
+/noContextArgument.kt:25:5: error: No context argument for 'String' found.

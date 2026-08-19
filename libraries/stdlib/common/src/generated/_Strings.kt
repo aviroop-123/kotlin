@@ -1,10 +1,11 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
 @file:kotlin.jvm.JvmName("StringsKt")
+@file:Suppress("REDUNDANT_CALL_OF_CONVERSION_METHOD")
 
 package kotlin.text
 
@@ -19,7 +20,7 @@ import kotlin.random.*
 /**
  * Returns a character at the given [index] or throws an [IndexOutOfBoundsException] if the [index] is out of bounds of this char sequence.
  * 
- * @sample samples.collections.Collections.Elements.elementAt
+ * @sample samples.text.Strings.elementAt
  */
 public expect fun CharSequence.elementAt(index: Int): Char
 
@@ -133,6 +134,8 @@ public inline fun CharSequence.firstOrNull(predicate: (Char) -> Boolean): Char? 
 
 /**
  * Returns a character at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this char sequence.
+ * 
+ * @sample samples.collections.Collections.Elements.getOrElse
  */
 @kotlin.internal.InlineOnly
 public inline fun CharSequence.getOrElse(index: Int, defaultValue: (Int) -> Char): Char {
@@ -1079,7 +1082,7 @@ public fun CharSequence.withIndex(): Iterable<IndexedValue<Char>> {
  * because there are no characters in it that _do not_ match the predicate.
  * See a more detailed explanation of this logic concept in ["Vacuous truth"](https://en.wikipedia.org/wiki/Vacuous_truth) article.
  * 
- * @sample samples.collections.Collections.Aggregates.all
+ * @sample samples.text.Strings.allWithPredicate
  */
 public inline fun CharSequence.all(predicate: (Char) -> Boolean): Boolean {
     for (element in this) if (!predicate(element)) return false
@@ -1089,7 +1092,7 @@ public inline fun CharSequence.all(predicate: (Char) -> Boolean): Boolean {
 /**
  * Returns `true` if char sequence has at least one character.
  * 
- * @sample samples.collections.Collections.Aggregates.any
+ * @sample samples.text.Strings.any
  */
 public fun CharSequence.any(): Boolean {
     return !isEmpty()
@@ -1098,7 +1101,7 @@ public fun CharSequence.any(): Boolean {
 /**
  * Returns `true` if at least one character matches the given [predicate].
  * 
- * @sample samples.collections.Collections.Aggregates.anyWithPredicate
+ * @sample samples.text.Strings.anyWithPredicate
  */
 public inline fun CharSequence.any(predicate: (Char) -> Boolean): Boolean {
     for (element in this) if (predicate(element)) return true
@@ -1856,7 +1859,7 @@ public fun CharSequence.minWithOrNull(comparator: Comparator<in Char>): Char? {
 /**
  * Returns `true` if the char sequence has no characters.
  * 
- * @sample samples.collections.Collections.Aggregates.none
+ * @sample samples.text.Strings.none
  */
 public fun CharSequence.none(): Boolean {
     return isEmpty()
@@ -1865,7 +1868,7 @@ public fun CharSequence.none(): Boolean {
 /**
  * Returns `true` if no characters match the given [predicate].
  * 
- * @sample samples.collections.Collections.Aggregates.noneWithPredicate
+ * @sample samples.text.Strings.noneWithPredicate
  */
 public inline fun CharSequence.none(predicate: (Char) -> Boolean): Boolean {
     for (element in this) if (predicate(element)) return false
@@ -2338,7 +2341,7 @@ public fun <R> CharSequence.chunked(size: Int, transform: (CharSequence) -> R): 
  * 
  * @param size the number of elements to take in each string, must be positive and can be greater than the number of elements in this char sequence.
  * 
- * @sample samples.collections.Collections.Transformations.chunked
+ * @sample samples.text.Strings.chunkedSequence
  */
 @SinceKotlin("1.2")
 public fun CharSequence.chunkedSequence(size: Int): Sequence<String> {

@@ -26,7 +26,8 @@ import org.jetbrains.kotlin.plugin.sandbox.fir.fqn
  */
 class AdditionalMembersGenerator(session: FirSession) : FirDeclarationGenerationExtension(session) {
     companion object {
-        private val MATERIALIZE_NAME = Name.identifier("materialize")
+        val MATERIALIZE_NAME = Name.identifier("materialize")
+        val ID_WITH_DEFAULT_NAME = Name.identifier("idWithDefault")
         private val NESTED_NAME = Name.identifier("Nested")
 
         /**
@@ -53,10 +54,32 @@ class AdditionalMembersGenerator(session: FirSession) : FirDeclarationGeneration
     }
 
     override fun generateFunctions(callableId: CallableId, context: MemberGenerationContext?): List<FirNamedFunctionSymbol> {
-        if (callableId.callableName != MATERIALIZE_NAME) return emptyList()
         if (context == null) return emptyList()
-        val matchedClassSymbol = matchedClasses.firstOrNull { it == context.owner } ?: return emptyList()
-        val function = createMemberFunction(context.owner, Key, callableId.callableName, matchedClassSymbol.constructStarProjectedType())
+
+        val function = when (callableId.callableName) {
+            MATERIALIZE_NAME -> {
+                val matchedClassSymbol = matchedClasses.firstOrNull { it == context.owner } ?: return emptyList()
+                createMemberFunction(
+                    context.owner, AdditionalMembersGeneratorKey, callableId.callableName, matchedClassSymbol.constructStarProjectedType(),
+                ) {
+                    withGeneratedDefaultBody()
+                }
+            }
+            ID_WITH_DEFAULT_NAME -> {
+                createMemberFunction(
+                    context.owner, AdditionalMembersGeneratorKey, callableId.callableName, session.builtinTypes.stringType.coneType,
+                ) {
+                    valueParameter(
+                        name = Name.identifier("x"),
+                        type = session.builtinTypes.stringType.coneType,
+                        hasDefaultValue = true,
+                    )
+                    withGeneratedDefaultBody()
+                }
+            }
+            else -> return emptyList()
+        }
+
         return listOf(function.symbol)
     }
 
@@ -66,17 +89,18 @@ class AdditionalMembersGenerator(session: FirSession) : FirDeclarationGeneration
         context: NestedClassGenerationContext
     ): FirClassLikeSymbol<*>? {
         if (matchedClasses.none { it == owner }) return null
-        return createNestedClass(owner, name, Key).symbol
+        return createNestedClass(owner, name, AdditionalMembersGeneratorKey).symbol
     }
 
     override fun generateConstructors(context: MemberGenerationContext): List<FirConstructorSymbol> {
-        val createConstructor = createConstructor(context.owner, Key, generateDelegatedNoArgConstructorCall = true)
+        val createConstructor =
+            createConstructor(context.owner, AdditionalMembersGeneratorKey, generateDelegatedNoArgConstructorCall = true)
         return listOf(createConstructor.symbol)
     }
 
     override fun getCallableNamesForClass(classSymbol: FirClassSymbol<*>, context: MemberGenerationContext): Set<Name> {
         return when {
-            classSymbol in matchedClasses -> setOf(MATERIALIZE_NAME)
+            classSymbol in matchedClasses -> setOf(MATERIALIZE_NAME, ID_WITH_DEFAULT_NAME)
             classSymbol.classId in nestedClassIds -> setOf(SpecialNames.INIT)
             else -> emptySet()
         }
@@ -86,11 +110,7 @@ class AdditionalMembersGenerator(session: FirSession) : FirDeclarationGeneration
         return if (classSymbol in matchedClasses) setOf(NESTED_NAME) else emptySet()
     }
 
-    object Key : GeneratedDeclarationKey() {
-        override fun toString(): String {
-            return "AllOpenMembersGeneratorKey"
-        }
-    }
+    data object AdditionalMembersGeneratorKey : GeneratedDeclarationKey()
 
     override fun FirDeclarationPredicateRegistrar.registerPredicates() {
         register(PREDICATE)

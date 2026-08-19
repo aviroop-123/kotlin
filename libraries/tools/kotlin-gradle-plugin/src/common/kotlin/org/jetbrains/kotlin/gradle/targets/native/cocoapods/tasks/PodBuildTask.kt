@@ -18,9 +18,12 @@ import org.gradle.work.DisableCachingByDefault
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.CocoapodsExtension.CocoapodsDependency
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.CocoapodsExtension.CocoapodsDependency.PodLocation.Path
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.cocoapodsBuildDirs
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.AppleSdk
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.AppleTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.applePlatform
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.genericPlatformDestination
 import org.jetbrains.kotlin.gradle.utils.getFile
+import org.jetbrains.kotlin.gradle.utils.property
 import org.jetbrains.kotlin.gradle.utils.runCommand
 import org.jetbrains.kotlin.konan.target.Family
 import javax.inject.Inject
@@ -65,6 +68,12 @@ abstract class PodBuildTask @Inject constructor(
         }
     }
 
+    @get:Optional
+    @get:Input
+    val targetDeviceIdentifier: Property<String> = objectFactory.property<String>().convention(
+        providerFactory.environmentVariable("TARGET_DEVICE_IDENTIFIER")
+    )
+
     @Suppress("unused") // declares an output
     @get:OutputFiles
     internal val buildResult: FileCollection = objectFactory.fileTree()
@@ -72,6 +81,7 @@ abstract class PodBuildTask @Inject constructor(
         .matching {
             it.include("**/${pod.get().schemeName}.*/")
             it.include("**/${pod.get().schemeName}/")
+            it.exclude("XCBuildData/**")
         }
 
     @get:Internal
@@ -87,7 +97,7 @@ abstract class PodBuildTask @Inject constructor(
             "xcodebuild",
             "-project", podsXcodeProjDir.asFile.name,
             "-scheme", pod.get().schemeName,
-            "-destination", appleTarget.get().genericPlatformDestination,
+            "-destination", destination(),
             "-configuration", podBuildSettings.configuration,
         )
 
@@ -102,9 +112,42 @@ abstract class PodBuildTask @Inject constructor(
         logger.info("Running xcodebuild command: ${podXcodeBuildCommand.joinToString(" ")}")
 
         // Run the xcodebuild command
-        runCommand(podXcodeBuildCommand, logger) {
+        runCommand(podXcodeBuildCommand, logger, errorHandler = { result ->
+            val output = result.stdErr.ifBlank { result.stdOut }
+
+            // Detect missing iOS/watchOS/tvOS platform
+            if (output.contains("is not installed") && output.contains("platform")) {
+                val platform = appleTarget.get().applePlatform
+                """
+                    |Xcode does not have the required $platform platform installed.
+                    |
+                    |To install the missing platform, run one of these commands:
+                    |    $ xcodebuild -downloadPlatform iOS
+                    |    $ xcodebuild -downloadPlatform watchOS
+                    |    $ xcodebuild -downloadPlatform tvOS
+                    |
+                    |Or open Xcode > Settings > Platforms and install the required platform.
+                    |
+                    |For more information: https://developer.apple.com/documentation/xcode/installing-additional-simulator-runtimes
+                    |
+                    |Original error:
+                    |$output
+                """.trimMargin()
+            } else {
+                null // Fall back to default error handling
+            }
+        }) {
             directory(podsXcodeProjDir.asFile.parentFile)
-            environment() // workaround for https://github.com/gradle/gradle/issues/27346
+            environment().apply { // workaround for https://github.com/gradle/gradle/issues/27346
+                keys.filter {
+                    // KT-80641 EXECUTABLE_DEBUG_DYLIB_PATH problem
+                    AppleSdk.xcodeEnvironmentDebugDylibVars.contains(it)
+                }.forEach {
+                    remove(it)
+                }
+            }
         }
     }
+
+    private fun destination() = targetDeviceIdentifier.map { "id=$it" }.getOrElse(appleTarget.get().genericPlatformDestination)
 }

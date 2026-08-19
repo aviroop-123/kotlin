@@ -11,21 +11,13 @@ import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 import org.jetbrains.kotlin.test.model.TestModule
-import org.jetbrains.kotlin.test.runners.AbstractDiagnosticTest
-import org.jetbrains.kotlin.test.runners.AbstractFirPsiDiagnosticTest
-import org.jetbrains.kotlin.test.runners.codegen.*
-import org.jetbrains.kotlin.test.configuration.configurationForClassicAndFirTestsAlongside
+import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTest
+import org.jetbrains.kotlin.test.runners.codegen.AbstractFirLightTreeBlackBoxCodegenTest
+import org.jetbrains.kotlin.test.runners.codegen.AbstractFirLightTreeBytecodeListingTest
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 
 // ---------------------------- codegen ----------------------------
-
-open class AbstractIrBlackBoxCodegenTestForNoArg : AbstractIrBlackBoxCodegenTest() {
-    override fun configure(builder: TestConfigurationBuilder) {
-        super.configure(builder)
-        builder.enableNoArg()
-    }
-}
 
 open class AbstractFirLightTreeBlackBoxCodegenTestForNoArg : AbstractFirLightTreeBlackBoxCodegenTest() {
     override fun configure(builder: TestConfigurationBuilder) {
@@ -36,13 +28,6 @@ open class AbstractFirLightTreeBlackBoxCodegenTestForNoArg : AbstractFirLightTre
 
 // ---------------------------- bytecode ----------------------------
 
-open class AbstractIrBytecodeListingTestForNoArg : AbstractIrBytecodeListingTest() {
-    override fun configure(builder: TestConfigurationBuilder) {
-        super.configure(builder)
-        builder.enableNoArg()
-    }
-}
-
 open class AbstractFirLightTreeBytecodeListingTestForNoArg : AbstractFirLightTreeBytecodeListingTest() {
     override fun configure(builder: TestConfigurationBuilder) {
         super.configure(builder)
@@ -52,17 +37,9 @@ open class AbstractFirLightTreeBytecodeListingTestForNoArg : AbstractFirLightTre
 
 // ---------------------------- diagnostic ----------------------------
 
-abstract class AbstractDiagnosticsTestForNoArg : AbstractDiagnosticTest() {
+abstract class AbstractFirPsiDiagnosticsTestForNoArg : AbstractPhasedJvmDiagnosticLightTreeTest() {
     override fun configure(builder: TestConfigurationBuilder) {
         super.configure(builder)
-        builder.enableNoArg()
-    }
-}
-
-abstract class AbstractFirPsiDiagnosticsTestForNoArg : AbstractFirPsiDiagnosticTest() {
-    override fun configure(builder: TestConfigurationBuilder) {
-        super.configure(builder)
-        builder.configurationForClassicAndFirTestsAlongside()
         builder.enableNoArg()
     }
 }
@@ -84,7 +61,7 @@ class NoArgEnvironmentConfigurator(testServices: TestServices) : EnvironmentConf
         module: TestModule,
         configuration: CompilerConfiguration
     ) {
-        NoArgComponentRegistrar.registerNoArgComponents(this, NOARG_ANNOTATIONS, NoArgDirectives.INVOKE_INITIALIZERS in module.directives)
+        NoArgComponentRegistrar.registerNoArgComponents(this, configuration, NOARG_ANNOTATIONS, NoArgDirectives.INVOKE_INITIALIZERS in module.directives)
     }
 }
 

@@ -35,7 +35,7 @@ import org.jetbrains.kotlin.serialization.deserialization.IncompatibleVersionErr
 import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerAbiStability
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.PreReleaseInfo
-import org.jetbrains.kotlin.util.toJvmMetadataVersion
+import org.jetbrains.kotlin.util.toMetadataVersion
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -56,7 +56,7 @@ open class JvmClassFileBasedSymbolProvider(
 ) : AbstractFirDeserializedSymbolProvider(
     session, moduleDataProvider, kotlinScopeProvider, defaultDeserializationOrigin, BuiltInSerializerProtocol
 ) {
-    private val ownMetadataVersion: MetadataVersion = session.languageVersionSettings.languageVersion.toJvmMetadataVersion()
+    private val ownMetadataVersion: MetadataVersion = session.languageVersionSettings.languageVersion.toMetadataVersion()
 
     private val reportErrorsOnPreReleaseDependencies = with(session.languageVersionSettings) {
         !getFlag(AnalysisFlags.skipPrereleaseCheck) && !isPreRelease() && !KotlinCompilerVersion.isPreRelease()
@@ -70,7 +70,7 @@ open class JvmClassFileBasedSymbolProvider(
     private fun computePackagePartInfo(packageFqName: FqName, partName: String): PackagePartsCacheData? {
         val classId = ClassId.topLevel(JvmClassName.byInternalName(partName).fqNameForTopLevelClassMaybeWithDollars)
         if (!javaFacade.hasTopLevelClassOf(classId)) return null
-        val (kotlinClass, byteContent) =
+        val [kotlinClass, byteContent] =
             kotlinClassFinder.findKotlinClassOrContent(classId, ownMetadataVersion) as? KotlinClassFinder.Result.KotlinClass ?: return null
 
         val header = kotlinClass.classHeader
@@ -95,7 +95,7 @@ open class JvmClassFileBasedSymbolProvider(
 
         val moduleData = moduleDataProvider.getModuleData(kotlinClass.containingLibraryPath?.asNioPath()) ?: return null
 
-        val (nameResolver, packageProto) = parseProto(kotlinClass) {
+        val [nameResolver, packageProto] = parseProto(kotlinClass) {
             JvmProtoBufUtil.readPackageDataFrom(data, strings)
         } ?: return null
 
@@ -111,6 +111,7 @@ open class JvmClassFileBasedSymbolProvider(
                 JvmBinaryAnnotationDeserializer(session, kotlinClass, kotlinClassFinder, byteContent),
                 JavaAwareFlexibleTypeFactory,
                 FirJvmConstDeserializer(facadeBinaryClass ?: kotlinClass, BuiltInSerializerProtocol),
+                FirKDocDeserializer.Empty,
                 source
             ),
         )
@@ -186,7 +187,7 @@ open class JvmClassFileBasedSymbolProvider(
         if (kotlinClass.classHeader.kind != KotlinClassHeader.Kind.CLASS || kotlinClass.classId != classId) return null
         val data = kotlinClass.classHeader.data ?: kotlinClass.classHeader.incompatibleData ?: return null
         val strings = kotlinClass.classHeader.strings ?: return null
-        val (nameResolver, classProto) = parseProto(kotlinClass) {
+        val [nameResolver, classProto] = parseProto(kotlinClass) {
             JvmProtoBufUtil.readClassDataFrom(data, strings)
         } ?: return null
 

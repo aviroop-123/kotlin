@@ -5,6 +5,7 @@
 
 package kotlin.io
 
+import kotlin.internal.UsedFromCompilerGeneratedCode
 import kotlin.native.internal.escapeAnalysis.Escapes
 import kotlin.native.internal.GCUnsafeCall
 
@@ -23,6 +24,7 @@ public actual fun print(message: Any?) {
 @GCUnsafeCall("Kotlin_io_Console_println")
 @PublishedApi
 @Escapes.Nothing
+@UsedFromCompilerGeneratedCode
 internal external fun println(message: String)
 
 /** Prints the given [message] and the line separator to the standard error output stream. */
@@ -69,6 +71,9 @@ public actual external fun readlnOrNull(): String?
  * Reads a line of input from the standard input stream.
  *
  * @return the line read or `null` if the input stream is redirected to a file and the end of file has been reached.
+ *
+ * @see readln
+ * @see readlnOrNull
  */
 @GCUnsafeCall("Kotlin_io_Console_readLine")
 @Escapes.Nothing

@@ -3,13 +3,13 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.buildtools.api.tests.compilation
+package org.jetbrains.kotlin.buildtools.tests.compilation
 
-import org.jetbrains.kotlin.buildtools.api.tests.CompilerExecutionStrategyConfiguration
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.model.DefaultStrategyAgnosticCompilationTest
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.scenario.scenario
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.util.compile
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.util.execute
+import org.jetbrains.kotlin.buildtools.tests.CompilerExecutionStrategyConfiguration
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.DefaultStrategyAgnosticCompilationTest
+import org.jetbrains.kotlin.buildtools.tests.compilation.scenario.jvmScenario
+import org.jetbrains.kotlin.buildtools.tests.compilation.util.compile
+import org.jetbrains.kotlin.buildtools.tests.compilation.util.execute
 import org.jetbrains.kotlin.test.TestMetadata
 import org.junit.jupiter.api.DisplayName
 
@@ -22,7 +22,7 @@ class AnonymousInheritorTest : BaseCompilationTest() {
     @DisplayName("Recompilation of call site affected by an anonymous object - no-inline version")
     @TestMetadata("ic-scenarios/inline-local-class/inline-anonymous-object-evil/lib")
     fun testAnonymousObjectBaseTypeChangeWithOverloads(strategyConfig: CompilerExecutionStrategyConfiguration) {
-        scenario(strategyConfig) {
+        jvmScenario(strategyConfig) {
             val lib = module("ic-scenarios/inline-local-class/inline-anonymous-object-evil/lib")
             val app = module(
                 "ic-scenarios/inline-local-class/inline-anonymous-object-evil/app",

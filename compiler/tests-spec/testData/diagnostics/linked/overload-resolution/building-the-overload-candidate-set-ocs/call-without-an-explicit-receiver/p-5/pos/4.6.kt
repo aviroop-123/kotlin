@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -101,15 +100,15 @@ class B : I
 
 fun case3(){
     <!DEBUG_INFO_EXPRESSION_TYPE("tests.case3.A")!>A()<!>
-    <!DEBUG_INFO_CALL("fqName: tests.case3.A.<init>; typeCall: function")!>A()<!>
+    <!DEBUG_INFO_CALL("fqName: tests.case3.A.A; typeCall: function")!>A()<!>
 
-    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>A.invoke()<!>
+    A.invoke()
     A.<!DEBUG_INFO_CALL("fqName: lib.case3.a.C.invoke; typeCall: function")!>invoke()<!>
 
     <!DEBUG_INFO_EXPRESSION_TYPE("tests.case3.B")!>B()<!>
-    <!DEBUG_INFO_CALL("fqName: tests.case3.B.<init>; typeCall: function")!>B()<!>
+    <!DEBUG_INFO_CALL("fqName: tests.case3.B.B; typeCall: function")!>B()<!>
 
-    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>B.invoke()<!>
+    B.invoke()
     B.<!DEBUG_INFO_CALL("fqName: lib.case3.b.C.invoke; typeCall: function")!>invoke()<!>
 }
 

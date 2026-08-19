@@ -5,9 +5,9 @@
 
 package org.jetbrains.kotlin.backend.common.phaser
 
+import org.jetbrains.kotlin.backend.common.CommonBackendErrors
 import org.jetbrains.kotlin.backend.common.ErrorReportingContext
 import org.jetbrains.kotlin.backend.common.LoweringContext
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.config.IrVerificationMode
 import org.jetbrains.kotlin.config.phaser.Action
 import org.jetbrains.kotlin.config.phaser.ActionState
@@ -97,32 +97,29 @@ fun <Context, Data> findKotlinBackendIr(context: Context, data: Data): IrElement
 fun <Context : ErrorReportingContext, Data> getIrValidator(checkTypes: Boolean): Action<Data, Context> =
     fun(state: ActionState, data: Data, context: Context) {
         if (!state.isValidationNeeded()) return
-        val messageCollector = context.messageCollector
         if (context !is BackendContextHolder) {
-            messageCollector.report(
-                CompilerMessageSeverity.LOGGING,
+            context.log(
                 "Cannot verify IR ${state.beforeOrAfter} ${state.phase}: insufficient context."
             )
             return
         }
         val element = findKotlinBackendIr(context, data)
         if (element == null) {
-            messageCollector.report(
-                CompilerMessageSeverity.LOGGING,
+            context.log(
                 "Cannot verify IR ${state.beforeOrAfter} ${state.phase}: IR not found."
             )
             return
         }
-        validateIr(messageCollector, IrVerificationMode.ERROR) {
-            performBasicIrValidation(
-                element,
-                context.heldBackendContext.irBuiltIns,
-                phaseName = "${state.beforeOrAfter.name.toLowerCaseAsciiOnly()} ${state.phase}",
-                config = IrValidatorConfig(checkTreeConsistency = true)
-                    .withBasicChecks()
-                    .applyIf(checkTypes) { withTypeChecks() }
-            )
-        }
+        validateIr(
+            element,
+            context.heldBackendContext.irBuiltIns,
+            IrValidatorConfig(checkTreeConsistency = true)
+                .withBasicChecks()
+                .applyIf(checkTypes) { withTypeChecks() },
+            context.diagnosticReporter,
+            IrVerificationMode.ERROR,
+            phaseName = "${state.beforeOrAfter.name.toLowerCaseAsciiOnly()} ${state.phase}",
+        )
     }
 
 fun <Data, Context : ErrorReportingContext> getIrDumper(): Action<Data, Context> =
@@ -130,8 +127,8 @@ fun <Data, Context : ErrorReportingContext> getIrDumper(): Action<Data, Context>
         if (!state.isDumpNeeded()) return
         val element = findKotlinBackendIr(context, data)
         if (element == null) {
-            context.messageCollector.report(
-                CompilerMessageSeverity.WARNING,
+            context.diagnosticReporter.report(
+                CommonBackendErrors.IR_DUMP_WARNING,
                 "Cannot dump IR ${state.beforeOrAfter} ${state.phase}: IR not found."
             )
             return

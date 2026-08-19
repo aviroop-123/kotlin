@@ -10,12 +10,14 @@ import org.jetbrains.kotlin.backend.konan.serialization.CacheMetadataSerializer
 import org.jetbrains.kotlin.backend.konan.serialization.ClassFieldsSerializer
 import org.jetbrains.kotlin.backend.konan.serialization.EagerInitializedPropertySerializer
 import org.jetbrains.kotlin.backend.konan.serialization.InlineFunctionBodyReferenceSerializer
+import org.jetbrains.kotlin.backend.konan.serialization.TrivialGettersSerializer
 import org.jetbrains.kotlin.backend.konan.util.compilerFingerprint
 import org.jetbrains.kotlin.backend.konan.util.runtimeFingerprint
 import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.library.impl.javaFile
 import org.jetbrains.kotlin.library.isNativeStdlib
+import org.jetbrains.kotlin.backend.konan.objcexport.ExportedAdapterMetadata
 import kotlin.random.Random
 
 private fun NativeGenerationState.generateCacheMetadata(): CacheMetadata {
@@ -30,7 +32,6 @@ private fun NativeGenerationState.generateCacheMetadata(): CacheMetadata {
             target = config.target,
             compilerFingerprint = config.distribution.compilerFingerprint,
             runtimeFingerprint = runtimeFingerprint,
-            fullCompilerConfiguration = config.configuration.toString(),
     )
 }
 
@@ -58,6 +59,9 @@ internal class CacheStorage(private val generationState: NativeGenerationState) 
 
     fun saveAdditionalCacheInfo() {
         outputFiles.prepareTempDirectories()
+        if (generationState.config.objcExportCacheEnabled) {
+            saveObjCExportCacheCsv()
+        }
         if (!generationState.config.produce.isHeaderCache) {
             saveMetadata()
         }
@@ -65,6 +69,16 @@ internal class CacheStorage(private val generationState: NativeGenerationState) 
         saveCacheBitcodeDependencies()
         saveClassFields()
         saveEagerInitializedProperties()
+        saveTrivialGetters()
+    }
+
+    private fun saveObjCExportCacheCsv() {
+        val csvFile = outputFiles.objcExportCacheCsvFile ?: return
+        csvFile.javaFile().bufferedWriter().use { writer ->
+            generationState.objCExport.exportedAdapters.forEach { metadata ->
+                writer.write("${metadata.objCName},${metadata.symbolName},${metadata.kind}\n")
+            }
+        }
     }
 
     private fun saveMetadata() {
@@ -91,5 +105,10 @@ internal class CacheStorage(private val generationState: NativeGenerationState) 
     private fun saveEagerInitializedProperties() {
         outputFiles.eagerInitializedPropertiesFile!!.writeBytes(
                 EagerInitializedPropertySerializer.serialize(generationState.eagerInitializedFiles))
+    }
+
+    private fun saveTrivialGetters() {
+        outputFiles.trivialGettersFile!!.writeBytes(
+                TrivialGettersSerializer.serialize(generationState.trivialGetters))
     }
 }

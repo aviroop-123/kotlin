@@ -10,6 +10,7 @@ import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.nio.file.spi.FileSystemProvider
+import java.util.stream.Collectors
 import java.util.zip.ZipEntry
 import java.util.zip.ZipException
 import java.util.zip.ZipOutputStream
@@ -28,17 +29,21 @@ internal fun File.zipFileSystem(create: Boolean = false): FileSystem {
 
     // There is no FileSystems.newFileSystem overload accepting the attribute map.
     // So we have to manually iterate over the filesystem providers.
-    return FileSystemProvider.installedProviders().filter { it.scheme == "jar" }.mapNotNull {
+    return FileSystemProvider.installedProviders().firstNotNullOfOrNull { fileSystemProvider ->
+        if (fileSystemProvider.scheme != "jar") return@firstNotNullOfOrNull null
+
         try {
-            it.newFileSystem(this.toPath(), attributes)
-        } catch(e: Exception) {
-            when(e) {
-                is UnsupportedOperationException,
-                is IllegalArgumentException -> null
+            fileSystemProvider.newFileSystem(this.toPath(), attributes)
+        } catch (e: Exception) {
+            when (e) {
+                is UnsupportedOperationException, is IllegalArgumentException -> null
                 else -> throw e
             }
         }
-    }.first()
+    } ?: throw ZipException(
+        "Cannot create a virtual file system to read KLIB archive file. " +
+                "Probably the file is a malformed archive or does not exist: $this"
+    )
 }
 
 fun FileSystem.file(file: File) = File(this.getPath(file.path))
@@ -47,16 +52,20 @@ fun FileSystem.file(path: String) = File(this.getPath(path))
 
 private fun File.toPath() = Paths.get(this.path)
 
-fun File.zipDirAs(zipFile: File): Unit = zipDirAs(dirPath = this.javaPath, zipFilePath = zipFile.javaPath)
+fun File.zipDirAs(zipFile: File): Unit = zipDirAsInternal(dirPath = this.javaPath, zipFilePath = zipFile.javaPath)
 
-private fun zipDirAs(dirPath: Path, zipFilePath: Path) {
+internal inline fun zipDirAsInternal(dirPath: Path, zipFilePath: Path, shuffle: (MutableList<Path>) -> Unit = {}) {
     val dirPathWithExpandedSymlinks: Path = dirPath.expandSymlinks()
 
     zipFilePath.outputStream().use { outputStream ->
         ZipOutputStream(outputStream).use { zipOutputStream ->
             zipOutputStream.setLevel(5) // Set the medium compression level.
 
-            Files.walk(dirPathWithExpandedSymlinks).forEach { path: Path ->
+            val paths: MutableList<Path> = Files.walk(dirPathWithExpandedSymlinks).collect(Collectors.toList())
+            shuffle(paths)
+            paths.sort()
+
+            paths.forEach { path: Path ->
                 val pathWithExpandedSymlinks: Path = path.expandSymlinks()
 
                 if (!pathWithExpandedSymlinks.startsWith(dirPathWithExpandedSymlinks)) {

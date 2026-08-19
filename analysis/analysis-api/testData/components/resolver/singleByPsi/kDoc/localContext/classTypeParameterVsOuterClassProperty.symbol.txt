@@ -1,0 +1,5 @@
+KDocName(74,76): 'TT'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      TT
+    ]

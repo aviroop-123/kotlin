@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.test.directives
 
+import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 
 object ConfigurationDirectives : SimpleDirectivesContainer() {
@@ -15,4 +16,15 @@ object ConfigurationDirectives : SimpleDirectivesContainer() {
     val DISABLE_TYPEALIAS_EXPANSION by directive("Disables automatic expansion of aliased types in type resolution")
 
     val SEPARATE_KMP_COMPILATION by directive("Enables separate compilation for KMP modules")
+
+    val METADATA_ONLY_COMPILATION by directive("Treats all compilations as metadata compilation")
+
+    val WORKS_WHEN_VALUE_CLASS by directive(
+        "Enables `JvmInlineSourceTransformer`, which transforms the OPTIONAL_JVM_INLINE_ANNOTATION placeholder"
+    )
+
+    val TARGET_BACKEND by enumDirective<TargetBackend>("If specified then test will be skipped on any non-specified backends")
+    val DONT_TARGET_EXACT_BACKEND by enumDirective<TargetBackend>("If specified then test will be skipped on specified backends")
+
+    val METADATA_TARGET_PLATFORMS by stringDirective("List of platforms for which metadata should be generated")
 }

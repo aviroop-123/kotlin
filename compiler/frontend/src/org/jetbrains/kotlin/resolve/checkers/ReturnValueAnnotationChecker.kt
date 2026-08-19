@@ -5,21 +5,25 @@
 
 package org.jetbrains.kotlin.resolve.checkers
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.config.AnalysisFlags
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.config.ReturnValueCheckerMode
 import org.jetbrains.kotlin.descriptors.annotations.KotlinTarget
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.KtAnnotated
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.resolve.AdditionalAnnotationChecker
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingTrace
 
+@K1Deprecation
 object ReturnValueAnnotationChecker : AdditionalAnnotationChecker {
-    val mustUseReturnValueFq = FqName("kotlin.MustUseReturnValue")
-    val ignorableFq = FqName("kotlin.IgnorableReturnValue")
+    val mustUseReturnValueFq = StandardClassIds.Annotations.MustUseReturnValues.asSingleFqName()
+    val oldMustUse = FqName("kotlin.MustUseReturnValue")
+    val ignorableFq = StandardClassIds.Annotations.IgnorableReturnValue.asSingleFqName()
 
     override fun checkEntries(
         entries: List<KtAnnotationEntry>,
@@ -33,7 +37,7 @@ object ReturnValueAnnotationChecker : AdditionalAnnotationChecker {
         for (entry in entries) {
             val descriptor = trace.get(BindingContext.ANNOTATION, entry) ?: continue
             val name = descriptor.fqName ?: continue
-            if (name == mustUseReturnValueFq || name == ignorableFq) {
+            if (name == mustUseReturnValueFq || name == ignorableFq || name == oldMustUse) {
                 trace.report(Errors.IGNORABILITY_ANNOTATIONS_WITH_CHECKER_DISABLED.on(entry))
             }
         }

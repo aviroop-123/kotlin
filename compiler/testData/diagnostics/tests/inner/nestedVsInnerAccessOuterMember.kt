@@ -1,15 +1,14 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// NI_EXPECTED_FILE
 
 class Outer {
     fun function() = 42
     val property = ""
     
     class Nested {
-        fun f() = <!UNRESOLVED_REFERENCE!>function<!>()
-        fun g() = <!UNRESOLVED_REFERENCE!>property<!>
-        fun h() = this<!UNRESOLVED_REFERENCE!>@Outer<!>.<!DEBUG_INFO_MISSING_UNRESOLVED!>function<!>()
-        fun i() = this<!UNRESOLVED_REFERENCE!>@Outer<!>.<!DEBUG_INFO_MISSING_UNRESOLVED!>property<!>
+        fun f() = <!INACCESSIBLE_OUTER_CLASS_RECEIVER!>function<!>()
+        fun g() = <!INACCESSIBLE_OUTER_CLASS_RECEIVER!>property<!>
+        fun h() = <!INACCESSIBLE_OUTER_CLASS_RECEIVER!>this@Outer<!>.function()
+        fun i() = <!INACCESSIBLE_OUTER_CLASS_RECEIVER!>this@Outer<!>.property
     }
     
     inner class Inner {

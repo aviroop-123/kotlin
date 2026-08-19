@@ -1,3 +1,0 @@
-KtOperationReferenceExpression(38,40): '?:'
-  KtSimpleNameReference:
-    Nothing (Unresolved reference)

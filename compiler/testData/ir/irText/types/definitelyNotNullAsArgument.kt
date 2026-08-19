@@ -1,5 +1,3 @@
-// LANGUAGE: +DefinitelyNonNullableTypes
-
 interface I<T> {
     fun input(t: T)
     fun output(): T

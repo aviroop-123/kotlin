@@ -1,6 +1,0 @@
-KtNameReferenceExpression(170,173): 'foo'
-  KtSimpleNameReference:
-    (in Base) abstract val R.foo: kotlin.Boolean
-
-  SyntheticPropertyAccessorReference:
-    Nothing (Unresolved reference)

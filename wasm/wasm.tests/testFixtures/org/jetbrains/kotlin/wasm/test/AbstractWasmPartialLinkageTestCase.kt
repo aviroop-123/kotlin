@@ -7,9 +7,10 @@ package org.jetbrains.kotlin.wasm.test
 
 import com.intellij.testFramework.TestDataFile
 import org.jetbrains.kotlin.cli.common.ExitCode
-import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.KotlinWasmCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.cliArgument
-import org.jetbrains.kotlin.cli.js.K2JSCompiler
+import org.jetbrains.kotlin.cli.js.KotlinWasmCompiler
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.klib.KlibCompilerChangeScenario
 import org.jetbrains.kotlin.klib.KlibCompilerEdition
 import org.jetbrains.kotlin.klib.KlibCompilerInvocationTestUtils
@@ -17,10 +18,13 @@ import org.jetbrains.kotlin.klib.KlibCompilerInvocationTestUtils.Dependencies
 import org.jetbrains.kotlin.klib.KlibCompilerInvocationTestUtils.Dependency
 import org.jetbrains.kotlin.klib.KlibCompilerInvocationTestUtils.MAIN_MODULE_NAME
 import org.jetbrains.kotlin.klib.PartialLinkageTestStructureExtractor
+import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.test.TargetBackend
+import org.jetbrains.kotlin.test.services.configuration.WasmEnvironmentConfigurator
 import org.jetbrains.kotlin.wasm.test.AbstractWasmPartialLinkageTestCase.CompilerType
 import org.jetbrains.kotlin.wasm.test.tools.WasmVM
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assumptions
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -50,7 +54,10 @@ abstract class AbstractWasmPartialLinkageTestCase(private val compilerType: Comp
         )
 
         KlibCompilerInvocationTestUtils.runTest(
-            testStructure = WasmPartialLinkageTestStructureExtractor(buildDir).extractTestStructure(File(testDir).absoluteFile),
+            testStructure = WasmPartialLinkageTestStructureExtractor(buildDir)
+                .extractTestStructure(
+                    ForTestCompileRuntime.transformTestDataPath(testDir)
+                ),
             testConfiguration = configuration,
             artifactBuilder = WasmCompilerInvocationTestArtifactBuilder(configuration),
             binaryRunner = WasmCompilerInvocationTestBinaryRunner,
@@ -63,12 +70,12 @@ internal class WasmCompilerInvocationTestConfiguration(
     override val buildDir: File,
     val compilerType: CompilerType,
 ) : KlibCompilerInvocationTestUtils.TestConfiguration {
-    override val stdlibFile: File get() = File("libraries/stdlib/build/classes/kotlin/wasmJs/main").absoluteFile
+    override val stdlibFile: File get() = File(WasmEnvironmentConfigurator.stdlibPath(WasmTarget.JS)).absoluteFile
     override val targetBackend get() = TargetBackend.WASM
 
 
     override fun onIgnoredTest() {
-        /* Do nothing specific. JUnit 3 does not support programmatic tests muting. */
+        Assumptions.abort<Unit>()
     }
 }
 
@@ -121,10 +128,9 @@ internal class WasmCompilerInvocationTestArtifactBuilder(
         // Build KLIB:
         runCompilerViaCLI(
             listOf(
-                K2JSCompilerArguments::irProduceKlibFile.cliArgument,
-                K2JSCompilerArguments::outputDir.cliArgument, module.klibFile.parentFile.absolutePath,
-                K2JSCompilerArguments::moduleName.cliArgument, module.moduleInfo.moduleName,
-                K2JSCompilerArguments::wasm.cliArgument
+                KotlinWasmCompilerArguments::outputDir.cliArgument, module.klibFile.parentFile.absolutePath,
+                KotlinWasmCompilerArguments::moduleName.cliArgument, module.moduleInfo.moduleName,
+                KotlinWasmCompilerArguments::verifyIr.cliArgument("error"),
             ),
             dependencies.toCompilerArgs(),
             compilerArguments,
@@ -143,16 +149,15 @@ internal class WasmCompilerInvocationTestArtifactBuilder(
 
         runCompilerViaCLI(
             listOf(
-                K2JSCompilerArguments::irProduceJs.cliArgument,
-                K2JSCompilerArguments::irPerModule.cliArgument,
-                K2JSCompilerArguments::moduleKind.cliArgument, "plain",
-                K2JSCompilerArguments::includes.cliArgument(mainModule.libraryFile.absolutePath),
-                K2JSCompilerArguments::outputDir.cliArgument, binariesDir.absolutePath,
-                K2JSCompilerArguments::moduleName.cliArgument, MAIN_MODULE_NAME,
-                K2JSCompilerArguments::wasm.cliArgument,
+                KotlinWasmCompilerArguments::irProduceJs.cliArgument,
+                KotlinWasmCompilerArguments::includes.cliArgument(mainModule.libraryFile.absolutePath),
+                KotlinWasmCompilerArguments::outputDir.cliArgument, binariesDir.absolutePath,
+                KotlinWasmCompilerArguments::moduleName.cliArgument, MAIN_MODULE_NAME,
+                KotlinWasmCompilerArguments::verifyIr.cliArgument("error"),
+                KotlinWasmCompilerArguments::disableIrCheckers.cliArgument("IrVisibilityChecker"),
             ),
             listOf(
-                K2JSCompilerArguments::cacheDirectory.cliArgument(configuration.buildDir.resolve("libs-cache").absolutePath),
+                KotlinWasmCompilerArguments::cacheDirectory.cliArgument(configuration.buildDir.resolve("libs-cache").absolutePath),
             ).takeIf { configuration.compilerType.useIc },
             otherDependencies.toCompilerArgs(),
         )
@@ -183,11 +188,11 @@ internal class WasmCompilerInvocationTestArtifactBuilder(
 
     private fun Dependencies.toCompilerArgs(): List<String> = buildList {
         if (regularDependencies.isNotEmpty()) {
-            this += K2JSCompilerArguments::libraries.cliArgument
+            this += KotlinWasmCompilerArguments::libraries.cliArgument
             this += regularDependencies.joinToString(File.pathSeparator) { it.libraryFile.absolutePath }
         }
         if (friendDependencies.isNotEmpty()) {
-            this += K2JSCompilerArguments::friendModules.cliArgument(friendDependencies.joinToString(File.pathSeparator) { it.libraryFile.absolutePath })
+            this += KotlinWasmCompilerArguments::friendModules.cliArgument(friendDependencies.joinToString(File.pathSeparator) { it.libraryFile.absolutePath })
         }
     }
 
@@ -203,7 +208,7 @@ internal class WasmCompilerInvocationTestArtifactBuilder(
 
         val compilerXmlOutput = ByteArrayOutputStream()
         val exitCode = PrintStream(compilerXmlOutput).use { printStream ->
-            K2JSCompiler().execFullPathsInMessages(printStream, allCompilerArgs)
+            KotlinWasmCompiler().execFullPathsInMessages(printStream, allCompilerArgs)
         }
 
         if (exitCode != ExitCode.OK)

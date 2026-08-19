@@ -1,6 +1,0 @@
-KtNameReferenceExpression(47,53): 'length'
-  KtSimpleNameReference:
-    (in <local>: StringBuilder.length) {psi: null} get()
-
-  SyntheticPropertyAccessorReference:
-    Nothing (Unresolved reference)

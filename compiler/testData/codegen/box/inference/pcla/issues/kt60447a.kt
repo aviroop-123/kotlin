@@ -1,8 +1,5 @@
 // ISSUE: KT-60447
 
-// IGNORE_BACKEND_K1: ANY
-// REASON: red code (see corresponding diagnostic test)
-
 fun box(): String {
     val buildee = build {
         class ConcreteType

@@ -7,11 +7,12 @@
 
 package org.jetbrains.kotlin.test.backend.handlers
 
-import org.jetbrains.kotlin.cli.pipeline.web.JsFir2IrPipelineArtifact
+import org.jetbrains.kotlin.cli.common.diagnosticsCollector
+import org.jetbrains.kotlin.cli.pipeline.PipelineArtifact
+import org.jetbrains.kotlin.cli.pipeline.web.WebFir2IrPipelineArtifact
 import org.jetbrains.kotlin.cli.pipeline.web.WebKlibSerializationPipelinePhase
 import org.jetbrains.kotlin.config.LanguageFeature
-import org.jetbrains.kotlin.config.messageCollector
-import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory
+import org.jetbrains.kotlin.diagnostics.impl.DiagnosticsCollectorImpl
 import org.jetbrains.kotlin.js.config.outputDir
 import org.jetbrains.kotlin.js.config.outputName
 import org.jetbrains.kotlin.js.config.produceKlibFile
@@ -98,28 +99,28 @@ class FirJsKlibAbiDumpBeforeInliningSavingHandler(testServices: TestServices) :
     AbstractKlibAbiDumpBeforeInliningSavingHandler(testServices) {
     override fun serializeModule(module: TestModule, inputArtifact: IrBackendInput): BinaryArtifacts.KLib {
         require(inputArtifact is Fir2IrCliBasedOutputArtifact<*>) {
-            "FirKlibSerializerCliWebFacade expects Fir2IrCliBasedWebOutputArtifact as input"
+            "FirJsKlibAbiDumpBeforeInliningSavingHandler expects Fir2IrCliBasedWebOutputArtifact as input"
         }
         val cliArtifact = inputArtifact.cliArtifact
-        require(cliArtifact is JsFir2IrPipelineArtifact) {
-            "FirKlibSerializerCliWebFacade expects JsFir2IrPipelineArtifact as input"
+        require(cliArtifact is WebFir2IrPipelineArtifact) {
+            "FirJsKlibAbiDumpBeforeInliningSavingHandler expects WebFir2IrPipelineArtifact as input"
         }
 
         val tmpConfiguration = cliArtifact.configuration.copy()
 
-        val messageCollector = tmpConfiguration.messageCollector
-        val diagnosticReporter = DiagnosticReporterFactory.createPendingReporter(messageCollector)
         val outputFile = getAbiCheckKlibArtifactFile(module.name)
 
         tmpConfiguration.produceKlibFile = true
         tmpConfiguration.outputDir = outputFile.parentFile
         tmpConfiguration.outputName = outputFile.name.removeSuffix(".klib")
+        tmpConfiguration.diagnosticsCollector = DiagnosticsCollectorImpl()
 
-        val input = cliArtifact.copy(diagnosticCollector = diagnosticReporter, configuration = tmpConfiguration)
+        @OptIn(PipelineArtifact.CliPipelineInternals::class)
+        val input = cliArtifact.withCompilerConfiguration(tmpConfiguration)
 
         WebKlibSerializationPipelinePhase.executePhase(input)
 
-        return BinaryArtifacts.KLib(outputFile, diagnosticReporter)
+        return BinaryArtifacts.KLib(outputFile, tmpConfiguration.diagnosticsCollector)
     }
 }
 

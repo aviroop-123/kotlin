@@ -2,7 +2,6 @@
  * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
-@file:OptIn(ExperimentalAnnotationsInMetadata::class)
 
 package org.jetbrains.kotlin.commonizer.metadata
 
@@ -12,7 +11,6 @@ import org.jetbrains.kotlin.commonizer.metadata.TypeAliasExpansion.*
 import org.jetbrains.kotlin.commonizer.utils.DEFAULT_SETTER_VALUE_NAME
 import org.jetbrains.kotlin.commonizer.utils.SPECIAL_CLASS_WITHOUT_SUPERTYPES_CLASS_NAMES
 import org.jetbrains.kotlin.commonizer.utils.compactMap
-import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
 import org.jetbrains.kotlin.serialization.deserialization.DYNAMIC_TYPE_DESERIALIZER_ID
 import org.jetbrains.kotlin.types.Variance
 import kotlin.metadata.*
@@ -23,7 +21,7 @@ internal fun CirModule.serializeModule(
 ): KlibModuleMetadata = KlibModuleMetadata(
     name = name.toStrippedString(),
     fragments = fragments.toList(),
-    annotations = emptyList()
+    metadataVersion = metadataVersion,
 )
 
 internal fun CirPackage.serializePackage(
@@ -182,7 +180,7 @@ internal fun CirFunction.serializeFunction(
 ): KmFunction = KmFunction(
     name = name.name
 ).also { function ->
-    function.modifiersFrom(this, isExpect = context.isCommon && kind != CallableMemberDescriptor.Kind.SYNTHESIZED)
+    function.modifiersFrom(this, isExpect = context.isCommon && kind != CirFunctionOrProperty.Kind.SYNTHESIZED)
     annotations.mapTo(function.annotations) { it.serializeAnnotation() }
     typeParameters.serializeTypeParameters(context, output = function.typeParameters)
     valueParameters.mapTo(function.valueParameters) { it.serializeValueParameter(context) }
@@ -196,12 +194,12 @@ internal fun CirFunction.serializeFunction(
 private fun CirAnnotation.serializeAnnotation(): KmAnnotation {
     val arguments = LinkedHashMap<String, KmAnnotationArgument>(constantValueArguments.size + annotationValueArguments.size, 1F)
 
-    constantValueArguments.forEach { (name: CirName, value: CirConstantValue) ->
+    constantValueArguments.forEach { [name: CirName, value: CirConstantValue] ->
         arguments[name.name] = value.serializeConstantValue()
             ?: error("Unexpected <null> constant value inside of $this")
     }
 
-    annotationValueArguments.forEach { (name: CirName, nested: CirAnnotation) ->
+    annotationValueArguments.forEach { [name: CirName, nested: CirAnnotation] ->
         arguments[name.name] = KmAnnotationArgument.AnnotationValue(nested.serializeAnnotation())
     }
 
@@ -306,8 +304,7 @@ private fun CirTypeAliasType.serializeTypeAliasType(
     expansion: TypeAliasExpansion
 ): KmType = when (expansion) {
     ONLY_ABBREVIATIONS -> serializeAbbreviationType(context, expansion)
-    EXPANDED_WITHOUT_ABBREVIATIONS -> serializeExpandedType(context, expansion)
-    FOR_TOP_LEVEL_TYPE -> serializeExpandedType(context, EXPANDED_WITHOUT_ABBREVIATIONS).apply {
+    FOR_TOP_LEVEL_TYPE -> serializeExpandedType(context, FOR_TOP_LEVEL_TYPE).apply {
         abbreviatedType = serializeAbbreviationType(context, expansion)
     }
     FOR_NESTED_TYPE -> serializeExpandedType(context, expansion).apply {
@@ -359,7 +356,6 @@ private inline fun Variance.serializeVariance(): KmVariance = when (this) {
 @Suppress("SpellCheckingInspection")
 private enum class TypeAliasExpansion {
     ONLY_ABBREVIATIONS,
-    EXPANDED_WITHOUT_ABBREVIATIONS,
     FOR_TOP_LEVEL_TYPE,
     FOR_NESTED_TYPE
 }

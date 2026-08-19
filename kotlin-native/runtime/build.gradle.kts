@@ -2,7 +2,7 @@
  * Copyright 2010-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
  * that can be found in the LICENSE file.
  */
-import org.jetbrains.kotlin.*
+import org.jetbrains.kotlin.PlatformInfo
 import org.jetbrains.kotlin.bitcode.CompileToBitcodeExtension
 import org.jetbrains.kotlin.cpp.CppUsage
 import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanCacheTask
@@ -10,8 +10,8 @@ import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanCompileTask
 import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.library.KOTLIN_NATIVE_STDLIB_NAME
 import org.jetbrains.kotlin.nativeDistribution.nativeDistribution
-import org.jetbrains.kotlin.testing.native.GitDownloadTask
-import java.net.URI
+import org.jetbrains.kotlin.nativeDistribution.registerNativeBootstrapDistribution
+import org.jetbrains.kotlin.platformManager
 import org.jetbrains.kotlin.konan.target.Architecture as TargetArchitecture
 
 val kotlinVersion: String by rootProject.extra
@@ -19,7 +19,27 @@ val kotlinVersion: String by rootProject.extra
 plugins {
     id("base")
     id("compile-to-bitcode")
-    id("runtime-testing")
+}
+
+repositories {
+    githubTag("google", "breakpad")
+    githubCommit("google", "googletest")
+}
+
+val breakpad = configurations.dependencyScope("breakpad")
+val breakpadClasspath = configurations.resolvable("breakpadClasspath") {
+    extendsFrom(breakpad.get())
+}
+val googletest = configurations.dependencyScope("googletest")
+val googletestClasspath = configurations.resolvable("googletestClasspath") {
+    extendsFrom(googletest.get())
+}
+dependencies {
+    breakpad("google:breakpad:2024.02.16@zip")
+    // GTest 1.10.0 doesn't properly register skipped tests in an XML-report.
+    // Therefore we use a fixed commit form the master branch where this problem is already fixed.
+    // https://github.com/google/googletest/commit/07f4869221012b16b7f9ee685d94856e1fc9f361
+    googletest("google:googletest:07f4869221012b16b7f9ee685d94856e1fc9f361@zip")
 }
 
 if (HostManager.host == KonanTarget.MACOS_ARM64) {
@@ -28,11 +48,13 @@ if (HostManager.host == KonanTarget.MACOS_ARM64) {
 
 val breakpadLocationNoDependency = layout.buildDirectory.dir("breakpad")
 
-val downloadBreakpad = tasks.register<GitDownloadTask>("downloadBreakpad") {
-    description = "Retrieves Breakpad sources"
-    repository.set(URI.create("https://github.com/google/breakpad.git"))
-    revision.set("v2024.02.16")
-    outputDirectory.set(breakpadLocationNoDependency)
+val unpackBreakpad = tasks.register<Sync>("unpackBreakpad") {
+    from(breakpadClasspath.map { zipTree(it.singleFile) })
+    eachFile {
+        relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray())
+    }
+    includeEmptyDirs = false
+    into(breakpadLocationNoDependency)
 }
 
 val breakpadSources by configurations.creating {
@@ -45,21 +67,101 @@ val breakpadSources by configurations.creating {
 }
 
 artifacts {
-    add(breakpadSources.name, downloadBreakpad)
+    add(breakpadSources.name, unpackBreakpad)
 }
 
-googletest {
-    revision = project.property("gtestRevision") as String
-    refresh = project.hasProperty("refresh-gtest")
+val googletestLocationNoDependency = layout.buildDirectory.dir("googletest")
+
+val unpackGoogletest = tasks.register<Sync>("unpackGoogletest") {
+    from(googletestClasspath.map { zipTree(it.singleFile) })
+    eachFile {
+        relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray())
+    }
+    includeEmptyDirs = false
+    into(googletestLocationNoDependency)
 }
 
 val targetList = enabledTargets(extensions.getByType<PlatformManager>())
 
 // NOTE: the list of modules is duplicated in `RuntimeModule.kt`
 bitcode {
+    // Cannot use output of `unpackGoogletest` to support Gradle Configuration Cache working before `unpackGoogletest`
+    // actually had a chance to run.
+    googleTestHeadersNoDependency.from(
+            googletestLocationNoDependency.map { it.dir("googletest/include") },
+            googletestLocationNoDependency.map { it.dir("googlemock/include") }
+    )
+    googleTestHeadersDependency.set(unpackGoogletest.name)
+
     allTargets {
+        val fixBrokenMacroExpansionInXcode15_3: List<String> = when (target) {
+            KonanTarget.MACOS_ARM64, KonanTarget.MACOS_X64 -> hashMapOf(
+                "TARGET_OS_OSX" to "1",
+            )
+            KonanTarget.IOS_ARM64 -> hashMapOf(
+                "TARGET_OS_EMBEDDED" to "1",
+                "TARGET_OS_IPHONE" to "1",
+                "TARGET_OS_IOS" to "1",
+            )
+            KonanTarget.TVOS_ARM64 -> hashMapOf(
+                "TARGET_OS_EMBEDDED" to "1",
+                "TARGET_OS_IPHONE" to "1",
+                "TARGET_OS_TV" to "1",
+            )
+            KonanTarget.WATCHOS_ARM64, KonanTarget.WATCHOS_ARM32, KonanTarget.WATCHOS_DEVICE_ARM64 -> hashMapOf(
+                "TARGET_OS_EMBEDDED" to "1",
+                "TARGET_OS_IPHONE" to "1",
+                "TARGET_OS_WATCH" to "1",
+            )
+            else -> emptyMap()
+            }.map { "-D${it.key}=${it.value}" }
+
+        val clangArgsSpecificForKonanSources: List<String> = run {
+            val konanOptions = listOfNotNull(
+                    target.architecture.name.takeIf { target != KonanTarget.WATCHOS_ARM64 },
+                    "ARM32".takeIf { target == KonanTarget.WATCHOS_ARM64 },
+                    target.family.name.takeIf { target.family != Family.MINGW },
+                    "WINDOWS".takeIf { target.family == Family.MINGW },
+                    "MACOSX".takeIf { target.family == Family.OSX },
+                    "APPLE".takeIf { target.family.isAppleFamily },
+
+                    "NO_64BIT_ATOMIC".takeUnless { target.supports64BitAtomics() },
+                    "NO_UNALIGNED_ACCESS".takeUnless { target.supportsUnalignedAccess() },
+                    "FORBID_BUILTIN_MUL_OVERFLOW".takeUnless { target.supports64BitMulOverflow() },
+
+                    "OBJC_INTEROP".takeIf { target.supportsObjcInterop() },
+                    "HAS_FOUNDATION_FRAMEWORK".takeIf { target.hasFoundationFramework() },
+                    "HAS_UIKIT_FRAMEWORK".takeIf { target.hasUIKitFramework() },
+                    "REPORT_BACKTRACE_TO_IOS_CRASH_LOG".takeIf { target.supportsIosCrashLog() },
+                    "SUPPORTS_GRAND_CENTRAL_DISPATCH".takeIf { target.supportsGrandCentralDispatch },
+                    "SUPPORTS_SIGNPOSTS".takeIf { target.supportsSignposts },
+            ).map { "KONAN_$it=1" }
+            val otherOptions = listOfNotNull(
+                    "USE_ELF_SYMBOLS=1".takeIf { target.binaryFormat() == BinaryFormat.ELF },
+                    "ELFSIZE=${target.pointerBits()}".takeIf { target.binaryFormat() == BinaryFormat.ELF },
+                    "MACHSIZE=${target.pointerBits()}".takeIf { target.binaryFormat() == BinaryFormat.MACH_O },
+                    "__ANDROID__".takeIf { target.family == Family.ANDROID },
+                    "USE_PE_COFF_SYMBOLS=1".takeIf { target.binaryFormat() == BinaryFormat.PE_COFF },
+                    "UNICODE".takeIf { target.family == Family.MINGW },
+                    "USE_WINAPI_UNWIND=1".takeIf { target.supportsWinAPIUnwind() },
+                    "USE_GCC_UNWIND=1".takeIf { target.supportsGccUnwind() }
+            )
+            (konanOptions + otherOptions).map { "-D$it" } + fixBrokenMacroExpansionInXcode15_3
+        }
+
+        defaultCompilerArgs.addAll(listOfNotNull(
+                "-gdwarf-2".takeIf { kotlinBuildProperties.isNativeRuntimeDebugInfoEnabled },
+                "-std=c++17",
+                "-Werror",
+                "-O2",
+                "-fno-aligned-allocation", // TODO: Remove when all targets support aligned allocation in C++ runtime.
+                "-Wall",
+                "-Wextra",
+                "-Wno-unused-parameter",  // False positives with polymorphic functions.
+        ) + clangArgsSpecificForKonanSources)
+
         module("main") {
-            headersDirs.from("src/externalCallsChecker/common/cpp", "src/objcExport/cpp", "src/breakpad/cpp", "src/crashHandler/common/cpp")
+            headersDirs.from("src/externalCallsChecker/common/cpp", "src/objcExport/cpp", "src/breakpad/cpp", "src/crashHandler/common/cpp", "src/utfcpp/cpp", "src/alloc/common/cpp", "src/gcScheduler/common/cpp", "src/gc/common/cpp",  "src/mm/cpp")
             sourceSets {
                 main {
                     // TODO: Split out out `base` module and merge it together with `main` into `runtime.bc`
@@ -84,9 +186,14 @@ bitcode {
             sourceSets {}
         }
 
+        module("utfcpp") {
+            // Header-only library
+            sourceSets {}
+        }
+
         if (!project.hasProperty("disableBreakpad")) {
             module("breakpad") {
-                srcRoot.set(downloadBreakpad.flatMap { it.outputDirectory })
+                srcRoot.fileProvider(unpackBreakpad.map { it.destinationDir })
                 val sources = listOf(
                         "client/mac/crash_generation/crash_generation_client.cc",
                         "client/mac/handler/breakpad_nlist_64.cc",
@@ -112,14 +219,10 @@ bitcode {
                         inputFiles.from(srcRoot.dir("src"))
                         inputFiles.setIncludes(sources)
                         headersDirs.setFrom(project.layout.projectDirectory.dir("src/breakpad/cpp"))
-                        // Fix Gradle Configuration Cache: support this task being configured before breakpad sources are actually downloaded.
-                        compileTask.configure {
-                            inputFiles.setFrom(sources.map { breakpadLocationNoDependency.get().dir("src").file(it) })
-                        }
                     }
                 }
                 // Make sure breakpad sources are downloaded when building the corresponding compilation database entry
-                dependencies.add(downloadBreakpad)
+                dependencies.add(unpackBreakpad)
                 compilerArgs.set(listOf(
                         "-std=c++17",
                         "-DHAVE_MACH_O_NLIST_H",
@@ -142,7 +245,6 @@ bitcode {
             val elfSize = when (target.architecture) {
                 TargetArchitecture.X64, TargetArchitecture.ARM64 -> 64
                 TargetArchitecture.X86, TargetArchitecture.ARM32 -> 32
-                else -> 32 // TODO(KT-66500): remove after the bootstrap
             }
             val useMachO = target.family.isAppleFamily
             val useElf = target.family in listOf(Family.LINUX, Family.ANDROID)
@@ -299,6 +401,61 @@ bitcode {
             }
         }
 
+        module("googletest") {
+            srcRoot.fileProvider(unpackGoogletest.map { it.destinationDir.resolve("googletest") })
+            sourceSets {
+                testFixtures {
+                    inputFiles.from(srcRoot.dir("src"))
+                    // That's how googletest/CMakeLists.txt builds gtest library.
+                    inputFiles.include("gtest-all.cc")
+                    // Cannot use output of `unpackGoogletest` to support Gradle Configuration Cache working before `unpackGoogletest`
+                    // actually had a chance to run.
+                    headersDirs.setFrom(
+                            googletestLocationNoDependency.map { it.dir("googletest") },
+                            googletestLocationNoDependency.map { it.dir("googletest/include") },
+                    )
+                    // `inputFiles` above is a `ConfigurableFileTree`. It gets resolved into a `FileCollection` during configuration phase
+                    // in order to become an input for the `ClangFrontend` task. At configuration phase the result of `unpackGoogletest` is
+                    // not yet available. Therefore, `inputFiles` expands into an empty list. To make it work correctly, we have to manually
+                    // override the sources for the `ClangFrontend` task  here.
+                    compileTask.configure {
+                        inputFiles.setFrom(srcRoot.dir("src/gtest-all.cc"))
+                    }
+                }
+            }
+            compilerArgs.set(listOf("-std=c++17", "-O2"))
+            // Make sure googletest sources are downloaded when building the corresponding compilation database entry
+            dependencies.add(unpackGoogletest)
+        }
+
+        module("googlemock") {
+            srcRoot.fileProvider(unpackGoogletest.map { it.destinationDir.resolve("googlemock") })
+            sourceSets {
+                testFixtures {
+                    inputFiles.from(srcRoot.dir("src"))
+                    // That's how googlemock/CMakeLists.txt builds gtest library.
+                    inputFiles.include("gmock-all.cc")
+                    // Cannot use output of `unpackGoogletest` to support Gradle Configuration Cache working before `unpackGoogletest`
+                    // actually had a chance to run.
+                    headersDirs.setFrom(
+                            googletestLocationNoDependency.map { it.dir("googlemock") },
+                            googletestLocationNoDependency.map { it.dir("googlemock/include") },
+                            googletestLocationNoDependency.map { it.dir("googletest/include") },
+                    )
+                    // `inputFiles` above is a `ConfigurableFileTree`. It gets resolved into a `FileCollection` during configuration phase
+                    // in order to become an input for the `ClangFrontend` task. At configuration phase the result of `unpackGoogletest` is
+                    // not yet available. Therefore, `inputFiles` expands into an empty list. To make it work correctly, we have to manually
+                    // override the sources for the `ClangFrontend` task  here.
+                    compileTask.configure {
+                        inputFiles.setFrom(srcRoot.dir("src/gmock-all.cc"))
+                    }
+                }
+            }
+            compilerArgs.set(listOf("-std=c++17", "-O2"))
+            // Make sure googletest sources are downloaded when building the corresponding compilation database entry
+            dependencies.add(unpackGoogletest)
+        }
+
         module("test_support") {
             headersDirs.from(files("src/externalCallsChecker/common/cpp", "src/objcExport/cpp", "src/main/cpp"))
             sourceSets {
@@ -312,7 +469,6 @@ bitcode {
             headersDirs.from(files("src/alloc/common/cpp", "src/gcScheduler/common/cpp", "src/gc/common/cpp", "src/externalCallsChecker/common/cpp", "src/objcExport/cpp", "src/main/cpp"))
             sourceSets {
                 main {}
-                testFixtures {}
                 test {}
             }
         }
@@ -471,14 +627,14 @@ bitcode {
         if (!project.hasProperty("disableBreakpad")) {
             module("impl_crashHandler") {
                 srcRoot.set(layout.projectDirectory.dir("src/crashHandler/impl"))
-                // Cannot use output of `downloadBreakpad` to support Gradle Configuration Cache working before `downloadBreakpad`
+                // Cannot use output of `unpackBreakpad` to support Gradle Configuration Cache working before `unpackBreakpad`
                 // actually had a chance to run.
                 headersDirs.from("src/main/cpp", "src/breakpad/cpp", breakpadLocationNoDependency.get().dir("src"))
                 sourceSets {
                     main {
                         // This task depends on breakpad headers being present.
                         compileTask.configure {
-                            dependsOn(downloadBreakpad)
+                            dependsOn(unpackBreakpad)
                         }
                     }
                 }
@@ -575,17 +731,20 @@ val hostAssemble by tasks.registering {
 
 tasks.named("clean", Delete::class) {
     this.delete(layout.buildDirectory)
+
+    // Make sure `clean` always run, when requested.
+    this.outputs.upToDateWhen { false }
 }
 
 // region: Stdlib
+
+val nativeBootstrapDistribution = registerNativeBootstrapDistribution()
 
 val stdlibBuildTask by tasks.registering(KonanCompileTask::class) {
     group = BasePlugin.BUILD_GROUP
     description = "Build the Kotlin/Native standard library"
 
-    // Requires Native distribution with the compiler JARs.
-    this.compilerDistribution.set(nativeDistribution)
-    dependsOn(":kotlin-native:distCompiler")
+    this.compilerDistributionRoot.set(nativeBootstrapDistribution.map { it.root })
 
     this.outputDirectory.set(
             layout.buildDirectory.dir("stdlib/${HostManager.hostName}/stdlib")
@@ -599,25 +758,30 @@ val stdlibBuildTask by tasks.registering(KonanCompileTask::class) {
             "-Xallow-kotlin-package",
             "-Xexplicit-api=strict",
             "-Xexpect-actual-classes",
+            "-Xklib-ir-inliner=intra-module",
             "-Xcontext-parameters",
+            "-Xname-based-destructuring=complete",
             "-module-name", KOTLIN_NATIVE_STDLIB_NAME,
             "-opt-in=kotlin.RequiresOptIn",
             "-opt-in=kotlin.contracts.ExperimentalContracts",
             "-opt-in=kotlin.ExperimentalMultiplatform",
             "-opt-in=kotlin.native.internal.InternalForKotlinNative",
-            "-language-version",
-            "2.3",
-            "-api-version",
-            "2.3",
             "-Xdont-warn-on-error-suppression",
             "-Xstdlib-compilation",
+            "-Xklib-relative-path-base=${rootDir.canonicalPath}",
 
-            // See allowReturnValueCheckerButNotReport() in libraries/stdlib/build.gradle.kts:
-            "-Xreturn-value-checker=check",
-            "-Xwarning-level=RETURN_VALUE_NOT_USED:disabled",
+            // See addReturnValueCheckerInfo() in libraries/stdlib/build.gradle.kts:
+            "-Xreturn-value-checker=full",
 
-            "-Xfragment-refines=nativeMain:nativeWasm,nativeMain:common,nativeWasm:common,nativeWasm:commonNonJvm,commonNonJvm:common",
+            "-Xfragment-refines=nativeMain:nativeWasm,nativeMain:nativeWasmWasi,nativeMain:common,nativeWasmWasi:nativeWasm,nativeWasm:common,nativeWasm:commonNonJvm,commonNonJvm:common",
             "-Xmanifest-native-targets=${platformManager.targetValues.joinToString(separator = ",") { it.visibleName }}",
+
+            // Between making a language feature stable and the next bootstrap, we need to keep providing the compiler argument.
+            // But this produces a warning
+            // "The argument ... is redundant for the current language version ..."
+            // in the bootstrap test and fails because of -Werror.
+            // To work around it, we suppress the warning.
+            "-Xwarning-level=REDUNDANT_CLI_ARG:disabled",
     ))
 
     val common by sourceSets.creating {
@@ -635,6 +799,10 @@ val stdlibBuildTask by tasks.registering(KonanCompileTask::class) {
 
     val nativeWasm by sourceSets.creating {
         srcDir(project(":kotlin-stdlib").file("native-wasm/src/"))
+    }
+
+    val nativeWasmWasi by sourceSets.creating {
+        srcDir(project(":kotlin-stdlib").file("native-wasm/wasi/"))
     }
 
     val nativeMain by sourceSets.creating {
@@ -656,14 +824,17 @@ cacheableTargetNames.forEach { targetName ->
         val dist = nativeDistribution
 
         // Requires Native distribution with stdlib klib and runtime modules for `targetName`.
-        this.compilerDistribution.set(dist)
+        this.compilerDistributionRoot.set(dist.map { it.root })
+        dependsOn(":kotlin-native:distCompiler")
         dependsOn(":kotlin-native:${targetName}CrossDistRuntime")
         inputs.dir(dist.map { it.runtime(targetName) }) // manually depend on runtime modules (stdlib cache links these modules in)
 
         this.klib.fileProvider(nativeStdlib.map { it.destinationDir })
         this.target.set(targetName)
+        this.makePerFileCache.set(true)
         // This path is used in `:kotlin-native:${targetName}StdlibCache`
-        this.outputDirectory.set(layout.buildDirectory.dir("cache/$targetName/$targetName-gSTATIC-system/$KOTLIN_NATIVE_STDLIB_NAME-cache"))
+        this.cacheDirectory.set(layout.buildDirectory.dir("cache/$targetName/$targetName-gSTATIC-system"))
+        this.cacheName.set(KOTLIN_NATIVE_STDLIB_NAME)
     }
 }
 

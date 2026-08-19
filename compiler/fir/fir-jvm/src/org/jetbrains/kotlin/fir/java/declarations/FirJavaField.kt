@@ -47,10 +47,10 @@ class FirJavaField @FirImplementationDetail constructor(
     override val attributes: FirDeclarationAttributes,
     private val containingClassSymbol: FirClassSymbol<*>,
 ) : FirField() {
-    internal var lazyInitializer: Lazy<FirExpression?> = lazyInitializer
+    var lazyInitializer: Lazy<FirExpression?> = lazyInitializer
         private set
 
-    internal var lazyHasConstantInitializer: Lazy<Boolean> = lazyHasConstantInitializer
+    var lazyHasConstantInitializer: Lazy<Boolean> = lazyHasConstantInitializer
         private set
 
     init {
@@ -93,6 +93,9 @@ class FirJavaField @FirImplementationDetail constructor(
     override val contextParameters: List<FirValueParameter>
         get() = emptyList()
 
+    override val isLocal: Boolean
+        get() = false
+
     override fun <D> transformReturnTypeRef(transformer: FirTransformer<D>, data: D): FirField {
         returnTypeRef = returnTypeRef.transformSingle(transformer, data)
         return this
@@ -127,6 +130,7 @@ class FirJavaField @FirImplementationDetail constructor(
         returnTypeRef.accept(visitor, data)
         annotations.forEach { it.accept(visitor, data) }
         typeParameters.forEach { it.accept(visitor, data) }
+        status.accept(visitor, data)
         initializer?.accept(visitor, data)
     }
 

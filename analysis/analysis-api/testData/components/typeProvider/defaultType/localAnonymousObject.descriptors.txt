@@ -1,4 +1,0 @@
-KaUsualClassType:
-  annotations: []
-  typeArguments: []
-  type: foo/<no name provided>

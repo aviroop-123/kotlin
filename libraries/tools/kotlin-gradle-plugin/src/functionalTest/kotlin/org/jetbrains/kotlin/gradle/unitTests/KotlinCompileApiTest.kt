@@ -10,7 +10,7 @@ import org.gradle.api.tasks.compile.JavaCompile
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompilerOptions
-import org.jetbrains.kotlin.gradle.internal.KOTLIN_COMPILER_EMBEDDABLE
+import org.jetbrains.kotlin.gradle.internal.KOTLIN_BUILD_TOOLS_API_IMPL
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_MODULE_GROUP
 import org.jetbrains.kotlin.gradle.plugin.COMPILER_CLASSPATH_CONFIGURATION_NAME
 import org.jetbrains.kotlin.gradle.plugin.KotlinApiPlugin
@@ -19,19 +19,19 @@ import org.jetbrains.kotlin.gradle.plugin.sources.android.AndroidVariantType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.jetbrains.kotlin.gradle.util.buildProject
-import org.junit.Before
-import org.junit.Rule
-import org.junit.Test
-import org.junit.rules.TemporaryFolder
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.io.TempDir
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import java.io.File
 
 class KotlinCompileApiTest {
 
-    @get:Rule
-    val tmpDir = TemporaryFolder()
+    @field:TempDir
+    lateinit var tmpDir: File
 
     private lateinit var project: ProjectInternal
     private lateinit var plugin: KotlinApiPlugin
@@ -44,7 +44,7 @@ class KotlinCompileApiTest {
         private const val MODULE_NAME = "customModuleName"
     }
 
-    @Before
+    @BeforeEach
     fun setUpProject() {
         project = buildProject {}
         plugin = project.plugins.apply(KotlinApiPlugin::class.java)
@@ -63,13 +63,13 @@ class KotlinCompileApiTest {
 
     @Test
     fun testSources() {
-        val sourcePath = tmpDir.newFolder().resolve("foo.kt").also {
+        val sourcePath = tmpDir.resolve("source").also { it.mkdirs() }.resolve("foo.kt").also {
             it.createNewFile()
         }
         taskApi.setSource(sourcePath)
         assertEquals(setOf(sourcePath), taskImpl.sources.files)
 
-        val sourcesDir = tmpDir.newFolder().also {
+        val sourcesDir = tmpDir.resolve("sourcesDir").also { it.mkdirs() }.also {
             it.resolve("a.kt").createNewFile()
             it.resolve("b.kt").createNewFile()
         }
@@ -82,33 +82,26 @@ class KotlinCompileApiTest {
 
     @Test
     fun testFriendPaths() {
-        val friendPath = tmpDir.newFolder()
+        val friendPath = tmpDir.resolve("friendPath").also { it.mkdirs() }
         taskApi.friendPaths.from(friendPath)
         assertEquals(setOf(friendPath), taskImpl.friendPaths.files)
     }
 
     @Test
     fun testLibraries() {
-        val classpathEntries = setOf(tmpDir.newFolder(), tmpDir.newFolder())
+        val classpathEntries = setOf(tmpDir.resolve("cp1").also { it.mkdirs() }, tmpDir.resolve("cp2").also { it.mkdirs() })
         taskApi.libraries.from(classpathEntries)
         assertEquals(classpathEntries, taskImpl.libraries.files)
     }
 
     @Test
     fun testPluginClasspath() {
-        val pluginDependency = tmpDir.newFile()
+        val pluginDependency = tmpDir.resolve("pluginDependency.jar").also { it.createNewFile() }
         plugin.addCompilerPluginDependency(project.provider { project.files(pluginDependency) })
 
-        val anotherCompilerPlugin = tmpDir.newFile()
+        val anotherCompilerPlugin = tmpDir.resolve("anotherPlugin.jar").also { it.createNewFile() }
         taskApi.pluginClasspath.from(plugin.getCompilerPlugins(), anotherCompilerPlugin)
         assertEquals(setOf(pluginDependency, anotherCompilerPlugin), taskImpl.pluginClasspath.files)
-    }
-
-    @Suppress("DEPRECATION_ERROR")
-    @Test
-    fun testModuleName() {
-        taskApi.moduleName.set("foo")
-        assertEquals("foo", taskImpl.moduleName.get())
     }
 
     @Test
@@ -119,14 +112,14 @@ class KotlinCompileApiTest {
 
     @Test
     fun testTaskBuildDirectory() {
-        val taskBuildDir = tmpDir.newFolder()
+        val taskBuildDir = tmpDir.resolve("taskBuildDir").also { it.mkdirs() }
         taskApi.destinationDirectory.fileValue(taskBuildDir)
         assertEquals(taskBuildDir, taskImpl.destinationDirectory.get().asFile)
     }
 
     @Test
     fun testDestinationDirectory() {
-        val destinationDir = tmpDir.newFolder()
+        val destinationDir = tmpDir.resolve("destinationDir").also { it.mkdirs() }
         taskApi.destinationDirectory.fileValue(destinationDir)
         assertEquals(destinationDir, taskImpl.destinationDirectory.get().asFile)
     }
@@ -183,10 +176,10 @@ class KotlinCompileApiTest {
             .getByName(COMPILER_CLASSPATH_CONFIGURATION_NAME)
             .incoming
             .dependencies
-            .single()
+            .single { it.name == KOTLIN_BUILD_TOOLS_API_IMPL }
 
         assertEquals(
-            "$KOTLIN_MODULE_GROUP:$KOTLIN_COMPILER_EMBEDDABLE:${plugin.pluginVersion}",
+            "$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_IMPL:${plugin.pluginVersion}",
             "${compilerDependency.group}:${compilerDependency.name}:${compilerDependency.version}"
         )
     }
@@ -198,7 +191,7 @@ class KotlinCompileApiTest {
         val jvmTask = plugin.registerKotlinJvmCompileTask(
             "jvmTask",
             jvmExtension.compilerOptions,
-            plugin.providerFactory.provider {  jvmExtension.explicitApi }
+            plugin.providerFactory.provider { jvmExtension.explicitApi }
         )
 
         jvmExtension.compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
@@ -240,6 +233,7 @@ class KotlinCompileApiTest {
         androidExtension.compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
         androidExtension.compilerOptions.javaParameters.set(true)
         androidExtension.explicitApi = ExplicitApiMode.Strict
+        @Suppress("DEPRECATION")
         androidExtension.sourceSets.register("main")
         androidExtension.target.withSourcesJar(false)
         androidExtension.target.compilations.register("main")
@@ -252,6 +246,7 @@ class KotlinCompileApiTest {
             ExplicitApiMode.Strict,
             (androidTask.get() as KotlinCompile).explicitApiMode.get()
         )
+        @Suppress("DEPRECATION")
         assertNotNull(androidExtension.sourceSets.findByName("main"))
     }
 

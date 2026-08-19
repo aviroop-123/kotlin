@@ -56,16 +56,25 @@ internal fun MethodId(methodInsnNode: MethodInsnNode): MethodId = MethodId(
     methodDescriptor = methodInsnNode.desc
 )
 
-context(reporter: ErrorReporter, keyCache: LambdaKeyCache)
-fun ClassInfo(bytecode: ByteArray): ClassInfo {
-    val reader = ClassReader(bytecode)
-    val node = ClassNode(ASM9)
-    reader.accept(node, 0)
-    return buildClassInfo(node)
+fun classInfoFromBytecode(
+    keyCache: LambdaKeyCache,
+    reporter: ErrorReporter,
+    fileName: String,
+    bytecode: ByteArray,
+): ClassInfo? {
+    val node = try {
+        val reader = ClassReader(bytecode)
+        val node = ClassNode(ASM9)
+        reader.accept(node, 0)
+        node
+    } catch (e: Exception) {
+        reporter.reportClassReadError(fileName, e)
+        return null
+    }
+    return buildClassInfo(keyCache, reporter, node)
 }
 
-context(reporter: ErrorReporter, keyCache: LambdaKeyCache)
-private fun buildClassInfo(classNode: ClassNode): ClassInfo {
+private fun buildClassInfo(keyCache: LambdaKeyCache, reporter: ErrorReporter, classNode: ClassNode): ClassInfo {
     val classId = ClassId(classNode)
 
     val methods = classNode.methods.mapNotNull { methodNode ->
@@ -74,7 +83,7 @@ private fun buildClassInfo(classNode: ClassNode): ClassInfo {
             return@mapNotNull null
         }
 
-        val groups = analyzeGroups(classId, methodNode)
+        val groups = analyzeGroups(keyCache, reporter, classId, methodNode)
 
         if (groups.isNotEmpty()) {
             MethodInfo(

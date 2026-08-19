@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// LANGUAGE: +VariableDeclarationInWhenSubject
 // DIAGNOSTICS: -DEBUG_INFO_SMARTCAST
 
 fun foo(s1: Int, s2: Int) = s1 + s2

@@ -1,26 +1,28 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
     id("project-tests-convention")
     id("test-inputs-check")
+    id("require-explicit-types")
 }
 
 dependencies {
-    compileOnly(project(":core:descriptors"))
-    compileOnly(project(":core:descriptors.jvm"))
-    compileOnly(project(":compiler:fir:cones"))
-    compileOnly(project(":compiler:fir:resolve"))
-    compileOnly(project(":compiler:fir:providers"))
-    compileOnly(project(":compiler:fir:semantics"))
-    compileOnly(project(":compiler:fir:tree"))
-    compileOnly(project(":compiler:ir.tree"))
-    compileOnly(project(":compiler:ir.backend.common"))
-    compileOnly(project(":compiler:ir.serialization.common"))
-    compileOnly(project(":compiler:fir:fir-serialization"))
-    compileOnly(project(":compiler:fir:fir-deserialization"))
-    compileOnly(project(":compiler:frontend.common.jvm"))
-    compileOnly(project(":compiler:config.jvm"))
+    implementation(project(":core:descriptors"))
+    implementation(project(":core:descriptors.jvm"))
+    implementation(project(":compiler:fir:cones"))
+    implementation(project(":compiler:fir:resolve"))
+    implementation(project(":compiler:fir:providers"))
+    implementation(project(":compiler:fir:semantics"))
+    implementation(project(":compiler:fir:tree"))
+    implementation(project(":compiler:ir.tree"))
+    implementation(project(":compiler:ir.backend.common"))
+    implementation(project(":compiler:ir.serialization.common"))
+    implementation(project(":compiler:fir:fir-serialization"))
+    implementation(project(":compiler:fir:fir-deserialization"))
+    implementation(project(":compiler:frontend.common.jvm"))
+    implementation(project(":compiler:config.jvm"))
+    implementation(project(":compiler:frontend"))
+    implementation(project(":core:compiler.common.web"))
 
     compileOnly(intellijCore())
 
@@ -33,13 +35,10 @@ dependencies {
     testFixturesImplementation(testFixtures(project(":generators:test-generator")))
     testFixturesImplementation(testFixtures(project(":compiler:tests-spec")))
 
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 
-    testRuntimeOnly(project(":core:deserialization"))
-    testRuntimeOnly(project(":core:descriptors.runtime"))
-    testRuntimeOnly(project(":core:descriptors.jvm"))
     testRuntimeOnly(project(":compiler:fir:fir2ir:jvm-backend"))
     testRuntimeOnly(project(":kotlin-util-klib-abi"))
     testRuntimeOnly(project(":generators"))
@@ -60,11 +59,11 @@ optInToObsoleteDescriptorBasedAPI()
 
 sourceSets {
     "main" { projectDefault() }
-    "test" { generatedTestDir() }
     "testFixtures" { projectDefault() }
 }
 
 fun Test.configure(configureJUnit: JUnitPlatformOptions.() -> Unit = {}) {
+    javaLauncher = project.getToolchainLauncherFor(JdkMajorVersion.JDK_1_8)
     useJUnitPlatform {
         configureJUnit()
     }
@@ -97,7 +96,7 @@ projectTests {
         }
     }
 
-    testGenerator("org.jetbrains.kotlin.test.TestGeneratorForFir2IrTestsKt")
+    testGenerator("org.jetbrains.kotlin.test.TestGeneratorForFir2IrTestsKt", generateTestsInBuildDirectory = true)
 
     withJvmStdlibAndReflect()
     withScriptRuntime()
@@ -109,6 +108,7 @@ projectTests {
     withAnnotations()
     withThirdPartyAnnotations()
     withThirdPartyJsr305()
+    withThirdPartyJava8Annotations()
 }
 
 testsJarToBeUsedAlongWithFixtures()

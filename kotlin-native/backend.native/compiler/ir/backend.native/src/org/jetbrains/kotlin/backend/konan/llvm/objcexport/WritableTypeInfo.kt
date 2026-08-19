@@ -14,14 +14,13 @@ import org.jetbrains.kotlin.backend.konan.llvm.ConstValue
 import org.jetbrains.kotlin.backend.konan.llvm.ContextUtils
 import org.jetbrains.kotlin.backend.konan.llvm.StaticData
 import org.jetbrains.kotlin.backend.konan.llvm.Struct
-import org.jetbrains.kotlin.backend.konan.llvm.bitcast
-import org.jetbrains.kotlin.backend.konan.llvm.functionType
 import org.jetbrains.kotlin.backend.konan.llvm.isExported
-import org.jetbrains.kotlin.backend.konan.llvm.kObjHeaderPtr
 import org.jetbrains.kotlin.backend.konan.llvm.llvmType
-import org.jetbrains.kotlin.backend.konan.llvm.pointerType
 import org.jetbrains.kotlin.backend.konan.llvm.replaceExternalWeakOrCommonGlobal
 import org.jetbrains.kotlin.backend.konan.llvm.writableTypeInfoSymbolName
+import org.jetbrains.kotlin.backend.konan.ir.konanLibrary
+import org.jetbrains.kotlin.konan.target.CompilerOutputKind
+import org.jetbrains.kotlin.library.uniqueName
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.util.isInterface
 import org.jetbrains.kotlin.ir.util.kotlinFqName
@@ -60,7 +59,18 @@ internal fun ContextUtils.generateWritableTypeInfoForSyntheticInterface(irClass:
  * If [irClass] is exported, its [WritableTypeInfoPointer] can later be overridden once.
  */
 internal fun ContextUtils.generateWritableTypeInfoForClass(irClass: IrClass): WritableTypeInfoPointer? = runtime.writableTypeInfoType?.let { type ->
-    if (!irClass.isExported()) {
+    val isExternal = isExternal(irClass)
+    val hasObjCCache = irClass.konanLibrary?.let {
+        generationState.config.cachedLibraries.getLibraryCache(it)?.objcCachePath != null
+    } == true
+    val shouldDefineExternal = isExternal && !hasObjCCache && generationState.config.produce == CompilerOutputKind.FRAMEWORK
+    if (isExternal && !shouldDefineExternal) {
+        if (!irClass.isExported()) {
+            null
+        } else {
+            OverridableWritableTypeInfo(staticData.createGlobal(type, irClass.writableTypeInfoSymbolName, isExported = true))
+        }
+    } else if (!irClass.isExported()) {
         // If the class not exported, its WritableTypeInfo cannot be replaced
         FixedWritableTypeInfo(staticData.createGlobal(type, "").apply {
             setZeroInitializer()
@@ -139,7 +149,7 @@ private fun CodeGenerator.buildWritableTypeInfoValue(
         typeAdapter: ConstPointer?
 ): Struct {
     if (convertToRetained != null) {
-        val expectedType = pointerType(functionType(llvm.int8PtrType, false, kObjHeaderPtr))
+        val expectedType = llvm.pointerType
         assert(convertToRetained.llvmType == expectedType) {
             "Expected: ${LLVMPrintTypeToString(expectedType)!!.toKString()} " +
                     "found: ${LLVMPrintTypeToString(convertToRetained.llvmType)!!.toKString()}"
@@ -148,7 +158,7 @@ private fun CodeGenerator.buildWritableTypeInfoValue(
 
     val objCExportAddition = Struct(
             runtime.typeInfoObjCExportAddition,
-            convertToRetained?.bitcast(llvm.int8PtrType),
+            convertToRetained,
             objCClass,
             swiftClass,
             typeAdapter

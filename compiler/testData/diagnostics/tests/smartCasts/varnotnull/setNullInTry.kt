@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// LANGUAGE: +SoundSmartCastsAfterTry
 
 fun foo() {
     var s: String?

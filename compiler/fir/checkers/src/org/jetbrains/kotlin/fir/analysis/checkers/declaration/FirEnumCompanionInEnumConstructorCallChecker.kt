@@ -5,23 +5,29 @@
 
 package org.jetbrains.kotlin.fir.analysis.checkers.declaration
 
+import org.jetbrains.kotlin.KtFakeSourceElementKind
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.isEnumEntry
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
-import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
+import org.jetbrains.kotlin.fir.analysis.checkers.resolvedSymbolOrCompanionSymbol
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousObject
 import org.jetbrains.kotlin.fir.declarations.FirClass
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.primaryConstructorIfAny
+import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.expressions.FirExpression
+import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.allReceiverExpressions
 import org.jetbrains.kotlin.fir.expressions.toReference
+import org.jetbrains.kotlin.fir.expressions.toResolvedCallableSymbol
 import org.jetbrains.kotlin.fir.expressions.unwrapSmartcastExpression
+import org.jetbrains.kotlin.fir.isEnabled
 import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNodeWithSubgraphs
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ControlFlowGraph
@@ -31,6 +37,7 @@ import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirEnumEntrySymbol
 import org.jetbrains.kotlin.utils.addToStdlib.lastIsInstanceOrNull
 
 object FirEnumCompanionInEnumConstructorCallChecker : FirClassChecker(MppCheckerKind.Common) {
@@ -78,11 +85,11 @@ object FirEnumCompanionInEnumConstructorCallChecker : FirClassChecker(MppChecker
             }
             val qualifiedAccess = when (node) {
                 is QualifiedAccessNode -> node.fir
-                is FunctionCallExitNode -> node.fir
+                is FunctionCallExitNode -> node.firAsFunctionCallOrNull ?: continue
                 else -> continue
             }
             val matchingReceiver = qualifiedAccess.allReceiverExpressions
-                .firstOrNull { it.unwrapSmartcastExpression().getClassSymbol(context.session) == companionSymbol }
+                .firstOrNull { it.unwrapSmartcastExpression().getClassSymbol(qualifiedAccess) == companionSymbol }
             if (matchingReceiver != null) {
                 reporter.reportOn(
                     matchingReceiver.source ?: qualifiedAccess.source,
@@ -93,12 +100,26 @@ object FirEnumCompanionInEnumConstructorCallChecker : FirClassChecker(MppChecker
         }
     }
 
-    private fun FirExpression.getClassSymbol(session: FirSession): FirRegularClassSymbol? {
+    context(context: CheckerContext)
+    private fun FirExpression.getClassSymbol(qualifiedAccess: FirQualifiedAccessExpression): FirRegularClassSymbol? {
         return when (this) {
-            is FirResolvedQualifier -> {
-                this.resolvedType.toRegularClassSymbol(session)
-            }
-            else -> (this.toReference(session) as? FirThisReference)?.boundSymbol
+            is FirResolvedQualifier ->
+                if (LanguageFeature.FixedUninitializedEnumCompanionCheck.isEnabled()) {
+                    this.resolvedSymbolOrCompanionSymbol()
+                } else {
+                    // Before companion blocks (KT-84484), unqualified accesses to static members didn't have a dispatch receiver.
+                    // The only static members in Kotlin classes were enum entries, `values()`, `valueOf()` and `entries`.
+                    // We emulate this behavior here, otherwise we start reporting false-positive UNINITIALIZED_ENUM_COMPANION on
+                    // newer compilers when LV is <= 2.3 (where FixedUninitializedEnumCompanionCheck (KT-84860) isn't enabled).
+                    if (qualifiedAccess.toResolvedCallableSymbol()?.isStatic == true &&
+                        source?.kind is KtFakeSourceElementKind.ImplicitReceiver
+                    ) {
+                        null
+                    } else {
+                        this.resolvedType.toRegularClassSymbol()
+                    }
+                }
+            else -> (this.toReference(context.session) as? FirThisReference)?.boundSymbol
         } as? FirRegularClassSymbol
     }
 }

@@ -19,11 +19,12 @@ class FunctionWithJsFuncAnnotationInliner(private val jsFuncCall: IrCall, privat
             JsNameRemappingTransformer(replacements).apply { acceptList(it) }
         }
 
-    private fun getJsFunctionImplementation(): JsFunction =
-        context.staticContext.backendContext.getJsCodeForFunction(jsFuncCall.symbol)?.deepCopy()
+    private fun getJsFunctionImplementation(): JsFunction = with(context.staticContext.backendContext) {
+        jsFuncCall.symbol.owner.getJsCode()?.deepCopy()
             ?: compilationException("JS function not found", jsFuncCall)
+    }
 
-    private fun collectReplacementsForCall(): Map<JsName, JsExpression> {
+    private fun collectReplacementsForCall(): Map<JsName?, JsExpression> {
         val translatedArguments = jsFuncCall.arguments.map { it!!.accept(IrElementToJsExpressionTransformer(), context) }
         return function.parameters
             .map { it.name }
@@ -32,7 +33,7 @@ class FunctionWithJsFuncAnnotationInliner(private val jsFuncCall: IrCall, privat
     }
 }
 
-private class JsNameRemappingTransformer(private val replacements: Map<JsName, JsExpression>) : JsVisitorWithContextImpl() {
+private class JsNameRemappingTransformer(private val replacements: Map<JsName?, JsExpression>) : JsVisitorWithContextImpl() {
     private val JsName.replacement: JsExpression? get() = replacements[this]
 
     override fun visit(nameRef: JsNameRef, ctx: JsContext<JsNode>): Boolean {

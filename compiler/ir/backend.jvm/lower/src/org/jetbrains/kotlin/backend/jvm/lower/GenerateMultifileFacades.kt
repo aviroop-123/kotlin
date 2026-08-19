@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.ModuleLoweringPass
 import org.jetbrains.kotlin.backend.common.defaultArgumentsOriginalFunction
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.*
 import org.jetbrains.kotlin.backend.jvm.ir.fileParent
 import org.jetbrains.kotlin.config.JvmAnalysisFlags
@@ -28,7 +27,6 @@ import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrClassReferenceImpl
-import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
@@ -52,7 +50,6 @@ import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
  *     - Otherwise, for each function in the multi-file part, a new function in the facade class is generated that calls it.
  * - Finally, it updates call sites of functions from parts to point to the corresponding function from the facade.
  */
-@PhaseDescription(name = "GenerateMultifileFacades")
 internal class GenerateMultifileFacades(private val context: JvmBackendContext) : ModuleLoweringPass {
     override fun lower(irModule: IrModuleFragment) {
         val functionDelegates = mutableMapOf<IrSimpleFunction, IrSimpleFunction>()
@@ -69,7 +66,7 @@ internal class GenerateMultifileFacades(private val context: JvmBackendContext) 
 
         context.multifileFacadesToAdd.clear()
 
-        for ((member, newMember) in functionDelegates) {
+        for ([member, newMember] in functionDelegates) {
             newMember.multifileFacadePartMember = member
         }
     }
@@ -81,7 +78,7 @@ private fun generateMultifileFacades(
     shouldGeneratePartHierarchy: Boolean,
     functionDelegates: MutableMap<IrSimpleFunction, IrSimpleFunction>
 ): List<IrFile> =
-    context.multifileFacadesToAdd.map { (jvmClassName, unsortedPartClasses) ->
+    context.multifileFacadesToAdd.map { [jvmClassName, unsortedPartClasses] ->
         val partClasses = unsortedPartClasses.sortedBy(IrClass::name)
         val kotlinPackageFqName = partClasses.first().fqNameWhenAvailable!!.parent()
         if (!partClasses.all { it.fqNameWhenAvailable!!.parent() == kotlinPackageFqName }) {
@@ -132,7 +129,7 @@ private fun generateMultifileFacades(
                     // If at least one of parts is annotated with @JvmSynthetic, then all other parts should also be annotated.
                     // We report this error on the `@JvmMultifileClass` annotation of each non-@JvmSynthetic part.
                     val annotation = partFile.annotations.singleOrNull { it.isAnnotationWithEqualFqName(JvmStandardClassIds.JVM_MULTIFILE_CLASS) }
-                    context.ktDiagnosticReporter.at(annotation ?: partFile, partFile).report(
+                    context.diagnosticReporter.at(annotation ?: partFile, partFile).report(
                         JvmBackendErrors.NOT_ALL_MULTIFILE_CLASS_PARTS_ARE_JVM_SYNTHETIC
                     )
                 }
@@ -175,7 +172,7 @@ private fun generateMultifileFacades(
 private fun modifyMultifilePartsForHierarchy(context: JvmBackendContext, parts: List<IrClass>): IrClass {
     val superClasses = listOf(context.irBuiltIns.anyClass.owner) + parts.subList(0, parts.size - 1)
 
-    for ((klass, superClass) in parts.zip(superClasses)) {
+    for ([klass, superClass] in parts.zip(superClasses)) {
         klass.modality = Modality.OPEN
         klass.visibility = JavaDescriptorVisibilities.PACKAGE_VISIBILITY
 
@@ -253,8 +250,7 @@ private fun IrSimpleFunction.createMultifileDelegateIfNeeded(
 
     function.copyAttributes(target)
     function.copyAnnotationsFrom(target)
-    function.copyValueAndTypeParametersFrom(target)
-    function.returnType = target.returnType.substitute(target.typeParameters, function.typeParameters.map { it.defaultType })
+    function.copyFunctionSignatureFrom(target)
     function.parent = facadeClass
 
     if (shouldGeneratePartHierarchy) {
@@ -344,8 +340,8 @@ private class UpdateConstantFacadePropertyReferences(
         ) return null
 
         val declaration = when (val callableReference = irClass.attributeOwnerId) {
-            is IrPropertyReference -> callableReference.getter?.owner?.correspondingPropertySymbol?.owner
-            is IrFunctionReference -> callableReference.symbol.owner
+            is IrRichPropertyReference -> callableReference.reflectionTargetSymbol?.owner as? IrProperty
+            is IrRichFunctionReference -> callableReference.reflectionTargetSymbol?.owner
             else -> null
         } ?: return null
         val parent = declaration.parent as? IrClass ?: return null

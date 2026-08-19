@@ -8,10 +8,10 @@ interface Base {
     fun baz(): String = ""
 }
 
-@MustUseReturnValue
+@MustUseReturnValues
 class Derived : Base
 
-@MustUseReturnValue
+@MustUseReturnValues
 class DerivedWithOverride : Base {
     override val a: String
         get() = ""
@@ -22,7 +22,7 @@ class DerivedWithOverride : Base {
     override fun baz() = "Derived"
 }
 
-@MustUseReturnValue
+@MustUseReturnValues
 interface BaseWithAnnotation {
     fun foo(): String = ""
     val a : String
@@ -45,13 +45,13 @@ class DerivedFromAnnotatedWithOverride : BaseWithAnnotation {
 fun usage() {
     Derived().foo()
     Derived().a
-    DerivedWithOverride().foo()
-    DerivedWithOverride().a
+    DerivedWithOverride().<!RETURN_VALUE_NOT_USED!>foo<!>()
+    DerivedWithOverride().<!RETURN_VALUE_NOT_USED!>a<!>
     DerivedWithOverride().baz()
-    DerivedFromAnnotated().foo()
-    DerivedFromAnnotated().a
-    DerivedFromAnnotatedWithOverride().foo()
-    DerivedFromAnnotatedWithOverride().a
+    DerivedFromAnnotated().<!RETURN_VALUE_NOT_USED!>foo<!>()
+    DerivedFromAnnotated().<!RETURN_VALUE_NOT_USED!>a<!>
+    DerivedFromAnnotatedWithOverride().<!RETURN_VALUE_NOT_USED!>foo<!>()
+    DerivedFromAnnotatedWithOverride().<!RETURN_VALUE_NOT_USED!>a<!>
     DerivedFromAnnotatedWithOverride().baz()
 }
 

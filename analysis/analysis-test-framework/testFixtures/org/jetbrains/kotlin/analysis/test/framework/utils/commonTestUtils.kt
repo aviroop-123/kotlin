@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -9,14 +9,21 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.vfs.impl.jar.CoreJarFileSystem
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiReference
-import com.intellij.psi.impl.source.resolve.reference.impl.PsiMultiReference
+import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.components.resolveCall
+import org.jetbrains.kotlin.analysis.api.components.resolveSymbol
+import org.jetbrains.kotlin.analysis.api.components.tryResolveCall
+import org.jetbrains.kotlin.analysis.api.components.tryResolveSymbols
 import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaBuiltinsModule
+import org.jetbrains.kotlin.analysis.api.resolution.KaSingleOrMultiCall
+import org.jetbrains.kotlin.analysis.api.resolution.calls
+import org.jetbrains.kotlin.analysis.api.resolution.symbols
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.diagnostics.PsiDiagnosticUtils.offsetToLineAndColumn
-import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.resolution.KtResolvable
+import org.jetbrains.kotlin.resolution.KtResolvableCall
 import org.jetbrains.kotlin.test.directives.model.Directive
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 
@@ -79,7 +86,7 @@ fun KtElement.renderLocationDescription(): String {
             ?: error("Expected a JAR file path for a virtual file in a JAR file system: ${virtualFile.path}")
     } else {
         virtualFile.name
-    }.stripOutSnapshotVersion()
+    }.let(::stripOutKotlinVersionFromFileName)
 
     return buildString {
         append("'$fileDescription'")
@@ -90,13 +97,18 @@ fun KtElement.renderLocationDescription(): String {
     }
 }
 
-fun findReferencesAtCaret(mainKtFile: KtFile, caretPosition: Int): List<KtReference> =
-    mainKtFile.findReferenceAt(caretPosition)?.unwrapMultiReferences().orEmpty().filterIsInstance<KtReference>()
-
-fun PsiReference.unwrapMultiReferences(): List<PsiReference> = when (this) {
-    is KtReference -> listOf(this)
-    is PsiMultiReference -> references.flatMap { it.unwrapMultiReferences() }
-    else -> error("Unexpected reference $this")
+/**
+ * Preferes to call [resolveCall], but falls back to [resolveSymbol] if [resolveCall] fails.
+ *
+ * Handles error calls as well.
+ *
+ * In case of ambiguity, returns `null`.
+ */
+@OptIn(KtExperimentalApi::class)
+context(session: KaSession)
+fun KtResolvable.resolveSymbolPreferringCall(): KaSymbol? {
+    return (this as? KtResolvableCall)?.tryResolveCall()?.calls?.flatMap(KaSingleOrMultiCall::symbols)?.singleOrNull()
+        ?: tryResolveSymbols()?.symbols?.singleOrNull()
 }
 
 /**
@@ -138,11 +150,35 @@ fun <T, R> Collection<T>.singleOrZeroValue(
     }
 }
 
-private val snapshotVersionRegex: Regex = """-2\.\d\.\d+-(\w+-\d+|SNAPSHOT)""".toRegex()
-
 /**
- * Removes version suffix from kotlin libraries, like stdlib or kotlin-reflect:
- * kotlin-stdlib-2.3.255-SNAPSHOT -> kotlin-stdlib
- * kotlin-stdlib-2.3.0-dev-1234 -> kotlin-stdlib
+ * Removes the given Kotlin [version] suffix from the file name.
+ * The function only strips out the version once.
+ *
+ * The file extension is preserved.
+ * If the file extension isn't included ([fileName] is the base file name), no extension is added.
+ *
+ * kotlin-stdlib-2.3.0.jar -> kotlin-stdlib.jar
+ * kotlin-stdlib-2.3.255-SNAPSHOT.jar -> kotlin-stdlib.jar
+ * kotlin-stdlib-2.3.0-dev-1234.jar -> kotlin-stdlib.jar
+ * kotlin-stdlib-2.3.0-RC3.jar -> kotlin-stdlib.jar
  */
-fun String.stripOutSnapshotVersion(): String = replace(snapshotVersionRegex, "")
+fun stripOutKotlinVersionFromFileName(fileName: String, version: KotlinVersion = KotlinVersion.CURRENT): String {
+    // E.g., kotlin-stdlib[[-2.3-SNAPSHOT]].jar
+    val kotlinVersionSuffixBase = "-$version"
+
+    val startIndex = fileName.indexOf(kotlinVersionSuffixBase)
+    if (startIndex < 0) {
+        return fileName
+    }
+
+    var endIndex = startIndex + kotlinVersionSuffixBase.length
+    while (endIndex < fileName.length) {
+        val ch = fileName[endIndex]
+        if (!ch.isLetterOrDigit() && ch != '-') {
+            break
+        }
+        endIndex++
+    }
+
+    return fileName.substring(0, startIndex) + fileName.substring(endIndex)
+}

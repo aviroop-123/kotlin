@@ -9,7 +9,6 @@ import kotlinx.coroutines.runBlocking
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.toScriptSource
 import kotlin.script.experimental.jvm.BasicJvmScriptEvaluator
-import kotlin.script.experimental.jvm.defaultJvmScriptingHostConfiguration
 import kotlin.script.experimental.jvm.updateClasspath
 import kotlin.script.experimental.jvm.util.classpathFromClass
 import kotlin.script.experimental.jvmhost.JvmScriptCompiler
@@ -27,32 +26,32 @@ class ConfigurationDslTest {
             updateClasspath(classpathFromClass<SimpleScript>())
             defaultImports(MyTestAnnotation1::class, MyTestAnnotation2::class)
             refineConfiguration {
-                beforeParsing { (_, config, _) ->
+                beforeParsing { (val _ = script, val config = compilationConfiguration, val _ = collectedData) ->
                     config.with {
                         implicitReceivers(Int::class)
                     }.asSuccess()
                 }
-                onAnnotations<MyTestAnnotation1> { (_, config, _) ->
+                onAnnotations<MyTestAnnotation1> { (val _ = script, val config = compilationConfiguration, val _ = collectedData) ->
                     config.with {
                         providedProperties("ann1" to String::class)
                     }.asSuccess()
                 }
-                onAnnotations(MyTestAnnotation1::class, MyTestAnnotation2::class) { (_, config, _) ->
+                onAnnotations(MyTestAnnotation1::class, MyTestAnnotation2::class) { (val _ = script, val config = compilationConfiguration, val _ = collectedData) ->
                     config.with {
                         providedProperties("ann12" to Int::class)
                     }.asSuccess()
                 }
-                onAnnotations<MyTestAnnotation2> { (_, config, _) ->
+                onAnnotations<MyTestAnnotation2> { (val _ = script, val config = compilationConfiguration, val _ = collectedData) ->
                     config.with {
                         providedProperties("ann2" to String::class)
                     }.asSuccess()
                 }
-                beforeCompiling { (_, config, _) ->
+                beforeCompiling { (val _ = script, val config = compilationConfiguration, val _ = collectedData) ->
                     config.with {
                         compilerOptions("-version")
                     }.asSuccess()
                 }
-                beforeCompiling { (_, config, _) ->
+                beforeCompiling { (val _ = script, val config = compilationConfiguration, val _ = collectedData) ->
                     config.with {
                         implicitReceivers(Float::class)
                     }.asSuccess()
@@ -67,7 +66,10 @@ class ConfigurationDslTest {
         val script = "@file:MyTestAnnotation1\nann1+ann12".toScriptSource()
 
         val compiledScript = runBlocking {
-            JvmScriptCompiler(defaultJvmScriptingHostConfiguration).invoke(script, baseConfig).valueOrThrow()
+            val compiler =
+                if (isRunningTestOnK2) JvmScriptCompiler()
+                else JvmScriptCompiler.createLegacy()
+            compiler.invoke(script, baseConfig).valueOrThrow()
         }
         val finalConfig = compiledScript.compilationConfiguration
 
@@ -90,13 +92,13 @@ class ConfigurationDslTest {
         val propAnn12 = 12
 
         val baseEvalConfig = createJvmEvaluationConfigurationFromTemplate<SimpleScript> {
-            refineConfigurationBeforeEvaluate { (_, config, _) ->
+            refineConfigurationBeforeEvaluate { (val _ = compiledScript, val config = evaluationConfiguration, val _ = contextData) ->
                 config.with {
                     implicitReceivers(implicitReceiver1)
                     providedProperties("ann1" to propAnn1)
                 }.asSuccess()
             }
-            refineConfigurationBeforeEvaluate { (_, config, _) ->
+            refineConfigurationBeforeEvaluate { (val _ = compiledScript, val config = evaluationConfiguration, val _ = contextData) ->
                 config.with {
                     implicitReceivers(implicitReceiver2)
                     providedProperties("ann12" to propAnn12)
@@ -129,7 +131,10 @@ class ConfigurationDslTest {
         val script = "val x = 1".toScriptSource()
 
         val evalRes = runBlocking {
-            JvmScriptCompiler(defaultJvmScriptingHostConfiguration).invoke(script, ScriptCompilationConfiguration()).onSuccess {
+            val compiler =
+                if (isRunningTestOnK2) JvmScriptCompiler()
+                else JvmScriptCompiler.createLegacy()
+            compiler.invoke(script, ScriptCompilationConfiguration()).onSuccess {
                 BasicJvmScriptEvaluator().invoke(it, ScriptEvaluationConfiguration())
             }.valueOrThrow()
         }

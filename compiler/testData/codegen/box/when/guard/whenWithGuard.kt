@@ -1,5 +1,4 @@
 // LANGUAGE: +WhenGuards
-// IGNORE_BACKEND_K1: ANY
 // WITH_STDLIB
 
 enum class Problem {

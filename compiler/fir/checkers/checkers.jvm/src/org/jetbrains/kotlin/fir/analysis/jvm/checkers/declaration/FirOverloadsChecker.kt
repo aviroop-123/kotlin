@@ -20,6 +20,9 @@ import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_OVERLOADS_CLASS_ID
 
 object FirOverloadsChecker : FirFunctionChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirFunction) {
         val session = context.session
@@ -35,7 +38,7 @@ object FirOverloadsChecker : FirFunctionChecker(MppCheckerKind.Common) {
                 reporter.reportOn(annotation.source, FirJvmErrors.OVERLOADS_INTERFACE)
             declaration.isAbstract ->
                 reporter.reportOn(annotation.source, FirJvmErrors.OVERLOADS_ABSTRACT)
-            (declaration is FirSimpleFunction && declaration.isLocal) ||
+            (declaration is FirNamedFunction && declaration.status.visibility == Visibilities.Local) ||
                     context.containingDeclarations.any { it.isLocalClassLike } ->
                 reporter.reportOn(annotation.source, FirJvmErrors.OVERLOADS_LOCAL)
             declaration is FirConstructor && containingDeclaration?.classKind == ClassKind.ANNOTATION_CLASS ->

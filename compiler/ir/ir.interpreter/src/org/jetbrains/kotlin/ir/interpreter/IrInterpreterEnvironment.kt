@@ -16,12 +16,16 @@ import org.jetbrains.kotlin.ir.interpreter.stack.CallStack
 import org.jetbrains.kotlin.ir.interpreter.state.*
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.functions
+import org.jetbrains.kotlin.ir.util.hasShape
 import org.jetbrains.kotlin.ir.util.properties
 import org.jetbrains.kotlin.ir.util.toIrConst
 import org.jetbrains.kotlin.platform.isJs
+import org.jetbrains.kotlin.util.OperatorNameConventions
 
 class IrInterpreterEnvironment(
     val irBuiltIns: IrBuiltIns,
@@ -38,6 +42,10 @@ class IrInterpreterEnvironment(
     internal val kParameterClass by lazy { irBuiltIns.kFunctionClass.getIrClassOfReflectionFromList("parameters")!! }
     internal val kTypeProjectionClass by lazy { kTypeClass.getIrClassOfReflectionFromList("arguments")!! }
     internal val kTypeClass: IrClassSymbol by lazy { irBuiltIns.kTypeClass }
+
+    internal val toStringSymbol: IrSimpleFunctionSymbol by lazy {
+        irBuiltIns.anyClass.owner.functions.first { it.name == OperatorNameConventions.TO_STRING && it.hasShape(dispatchReceiver = true) }.symbol
+    }
 
     init {
         mapOfObjects[irBuiltIns.unitClass] = Common(irBuiltIns.unitClass.owner)
@@ -89,7 +97,7 @@ class IrInterpreterEnvironment(
         return when (value) {
             is Proxy -> value.state
             is State -> value
-            is Boolean, is Char, is Byte, is Short, is Int, is Long, is String, is Float, is Double, is Array<*>, is ByteArray,
+            is Boolean, is Char, is Byte, is Short, is Int, is ULong, is UByte, is UShort, is UInt, is Long,is String, is Float, is Double, is Array<*>, is ByteArray,
             is CharArray, is ShortArray, is IntArray, is LongArray, is FloatArray, is DoubleArray, is BooleanArray -> Primitive(value, irType)
             null -> Primitive.nullStateOfType(irType)
             else -> irType.classOrNull?.owner?.let { Wrapper(value, it, this) }
@@ -105,7 +113,7 @@ class IrInterpreterEnvironment(
             is Primitive -> when {
                 configuration.platform.isJs() && state.value is Float -> IrConstImpl.float(start, end, type, state.value)
                 configuration.platform.isJs() && state.value is Double -> IrConstImpl.double(start, end, type, state.value)
-                state.value == null || type.isPrimitiveType() || type.isString() -> state.value.toIrConst(type, start, end)
+                state.value == null || type.isPrimitiveType() || type.isUnsignedType() || type.isString() -> state.value.toIrConst(type, start, end)
                 else -> original // TODO support for arrays
             }
             is ExceptionState -> {

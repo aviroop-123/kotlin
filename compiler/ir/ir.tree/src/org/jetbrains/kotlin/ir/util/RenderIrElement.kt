@@ -34,7 +34,7 @@ import java.io.File
 fun IrElement.render(options: DumpIrTreeOptions = DumpIrTreeOptions()) =
     accept(RenderIrElementVisitor(options), null)
 
-open class RenderIrElementVisitor(
+class RenderIrElementVisitor(
     private val options: DumpIrTreeOptions = DumpIrTreeOptions(),
     private var isUsedForIrDump: Boolean = false,
 ) : IrVisitor<String, Nothing?>() {
@@ -694,8 +694,11 @@ private fun IrFile.renderLineStartOffsets(options: DumpIrTreeOptions): String =
         "lineStartOffsets: ${(fileEntry as? AbstractIrFileEntry)?.getLineStartOffsetsForSerialization().orEmpty()}"
     else ""
 
-private fun IrElement.renderOffsets(options: DumpIrTreeOptions): String =
-    if (options.printSourceOffsets) "[$startOffset, $endOffset]" else ""
+private fun IrElement.renderOffsets(options: DumpIrTreeOptions): String = when {
+    !options.printSourceOffsets -> ""
+    this is IrInlinedFunctionBlock -> "[$startOffset, $endOffset]->[$inlinedFunctionStartOffset, $inlinedFunctionEndOffset]"
+    else -> "[$startOffset, $endOffset]"
+}
 
 private fun IrDeclarationWithName.renderSignatureIfEnabled(printSignatures: Boolean): String =
     if (printSignatures) symbol.signature?.let { "signature:${it.render()} " }.orEmpty() else ""
@@ -1038,6 +1041,15 @@ private fun StringBuilder.renderAsAnnotationArgument(irElement: IrElement?, rend
         is IrConstructorCall -> renderAsAnnotation(irElement, renderer, options)
         is IrConst -> {
             renderIrConstAsAnnotationArgument(irElement)
+        }
+        is IrClassReference -> {
+            val className = irElement.classType.classOrNull?.getOwnerIfBound()?.name ?: "<UNKNOWN>"
+            append("$className::class")
+        }
+        is IrGetEnumValue -> {
+            val className = irElement.type.classOrNull?.getOwnerIfBound()?.name ?: "<UNKNOWN>"
+            val entryName = irElement.symbol.getOwnerIfBound()?.name ?: "<UNKNOWN>"
+            append("$className.$entryName")
         }
         is IrVararg -> {
             appendIterableWith(irElement.elements, prefix = "[", postfix = "]", separator = ", ") {

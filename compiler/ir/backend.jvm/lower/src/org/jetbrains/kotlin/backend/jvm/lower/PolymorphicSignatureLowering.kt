@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.config.LanguageFeature
@@ -20,14 +19,16 @@ import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.classOrNull
+import org.jetbrains.kotlin.ir.types.isClassWithFqName
 import org.jetbrains.kotlin.ir.types.isNullableAny
 import org.jetbrains.kotlin.ir.util.copyTypeParametersFrom
 import org.jetbrains.kotlin.ir.util.dump
-import org.jetbrains.kotlin.ir.util.hasAnnotation
 import org.jetbrains.kotlin.ir.util.transformInPlace
 import org.jetbrains.kotlin.ir.visitors.IrTransformer
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.resolve.jvm.JAVA_POLYMORPHIC_SIGNATURE_NAME
+import org.jetbrains.kotlin.resolve.jvm.JAVA_METHOD_HANDLE_FQ_NAME
+import org.jetbrains.kotlin.resolve.jvm.JAVA_VAR_HANDLE_FQ_NAME
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 
 /**
@@ -48,7 +49,6 @@ import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
  * This lowering phase creates and calls a fake `IrFunction` which is the same as the original callee in everything except value parameter
  * types and return type.
  */
-@PhaseDescription(name = "PolymorphicSignature")
 internal class PolymorphicSignatureLowering(val context: JvmBackendContext) : IrTransformer<PolymorphicSignatureLowering.Data>(),
     FileLoweringPass {
     override fun lower(irFile: IrFile) {
@@ -114,12 +114,28 @@ internal class PolymorphicSignatureLowering(val context: JvmBackendContext) : Ir
             expression.transform(data.coerceToType)
         } else super.visitCall(expression, Data.NO_COERCION)
 
-    private fun IrCall.isPolymorphicCall(): Boolean =
-        symbol.owner.hasAnnotation(JAVA_POLYMORPHIC_SIGNATURE_NAME)
+    private fun IrCall.isPolymorphicCall(): Boolean {
+        // See JLS §15.12.3.
+        // > A method is _signature polymorphic_ if all of the following are true:
+        // >     * It is declared in the `java.lang.invoke.MethodHandle` class or the `java.lang.invoke.VarHandle` class.
+        // >     * It has a single variable arity parameter (§8.4.1) whose declared type is `Object[]`.
+        // >     * It is `native`.
+        val callee = symbol.owner
+        return callee.isExternal &&
+                callee.parameters.size == 2 &&
+                callee.parameters[0].let { dispatchReceiver ->
+                    dispatchReceiver.kind == IrParameterKind.DispatchReceiver && dispatchReceiver.type.classOrNull?.owner?.let {
+                        it.isClassWithFqName(JAVA_METHOD_HANDLE_FQ_NAME) || it.isClassWithFqName(JAVA_VAR_HANDLE_FQ_NAME)
+                    } == true
+                } &&
+                callee.parameters[1].let { parameter ->
+                    parameter.kind == IrParameterKind.Regular && parameter.varargElementType?.isNullableAny() == true
+                }
+    }
 
     private fun IrCall.transform(castReturnType: IrType?): IrCall {
         val function = symbol.owner
-        val (regularParameters, nonRegularParameters) = function.parameters.partition { it.kind == IrParameterKind.Regular }
+        val [regularParameters, nonRegularParameters] = function.parameters.partition { it.kind == IrParameterKind.Regular }
         val regularParameter = regularParameters.singleOrNull()
         require(regularParameter?.varargElementType != null) {
             "@PolymorphicSignature methods should only have a single vararg argument: ${dump()}"

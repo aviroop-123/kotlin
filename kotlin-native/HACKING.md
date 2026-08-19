@@ -98,12 +98,14 @@ See the table of property names and values below.
 | `gcType`                | The type of GC: `UNSPECIFIED` (default), `NOOP`, `STWMS`, `PMCS`, `CMS`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `gcScheduler`           | The type of GC scheduler: `UNSPECIFIED` (default), `ADAPTIVE`, `AGGRESSIVE`, `MANUAL`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `alloc`                 | The type of allocator: `UNSPECIFIED` (default), `STD`, `CUSTOM`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `pagedAllocator`        | Controls if allocations should be done in pages or per-object. The default is `true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `cacheMode`             | * `NO`: no caches <br/>* `STATIC_ONLY_DIST` (default): use only caches for libs from the distribution <br/>* `STATIC_EVERYWHERE`: use caches for libs from the distribution and generate caches for all produced KLIBs<br/>* `STATIC_PER_FILE_EVERYWHERE`: same as `STATIC_EVERYWHERE`, but use per-file caches. <br/>* `STATIC_USE_HEADERS_EVERYWHERE`: same as `STATIC_EVERYWHERE`, but use header caches <br/><br/>Note: Any cache mode that permits using caches can be enabled only when thread state checker is disabled.                                                                     |
 | `executionTimeout`      | Max permitted duration of each individual test execution in milliseconds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `sanitizer`             | Run tests with sanitizer: `NONE` (default), `THREAD`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `sharedTestExecution`   | Controls how to run tests compiled into the same test executable: `false` (default) -- run executable many times, `true` -- run it once, parse the result to distinguish tests.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `eagerGroupCreation`    | Group more tests into an executable: `false` (default), `true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `xctest`                | Compile and run tests with XCTest: `false` (default), `true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `jdkVersion`            | The JDK major version used to run the compiler and tests (e.g., `11`, `17`, `21`). Falls back to JDK 11 when unset.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
  #### Passing arbitrary binary options
 
@@ -153,14 +155,12 @@ and they generally do not depend on a particular Kotlin/Native target.
 
 A test can be ignored for certain property values with the help of test directives within
 [test data files](../compiler/testData/codegen):
-- `// IGNORE_NATIVE: <name>=<value>` to ignore test for both K1 and K2 frontends
-- `// IGNORE_NATIVE_K1: <name>=<value>` to ignore test for K1 frontend only
-- `// IGNORE_NATIVE_K2: <name>=<value>` to ignore test for K2 frontend only
+- `// IGNORE_NATIVE: <name>=<value>` to ignore test
 
 Good examples are:
 - `// IGNORE_NATIVE: cacheMode=STATIC_EVERYWHERE`
-- `// IGNORE_NATIVE_K1: mode=ONE_STAGE_MULTI_MODULE`
-- `// IGNORE_NATIVE_K2: optimizationMode=OPT`
+- `// IGNORE_NATIVE: mode=ONE_STAGE_MULTI_MODULE`
+- `// IGNORE_NATIVE: optimizationMode=OPT`
 - `// IGNORE_NATIVE: cacheMode=STATIC_EVERYWHERE && target=linux_x64`
 
 Test will be ignored in case value of any `// IGNORE_NATIVE*` directive would match to an actual test run setting.
@@ -265,115 +265,35 @@ Use `Edit Configurations` in dropdown menu with your run/debug configurations an
 Ensure the port is `5005`.
 Now just run this configuration. It’ll attach and let the compiler run.
 
-## Developing Kotlin/Native runtime in CLion
+## Working with C++ code in CLion
 
-It's possible to use CLion to develop C++ runtime code efficiently and to have navigation in C++ code.
-To open runtime code in CLion as project and use all provided features of CLion, use a compilation database.
-It lets CLion detect project files and extract all the necessary compiler information, such as include paths and compilation flags.
-To generate a compilation database for the Kotlin/Native runtime, run the Gradle task
-`./gradlew :kotlin-native:compdb`.
-This task generates `<path_to_kotlin>/kotlin-native/compile_commands.json` file that should be opened in CLion as project.
-Other developer tools also can use generated compilation database, but then `clangd` tool should be installed manually.
+It's possible to use CLion to work on C++ code used in Kotlin/Native: 
+- Kotlin/Native runtime found in `kotlin-native/runtime`
+- extensions for llvm found in `kotlin-native/libllvmext` and `kotlin-native/llvmDebugInfoC`
+- extensions for libclang found in `kotlin-native/libclangext`
+- support code for JVM<->C++ bindings in `kotlin-native/Interop/Runtime`
+- a tool to analyze minidumps used in Compiler Tests on macOS in `kotlin-native/tools/minidump-analyzer`
 
-Also, it's possible to build Kotlin/Native runtime with dwarf debug information, which can be useful for debugging.
-To do this you should add `kotlin.native.isNativeRuntimeDebugInfoEnabled=true` line to `local.properties` file. Note, that changing
-this property requires clean compiler rebuild with gradle daemon restart.
+C++ code support is done via Compilation Database. It lets CLion detect project files and extract all the necessary compiler information, such as include paths and compilation flags.
 
-Unfortunately, this feature works quite unstable because of using several llvm versions simultaneously,
-so it's need to be additionally enabled while compiling application with `-Xbinary=stripDebugInfoFromNativeLibs=false`
-compiler flag or corresponding setting in gradle build script. After doing this, Kotlin/Native runtime in application
+To generate the Compilation Database, run `./gradlew :kotlin-native:compdb`.
+This task generates `<path_to_kotlin>/kotlin-native/compile_commands.json` file that should be opened in CLion as a project.
+Other developer tools can also use the generated Compilation Database, but may require a manual installation of `clangd` LSP.
+
+### Kotlin/Native runtime specifics
+
+It's possible to build Kotlin/Native runtime with dwarf debug information, which can be useful for debugging.
+To do this you should add `kotlin.native.isNativeRuntimeDebugInfoEnabled=true` line to `local.properties` file.
+
+Unfortunately, this feature might work unstable, so it's need to be additionally enabled while
+compiling an application with `-Xbinary=stripDebugInfoFromNativeLibs=false` compiler flag or
+the corresponding setting in the Gradle build script. After doing this, Kotlin/Native runtime in application
 is debuggable in CLion, with Attach to process tool.
 
 
  ## Performance measurement
- ### Pre-requisite
-  **konanRun** task needs built compiler and platform POSIX libs. To test against working tree make sure to run
 
-    ./gradlew :kotlin-native:dist :kotlin-native:distPlatformLibs
-
- ### Run tests
- To measure performance of Kotlin/Native compiler on existing benchmarks:
- 
-    cd kotlin-native/performance
-    ../../gradlew :konanRun
- 
- **konanRun** task can be run separately for one/several benchmark applications:
- 
-    cd kotlin-native/performance
-    ../../gradlew :cinterop:konanRun
-    
- **konanRun** task has parameter `filter` which allows to run only some subset of benchmarks:
- 
-    cd kotlin-native/performance
-    ../../gradlew :cinterop:konanRun --filter=struct,macros
-    ../../gradlew :ring:konanRun --filter=Euler.problem9,ForLoops.charArrayIndicesLoop
-    
- Or you can use `filterRegex` if you want to specify the filter as regexes:
- 
-    cd kotlin-native/performance
-    ../../gradlew :ring:konanRun --filterRegex=String.*,Loop.*
-    
- There us also verbose mode to follow progress of running benchmarks
- 
-    cd kotlin-native/performance
-    ../../gradlew :cinterop:konanRun --verbose
-    
-    > Task :performance:cinterop:konanRun
-    [DEBUG] Warm up iterations for benchmark macros
-    [DEBUG] Running benchmark macros
-    ...
-    
- There are also tasks for running benchmarks on JVM (pay attention, some benchmarks e.g. cinterop benchmarks can't be run on JVM)
- 
-    cd kotlin-native/performance
-    ../../gradlew :jvmRun
-
- You can use the `compilerArgs` property to pass flags to the compiler used to compile the benchmarks:
-
-    cd kotlin-native/performance
-    ../../gradlew :konanRun -PcompilerArgs="--time -g"
-
- ### Analyze the results
- Files with results of benchmarks run are saved in `kotlin-native/performance/build` folder: `nativeReport.json` for konanRun and `jvmReport.json` for jvmRun.
- You can change the output filename by setting the `nativeJson` property for konanRun and `jvmJson` for jvmRun:
-
-    cd kotlin-native/performance
-    ../../gradlew :ring:konanRun --filter=String.*,Loop.* -PnativeJson=stringsAndLoops.json
-
- To compare different results use benchmarksAnalyzer tool:
-
-    ./gradlew macos_arm64PlatformLibs  # use target of your laptop here instead
-    cd kotlin-native/tools/benchmarksAnalyzer
-    ../../../gradlew build
-    ./build/bin/<target>/benchmarksAnalyzerReleaseExecutable/benchmarksAnalyzer.kexe <file1> <file2>
-    
- Tool has several renders which allow produce output report in different forms (text, html, etc.). To set up render use flag `--render/-r`.
- Output can be redirected to file with flag `--output/-o`.
- To get detailed information about supported options, please use `--help/-h`.
- 
- Analyzer tool can compare both local files and files placed on Artifactory/TeamCity.
- 
- File description stored on Artifactory
- 
-    artifactory:<build number>:<target (Linux|Windows10|MacOSX)>:<filename>
-    
- Example
-    
-    artifactory:1.2-dev-7942:Windows10:nativeReport.json
-    
- File description stored on TeamCity
-  
-     teamcity:<build locator>:<filename>
-     
- Example
-     
-     teamcity:id:42491947:nativeReport.json
-     
- Pay attention, user and password information(with flag `-u <username>:<password>`) should be provided to get data from TeamCity.
-
- By default analyzing tool splits benchmarks into stable and unstable taking information from database. If you have no connection to inner network please use `-f` flag.
-
-    ./benchmarksAnalyzer.kexe -f <file1> <file2>
+See [the performance project](performance/README.md) for details on the micro-benchmarking setup.
 
 ## LLVM
 
@@ -427,8 +347,25 @@ kotlinc-native main.kt -Xsave-llvm-ir-after=<PhaseName> -Xsave-llvm-ir-directory
 `<PATH>/out.<PhaseName>.ll` will contain LLVM IR after given phase.
 
 Passing `Codegen` phase allows to get LLVM IR right after translation from Kotlin Backend IR, and
-`BitcodeOptimization` phase allows to see the result of LLVM optimization pipeline. The list of phases that support LLVM IR dumping is constantly changing, so check out compiler sources
+`LTOBitcodeOptimization` phase allows to see the result of LLVM optimization pipeline. The list of phases that support LLVM IR dumping is constantly changing, so check out compiler sources
 if you want to get the full list of such phases.
+
+It's also possible to dump LLVM IR after LLVM passes. Use `<PhaseName>:<LLVMPassName>` to dump after `LLVMPassName` while executing `PhaseName`
+in Kotlin compiler. For example,
+
+```shell script
+mkdir llvm-ir
+kotlinc-native main.kt -Xsave-llvm-ir-after=ModuleBitcodeOptimization:always-inline -Xsave-llvm-ir-directory=llvm-ir/
+```
+
+will dump LLVM IR in `llvm-ir/ModuleBitcodeOptimization/<...>-module-AlwaysInlinerPass-after.ll`.
+
+Important: only use this when running the CLI compiler; the implementation sets up global variables in the shared llvm library,
+which can lead to data races, if the compiler is running inside Gradle daemon.
+
+The output logic and file naming differs from the compiler, but it matches `opt -print-after=...` exactly:
+for example, if a pass is a function pass, there will be `n` files created with each of the `n` functions
+on which the pass ran.
 
 ## Running Clang the same way Kotlin/Native compiler does
 

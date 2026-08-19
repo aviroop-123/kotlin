@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // JSPECIFY_STATE: warn
 // ALLOW_KOTLIN_PACKAGE
 
@@ -40,7 +39,7 @@ import test1.Test1
 import test2.Test2
 
 fun main(x: Test1, y: Test2) {
-    x.foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
-    y.foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
+    x.foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
+    y.foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
     y.foo2(null)
 }

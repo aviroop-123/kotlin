@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 interface CPointed
 
 inline fun <reified T : CPointed> CPointed.reinterpret(): T = TODO()

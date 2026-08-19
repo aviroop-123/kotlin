@@ -6,16 +6,22 @@
 package org.jetbrains.kotlin.fir.resolve.calls
 
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.OnlyForDefaultLanguageFeatureDisabled
 import org.jetbrains.kotlin.fir.collectUpperBounds
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.expressions.FirExpression
+import org.jetbrains.kotlin.fir.expressions.FirInaccessibleReceiverExpression
 import org.jetbrains.kotlin.fir.expressions.FirNamedArgumentExpression
 import org.jetbrains.kotlin.fir.expressions.FirSpreadArgumentExpression
+import org.jetbrains.kotlin.fir.expressions.InaccessibleReceiverKind
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.substitution.AbstractConeSubstitutor
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.types.model.TypeSystemCommonSuperTypesContext
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 internal fun prepareCapturedType(argumentType: ConeKotlinType, session: FirSession): ConeKotlinType {
     if (argumentType.isRaw()) return argumentType
@@ -50,7 +56,7 @@ private class FunctionTypeKindSubstitutor(private val session: FirSession) : Abs
      */
     override fun substituteType(type: ConeKotlinType): ConeKotlinType? {
         if (type !is ConeClassLikeType) return null
-        val classId = type.classId ?: return null
+        val classId = type.classId
         return session.functionTypeService.extractSingleExtensionKindForDeserializedConeType(classId, type.customAnnotations)
             ?.let { functionTypeKind ->
                 type.createFunctionTypeWithNewKind(session, functionTypeKind) {
@@ -106,5 +112,25 @@ private fun ConeKotlinType.hasSupertypeWithGivenClassId(classId: ClassId, contex
             val typeConstructor = it.typeConstructor()
             typeConstructor is ConeClassLikeLookupTag && typeConstructor.classId == classId
         }
+    }
+}
+
+/**
+ * [InaccessibleReceiverKind.SecondaryConstructor] should produce a successful candidate, but `INSTANCE_ACCESS_BEFORE_SUPER_CALL`
+ * will be reported in a checker, whereas other kinds should produce an inapplicable candidate.
+ */
+@OptIn(ExperimentalContracts::class)
+internal fun FirExpression?.isInaccessibleAndInapplicable(): Boolean {
+    contract { returns(true) implies (this@isInaccessibleAndInapplicable is FirInaccessibleReceiverExpression) }
+    return this is FirInaccessibleReceiverExpression && !kind.producesApplicableCandidate
+}
+
+internal fun FirInaccessibleReceiverExpression.toInaccessibleReceiverDiagnostic(): ResolutionDiagnostic {
+    return when (kind) {
+        InaccessibleReceiverKind.OuterClassOfNonInner -> InaccessibleOuterClassReceiver(calleeReference.boundSymbol as FirClassSymbol)
+        InaccessibleReceiverKind.ClassHeader -> InaccessibleFromClassHeader
+        @OptIn(OnlyForDefaultLanguageFeatureDisabled::class)
+        InaccessibleReceiverKind.SecondaryConstructor,
+            -> error("Should not be called for $kind")
     }
 }

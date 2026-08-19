@@ -11,16 +11,17 @@ import org.jetbrains.kotlin.backend.common.lower.irNot
 import org.jetbrains.kotlin.backend.jvm.*
 import org.jetbrains.kotlin.codegen.ASSERTIONS_DISABLED_FIELD_NAME
 import org.jetbrains.kotlin.codegen.AsmUtil
+import org.jetbrains.kotlin.codegen.inline.classFileContainsMethod
 import org.jetbrains.kotlin.codegen.inline.coroutines.FOR_INLINE_SUFFIX
 import org.jetbrains.kotlin.codegen.mangleNameIfNeeded
 import org.jetbrains.kotlin.codegen.state.JvmBackendConfig
 import org.jetbrains.kotlin.config.JvmDefaultMode
 import org.jetbrains.kotlin.config.LanguageFeature
-import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.ValueClassBackendAgnosticApi
 import org.jetbrains.kotlin.descriptors.annotations.KotlinRetention
 import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.IrElement
@@ -29,11 +30,11 @@ import org.jetbrains.kotlin.ir.PsiIrFileEntry
 import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
 import org.jetbrains.kotlin.ir.builders.declarations.buildField
 import org.jetbrains.kotlin.ir.builders.declarations.buildProperty
+import org.jetbrains.kotlin.ir.builders.irAnnotation
 import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.builders.irExprBody
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin.Companion.UNDERSCORE_PARAMETER
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrClassReferenceImpl
@@ -44,7 +45,6 @@ import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrVariableSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.ir.util.erasedUpperBound
 import org.jetbrains.kotlin.ir.util.getArrayElementType
 import org.jetbrains.kotlin.ir.util.isBoxedArray
 import org.jetbrains.kotlin.ir.util.isSubtypeOf
@@ -62,8 +62,9 @@ import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_SYNTHETIC_ANNOTATION_FQ
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.resolve.JVM_NAME_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
 import org.jetbrains.kotlin.resolve.jvm.AsmTypes
-import org.jetbrains.kotlin.resolve.jvm.JvmConstants
 import org.jetbrains.kotlin.resolve.multiplatform.OptionalAnnotationUtil
 import org.jetbrains.kotlin.resolve.source.PsiSourceElement
 import org.jetbrains.kotlin.utils.DFS
@@ -75,16 +76,20 @@ import java.lang.annotation.RetentionPolicy
 
 fun IrDeclaration.getJvmNameFromAnnotation(): String? {
     // TODO lower @JvmName and @JvmExposeBoxed?
-    val const = getAnnotation(DescriptorUtils.JVM_NAME)?.arguments[0] as? IrConst
-        ?: getAnnotation(JVM_EXPOSE_BOXED_ANNOTATION_FQ_NAME)?.arguments[0] as? IrConst
+    val value = (getAnnotation(DescriptorUtils.JVM_NAME)?.arguments[0] as? IrConst)?.value as? String
+        ?: getJvmNameFromJvmExposeBoxedAnnotation()
         ?: return null
-    val value = const.value as? String ?: return null
     return when (origin) {
         IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER -> "$value\$default"
         JvmLoweredDeclarationOrigin.FOR_INLINE_STATE_MACHINE_TEMPLATE,
         JvmLoweredDeclarationOrigin.FOR_INLINE_STATE_MACHINE_TEMPLATE_CAPTURES_CROSSINLINE -> "$value$FOR_INLINE_SUFFIX"
         else -> value
     }
+}
+
+fun IrDeclaration.getJvmNameFromJvmExposeBoxedAnnotation(): String? {
+    val value = getAnnotation(JVM_EXPOSE_BOXED_ANNOTATION_FQ_NAME)?.arguments[0] as? IrConst ?: return null
+    return if (value.value == "") null else value.value as? String
 }
 
 fun IrFunction.getJvmVisibilityOfDefaultArgumentStub() =
@@ -246,24 +251,33 @@ val IrDeclaration.isStaticMultiFieldValueClassReplacement: Boolean
     get() = origin == JvmLoweredDeclarationOrigin.STATIC_MULTI_FIELD_VALUE_CLASS_REPLACEMENT
             || origin == JvmLoweredDeclarationOrigin.STATIC_MULTI_FIELD_VALUE_CLASS_CONSTRUCTOR
 
-fun IrDeclaration.shouldBeExposedByAnnotationOrFlag(languageVersionSettings: LanguageVersionSettings): Boolean {
-    if (!isFunctionWhichCanBeExposed()) return false
+fun IrDeclaration.shouldBeExposedByAnnotationOrFlag(context: JvmBackendContext): Boolean {
+    val isPropagatedOrImplicit = propagatedOrImplicitJvmExposeBoxed(context)
+    val isExplicit = hasAnnotation(JVM_EXPOSE_BOXED_ANNOTATION_FQ_NAME)
+
+    if (!(isExplicit || isPropagatedOrImplicit)) return false
+    if (!isFunctionWhichCanBeExposed(isPropagatedOrImplicit && !isExplicit)) return false
     if (hasAnnotation(JVM_SYNTHETIC_ANNOTATION_FQ_NAME)) return false
 
-    return getAnnotation(JVM_EXPOSE_BOXED_ANNOTATION_FQ_NAME) != null ||
-            parentClassOrNull?.getAnnotation(JVM_EXPOSE_BOXED_ANNOTATION_FQ_NAME) != null ||
-            languageVersionSettings.supportsFeature(LanguageFeature.ImplicitJvmExposeBoxed)
+    return true
 }
 
+private fun IrDeclaration.propagatedOrImplicitJvmExposeBoxed(context: JvmBackendContext): Boolean =
+    parentClassOrNull?.getAnnotation(JVM_EXPOSE_BOXED_ANNOTATION_FQ_NAME) != null ||
+            context.config.implicitJvmExposeBoxed
+
 // Do not duplicate function without inline classes in parameters, since it would lead to CONFLICTING_JVM_DECLARATIONS
-private fun IrDeclaration.isFunctionWhichCanBeExposed(): Boolean {
+private fun IrDeclaration.isFunctionWhichCanBeExposed(isPropagatedOrImplicit: Boolean): Boolean {
     if (this !is IrFunction || origin == IrDeclarationOrigin.GENERATED_SINGLE_FIELD_VALUE_CLASS_MEMBER) return false
     // No sense in exposing suspend functions - they cannot be called from Java in normal way anyway
     if (isSuspend) return false
+    // Ditto for suspend lambda methods
+    if (parentClassOrNull?.origin == JvmLoweredDeclarationOrigin.SUSPEND_LAMBDA) return false
     // Cannot expose open or abstract - @JvmName problem
     if (isOverridable) return false
     if (parameters.any { it.type.isInlineClassType() }) return true
-    if (!returnType.isInlineClassType()) return false
+    // If the function is annotated with @JvmName, it is unmangled, so, we cannot implicitly expose it.
+    if (!returnType.isInlineClassType() || (isPropagatedOrImplicit && hasAnnotation(JVM_NAME_ANNOTATION_FQ_NAME))) return false
     // It is not explicitly annotated, global and returns inline class, do not expose it, since otherwise
     // it would lead to ambiguous call on Java side
     // WARNING: Do not use parentAsClass here, otherwise, it leads to ICE in some obscure cases, see KT-78551
@@ -275,7 +289,7 @@ val IrDeclaration.isStaticValueClassReplacement: Boolean
 
 // On the IR backend we represent raw types as star projected types with a special synthetic annotation.
 // See `TypeTranslator.translateTypeAnnotations`.
-private fun JvmBackendContext.makeRawTypeAnnotation() = generatorExtensions.generateRawTypeAnnotationCall()!!
+private fun JvmBackendContext.makeRawTypeAnnotation() = generatorExtensions.generateRawTypeAnnotation()!!
 
 fun IrClass.rawType(context: JvmBackendContext): IrType =
     defaultType.addAnnotations(listOf(context.makeRawTypeAnnotation()))
@@ -480,7 +494,7 @@ fun classFileContainsMethod(classId: ClassId, function: IrFunction, context: Jvm
         listOf(*Type.getArgumentTypes(originalDescriptor), Type.getObjectType("kotlin/coroutines/Continuation"))
             .joinToString(prefix = "(", postfix = ")", separator = "") + AsmTypes.OBJECT_TYPE
     else originalDescriptor
-    return org.jetbrains.kotlin.codegen.classFileContainsMethod(classId, context.state, Method(originalSignature.name, descriptor))
+    return classFileContainsMethod(classId, context.state, Method(originalSignature.name, descriptor))
 }
 
 val DeclarationDescriptorWithSource.psiElement: PsiElement?
@@ -510,8 +524,6 @@ fun IrFunction.extensionReceiverName(config: JvmBackendConfig): String {
     else
         AsmUtil.LABELED_THIS_PARAMETER + mangleNameIfNeeded(callableName.asString())
 }
-
-fun IrFunction.anonymousContextParameterName(parameter: IrValueParameter): String? = anonymousContextParameterName(parameter, JvmConstants.INVALID_CHARS)
 
 fun IrFunction.isBridge(): Boolean =
     origin == IrDeclarationOrigin.BRIDGE || origin == IrDeclarationOrigin.BRIDGE_SPECIAL
@@ -588,3 +600,27 @@ fun IrFunction.isBodyBridgeCallTo(target: IrSimpleFunction?): Boolean {
     val callee: IrSimpleFunction = singleCallOrNull()?.symbol?.owner ?: return false
     return callee == target || (callee.origin == IrDeclarationOrigin.SYNTHETIC_ACCESSOR && callee.isBodyBridgeCallTo(target))
 }
+
+context(irBuilder: JvmIrBuilder)
+fun IrMutableAnnotationContainer.addJavaLangDeprecatedAnnotation() = copyAnnotationsAndAddJavaLangDeprecated(this)
+
+context(irBuilder: JvmIrBuilder)
+fun IrMutableAnnotationContainer.copyAnnotationsAndAddJavaLangDeprecated(source: IrAnnotationContainer) {
+    isJavaLangDeprecatedOnlyAddedByCompiler = !source.annotations.hasAnnotation(DeprecationResolver.JAVA_DEPRECATED)
+    annotations = filterOutAnnotations(DeprecationResolver.JAVA_DEPRECATED, source.annotations) +
+            irBuilder.irAnnotation(irBuilder.irSymbols.javaLangDeprecatedConstructorWithDeprecatedFlag)
+}
+
+fun IrConstructor.isNonExposedConstructorOfOrdinaryClass(): Boolean =
+    parameters.lastOrNull()?.origin == JvmLoweredDeclarationOrigin.NON_EXPOSED_CONSTRUCTOR_SYNTHETIC_PARAMETER
+
+
+@OptIn(ValueClassBackendAgnosticApi::class)
+val IrClass.isSingleFieldValueClass: Boolean get() = isSingleFieldValueClass(treatFullValueClassesWithOneFieldAsBasic = false)
+
+@OptIn(ValueClassBackendAgnosticApi::class)
+val IrClass.inlineClassRepresentation get() = inlineClassRepresentation(treatFullValueClassesWithOneFieldAsBasic = false)
+
+@OptIn(ValueClassBackendAgnosticApi::class)
+fun getInlineClassUnderlyingType(irClass: IrClass): IrSimpleType =
+    getInlineClassUnderlyingType(irClass, treatFullValueClassesWithOneFieldAsBasic = false)

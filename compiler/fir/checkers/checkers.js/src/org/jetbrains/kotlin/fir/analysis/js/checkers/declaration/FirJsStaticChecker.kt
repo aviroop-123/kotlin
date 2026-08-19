@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.descriptors.isInterface
+import org.jetbrains.kotlin.descriptors.isObject
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.FirSession
@@ -23,13 +24,18 @@ import org.jetbrains.kotlin.fir.analysis.diagnostics.js.FirJsErrors
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
+import org.jetbrains.kotlin.fir.isDisabled
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.JsStandardClassIds
 
 object FirJsStaticChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirDeclaration) {
         if (declaration is FirConstructor) {
@@ -67,18 +73,18 @@ object FirJsStaticChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
         targetSource: KtSourceElement?,
     ) {
         if (declaration !is FirMemberDeclaration) {
+            // WRONG_DECLARATION_TARGET
             return
         }
 
-        val container = declaration.getContainingClassSymbol() ?: return
+        val container = declaration.getContainingClassSymbol()
 
         if (
-            !container.isCompanion() || (
-                    container.containerIsInterface() &&
-                    !context.languageVersionSettings.supportsFeature(LanguageFeature.JsStaticInInterface)
-            )
+            (container as? FirClassSymbol<*>) == null ||
+            !container.classKind.isObject ||
+            (container.containerIsInterface() && LanguageFeature.JsStaticInInterface.isDisabled())
         ) {
-            reporter.reportOn(targetSource, FirJsErrors.JS_STATIC_NOT_IN_CLASS_COMPANION)
+            reporter.reportOn(targetSource, FirJsErrors.JS_STATIC_NOT_IN_OBJECT)
         }
 
         checkStaticOnConst(declaration, targetSource)
@@ -140,8 +146,6 @@ object FirJsStaticChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
     private fun FirClassLikeSymbol<*>.containerIsInterface(): Boolean {
         return getContainingClassSymbol()?.classKind?.isInterface == true
     }
-
-    private fun FirClassLikeSymbol<*>.isCompanion() = (this as? FirRegularClassSymbol)?.isCompanion == true
 
     private fun FirDeclaration.findAnnotation(classId: ClassId, session: FirSession): FirAnnotation? {
         return annotations.firstOrNull {

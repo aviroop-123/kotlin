@@ -5,14 +5,15 @@
 
 package org.jetbrains.kotlin.psi2ir.lazy
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.lazy.lazyVar
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrBody
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.util.DeclarationStubGenerator
@@ -23,6 +24,7 @@ import org.jetbrains.kotlin.serialization.deserialization.descriptors.Descriptor
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
+@K1Deprecation
 class IrLazyConstructor(
     override var startOffset: Int,
     override var endOffset: Int,
@@ -38,7 +40,7 @@ class IrLazyConstructor(
     override val stubGenerator: DeclarationStubGenerator,
     override val typeTranslator: TypeTranslator,
 ) : IrConstructor(), Psi2IrLazyFunctionBase {
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+    override var annotations: List<IrAnnotation> by createLazyAnnotations()
 
     override var body: IrBody? = null
 

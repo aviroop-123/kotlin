@@ -103,6 +103,9 @@ abstract class IrVisitor<out R, in D> {
     open fun visitConstructorCall(expression: IrConstructorCall, data: D): R =
         visitFunctionAccess(expression, data)
 
+    open fun visitAnnotation(expression: IrAnnotation, data: D): R =
+        visitConstructorCall(expression, data)
+
     open fun visitSingletonReference(expression: IrGetSingletonValue, data: D): R =
         visitDeclarationReference(expression, data)
 

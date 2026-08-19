@@ -18,7 +18,7 @@ package org.jetbrains.kotlin.backend.common.lower
 
 import org.jetbrains.kotlin.backend.common.BodyLoweringPass
 import org.jetbrains.kotlin.backend.common.LoweringContext
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.*
@@ -52,8 +52,8 @@ import org.jetbrains.kotlin.utils.addToStdlib.runIf
  *         println(x.element)
  *     }
  */
-@PhaseDescription(name = "SharedVariables")
-class SharedVariablesLowering(val context: LoweringContext) : BodyLoweringPass {
+@PhasePrerequisites(LateinitLowering::class)
+open class SharedVariablesLowering(val context: LoweringContext, val skipRichCallables: Boolean = true) : BodyLoweringPass {
     override fun lower(irBody: IrBody, container: IrDeclaration) {
         SharedVariablesTransformer(irBody, container).lowerSharedVariables()
     }
@@ -89,8 +89,8 @@ class SharedVariablesLowering(val context: LoweringContext) : BodyLoweringPass {
                         val toSkip = runIf(param.isInlineParameter() && !param.isCrossinline) {
                             when (arg) {
                                 is IrFunctionExpression -> arg.function
-                                is IrRichFunctionReference -> arg.invokeFunction
-                                is IrRichPropertyReference -> arg.getterFunction
+                                is IrRichFunctionReference if skipRichCallables -> arg.invokeFunction
+                                is IrRichPropertyReference if skipRichCallables -> arg.getterFunction
                                 else -> null
                             }
                         }

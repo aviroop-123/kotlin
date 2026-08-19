@@ -6,16 +6,14 @@
 package org.jetbrains.kotlin.psi.stubs.impl
 
 import com.intellij.psi.stubs.StubElement
-import com.intellij.psi.stubs.StubInputStream
-import com.intellij.psi.stubs.StubOutputStream
 import com.intellij.util.io.StringRef
 import org.jetbrains.kotlin.contracts.description.KtContractDescriptionElement
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.stubs.KotlinFunctionStub
+import org.jetbrains.kotlin.psi.stubs.KotlinStubElement
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
-import java.io.IOException
 
 @OptIn(KtImplementationDetail::class)
 class KotlinFunctionStubImpl(
@@ -28,6 +26,7 @@ class KotlinFunctionStubImpl(
     override val hasBody: Boolean,
     override val hasTypeParameterListBeforeFunctionName: Boolean,
     override val mayHaveContract: Boolean,
+    override val kdocText: String?,
     val contract: List<KtContractDescriptionElement<KotlinTypeBean, Nothing?>>?,
     val origin: KotlinStubOrigin?,
 ) : KotlinStubBaseImpl<KtNamedFunction>(parent, KtStubElementTypes.FUNCTION), KotlinFunctionStub {
@@ -38,14 +37,6 @@ class KotlinFunctionStubImpl(
     }
 
     override fun getName(): String? = StringRef.toString(nameRef)
-
-    @Throws(IOException::class)
-    fun serializeContract(dataStream: StubOutputStream) {
-        val effects: List<KtContractDescriptionElement<KotlinTypeBean, Nothing?>>? = contract
-        dataStream.writeVarInt(effects?.size ?: 0)
-        val visitor = KotlinContractSerializationVisitor(dataStream)
-        effects?.forEach { it.accept(visitor, null) }
-    }
 
     @KtImplementationDetail
     override fun copyInto(newParent: StubElement<*>?): KotlinFunctionStubImpl = KotlinFunctionStubImpl(
@@ -58,19 +49,23 @@ class KotlinFunctionStubImpl(
         hasBody = hasBody,
         hasTypeParameterListBeforeFunctionName = hasTypeParameterListBeforeFunctionName,
         mayHaveContract = mayHaveContract,
+        kdocText = kdocText,
         contract = contract,
         origin = origin,
     )
 
-    companion object {
-        fun deserializeContract(dataStream: StubInputStream): List<KtContractDescriptionElement<KotlinTypeBean, Nothing?>> {
-            val effects = mutableListOf<KtContractDescriptionElement<KotlinTypeBean, Nothing?>>()
-            val count: Int = dataStream.readVarInt()
-            for (i in 0 until count) {
-                val effectType: KotlinContractEffectType = KotlinContractEffectType.entries[dataStream.readVarInt()]
-                effects.add(effectType.deserialize(dataStream))
-            }
-            return effects
-        }
-    }
+    @KtImplementationDetail
+    override fun isEquivalentTo(other: KotlinStubElement<*>): Boolean =
+        other is KotlinFunctionStubImpl &&
+                other.nameRef == nameRef &&
+                other.fqName == fqName &&
+                other.isTopLevel == isTopLevel &&
+                other.isExtension == isExtension &&
+                other.hasBody == hasBody &&
+                other.hasNoExpressionBody == hasNoExpressionBody &&
+                other.mayHaveContract == mayHaveContract &&
+                other.hasTypeParameterListBeforeFunctionName == hasTypeParameterListBeforeFunctionName &&
+                other.origin == origin &&
+                other.kdocText == kdocText &&
+                other.contract == contract
 }

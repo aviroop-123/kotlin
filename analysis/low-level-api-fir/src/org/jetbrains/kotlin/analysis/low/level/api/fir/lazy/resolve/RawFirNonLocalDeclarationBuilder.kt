@@ -1,27 +1,31 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve
 
 import com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.KtPsiSourceFile
 import org.jetbrains.kotlin.KtSourceElement
-import org.jetbrains.kotlin.analysis.api.utils.errors.withPsiEntry
+import org.jetbrains.kotlin.analysis.api.impl.base.util.requireIsInstance
+import org.jetbrains.kotlin.analysis.api.impl.base.util.withPsiEntry
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.FirDesignation
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.llFirModuleData
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.codeFragment
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
-import org.jetbrains.kotlin.analysis.utils.errors.requireIsInstance
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.builder.BodyBuildingMode
 import org.jetbrains.kotlin.fir.builder.PsiRawFirBuilder
 import org.jetbrains.kotlin.fir.builder.buildDestructuringVariable
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.utils.isExpect
 import org.jetbrains.kotlin.fir.declarations.utils.isInner
+import org.jetbrains.kotlin.fir.declarations.utils.isReplSnippetDeclaration
 import org.jetbrains.kotlin.fir.expressions.FirMultiDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.scopes.FirScopeProvider
+import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeRef
 import org.jetbrains.kotlin.fir.utils.exceptions.withFirEntry
@@ -29,7 +33,6 @@ import org.jetbrains.kotlin.name.NameUtils
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
-import org.jetbrains.kotlin.psi.psiUtil.hasExpectModifier
 import org.jetbrains.kotlin.util.PrivateForInline
 import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
 import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
@@ -40,22 +43,32 @@ internal class RawFirNonLocalDeclarationBuilder private constructor(
     baseScopeProvider: FirScopeProvider,
     private val originalDeclaration: FirDeclaration,
     private val declarationToBuild: KtElement,
-    private val functionsToRebind: Set<FirFunction>,
+    private val declarationsToRebind: List<FirDeclaration>,
 ) : PsiRawFirBuilder(session, baseScopeProvider, bodyBuildingMode = BodyBuildingMode.NORMAL) {
     companion object {
-        fun buildWithFunctionSymbolRebind(
+        fun buildWithSymbolRebind(
             session: FirSession,
             scopeProvider: FirScopeProvider,
             designation: FirDesignation,
             rootNonLocalDeclaration: KtAnnotated,
         ): FirDeclaration {
-            val functionsToRebind = when (val originalDeclaration = designation.target) {
-                is FirFunction -> setOf(originalDeclaration)
-                is FirProperty -> setOfNotNull(originalDeclaration.getter, originalDeclaration.setter)
-                else -> emptySet()
+            val declarationsToRebind = when (val originalDeclaration = designation.target) {
+                is FirFunction -> listOf(originalDeclaration)
+                is FirProperty -> listOfNotNull(originalDeclaration.getter, originalDeclaration.setter)
+                is FirReplSnippet -> originalDeclaration.snippetClass.let { snippetClass ->
+                    snippetClass.declarations.filter { it.isReplSnippetDeclaration == true } + snippetClass
+                }
+
+                else -> emptyList()
             }
 
-            return build(session, scopeProvider, designation, rootNonLocalDeclaration, functionsToRebind)
+            return build(
+                session = session,
+                scopeProvider = scopeProvider,
+                designation = designation,
+                rootNonLocalDeclaration = rootNonLocalDeclaration,
+                declarationsToRebind = declarationsToRebind,
+            )
         }
 
         private fun build(
@@ -63,7 +76,7 @@ internal class RawFirNonLocalDeclarationBuilder private constructor(
             scopeProvider: FirScopeProvider,
             designation: FirDesignation,
             rootNonLocalDeclaration: KtElement,
-            functionsToRebind: Set<FirFunction>,
+            declarationsToRebind: List<FirDeclaration>,
         ): FirDeclaration {
             check(rootNonLocalDeclaration is KtDeclaration || rootNonLocalDeclaration is KtCodeFragment)
 
@@ -72,7 +85,7 @@ internal class RawFirNonLocalDeclarationBuilder private constructor(
                 baseScopeProvider = scopeProvider,
                 originalDeclaration = designation.target as FirDeclaration,
                 declarationToBuild = rootNonLocalDeclaration,
-                functionsToRebind = functionsToRebind,
+                declarationsToRebind = declarationsToRebind,
             )
 
             builder.context.packageFqName = rootNonLocalDeclaration.containingKtFile.packageFqName
@@ -84,26 +97,39 @@ internal class RawFirNonLocalDeclarationBuilder private constructor(
     }
 
     override fun bindFunctionTarget(target: FirFunctionTarget, function: FirFunction) {
-        super.bindFunctionTarget(target, computeRebindTarget(function) ?: function)
+        super.bindFunctionTarget(target, computeRebindTarget(function) as? FirFunction ?: function)
+    }
+
+    override fun <T : FirDeclaration, R : FirBasedSymbol<T>> replSnippetDeclarationSymbol(declaration: T): R {
+        val target = (computeRebindTarget(declaration) ?: declaration)
+        requireWithAttachment(
+            declaration.javaClass == target.javaClass,
+            { "Expected ${declaration.javaClass.simpleName} but got ${target.javaClass.simpleName}" },
+        ) {
+            withFirEntry("declaration", declaration)
+            withFirEntry("target", target)
+        }
+
+        return super.replSnippetDeclarationSymbol(target)
     }
 
     /**
-     * @return [FirFunction] if another function should be used instead of [function] for [FirFunctionTarget]
+     * @return [FirFunction] if another function should be used instead of [declaration] for [FirFunctionTarget]
      *
      * @see bindFunctionTarget
-     * @see functionsToRebind
+     * @see declarationsToRebind
      */
-    private fun computeRebindTarget(function: FirFunction): FirFunction? {
-        if (functionsToRebind.isNullOrEmpty()) return null
-        val realPsi = function.realPsi
+    private fun computeRebindTarget(declaration: FirDeclaration): FirDeclaration? {
+        if (declarationsToRebind.isEmpty()) return null
+        val realPsi = declaration.realPsi
         if (realPsi != null) {
-            return functionsToRebind.firstOrNull { it.realPsi == realPsi }
+            return declarationsToRebind.firstOrNull { it.realPsi == realPsi }
         }
 
-        val accessor = function as? FirPropertyAccessor ?: return null
+        val accessor = declaration as? FirPropertyAccessor ?: return null
         val accessorPsi = accessor.psi ?: return null
 
-        return functionsToRebind.firstOrNull { it is FirPropertyAccessor && it.isGetter == accessor.isGetter && it.psi == accessorPsi }
+        return declarationsToRebind.firstOrNull { it is FirPropertyAccessor && it.isGetter == accessor.isGetter && it.psi == accessorPsi }
     }
 
     override fun addCapturedTypeParameters(
@@ -211,7 +237,7 @@ internal class RawFirNonLocalDeclarationBuilder private constructor(
             )
             val delegatedConstructor = firConstructor.delegatedConstructor
             if (delegatedConstructor is FirMultiDelegatedConstructorCall) {
-                for ((oldExcessiveDelegate, newExcessiveDelegate) in delegatedConstructor.delegatedConstructorCalls
+                for ([oldExcessiveDelegate, newExcessiveDelegate] in delegatedConstructor.delegatedConstructorCalls
                     .zip((newConstructor.delegatedConstructor as FirMultiDelegatedConstructorCall).delegatedConstructorCalls)) {
                     val calleeReferenceForExessiveDelegate = oldExcessiveDelegate.calleeReference
                     if (calleeReferenceForExessiveDelegate is FirSuperReference) {
@@ -264,6 +290,12 @@ internal class RawFirNonLocalDeclarationBuilder private constructor(
             }
             return null
         }
+
+        override fun visitScript(script: KtScript, data: FirElement?): FirElement {
+            val sourceFile = KtPsiSourceFile(data?.psi?.containingFile as? KtFile ?: script.containingKtFile)
+            // TODO(KT-73847): looks like we may loose the implicit imports here, find out whether and how the file could be configured too
+            return convertScriptOrSnippets(declaration = script, sourceFile = sourceFile, fileBuilder = null)
+        }
     }
 
     private fun moveNext(iterator: Iterator<FirDeclaration>, containingDeclaration: FirDeclaration?): FirDeclaration {
@@ -309,18 +341,24 @@ internal class RawFirNonLocalDeclarationBuilder private constructor(
         val parent = iterator.next()
         if (parent !is FirRegularClass) return moveNext(iterator, containingDeclaration = parent)
 
-        val classOrObject = parent.psi
-        if (classOrObject !is KtClassOrObject) {
-            errorWithFirSpecificEntries("Expected KtClassOrObject is not found", fir = parent, psi = classOrObject)
+        val psi = parent.psi
+        val typeParameters = when (psi) {
+            is KtClassOrObject -> parent.typeParameters.subList(0, psi.typeParameters.size)
+            is KtScript -> emptyList()
+            else -> errorWithFirSpecificEntries(
+                message = "Expected ${KtClassOrObject::class.simpleName}/${KtScript::class.simpleName} is not found",
+                fir = parent,
+                psi = psi,
+            )
         }
 
-        withChildClassName(classOrObject.nameAsSafeName, isExpect = classOrObject.hasExpectModifier() || context.containerIsExpect) {
+        withChildClassName(parent.name, isExpect = parent.isExpect) {
             withCapturedTypeParameters(
-                parent.isInner,
+                status = parent.isInner,
                 declarationSource = null,
-                parent.typeParameters.subList(0, classOrObject.typeParameters.size)
+                currentFirTypeParameters = typeParameters,
             ) {
-                registerSelfType(classOrObject.toDelegatedSelfType(parent))
+                registerSelfType(psi.toDelegatedSelfType(parent))
                 return moveNext(iterator, parent)
             }
         }

@@ -67,7 +67,7 @@ fun Sequence<MemberBuilder>.groupByFileAndWrite(
 ) {
     val groupedMembers = groupBy { TargetedSourceFile(it.target, it.sourceFile) }
 
-    for ((psf, members) in groupedMembers) {
+    for ([psf, members] in groupedMembers) {
         val file = fileNameBuilder(psf)
         members.writeTo(file, psf)
     }
@@ -87,6 +87,9 @@ fun List<MemberBuilder>.writeTo(file: File, targetedSource: TargetedSourceFile) 
                 }
 
                 writer.appendLine("@file:kotlin.jvm.JvmName(\"${sourceFile.jvmClassName}\")")
+                if (target.platform == Platform.Common) {
+                    writer.appendLine("@file:Suppress(\"REDUNDANT_CALL_OF_CONVERSION_METHOD\")")
+                }
                 sourceFile.jvmPackageName?.let {
                     writer.appendLine("@file:kotlin.jvm.JvmPackageName(\"$it\")")
                 }

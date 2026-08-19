@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: false
   isActual: false
   isBuiltinFunctionInvoke: true
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -34,11 +35,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -56,17 +61,22 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: kotlin.Function2
       getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
       deprecationStatus: null
+      importableFqName: null
     KaValueParameterSymbol:
       annotations: []
       callableId: null
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -84,6 +94,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: kotlin.Function2
       getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getDispatchReceiver(): KaFunctionType:
@@ -99,12 +110,14 @@ KaNamedFunctionSymbol:
         annotations: []
         type: R
     ]
-    type: kotlin/Function2<P1, P2, R>
+    type: (P1, P2) -> R
   getContainingFileSymbol: null
   getContainingJvmClassName: kotlin.Function2
   canBeOperator: true
   getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -116,6 +129,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -143,11 +157,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -166,6 +184,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: kotlin.Any
       getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getDispatchReceiver(): KaUsualClassType:
@@ -177,6 +196,8 @@ KaNamedFunctionSymbol:
   canBeOperator: true
   getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -188,6 +209,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -219,6 +241,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -230,6 +254,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -261,3 +286,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null

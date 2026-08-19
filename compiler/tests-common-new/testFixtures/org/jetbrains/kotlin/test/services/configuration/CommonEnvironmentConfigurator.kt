@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.config.AnalysisFlags.allowFullyQualifiedNameInKClass
 import org.jetbrains.kotlin.platform.isCommon
+import org.jetbrains.kotlin.platform.isMultiplatformWeb
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.DISABLE_TYPEALIAS_EXPANSION
@@ -87,7 +88,7 @@ class CommonEnvironmentConfigurator(testServices: TestServices) : EnvironmentCon
                 }
 
             val sourceDependencies = buildMap {
-                for ((testModule, cliModule) in hmppModules) {
+                for ([testModule, cliModule] in hmppModules) {
                     put(cliModule, testModule.dependsOnDependencies.map { hmppModules.getValue(it.dependencyModule) })
                 }
             }
@@ -96,7 +97,7 @@ class CommonEnvironmentConfigurator(testServices: TestServices) : EnvironmentCon
             val friendDependencies = mutableMapOf<HmppCliModule, List<String>>()
 
             if (SEPARATE_KMP_COMPILATION in module.directives) {
-                for ((testModule, cliModule) in hmppModules) {
+                for ([testModule, cliModule] in hmppModules) {
                     val dependencies = mutableListOf<String>()
                     val friends = mutableListOf<String>()
 
@@ -113,6 +114,9 @@ class CommonEnvironmentConfigurator(testServices: TestServices) : EnvironmentCon
 
                     val standardLibrariesPathProvider = testServices.standardLibrariesPathProvider
                     dependencies.add(standardLibrariesPathProvider.commonStdlibForTests().canonicalPath)
+                    if (testModule.targetPlatform(testServices).isMultiplatformWeb()) {
+                        dependencies.add(standardLibrariesPathProvider.webStdlibForTests().canonicalPath)
+                    }
 
                     moduleDependencies[cliModule] = dependencies
                     friendDependencies[cliModule] = friends
@@ -124,6 +128,7 @@ class CommonEnvironmentConfigurator(testServices: TestServices) : EnvironmentCon
                 sourceDependencies,
                 moduleDependencies,
                 friendDependencies,
+                incrementalDependencies = emptyMap(),
             )
         }
 

@@ -5,15 +5,16 @@
 
 package org.jetbrains.kotlin.js.testOld.optimizer
 
-import com.google.gwt.dev.js.rhino.CodePosition
-import com.google.gwt.dev.js.rhino.ErrorReporter
+import org.jetbrains.kotlin.js.parser.CodePosition
+import org.jetbrains.kotlin.js.parser.ErrorReporter
 import com.intellij.openapi.util.io.FileUtil
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.js.backend.JsToStringGenerationVisitor
 import org.jetbrains.kotlin.js.backend.ast.*
 import org.jetbrains.kotlin.js.backend.ast.metadata.synthetic
 import org.jetbrains.kotlin.js.engine.ScriptEngine
 import org.jetbrains.kotlin.js.inline.clean.FunctionPostProcessor
-import org.jetbrains.kotlin.js.parser.parse
+import org.jetbrains.kotlin.js.parser.JsParser
 import org.jetbrains.kotlin.js.testOld.TEST_DATA_DIR_PATH
 import org.jetbrains.kotlin.js.testOld.createScriptEngine
 import org.jetbrains.kotlin.js.translate.utils.JsAstUtils
@@ -49,20 +50,20 @@ abstract class BasicOptimizerTest(private var basePath: String) {
     protected fun box() {
         val methodName = testName.methodName
         val baseName = "${TEST_DATA_DIR_PATH}/js-optimizer/$basePath"
-        val unoptimizedName = "$baseName/$methodName.original.js"
-        val optimizedName = "$baseName/$methodName.optimized.js"
+        val unoptimizedName = ForTestCompileRuntime.transformTestDataPath("$baseName/$methodName.original.js")
+        val optimizedName = ForTestCompileRuntime.transformTestDataPath("$baseName/$methodName.optimized.js")
 
-        val unoptimizedCode = FileUtil.loadFile(File(unoptimizedName))
-        val optimizedCode = FileUtil.loadFile(File(optimizedName))
+        val unoptimizedCode = FileUtil.loadFile(unoptimizedName)
+        val optimizedCode = FileUtil.loadFile(optimizedName)
 
-        runScript(unoptimizedName, unoptimizedCode)
-        runScript(optimizedName, optimizedCode)
+        runScript(unoptimizedName.absolutePath, unoptimizedCode)
+        runScript(optimizedName.absolutePath, optimizedCode)
         checkOptimizer(unoptimizedCode, optimizedCode)
     }
 
     private fun checkOptimizer(unoptimizedCode: String, optimizedCode: String) {
         val parserScope = JsFunctionScope(JsRootScope(JsProgram()), "<js fun>")
-        val unoptimizedAst = parse(unoptimizedCode, errorReporter, parserScope, "<unknown file>")!!
+        val unoptimizedAst = JsParser.parse(unoptimizedCode, errorReporter, parserScope, "<unknown file>")
 
         updateMetadata(unoptimizedCode, unoptimizedAst)
 
@@ -70,7 +71,7 @@ abstract class BasicOptimizerTest(private var basePath: String) {
             process(statement)
         }
 
-        val optimizedAst = parse(optimizedCode, errorReporter, parserScope, "<unknown file>")!!
+        val optimizedAst = JsParser.parse(optimizedCode, errorReporter, parserScope, "<unknown file>")
         Assert.assertEquals(astToString(optimizedAst), astToString(unoptimizedAst))
     }
 
@@ -89,7 +90,7 @@ abstract class BasicOptimizerTest(private var basePath: String) {
         for (stmt in ast) {
             object : RecursiveJsVisitor() {
                 override fun visitVars(x: JsVars) {
-                    x.synthetic = x.vars.any { isSyntheticId(it.name.ident) }
+                    x.synthetic = x.vars.flatMap { it.assignable.names }.any { isSyntheticId(it.ident) }
                     super.visitVars(x)
                 }
 

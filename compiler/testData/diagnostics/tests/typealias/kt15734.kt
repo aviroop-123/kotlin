@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// WITH_EXTRA_CHECKERS
 @Target(AnnotationTarget.TYPE)
 annotation class Ann
 

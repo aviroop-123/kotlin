@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseReturnsEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -14,20 +13,20 @@ fun isString(x: Any?): Boolean {
 
 fun exhaustive(x: Any?) {
     when {
-        isString(x) -> <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        isString(x) -> x.length
         !isString(x) -> x.<!UNRESOLVED_REFERENCE!>length<!>
     }
 
     when {
         !isString(x) -> x.<!UNRESOLVED_REFERENCE!>length<!>
-        isString(x) -> <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        isString(x) -> x.length
     }
 }
 
 fun smartcastInElse(x: Any?) {
     when {
         !isString(x) -> x.<!UNRESOLVED_REFERENCE!>length<!>
-        else -> <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        else -> x.length
     }
 }
 

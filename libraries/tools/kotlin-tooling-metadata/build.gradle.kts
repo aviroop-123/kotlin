@@ -1,7 +1,7 @@
 plugins {
     java
     kotlin("jvm")
-    id("jps-compatible")
+    id("test-inputs-check")
 }
 
 publish()
@@ -11,7 +11,8 @@ configureKotlinCompileTasksGradleCompatibility()
 
 dependencies {
     val coreDepsVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation.get()
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$coreDepsVersion")
+    implementation(kotlin("stdlib", coreDepsVersion))
     implementation(commonDependency("com.google.code.gson:gson"))
-    testImplementation(kotlinTest("junit"))
+    testImplementation(kotlin("stdlib", coreDepsVersion))
+    testImplementation(kotlin("test-junit", coreDepsVersion))
 }

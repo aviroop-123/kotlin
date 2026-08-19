@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.cliArgument
 import org.jetbrains.kotlin.cli.common.environment.setIdeaIoUseFallback
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.scripting.compiler.test.linesSplitTrim
 import java.io.File
 import java.net.URLClassLoader
@@ -24,7 +25,7 @@ import kotlin.test.assertTrue
 class ScriptingWithCliCompilerTest {
 
     companion object {
-        const val TEST_DATA_DIR = "plugins/scripting/scripting-compiler/testData"
+        val TEST_DATA_DIR: String = ForTestCompileRuntime.transformTestDataPath("plugins/scripting/scripting-compiler/testData").path
         val SIMPLE_TEST_SCRIPT = "$TEST_DATA_DIR/compiler/mixedCompilation/simpleScript.main.kts"
     }
 
@@ -121,6 +122,8 @@ class ScriptingWithCliCompilerTest {
         runWithK2JVMCompiler(
             arrayOf(
                 K2JVMCompilerArguments::classpath.cliArgument, getMainKtsClassPath().joinToString(File.pathSeparator),
+                "-P",
+                "plugin:kotlin.scripting:disable-script-compilation-cache=true",
                 K2JVMCompilerArguments::script.cliArgument,
                 scriptFile.path
             ),
@@ -133,6 +136,8 @@ class ScriptingWithCliCompilerTest {
             arrayOf(
                 K2JVMCompilerArguments::classpath.cliArgument, getMainKtsClassPath().joinToString(File.pathSeparator),
                 K2JVMCompilerArguments::defaultScriptExtension.cliArgument(".main.kts"),
+                "-P",
+                "plugin:kotlin.scripting:disable-script-compilation-cache=true",
                 K2JVMCompilerArguments::script.cliArgument,
                 scriptFile.path
             ),
@@ -145,6 +150,8 @@ class ScriptingWithCliCompilerTest {
             arrayOf(
                 K2JVMCompilerArguments::classpath.cliArgument, getMainKtsClassPath().joinToString(File.pathSeparator),
                 K2JVMCompilerArguments::defaultScriptExtension.cliArgument("main.kts"),
+                "-P",
+                "plugin:kotlin.scripting:disable-script-compilation-cache=true",
                 K2JVMCompilerArguments::script.cliArgument,
                 scriptFile.path
             ),
@@ -181,7 +188,7 @@ class ScriptingWithCliCompilerTest {
 
     @Test
     fun testExceptionWithCause() {
-        val (_, err, _) = captureOutErrRet {
+        val [_, err, _] = captureOutErrRet {
             CLICompiler.doMainNoExit(
                 K2JVMCompiler(),
                 arrayOf(
@@ -217,12 +224,13 @@ class ScriptingWithCliCompilerTest {
                         K2JVMCompilerArguments::useFirLT.cliArgument("false"),
                         K2JVMCompilerArguments::allowAnyScriptsInSourceRoots.cliArgument,
                         K2JVMCompilerArguments::verbose.cliArgument,
+                        K2JVMCompilerArguments::noStdlib.cliArgument,
                         "$TEST_DATA_DIR/compiler/mixedCompilation/nonScript.kt",
                         scriptPath,
                     )
                 )
             assertEquals(ExitCode.OK.code, ret.code)
-            val (out, _, _) = captureOutErrRet {
+            val [out, _, _] = captureOutErrRet {
                 val cl = URLClassLoader((getMainKtsClassPath() + tmpdir).map { it.toURI().toURL() }.toTypedArray())
                 val klass = cl.loadClass("ScriptAccessingNonScript_main")
                 val ctor = klass.constructors.single()
@@ -235,7 +243,7 @@ class ScriptingWithCliCompilerTest {
     @Test
     fun testAccessScriptFromRegularSource() {
         withTempDir { tmpdir ->
-            val (_, err, ret) = captureOutErrRet {
+            val [_, err, ret] = captureOutErrRet {
                 CLICompiler.doMainNoExit(
                     K2JVMCompiler(),
                     arrayOf(
@@ -260,7 +268,7 @@ class ScriptingWithCliCompilerTest {
         withTempDir { tmpdir ->
 
             fun compileSuccessfullyGetStdErr(fileArg: String): List<String> {
-                val (_, err, ret) = captureOutErrRet {
+                val [_, err, ret] = captureOutErrRet {
                     CLICompiler.doMainNoExit(
                         K2JVMCompiler(),
                         arrayOf(
@@ -270,7 +278,6 @@ class ScriptingWithCliCompilerTest {
                             getMainKtsClassPath().joinToString(File.pathSeparator),
                             K2JVMCompilerArguments::destination.cliArgument,
                             tmpdir.path,
-                            K2JVMCompilerArguments::useFirLT.cliArgument("false"),
                             K2JVMCompilerArguments::allowAnyScriptsInSourceRoots.cliArgument,
                             K2JVMCompilerArguments::verbose.cliArgument,
                             fileArg
@@ -299,7 +306,7 @@ class ScriptingWithCliCompilerTest {
         val quoteForWin = if (SystemInfo.isWindows) "\"" else ""
         runWithKotlinc(
             arrayOf(
-                "-Xplugin=dist/kotlinc/lib/allopen-compiler-plugin.jar",
+                "-Xplugin=" + ForTestCompileRuntime.allOpenCompilerPluginForTests().path,
                 "-P", "${quoteForWin}plugin:org.jetbrains.kotlin.allopen:annotation=AllOpen$quoteForWin",
                 "-script", "$TEST_DATA_DIR/integration/withAllOpenPlugin.kts",
             ), listOf("OK")
@@ -314,7 +321,7 @@ class ScriptingWithCliCompilerTest {
         val quoteForWin = if (SystemInfo.isWindows) "\"" else ""
         runWithKotlinc(
             arrayOf(
-                "-Xcompiler-plugin=${quoteForWin}dist/kotlinc/lib/allopen-compiler-plugin.jar=annotation=AllOpen$quoteForWin",
+                "-Xcompiler-plugin=${quoteForWin}${ForTestCompileRuntime.allOpenCompilerPluginForTests().path}=annotation=AllOpen$quoteForWin",
                 "-script", "$TEST_DATA_DIR/integration/withAllOpenPlugin.kts",
             ), listOf("OK")
         )
@@ -322,9 +329,7 @@ class ScriptingWithCliCompilerTest {
 
     private fun getMainKtsClassPath(): List<File> {
         return listOf(
-            File("dist/kotlinc/lib/kotlin-main-kts.jar").also {
-                assertTrue(it.exists(), "kotlin-main-kts.jar not found, run dist task: ${it.absolutePath}")
-            }
+            ForTestCompileRuntime.mainKtsJar()
         )
     }
 }

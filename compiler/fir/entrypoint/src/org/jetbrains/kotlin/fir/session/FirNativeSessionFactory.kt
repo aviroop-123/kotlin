@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.fir.session
 
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.fir.FirBinaryDependenciesModuleData
-import org.jetbrains.kotlin.fir.FirPlatformSpecificCastChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.FirPlatformSpecificCastChecker
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.SessionConfiguration
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.PlatformConflictDeclarationsDiagnosticDispatcher
@@ -19,16 +19,17 @@ import org.jetbrains.kotlin.fir.checkers.registerExtraNativeCheckers
 import org.jetbrains.kotlin.fir.checkers.registerNativeCheckers
 import org.jetbrains.kotlin.fir.deserialization.ModuleDataProvider
 import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProvider
-import org.jetbrains.kotlin.fir.scopes.FirDefaultImportProviderHolder
+import org.jetbrains.kotlin.fir.scopes.FirDefaultImportsProviderHolder
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider
 import org.jetbrains.kotlin.fir.scopes.FirOverrideChecker
 import org.jetbrains.kotlin.fir.scopes.FirPlatformClassMapper
+import org.jetbrains.kotlin.fir.scopes.impl.FirEnumEntriesSupport
 import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.library.metadata.impl.KlibResolvedModuleDescriptorsFactoryImpl.Companion.FORWARD_DECLARATIONS_MODULE_NAME
-import org.jetbrains.kotlin.resolve.konan.platform.NativePlatformAnalyzerServices
+import org.jetbrains.kotlin.resolve.konan.platform.NativeDefaultImportsProvider
 
 @OptIn(SessionConfiguration::class)
-abstract class FirNativeSessionFactory : AbstractFirKlibSessionFactory<Nothing?, Nothing?>() {
+abstract class FirNativeSessionFactory : AbstractFirKlibSessionFactory<Nothing?>() {
     companion object : FirNativeSessionFactory()
 
     object ForMetadata : FirNativeSessionFactory() {
@@ -68,11 +69,11 @@ abstract class FirNativeSessionFactory : AbstractFirKlibSessionFactory<Nothing?,
 
     // ==================================== Platform session ====================================
 
-    override fun FirSessionConfigurator.registerPlatformCheckers(c: Nothing?) {
+    override fun FirSessionConfigurator.registerPlatformCheckers() {
         registerNativeCheckers()
     }
 
-    override fun FirSessionConfigurator.registerExtraPlatformCheckers(c: Nothing?) {
+    override fun FirSessionConfigurator.registerExtraPlatformCheckers() {
         registerExtraNativeCheckers()
     }
 
@@ -87,17 +88,17 @@ abstract class FirNativeSessionFactory : AbstractFirKlibSessionFactory<Nothing?,
     // ==================================== Common parts ====================================
 
     private fun FirSession.registerComponents() {
-        registerDefaultComponents()
         registerNativeComponents()
     }
 
     // ==================================== Utilities ====================================
 
     fun FirSession.registerNativeComponents() {
+        register(FirEnumEntriesSupport(this))
         register(FirPlatformClassMapper::class, FirNativeClassMapper())
         register(FirPlatformSpecificCastChecker::class, FirNativeCastChecker)
         register(PlatformConflictDeclarationsDiagnosticDispatcher::class, NativeConflictDeclarationsDiagnosticDispatcher)
         register(FirOverrideChecker::class, FirNativeOverrideChecker(this))
-        register(FirDefaultImportProviderHolder::class, FirDefaultImportProviderHolder(NativePlatformAnalyzerServices))
+        register(FirDefaultImportsProviderHolder.of(NativeDefaultImportsProvider))
     }
 }

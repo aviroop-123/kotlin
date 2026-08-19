@@ -1,5 +1,9 @@
+import org.gradle.api.Action
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.testing.Test
+import org.gradle.kotlin.dsl.configure
 import javax.inject.Inject
 
 /*
@@ -9,5 +13,12 @@ import javax.inject.Inject
 
 abstract class TestInputsCheckExtension @Inject constructor(objects: ObjectFactory){
     val isNative: Property<Boolean> = objects.property(Boolean::class.java).convention(false)
-    val useXcode: Property<Boolean> = objects.property(Boolean::class.java).convention(false)
+    val allowFlightRecorder: Property<Boolean> = objects.property(Boolean::class.java).convention(false)
+    val extraPermissions: ListProperty<String> = objects.listProperty(String::class.java)
+}
+
+fun Test.testInputsCheck(action: Action<TestInputsCheckExtension>) {
+    configure<TestInputsCheckExtension> {
+        action.execute(this)
+    }
 }

@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.api.targets.resolve
 import org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve.LLFirResolveDesignationCollector
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirResolvableModuleSession
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.body
+import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirConstructor
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
@@ -127,7 +128,7 @@ internal class LLPartialBodyElementMapper(
                                     withPsiEntry("statement", previous)
                                     withPsiEntry("declaration", psiDeclaration)
                                     withEntry("statements") {
-                                        for ((index, psiStatement) in psiStatements.withIndex()) {
+                                        for ([index, psiStatement] in psiStatements.withIndex()) {
                                             this@withEntry.println(index, ": ", psiStatement.text)
                                         }
                                     }
@@ -199,7 +200,11 @@ internal class LLPartialBodyElementMapper(
 
     // The body block cannot be cached on the element provider construction, as the body might be lazy at that point
     private val bodyBlock: FirBlock
-        get() = declaration.body ?: error("Partial body element provider supports only declarations with bodies")
+        get() = declaration.body ?: errorWithFirSpecificEntries(
+            "Partial body element provider supports only declarations with bodies",
+            fir = declaration,
+            psi = psiDeclaration,
+        )
 
     private val lock = Any()
 

@@ -39,6 +39,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
             Divides this value by the other value, flooring the result to an integer that is closer to negative infinity.
             
             For unsigned types, the results of flooring division and truncating division are the same.
+            @sample samples.misc.Builtins.floorDivUnsigned
             """.trimIndent()
         "rem" -> {
             """
@@ -54,6 +55,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
                 The result is always less than the divisor.
                 
                 For unsigned types, the remainders of flooring division and truncating division are the same.
+                @sample samples.misc.Builtins.modUnsigned
                 """.trimIndent()
         }
         else -> BasePrimitivesGenerator.binaryOperatorDoc(operator, operand1.asSigned, operand2.asSigned)
@@ -126,6 +128,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
      * or a positive number if it's greater than other.
      */""")
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             if (otherType == type)
                 out.println("""    @Suppress("OVERRIDE_BY_INLINE")""")
             out.print("    public ")
@@ -159,6 +162,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
 
             out.printDoc(binaryOperatorDoc(name, type, otherType), "    ")
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             out.print("    public inline operator fun $name(other: ${otherType.capitalized}): ${returnType.capitalized} = ")
             if (type == otherType && type == returnType) {
                 when (name) {
@@ -181,6 +185,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
 
             out.printDoc(binaryOperatorDoc(name, type, otherType), "    ")
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             out.print("    public inline fun $name(other: ${otherType.capitalized}): ${returnType.capitalized} = ")
             if (type == otherType && type == operationType) {
                 when (name) {
@@ -244,6 +249,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
             val detail = BasePrimitivesGenerator.shiftOperatorsDocDetail(type.asSigned)
             out.printDoc(doc + END_LINE + END_LINE + detail, "    ")
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             out.println("    public inline infix fun $name(bitCount: Int): $className = $className(data $implementation bitCount)")
             out.println()
         }
@@ -253,13 +259,15 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
     }
 
     private fun generateBitwiseOperators() {
-        for ((name, doc) in BasePrimitivesGenerator.bitwiseOperators) {
+        for ([name, doc] in BasePrimitivesGenerator.bitwiseOperators) {
             out.println("    /** $doc */")
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             out.println("    public inline infix fun $name(other: $className): $className = $className(this.data $name other.data)")
         }
         out.println("    /** Inverts the bits in this value. */")
         out.println("    @kotlin.internal.InlineOnly")
+        out.println("    @kotlin.internal.IntrinsicConstEvaluation")
         out.println("    public inline fun inv(): $className = $className(data.inv())")
         out.println()
     }
@@ -296,6 +304,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
             out.println("     */")
 
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             out.print("    public inline fun to$signed(): $signed = ")
             out.println(when {
                     type == UnsignedType.UINT && otherType == UnsignedType.ULONG -> "uintToLong(data)"
@@ -332,6 +341,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
             }
 
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             out.print("    public inline fun to$name(): $name = ")
             out.println(
                 when {
@@ -360,6 +370,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
             out.println("     */")
 
             out.println("    @kotlin.internal.InlineOnly")
+            out.println("    @kotlin.internal.IntrinsicConstEvaluation")
             out.print("    public inline fun to$otherName(): $otherName = ")
             when (type) {
                 UnsignedType.UINT, UnsignedType.ULONG ->
@@ -399,6 +410,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
             out.println(" */")
             out.println("@SinceKotlin(\"1.5\")")
             out.println("@kotlin.internal.InlineOnly")
+            out.println("@kotlin.internal.IntrinsicConstEvaluation")
             out.print("public inline fun $otherSigned.to$className(): $className = ")
             out.println(when {
                 otherType == type -> "$className(this)"
@@ -425,6 +437,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
             )
             out.println("@SinceKotlin(\"1.5\")")
             out.println("@kotlin.internal.InlineOnly")
+            out.println("@kotlin.internal.IntrinsicConstEvaluation")
             out.print("public inline fun $otherName.to$className(): $className = ")
             out.println("${otherName.lowercase()}To$className(this)")
         }
@@ -432,6 +445,7 @@ class UnsignedTypeGenerator(val type: UnsignedType, out: PrintWriter) : BuiltIns
 
 
     private fun generateToStringHashCode() {
+        out.println("    @kotlin.internal.IntrinsicConstEvaluation")
         out.print("    public override fun toString(): String = ")
         when (type) {
             UnsignedType.UBYTE, UnsignedType.USHORT -> out.println("toInt().toString()")
@@ -603,6 +617,7 @@ public class ${elementType}Range(start: $elementType, endInclusive: $elementType
  * A progression of values of type `$elementType`.
  */
 @SinceKotlin("1.5")
+@Suppress("REDUNDANT_CALL_OF_CONVERSION_METHOD")
 public open class ${elementType}Progression
 internal constructor(
     start: $elementType,

@@ -1,13 +1,13 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // FULL_JDK
-// LANGUAGE: +DontMakeExplicitJavaTypeArgumentsFlexible
+// LATEST_LV_DIFFERENCE
 
 import java.util.Comparator;
 
 fun foo() {
-    Comparator.comparing<String?, Boolean?> {
+    Comparator.comparing<String?, <!UPPER_BOUND_VIOLATED!>Boolean?<!>> <!ARGUMENT_TYPE_MISMATCH!>{
         it != ""
-    }
+    }<!>
 }
 
 /* GENERATED_FIR_TAGS: equalityExpression, flexibleType, functionDeclaration, inProjection, javaFunction, lambdaLiteral,

@@ -51,7 +51,8 @@ fun deserializeClassToSymbol(
     nameResolver: NameResolver,
     session: FirSession,
     moduleData: FirModuleData,
-    defaultAnnotationDeserializer: AbstractAnnotationDeserializer?,
+    defaultAnnotationDeserializer: AnnotationDeserializer?,
+    kdocDeserializer: FirKDocDeserializer,
     flexibleTypeFactory: FirTypeDeserializer.FlexibleTypeFactory,
     scopeProvider: FirScopeProvider,
     serializerExtensionProtocol: SerializerExtensionProtocol,
@@ -110,6 +111,7 @@ fun deserializeClassToSymbol(
             annotationDeserializer,
             flexibleTypeFactory,
             constDeserializer,
+            kdocDeserializer,
             containerSource,
             symbol,
             status.effectiveVisibility
@@ -202,6 +204,7 @@ fun deserializeClassToSymbol(
                     ).apply {
                         isStatic = true
                     }
+                    isLocal = false
                     resolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
                 }.apply {
                     containingClassForStaticMemberAttr = context.dispatchReceiver!!.lookupTag
@@ -233,6 +236,8 @@ fun deserializeClassToSymbol(
         companionObjectSymbol = (declarations.firstOrNull { it is FirRegularClass && it.isCompanion } as FirRegularClass?)?.symbol
 
         contextParameters.addAll(classDeserializer.createContextParametersForClass(classProto, origin, symbol))
+
+        applyKDoc(context.kdocDeserializer.loadClassKDoc(classProto))
     }.apply {
         if (isSealed) {
             val inheritors = classProto.sealedSubclassFqNameList.map { nameIndex ->
@@ -244,6 +249,7 @@ fun deserializeClassToSymbol(
         valueClassRepresentation =
             classProto.loadValueClassRepresentation(
                 session.deserializationExtension?.isMaybeMultiFieldValueClass(containerSource) == true,
+                session.deserializationExtension?.isMaybeFullValueClass(containerSource) == true,
                 context.nameResolver,
                 context.typeTable,
                 context.typeDeserializer::rigidType,
@@ -298,7 +304,7 @@ fun FirRegularClassBuilder.addCloneForArrayIfNeeded(classId: ClassId, dispatchRe
             isMarkedNullable = false
         )
     }
-    declarations += buildSimpleFunction {
+    declarations += buildNamedFunction {
         moduleData = this@addCloneForArrayIfNeeded.moduleData
         origin = FirDeclarationOrigin.Library
         resolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
@@ -321,6 +327,7 @@ fun FirRegularClassBuilder.addCloneForArrayIfNeeded(classId: ClassId, dispatchRe
         status = FirResolvedDeclarationStatusImpl(Visibilities.Public, Modality.FINAL, EffectiveVisibility.Public).apply {
             isOverride = true
         }
+        isLocal = false
         name = StandardClassIds.Callables.clone.callableName
         symbol = FirNamedFunctionSymbol(CallableId(classId, name))
         dispatchReceiverType = dispatchReceiver!!

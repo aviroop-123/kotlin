@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +FunctionalInterfaceConversion +SamConversionPerArgument +SamConversionForKotlinFunctions
 // DIAGNOSTICS: -UNUSED_PARAMETER
 
 fun interface Base {
@@ -15,7 +14,7 @@ fun takeWithFun(a: WithFun) {}
 
 fun test() {
     takeBase {}
-    takeWithoutFun(<!TYPE_MISMATCH!>{}<!>)
+    takeWithoutFun(<!ARGUMENT_TYPE_MISMATCH!>{}<!>)
     takeWithFun {}
 }
 

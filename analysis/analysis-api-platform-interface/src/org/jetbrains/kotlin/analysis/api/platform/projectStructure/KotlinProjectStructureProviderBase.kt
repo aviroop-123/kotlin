@@ -1,32 +1,25 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.api.platform.projectStructure
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
-import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileModule
-import org.jetbrains.kotlin.analysis.api.projectStructure.danglingFileResolutionMode
-import org.jetbrains.kotlin.analysis.api.projectStructure.isDangling
-import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
-import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.api.projectStructure.KaNotUnderContentRootModule
-import org.jetbrains.kotlin.psi.KtCodeFragment
-import org.jetbrains.kotlin.analysis.api.projectStructure.analysisContextModule
-import org.jetbrains.kotlin.analysis.api.projectStructure.contextModule
-import org.jetbrains.kotlin.analysis.api.projectStructure.copyOrigin
-import org.jetbrains.kotlin.analysis.api.projectStructure.explicitModule
-import org.jetbrains.kotlin.analysis.api.projectStructure.baseContextModule
+import org.jetbrains.kotlin.analysis.api.KaPlatformInterface
+import org.jetbrains.kotlin.analysis.api.projectStructure.*
 import org.jetbrains.kotlin.idea.KotlinLanguage
+import org.jetbrains.kotlin.psi.KtCodeFragment
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.analysisContext
 
+@KaPlatformInterface
 public abstract class KotlinProjectStructureProviderBase : KotlinProjectStructureProvider {
     protected abstract fun getNotUnderContentRootModule(project: Project): KaNotUnderContentRootModule
 
@@ -39,13 +32,7 @@ public abstract class KotlinProjectStructureProviderBase : KotlinProjectStructur
             }
         }
 
-        val virtualFile = file.virtualFile
-        if (virtualFile != null) {
-            val contextModule = virtualFile.analysisContextModule
-            if (contextModule != null) {
-                return contextModule
-            }
-        }
+        file.virtualFile?.resolveExtensionFileModule?.let { return it }
 
         if (file is KtFile && file.isDangling) {
             val contextModule = computeContextModule(file)
@@ -56,8 +43,12 @@ public abstract class KotlinProjectStructureProviderBase : KotlinProjectStructur
         return null
     }
 
-    @OptIn(KaExperimentalApi::class)
+    @OptIn(KaExperimentalApi::class, KaImplementationDetail::class)
     private fun computeDefaultDanglingFileResolutionMode(file: KtFile): KaDanglingFileResolutionMode {
+        if (autoDanglingResolutionMode) {
+            return KaDanglingFileResolutionModeProvider.calculateMode(file)
+        }
+
         if (!file.isPhysical && !file.viewProvider.isEventSystemEnabled && file.copyOrigin != null) {
             return KaDanglingFileResolutionMode.IGNORE_SELF
         }
@@ -68,13 +59,15 @@ public abstract class KotlinProjectStructureProviderBase : KotlinProjectStructur
     @OptIn(KaImplementationDetail::class, KaExperimentalApi::class)
     private fun computeContextModule(file: KtFile): KaModule {
         val originalFile = file.copyOrigin
+
+        @Suppress("DEPRECATION")
         originalFile?.virtualFile?.analysisContextModule?.let { return it }
 
         file.contextModule?.let { return it }
 
-        val contextElement = file.context?.takeIf(::isSupportedContextElement)
+        val contextElement = originalFile
+            ?: file.context?.takeIf(::isSupportedContextElement)
             ?: file.analysisContext?.takeIf(::isSupportedContextElement)
-            ?: originalFile
 
         if (contextElement != null) {
             val contextModule = getModule(contextElement, useSiteModule = null)
@@ -94,6 +87,7 @@ public abstract class KotlinProjectStructureProviderBase : KotlinProjectStructur
     }
 }
 
+@KaPlatformInterface
 @OptIn(KaExperimentalApi::class)
 @Deprecated("Use 'explicitModule' instead.")
 public var KtCodeFragment.forcedSpecialModule: KaDanglingFileModule?
@@ -101,3 +95,11 @@ public var KtCodeFragment.forcedSpecialModule: KaDanglingFileModule?
     set(value) {
         explicitModule = value
     }
+
+/**
+ * Whether [KaDanglingFileResolutionMode] for dangling files should be automatically calculated by [KaDanglingFileResolutionModeProvider]
+ * in cases when [KtFile.danglingFileResolutionMode] is not set.
+ */
+private val autoDanglingResolutionMode by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    Registry.`is`("kotlin.analysis.autoDanglingResolutionMode", true)
+}

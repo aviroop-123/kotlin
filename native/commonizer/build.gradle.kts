@@ -1,6 +1,9 @@
+import org.jetbrains.kotlin.gradle.utils.NativeCompilerDownloader
+
 plugins {
     kotlin("jvm")
     id("project-tests-convention")
+    id("test-inputs-check-v2")
 }
 
 description = "Kotlin KLIB Library Commonizer"
@@ -25,14 +28,17 @@ dependencies {
     compileOnly(project(":kotlin-metadata")) { isTransitive = false }
     compileOnly(project(":native:kotlin-klib-commonizer-api")) { isTransitive = false }
     compileOnly(project(":kotlin-tooling-core")) { isTransitive = false }
-    compileOnly(project(":compiler:cli-common"))
+    compileOnly(project(":compiler:cli-base"))
     compileOnly(project(":compiler:ir.serialization.common"))
-    compileOnly(project(":compiler:frontend"))
     compileOnly(project(":core:compiler.common.native"))
     compileOnly(project(":native:frontend.native"))
     compileOnly(project(":kotlin-util-klib-metadata"))
     compileOnly(intellijCore())
     compileOnly(libs.intellij.fastutil)
+
+    compileOnly(project(":core:descriptors"))
+    compileOnly(project(":core:deserialization"))
+    compileOnly(project(":core:deserialization.common"))
 
     // This dependency is necessary to keep the right dependency record inside of POM file:
     publishedCompile(project(":kotlin-compiler"))
@@ -45,27 +51,35 @@ dependencies {
     testImplementation(project(":kotlin-metadata")) { isTransitive = false }
     testImplementation(project(":native:kotlin-klib-commonizer-api"))
     testImplementation(project(":kotlin-tooling-core"))
-    testApi(intellijCore())
+    testImplementation(project(":native:native.config"))
+    testImplementation(intellijCore())
+
+    testRuntimeOnly(libs.junit.vintage.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+val runCommonizer by tasks.registering(JavaExec::class) {
+    classpath(configurations.compileOnly, sourceSets.main.get().runtimeClasspath)
+    mainClass = "org.jetbrains.kotlin.commonizer.cli.CommonizerCLI"
+}
+
+sourceSets {
+    main { projectDefault() }
+    test { projectDefault() }
 }
 
 optInToK1Deprecation()
 
-val runCommonizer by tasks.registering(JavaExec::class) {
-    classpath(configurations.compileOnly, sourceSets.main.get().runtimeClasspath)
-    mainClass.set("org.jetbrains.kotlin.commonizer.cli.CommonizerCLI")
-}
-
-sourceSets {
-    "main" { projectDefault() }
-    "test" { projectDefault() }
-}
-
 projectTests {
-    testTask(parallel = true, jUnitMode = JUnitMode.JUnit4) {
-        workingDir = rootDir
+    testTask(jUnitMode = JUnitMode.JUnit5) {
+        // Use the bootstrap K/N stdlib for compiling test code samples.
+        val nativeDistributionDownloader = NativeCompilerDownloader(project).also { it.downloadIfNeeded() }
+        val compilerDirectory = project.layout.dir(providers.provider { nativeDistributionDownloader.compilerDirectory })
+        addClasspathProperty("kotlin.internal.native.test.nativeHome") { from(compilerDirectory) }
     }
+    testData(project.isolated, "testData")
 }
 
 runtimeJar()
-sourcesJar { includeEmptyDirs = false; eachFile { exclude() } } // empty Jar, no public sources
-javadocJar { includeEmptyDirs = false; eachFile { exclude() } } // empty Jar, no public javadocs
+emptySourcesJar()
+emptyJavadocJar()

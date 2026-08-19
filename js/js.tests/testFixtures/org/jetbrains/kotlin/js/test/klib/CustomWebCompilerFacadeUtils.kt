@@ -9,9 +9,9 @@ import org.jetbrains.kotlin.platform.isWasm
 import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.test.frontend.fir.getTransitivesAndFriends
 import org.jetbrains.kotlin.test.model.TestModule
+import org.jetbrains.kotlin.test.services.CompilationStage
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.compilerConfigurationProvider
-import org.jetbrains.kotlin.test.services.configuration.JsEnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.targetPlatformProvider
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
 import org.jetbrains.kotlin.utils.mapToSetOrEmpty
@@ -19,7 +19,7 @@ import org.jetbrains.kotlin.wasm.config.wasmTarget
 import java.io.File
 
 /**
- * Note: To be used only internally in [CustomWebCompilerFirstPhaseFacade].
+ * Note: To be used only internally in [CustomWebCompilerFirstStageFacade].
  */
 internal fun TestModule.isWasmModule(testServices: TestServices): Boolean =
     testServices.targetPlatformProvider.getTargetPlatform(module = this).isWasm()
@@ -27,29 +27,33 @@ internal fun TestModule.isWasmModule(testServices: TestServices): Boolean =
 /**
  * Returns null only if this is a JS target.
  *
- * Note: To be used only internally in [CustomWebCompilerFirstPhaseFacade].
+ * Note: To be used only internally in [CustomWebCompilerFirstStageFacade].
  */
-internal fun TestModule.wasmTargetOrNull(testServices: TestServices): WasmTarget? =
+internal fun TestModule.wasmTargetOrNull(testServices: TestServices, compilationStage: CompilationStage): WasmTarget? =
     runIf(isWasmModule(testServices)) {
-        testServices.compilerConfigurationProvider.getCompilerConfiguration(module = this).wasmTarget
+        testServices.compilerConfigurationProvider.getCompilerConfiguration(module = this, compilationStage).wasmTarget
     }
 
 /**
- * Note: To be used only internally in [CustomWebCompilerFirstPhaseFacade] and [CustomWebCompilerFirstPhaseEnvironmentConfigurator].
+ * Note: To be used only internally in [CustomWebCompilerFirstStageFacade].
  */
 internal fun TestModule.customWebCompilerSettings(testServices: TestServices): CustomWebCompilerSettings =
     if (isWasmModule(testServices)) customWasmJsCompilerSettings else customJsCompilerSettings
 
 /**
- * Note: To be used only internally in [CustomWebCompilerFirstPhaseFacade] and [CustomJsCompilerSecondPhaseFacade].
+ * Note: To be used only internally in [CustomWebCompilerFirstStageFacade] and [CustomJsCompilerSecondStageFacade].
  */
-internal fun TestModule.collectDependencies(testServices: TestServices): Pair<Set<String>, Set<String>> {
-    val runtimeLibraries: List<File> = when (wasmTargetOrNull(testServices)) {
+fun TestModule.collectDependencies(
+    testServices: TestServices,
+    compilationStage: CompilationStage,
+): Pair<Set<String>, Set<String>> {
+    val runtimeLibraries: List<File> = when (wasmTargetOrNull(testServices, compilationStage)) {
         null -> { // JS
-            listOfNotNull(
+            // For proper compilation by the old compiler version, `kotlin-stdlib-js-ir-minimal-for-test` cannot be used from the current Kotlin repo.
+            // Instead, stdlib and `kotlin.test` from old dist must be used for all tests (`kotlin.test` is not part of `kotlin-stdlib-js-*.klib`)
+            listOf(
                 customJsCompilerSettings.stdlib,
-                // Load "kotlin-test" only when one of the corresponding directives has been specified.
-                runIf(JsEnvironmentConfigurator.isFullJsRuntimeNeeded(module = this)) { customJsCompilerSettings.kotlinTest },
+                customJsCompilerSettings.kotlinTest,
             )
         }
         WasmTarget.JS -> {
@@ -58,10 +62,10 @@ internal fun TestModule.collectDependencies(testServices: TestServices): Pair<Se
                 customWasmJsCompilerSettings.kotlinTest,
             )
         }
-        WasmTarget.WASI -> error("WASI target is not yet supported in the first phase of ${CustomWebCompilerFirstPhaseFacade::class.simpleName}")
+        WasmTarget.WASI -> error("WASI target is not yet supported in the first phase of ${CustomWebCompilerFirstStageFacade::class.simpleName}")
     }
 
-    val (transitiveLibraries: List<File>, friendLibraries: List<File>) = getTransitivesAndFriends(module = this, testServices)
+    val [transitiveLibraries: List<File>, friendLibraries: List<File>] = getTransitivesAndFriends(module = this, testServices)
 
     val regularDependencies: Set<String> = buildSet {
         runtimeLibraries.mapTo(this) { it.absolutePath }

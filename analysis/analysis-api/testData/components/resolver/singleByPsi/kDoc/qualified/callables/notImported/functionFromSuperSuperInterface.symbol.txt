@@ -1,0 +1,5 @@
+KDocName(50,61): 'foo.Foo.foo'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      foo/Baz.foo(<dispatch receiver>: foo.Baz): kotlin.Unit
+    ]

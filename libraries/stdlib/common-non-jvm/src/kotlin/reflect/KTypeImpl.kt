@@ -5,6 +5,9 @@
 
 package kotlin.reflect
 
+import kotlin.internal.UsedFromCompilerGeneratedCode
+
+@UsedFromCompilerGeneratedCode
 internal class KTypeImpl(
     override val classifier: KClassifier?,
     override val arguments: List<KTypeProjection>,
@@ -29,7 +32,7 @@ internal class KTypeImpl(
 
             if (arguments.isNotEmpty()) {
                 append('<')
-                for ((index, argument) in arguments.withIndex()) {
+                for ([index, argument] in arguments.withIndex()) {
                     if (index > 0) append(", ")
                     append(argument)
                 }

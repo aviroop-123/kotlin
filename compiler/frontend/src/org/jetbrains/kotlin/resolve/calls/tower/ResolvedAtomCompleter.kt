@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.resolve.calls.tower
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.createFunctionType
 import org.jetbrains.kotlin.config.LanguageFeature
@@ -49,6 +50,7 @@ import org.jetbrains.kotlin.types.expressions.ExpressionTypingServices
 import org.jetbrains.kotlin.types.expressions.typeInfoFactory.createTypeInfo
 import org.jetbrains.kotlin.types.typeUtil.*
 
+@K1Deprecation
 class ResolvedAtomCompleter(
     private val resultSubstitutor: NewTypeSubstitutor,
     private val topLevelCallContext: BasicCallResolutionContext,
@@ -83,7 +85,7 @@ class ResolvedAtomCompleter(
         }
 
         when (resolvedAtom) {
-            is ResolvedCollectionLiteralAtom -> completeCollectionLiteralCalls(resolvedAtom)
+            is ResolvedCollectionLiteralAtom -> completeCollectionLiterals(resolvedAtom)
             is ResolvedCallableReferenceArgumentAtom -> completeCallableReferenceArgument(resolvedAtom)
             is ResolvedLambdaAtom -> completeLambda(resolvedAtom)
             is ResolvedCallAtom -> completeResolvedCall(resolvedAtom, emptyList())
@@ -325,7 +327,7 @@ class ResolvedAtomCompleter(
         val resultArgumentsInfo = lambda.resultArgumentsInfo!!
 
         val psiCallArgument = lambda.atom.psiCallArgument
-        val (ktArgumentExpression, ktFunction) = when (psiCallArgument) {
+        val [ktArgumentExpression, ktFunction] = when (psiCallArgument) {
             is LambdaKotlinCallArgumentImpl -> psiCallArgument.ktLambdaExpression to psiCallArgument.ktLambdaExpression.functionLiteral
             is FunctionExpressionImpl -> psiCallArgument.ktFunction to psiCallArgument.ktFunction
             else -> throw AssertionError("Unexpected psiCallArgument for resolved lambda argument: $psiCallArgument")
@@ -592,7 +594,7 @@ class ResolvedAtomCompleter(
         // - result should be coerced.
         var hasNonTrivialMapping = false
         val mappedArguments = ArrayList<Pair<ValueParameterDescriptor, ResolvedValueArgument>>()
-        for ((valueParameter, resolvedCallArgument) in callableReferenceAdaptation.mappedArguments) {
+        for ([valueParameter, resolvedCallArgument] in callableReferenceAdaptation.mappedArguments) {
             val resolvedValueArgument = when (resolvedCallArgument) {
                 ResolvedCallArgument.DefaultArgument -> {
                     hasNonTrivialMapping = true
@@ -641,7 +643,7 @@ class ResolvedAtomCompleter(
         return false
     }
 
-    private fun completeCollectionLiteralCalls(collectionLiteralArgument: ResolvedCollectionLiteralAtom) {
+    private fun completeCollectionLiterals(collectionLiteralArgument: ResolvedCollectionLiteralAtom) {
         val psiCallArgument = collectionLiteralArgument.atom.psiCallArgument as CollectionLiteralKotlinCallArgumentImpl
         val context = psiCallArgument.outerCallContext
 
@@ -657,6 +659,7 @@ class ResolvedAtomCompleter(
     }
 }
 
+@K1Deprecation
 class FunctionLiteralTypes(
     val returnType: ProcessedType,
     val parameterTypes: List<ProcessedType>,

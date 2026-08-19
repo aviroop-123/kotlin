@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.test.directives
 
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
-import org.jetbrains.kotlin.test.frontend.classic.handlers.ConstantValuesHandler
 
 object DiagnosticsDirectives : SimpleDirectivesContainer() {
     val WITH_NEW_INFERENCE by directive(
@@ -30,24 +29,9 @@ object DiagnosticsDirectives : SimpleDirectivesContainer() {
         """.trimIndent()
     )
 
-    val SKIP_TXT by directive(
-        description = "Disables handler which dumps declarations to testName.txt"
-    )
-
-    val NI_EXPECTED_FILE by directive(
-        description = "Create separate .ni.txt file for declarations dump with new inference enabled"
-    )
-
     val MARK_DYNAMIC_CALLS by directive(
         description = """
             Render debug info about dynamic calls
-        """.trimIndent()
-    )
-
-    val RENDER_PACKAGE by stringDirective(
-        description = """
-            Dump declaration from packages listed in directive
-              (additional to root package)
         """.trimIndent()
     )
 
@@ -55,15 +39,6 @@ object DiagnosticsDirectives : SimpleDirectivesContainer() {
         description = """
             If this directive enabled then `DEBUG_INFO_...` diagnostics will be reported
               only if they are defined in testdata.
-        """.trimIndent()
-    )
-
-    val CHECK_COMPILE_TIME_VALUES by enumDirective<ConstantValuesHandler.Mode>(
-        description = """
-            Enables ${ConstantValuesHandler::class} which renders values from constant
-              evaluator in <!DEBUG_INFO_CONSTANT_VALUE!> meta infos.
-              
-            Value determines which context slice should be checked
         """.trimIndent()
     )
 

@@ -40,8 +40,12 @@ fun return_any_should_append_runtime_import(): Any = TODO()
 
 package namespace3
 
+// KT-79227 Swift Export: Fix First Release Issues
+// Void function parameters aren't passed down correctly
 fun foo(faux: Unit): Unit = Unit
 
+// KT-79227 Swift Export: Fix First Release Issues
+// Void has to be the first and the only argument
 fun foo(arg1: Int, faux: Unit): Unit = Unit
 
 val bar: Unit get() = Unit
@@ -112,9 +116,8 @@ val Int?.bar: String get() = TODO()
 val Foo.bar: String get() = TODO()
 val Foo?.bar: String get() = TODO()
 
-// FILE: suspend_function.kt
-// we do not support sus fun. This should not be exported
-suspend fun suspending_fun(): Int = TODO()
+fun Foo.combine(foo: Foo): Foo = TODO()
+fun combine(foo: Foo, foo2: Foo): Foo = TODO()
 
 // FILE: operator_fun.kt
 package operators
@@ -182,3 +185,12 @@ data class Foo(var value: Int = 0) {
 }
 
 operator fun Foo.invoke(other: Foo): Foo = other
+
+// FILE: inline_fun.kt
+package inline
+
+inline fun foo(): String = TODO()
+
+class Bar {
+    inline fun bar(): String = TODO()
+}

@@ -23,7 +23,6 @@ import kotlin.reflect.KProperty1
  * The entry point is [MetadataDeclarationsComparator.Companion.compare] function.
  */
 // TODO: extract to kotlinx-metadata-klib library?
-@OptIn(ExperimentalAnnotationsInMetadata::class)
 class MetadataDeclarationsComparator private constructor(private val config: Config) {
 
     interface Config {
@@ -335,7 +334,7 @@ class MetadataDeclarationsComparator private constructor(private val config: Con
             val missingInB: Boolean get() = !missingInA
 
             override fun toString() = buildString {
-                val (missing, existing) = if (missingInA) "A" to "B" else "B" to "A"
+                val [missing, existing] = if (missingInA) "A" to "B" else "B" to "A"
                 appendNameKind().appendLine(" is missing in ($missing)")
                 val existentValueText = when (val existentValue = existentValue) {
                     is KmType -> existentValue.dumpToString(dumpExtras = true)
@@ -372,7 +371,6 @@ class MetadataDeclarationsComparator private constructor(private val config: Con
 
         val moduleContext = rootContext.next(PathElement.Module(metadataA, metadataB))
 
-        compareAnnotationLists(moduleContext, metadataA.annotations, metadataB.annotations)
         compareModuleFragmentLists(moduleContext, metadataA.fragments, metadataB.fragments)
 
         return toResult()
@@ -1123,7 +1121,6 @@ class MetadataDeclarationsComparator private constructor(private val config: Con
         ): Result = MetadataDeclarationsComparator(config).compareModules(metadataA, metadataB)
 
         private val CLASS_FLAGS: Array<KProperty1<KmClass, Any>> = arrayOf(
-            KmClass::hasAnnotations,
             KmClass::visibility,
             KmClass::modality,
             KmClass::kind,
@@ -1137,19 +1134,16 @@ class MetadataDeclarationsComparator private constructor(private val config: Con
         )
 
         private val TYPE_ALIAS_FLAGS: Array<KProperty1<KmTypeAlias, Any>> = arrayOf(
-            KmTypeAlias::hasAnnotations,
             KmTypeAlias::visibility
         )
 
         private val CONSTRUCTOR_FLAGS: Array<KProperty1<KmConstructor, Any>> = arrayOf(
-            KmConstructor::hasAnnotations,
             KmConstructor::visibility,
             KmConstructor::isSecondary,
             KmConstructor::hasNonStableParameterNames
         )
 
         private val FUNCTION_FLAGS: Array<KProperty1<KmFunction, Any>> = arrayOf(
-            KmFunction::hasAnnotations,
             KmFunction::visibility,
             KmFunction::modality,
             KmFunction::kind,
@@ -1164,7 +1158,6 @@ class MetadataDeclarationsComparator private constructor(private val config: Con
         )
 
         private val PROPERTY_FLAGS: Array<KProperty1<KmProperty, Any>> = arrayOf(
-            KmProperty::hasAnnotations,
             KmProperty::visibility,
             KmProperty::modality,
             KmProperty::kind,
@@ -1178,7 +1171,6 @@ class MetadataDeclarationsComparator private constructor(private val config: Con
         )
 
         private val PROPERTY_ACCESSOR_FLAGS: Array<KProperty1<KmPropertyAccessorAttributes, Any>> = arrayOf(
-            KmPropertyAccessorAttributes::hasAnnotations,
             KmPropertyAccessorAttributes::visibility,
             KmPropertyAccessorAttributes::modality,
             KmPropertyAccessorAttributes::isNotDefault,
@@ -1197,7 +1189,6 @@ class MetadataDeclarationsComparator private constructor(private val config: Con
         )
 
         private val VALUE_PARAMETER_FLAGS: Array<KProperty1<KmValueParameter, Boolean>> = arrayOf(
-            KmValueParameter::hasAnnotations,
             KmValueParameter::declaresDefaultValue,
             KmValueParameter::isCrossinline,
             KmValueParameter::isNoinline

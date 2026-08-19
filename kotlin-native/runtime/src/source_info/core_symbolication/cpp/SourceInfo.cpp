@@ -285,75 +285,77 @@ extern "C" int Kotlin_getSourceInfo_core_symbolication(void* addr, SourceInfo *r
 
   static bool csIsAvailable = TryInitializeCoreSymbolication();
 
-  if (csIsAvailable) {
-    unsigned long long address = static_cast<unsigned long long>((uintptr_t)addr);
+  if (!csIsAvailable) {
+    return -1;
+  }
 
-    CSSymbolOwnerRef symbolOwner = CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator, address, kCSNow);
-    if (CSIsNull(symbolOwner))
+  unsigned long long address = static_cast<unsigned long long>((uintptr_t)addr);
+
+  CSSymbolOwnerRef symbolOwner = CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator, address, kCSNow);
+  if (CSIsNull(symbolOwner))
+    return 0;
+  CSSymbolRef symbol = CSSymbolOwnerGetSymbolWithAddress(symbolOwner, address);
+  if (CSIsNull(symbol))
+    return 0;
+  SYM_LOG("Kotlin_getSourceInfo: address: (%p) {\n", addr);
+  SYM_DUMP(symbol);
+
+
+  /**
+   * ASSUMPTION: we assume that the _first_ and the _last_ source infos should belong to real function(symbol) the rest might belong to
+   * inlined functions.
+   */
+  CSSymbolForeachSourceInfo(symbol,
+    ^(CSSourceInfoRef ref) {
+      // Expecting CSSourceInfoGetLineNumber not to overflow int32_t max value.
+      int32_t lineNumber = CSSourceInfoGetLineNumber(ref);
+      if (lineNumber == 0)
+        return 0;
+      if (limits.start == -1) {
+        limits.start = lineNumber;
+        limits.fileName = CSSourceInfoGetPath(ref);
+      } else {
+        limits.end = lineNumber;
+      }
       return 0;
-    CSSymbolRef symbol = CSSymbolOwnerGetSymbolWithAddress(symbolOwner, address);
-    if (CSIsNull(symbol))
-      return 0;
-    SYM_LOG("Kotlin_getSourceInfo: address: (%p) {\n", addr);
-    SYM_DUMP(symbol);
+  });
 
+  SYM_LOG("limits: {%s %d..%d}\n", limits.fileName, limits.start, limits.end);
+  result.setFilename(limits.fileName);
 
-    /**
-     * ASSUMPTION: we assume that the _first_ and the _last_ source infos should belong to real function(symbol) the rest might belong to
-     * inlined functions.
-     */
-    CSSymbolForeachSourceInfo(symbol,
-      ^(CSSourceInfoRef ref) {
+  CSSymbolForeachSourceInfo(symbol,
+    ^(CSSourceInfoRef ref) {
         // Expecting CSSourceInfoGetLineNumber not to overflow int32_t max value.
         int32_t lineNumber = CSSourceInfoGetLineNumber(ref);
         if (lineNumber == 0)
           return 0;
-        if (limits.start == -1) {
-          limits.start = lineNumber;
-          limits.fileName = CSSourceInfoGetPath(ref);
-        } else {
-          limits.end = lineNumber;
+        CSRange range = CSSourceInfoGetRange(ref);
+        SYM_LOG("ref(%p .. %p) [{\n", (void *)range.location,  (void *)(range.location + range.length));
+        SYM_DUMP(ref);
+        SYM_DUMP(CSSourceInfoGetSymbol(ref));
+        const char* fileName = CSSourceInfoGetPath(ref);
+        /**
+         * We need to change API fo Kotlin_getSourceInfo to return information about inlines,
+         * but for a moment we have to track that we updating result info _only_ for upper level or _inlined at_ and
+         * don't go deeper. at deeper level we check only that we at the right _inlined at_ position.
+         */
+        if (continueUpdateResult
+            && strcmp(limits.fileName, fileName) == 0
+            && lineNumber >= limits.start
+            && lineNumber <= limits.end) {
+          result.lineNumber = lineNumber;
+          result.column = CSSourceInfoGetColumn(ref);
         }
+        /**
+         * if found right inlined function don't bother with
+         * updating high level inlined _at_ source info
+         */
+        if (continueUpdateResult &&  (address >= range.location
+                                      && address < range.location + range.length))
+           continueUpdateResult = false;
+        SYM_LOG("}]\n");
         return 0;
-    });
-
-    SYM_LOG("limits: {%s %d..%d}\n", limits.fileName, limits.start, limits.end);
-    result.setFilename(limits.fileName);
-
-    CSSymbolForeachSourceInfo(symbol,
-      ^(CSSourceInfoRef ref) {
-          // Expecting CSSourceInfoGetLineNumber not to overflow int32_t max value.
-          int32_t lineNumber = CSSourceInfoGetLineNumber(ref);
-          if (lineNumber == 0)
-            return 0;
-          CSRange range = CSSourceInfoGetRange(ref);
-          SYM_LOG("ref(%p .. %p) [{\n", (void *)range.location,  (void *)(range.location + range.length));
-          SYM_DUMP(ref);
-          SYM_DUMP(CSSourceInfoGetSymbol(ref));
-          const char* fileName = CSSourceInfoGetPath(ref);
-          /**
-           * We need to change API fo Kotlin_getSourceInfo to return information about inlines,
-           * but for a moment we have to track that we updating result info _only_ for upper level or _inlined at_ and
-           * don't go deeper. at deeper level we check only that we at the right _inlined at_ position.
-           */
-          if (continueUpdateResult
-              && strcmp(limits.fileName, fileName) == 0
-              && lineNumber >= limits.start
-              && lineNumber <= limits.end) {
-            result.lineNumber = lineNumber;
-            result.column = CSSourceInfoGetColumn(ref);
-          }
-          /**
-           * if found right inlined function don't bother with
-           * updating high level inlined _at_ source info
-           */
-          if (continueUpdateResult &&  (address >= range.location
-                                        && address < range.location + range.length))
-             continueUpdateResult = false;
-          SYM_LOG("}]\n");
-          return 0;
-   });
-  }
+  });
   SYM_LOG("}\n");
   result_buffer[0] = result;
   return 1;

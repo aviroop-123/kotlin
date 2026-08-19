@@ -5,12 +5,16 @@
 
 package org.jetbrains.kotlin.analysis.low.level.api.fir.sessions
 
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.ModificationTracker
 import org.jetbrains.kotlin.analysis.api.platform.lifetime.ModificationTrackerWithInvalidationReason
+import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KaModulePlatformKind
+import org.jetbrains.kotlin.analysis.api.platform.projectStructure.platformKind
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCache
 import org.jetbrains.kotlin.fir.BuiltinTypes
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
 import org.jetbrains.kotlin.fir.FirSession
@@ -19,24 +23,30 @@ import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicLongFieldUpdater
+import kotlin.time.TimeSource
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * An [LLFirSession] stores all symbols, components, and configuration needed for the resolution of Kotlin code/binaries from a [KaModule].
  *
  * ### Invalidation
  *
- * [LLFirSession] will be invalidated by [LLFirSessionInvalidationService] when its [KaModule] or one of the module's dependencies is
- * modified, or when a global modification event occurs. Sessions are managed by [LLFirSessionCache], which holds a soft reference to its
- * [LLFirSession]s. This allows a session to be garbage collected when it is softly reachable. The session's [LLFirSessionCleaner] ensures
- * that its associated [Disposable] is properly disposed even after garbage collection.
+ * [LLFirSession] will be invalidated by [LLFirSessionInvalidationService][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationService]
+ * when its [KaModule] or one of the module's dependencies is modified, or when a global modification event occurs. Sessions are managed by
+ * [LLFirSessionCache][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCache], which holds a soft reference to
+ * its [LLFirSession]s. This allows a session to be garbage collected when it is softly reachable. The session's
+ * [LLFirSessionCleaner][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCleaner] ensures that its associated
+ * [Disposable] is properly disposed even after garbage collection.
  *
- * When a session is invalidated after a modification event, the [LLFirSessionInvalidationEventPublisher] will publish a
- * [session invalidation event][LLFirSessionInvalidationTopics]. This allows entities whose lifetime depends on the session's lifetime to be
- * invalidated with the session. Such an event is not published when the session is garbage collected due to being softly reachable, because
- * the [LLFirSessionCleaner] is not guaranteed to be executed in a write action. If we try to publish a session invalidation event outside
- * a write action, another thread might already have built another [LLFirSession] for the same [KaModule], causing a race between the new
- * session and the session invalidation event (which can only refer to the [KaModule] because the session has already been garbage
- * collected).
+ * When a session is invalidated after a modification event, the [LLFirSessionInvalidationEventPublisher][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationEventPublisher]
+ * will publish a [session invalidation event][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationTopics].
+ * This allows entities whose lifetime depends on the session's lifetime to be invalidated with the session. Such an event is not published
+ * when the session is garbage collected due to being softly reachable, because the
+ * [LLFirSessionCleaner][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCleaner] is not guaranteed to be
+ * executed in a write action. If we try to publish a session invalidation event outside a write action, another thread might already have
+ * built another [LLFirSession] for the same [KaModule], causing a race between the new session and the session invalidation event (which
+ * can only refer to the [KaModule] because the session has already been garbage collected).
  *
  * Because of this, it's important that cached entities which depend on a session's lifetime (and therefore its session invalidation events)
  * are *exactly as softly reachable* as the [LLFirSession]. This means that the cached entity should keep a strong reference to the session,
@@ -44,15 +54,40 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater
  * `KaFirSessionProvider`, but keep a strong reference to the [LLFirSession].
  */
 @OptIn(PrivateSessionConstructor::class)
+@KaImplementationDetail
 abstract class LLFirSession(
     val ktModule: KaModule,
     override val builtinTypes: BuiltinTypes,
-    kind: Kind
+    kind: Kind,
 ) : FirSession(kind) {
     abstract fun getScopeSession(): ScopeSession
 
     val project: Project
         get() = ktModule.project
+
+    /**
+     * The session's [KaModulePlatformKind].
+     *
+     * It should not be confused with the [ktModule]'s [TargetPlatform][org.jetbrains.kotlin.platform.TargetPlatform].
+     */
+    internal val platformKind: KaModulePlatformKind = ktModule.platformKind
+
+    /**
+     * Whether the [LLFirSession] is a metadata session.
+     *
+     * @see KaModulePlatformKind.METADATA
+     */
+    internal val isMetadataSession: Boolean
+        get() = platformKind == KaModulePlatformKind.METADATA
+
+    /**
+     * The session's UUID to identify it for diagnostic purposes.
+     *
+     * For example, the UUID can be used to identify a session across multiple session structure files (see
+     * [LLSessionStructureWriter][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.structure.LLSessionStructureWriter]).
+     */
+    @OptIn(ExperimentalUuidApi::class)
+    val uuid: Uuid = Uuid.random()
 
     /**
      * Whether the [LLFirSession] is valid. The session should not be used if it is invalid.
@@ -66,6 +101,11 @@ abstract class LLFirSession(
      */
     var invalidationInformation: String? = null
         internal set
+
+    /**
+     * The time at which the session was created. This is used for diagnostic purposes.
+     */
+    val creationTimeMark: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
 
     /**
      * Creates a [ModificationTracker] which tracks the validity of this session via [isValid].
@@ -142,14 +182,17 @@ private class LLFirSessionValidityModificationTracker(private val sessionRef: We
     }
 }
 
+@KaImplementationDetail
 abstract class LLFirModuleSession(
     ktModule: KaModule,
     builtinTypes: BuiltinTypes,
     kind: Kind
 ) : LLFirSession(ktModule, builtinTypes, kind)
 
+@KaImplementationDetail
 val FirElementWithResolveState.llFirSession: LLFirSession
     get() = moduleData.session as LLFirSession
 
+@KaImplementationDetail
 val FirBasedSymbol<*>.llFirSession: LLFirSession
     get() = moduleData.session as LLFirSession

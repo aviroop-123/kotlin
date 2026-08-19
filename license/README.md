@@ -43,15 +43,40 @@ the Kotlin IntelliJ IDEA plugin:
      - License: BSD ([license/third_party/asm_license.txt][asm])
      - Origin: Derived from ASM: a very small and fast Java bytecode manipulation framework, Copyright (c) 2000-2011 INRIA, France Telecom
 
+ - Path: dependencies/protobuf/protobuf-patches/src/main/java/com/google/protobuf/CodedInputStream.java
+     - License: BSD ([license/third_party/protobuf_license.txt][protobuf])
+     - Origin: Derived from Protocol Buffers, Copyright 2008, Google Inc.
+
  - Path: js/js.ast
      - License: BSD ([license/third_party/dart_LICENSE.txt][dart])
      - Origin: Originally part of the Dart compiler, (c) 2011 the Dart Project Authors,
 
- - Path: js/js.parser/src/com/google
+ - Path: js/js.parser/src/org/jetbrains/kotlin/js/parser/ErrorReporter.java
       - License: Netscape Public License 1.1 ([license/third_party/rhino_LICENSE.txt][rhino])
       - Origin: Originally part of GWT, (C) 2007-08 Google Inc., distributed under the Apache 2 license. The code
         is derived from Rhino, (C) 1997-1999 Netscape Communications Corporation, distributed under the
         Netscape Public License.
+
+ - Path: js/js.parser/src/org/jetbrains/kotlin/js/parser/parserExceptions.kt
+      - License: Netscape Public License 1.1 ([license/third_party/rhino_LICENSE.txt][rhino])
+      - Origin: Originally part of GWT, (C) 2007-08 Google Inc., distributed under the Apache 2 license. The code
+        is derived from Rhino, (C) 1997-1999 Netscape Communications Corporation, distributed under the
+        Netscape Public License.
+
+ - Path: js/js.parser/src/main/antlr
+      - License: MIT ([license/third_party/antlr_js_grammar_license.txt][antlr_js_grammar])
+      - Origin: Derived from ANTLR grammars examples repository, Copyright (c) 2014 Bart Kiers, Alexandre Vitorelli,
+        Copyright (c) 2017-2020 Ivan Kochurkin, Copyright (c) 2018 Juan Alvarez, Copyright (c) 2019 Student Main.
+
+ - Path: js/js.parser/src/org/jetbrains/kotlin/js/parser/antlr/JavaScriptLexerBase.kt
+      - License: MIT ([license/third_party/antlr_js_grammar_license.txt][antlr_js_grammar])
+      - Origin: Derived from ANTLR grammars examples repository, Copyright (c) 2014 Bart Kiers, Alexandre Vitorelli,
+        Copyright (c) 2017-2020 Ivan Kochurkin, Copyright (c) 2018 Juan Alvarez, Copyright (c) 2019 Student Main.
+
+ - Path: js/js.parser/src/org/jetbrains/kotlin/js/parser/antlr/JavaScriptParserBase.kt
+      - License: MIT ([license/third_party/antlr_js_grammar_license.txt][antlr_js_grammar])
+      - Origin: Derived from ANTLR grammars examples repository, Copyright (c) 2014 Bart Kiers, Alexandre Vitorelli,
+        Copyright (c) 2017-2020 Ivan Kochurkin, Copyright (c) 2018 Juan Alvarez, Copyright (c) 2019 Student Main.
 
  - Path: libraries/stdlib/src/kotlin/collections
       - License: Apache 2 ([license/third_party/gwt_license.txt][gwt])
@@ -145,9 +170,17 @@ the Kotlin IntelliJ IDEA plugin:
    - License: Boost Software License 1.0 ([license/third_party/boost_LICENSE.txt][boost])
    - Origin: Derived from boost hash functions, Copyright 2005-2014 Daniel James
 
+ - Path: kotlin-native/libclangext/src/main/cpp/ClangExt.cpp
+   - License: Boost Software License 1.0 ([license/third_party/boost_LICENSE.txt][boost])
+   - Origin: Derived from boost hash functions, Copyright 2005-2014 Daniel James
+
  - Path: prepare/compiler/
     - License: Apache 2 ([license/third_party/opentelemetry_license.txt][opentelemetry])
     - Origin: Copyright The OpenTelemetry Authors
+
+ - Path: compiler/util-klib-abi/src/org/jetbrains/kotlin/library/abi/parser
+    - License: Apache 2 ([license/third_party/aosp_license.txt][aosp])
+    - Origin: Copyright (C) 2024 The Android Open Source Project
 
 ## Kotlin Test Data
 
@@ -226,6 +259,14 @@ any distributions of the compiler, libraries or plugin:
       - License: Apache 2 ([license/third_party/testdata/spring_license.txt][spring])
       - Origin: Spring Framework, Copyright 2002-2007 the original author or authors.
 
+ - Path: compiler/util-klib-abi/test/org/jetbrains/kotlin/library/abi/parser
+      - License: Apache 2 ([license/third_party/aosp_license.txt][aosp])
+      - Origin: Copyright (C) 2024 The Android Open Source Project
+
+ - Path: compiler/util-io/src/org/jetbrains/kotlin/util/Leb128.kt
+      - License: Apache 2 ([license/third_party/aosp_license.txt][aosp])
+      - Origin: Copyright (C) 2008 The Android Open Source Project
+
 ## Kotlin Tools and Libraries Tests
 
 The following source code is used for testing the Kotlin tools and/or libraries and is not incorporated into
@@ -283,6 +324,7 @@ any distributions of the compiler, libraries or plugin:
 [asm]: third_party/asm_license.txt
 [asmble]: third_party/asmble_license.txt
 [assemblyscript]: third_party/assemblyscript_license.txt
+[antlr_js_grammar]: third_party/antlr_js_grammar_license.txt
 [boost]: third_party/boost_LICENSE.txt
 [closure-compiler]: third_party/closure-compiler_LICENSE.txt
 [compose]: third_party/compose_license.txt
@@ -298,6 +340,7 @@ any distributions of the compiler, libraries or plugin:
 [jspecify]: third_party/testdata/jspecify_license.txt
 [lombok]: third_party/testdata/lombok_license.txt
 [power-assert]: third_party/power_assert_license.txt
+[protobuf]: third_party/protobuf_license.txt
 [rhino]: third_party/rhino_LICENSE.txt
 [rxjava]: third_party/testdata/rxjava_license.txt
 [spring]: third_party/testdata/spring_license.txt

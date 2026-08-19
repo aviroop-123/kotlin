@@ -19,16 +19,14 @@ import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
 import org.jetbrains.kotlin.gradle.internal.CompilerArgumentAware
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerArgumentsProducer.CreateCompilerArgumentsContext.Companion.lenient
-import org.jetbrains.kotlin.gradle.plugin.KotlinJsCompilerType.IR
 import org.jetbrains.kotlin.gradle.plugin.mpp.disambiguateName
 import org.jetbrains.kotlin.gradle.tasks.*
 import org.jetbrains.kotlin.gradle.tasks.K2MultiplatformStructure.Fragment
 import org.jetbrains.kotlin.gradle.tasks.K2MultiplatformStructure.RefinesEdge
 import org.jetbrains.kotlin.gradle.util.*
-import org.junit.Test
+import kotlin.test.Test
 import java.io.File
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.fail
 
 class K2MultiplatformStructureTest {
@@ -45,9 +43,24 @@ class K2MultiplatformStructureTest {
         structure.refinesEdges.set(listOf(RefinesEdge("a", "b"), RefinesEdge("b", "c")))
         structure.fragments.set(
             listOf(
-                Fragment("a", project.files("a.kt"), project.objects.fileCollection()),
-                Fragment("b", project.files("b.kt"), project.objects.fileCollection()),
-                Fragment("c", project.files(), project.objects.fileCollection())
+                Fragment(
+                    "a",
+                    project.files("a.kt"),
+                    project.objects.fileCollection(),
+                    project.objects.fileCollection()
+                ),
+                Fragment(
+                    "b",
+                    project.files("b.kt"),
+                    project.objects.fileCollection(),
+                    project.objects.fileCollection(),
+                ),
+                Fragment(
+                    "c",
+                    project.files(),
+                    project.objects.fileCollection(),
+                    project.objects.fileCollection(),
+                )
             )
         )
         structure.defaultFragmentName.set("a")
@@ -59,10 +72,10 @@ class K2MultiplatformStructureTest {
             parseCommandLineArguments(ArgumentUtils.convertArgumentsToStringList(sourceArguments), this)
         }
 
-        val fragments = parsedArguments.fragments ?: fail("Missing ${CommonCompilerArguments::fragments.name}")
+        val fragments = parsedArguments.fragments
         assertEquals(listOf("a", "b", "c"), fragments.toList())
 
-        val fragmentSources = parsedArguments.fragmentSources ?: fail("Missing ${CommonCompilerArguments::fragmentSources.name}")
+        val fragmentSources = parsedArguments.fragmentSources
         assertEquals(
             listOf(
                 "a:${project.file("a.kt").absolutePath}",
@@ -71,7 +84,7 @@ class K2MultiplatformStructureTest {
             fragmentSources.toList()
         )
 
-        val dependsOn = parsedArguments.fragmentRefines ?: fail("Missing ${CommonCompilerArguments::fragmentRefines.name}")
+        val dependsOn = parsedArguments.fragmentRefines
         assertEquals(listOf("a:b", "b:c"), dependsOn.toList())
     }
 
@@ -87,7 +100,7 @@ class K2MultiplatformStructureTest {
 
     @Test
     fun `test - configure js compilation`() {
-        `test compilations multiplatformStructure configuration`(kotlin.js(IR).compilations.main)
+        `test compilations multiplatformStructure configuration`(kotlin.js().compilations.main)
     }
 
     @Test
@@ -99,7 +112,7 @@ class K2MultiplatformStructureTest {
 
         project.tasks.withType<KotlinCompile>().forEach { task ->
             val arguments = task.buildCompilerArguments()
-            assertNull(arguments.fragmentSources, "Task $task has -Xframent-sources but it shouldn't.")
+            assert(arguments.fragmentSources.isEmpty()) { "Task $task has -Xframent-sources but it shouldn't." }
         }
     }
 
@@ -127,7 +140,7 @@ class K2MultiplatformStructureTest {
             val compileTask = target.compilations.get("main").compileTaskProvider.get() as K2MultiplatformCompilationTask
             val args = compileTask.buildCompilerArguments()
 
-            target.name to args.fragmentSources?.toList().orEmpty().map {
+            target.name to args.fragmentSources.toList().map {
                 val fragment = it.substringBefore(":")
                 val filePath = it.substringAfter(":")
                 "$fragment:${File(filePath).name}"
@@ -208,19 +221,19 @@ class K2MultiplatformStructureTest {
 
         val args = compileTask.buildCompilerArguments()
 
-        if (args.commonSources != null) {
+        if (args.commonSources.isNotEmpty()) {
             fail("Unexpected ${CommonCompilerArguments::commonSources.name} in K2 compilation: ${args.commonSources}")
         }
 
-        if (args.fragments == null) {
+        if (args.fragments.isEmpty()) {
             fail("Missing ${CommonCompilerArguments::fragments.name} in K2 compilation")
         }
 
-        if (args.fragmentSources == null) {
+        if (args.fragmentSources.isEmpty()) {
             fail("Missing ${CommonCompilerArguments::fragmentSources.name} in K2 compilation")
         }
 
-        if (args.fragmentRefines == null) {
+        if (args.fragmentRefines.isEmpty()) {
             fail("Missing ${CommonCompilerArguments::fragmentRefines.name} in K2 compilation")
         }
     }

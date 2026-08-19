@@ -1,0 +1,14 @@
+// RUN_PIPELINE_TILL: FIR2IR
+// RENDER_ALL_DIAGNOSTICS_FULL_TEXT
+
+// KT-19423 variation
+
+val used = "abc"
+
+object Outer {
+    <!SCRIPT_CAPTURING_NESTED_CLASS!>class User {
+        val property = used
+    }<!>
+}
+
+/* GENERATED_FIR_TAGS: classDeclaration, nestedClass, objectDeclaration, propertyDeclaration, stringLiteral */

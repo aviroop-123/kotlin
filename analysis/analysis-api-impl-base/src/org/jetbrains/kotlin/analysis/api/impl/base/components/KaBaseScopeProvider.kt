@@ -6,13 +6,8 @@
 package org.jetbrains.kotlin.analysis.api.impl.base.components
 
 import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
-import org.jetbrains.kotlin.analysis.api.components.KaImplicitReceiver
-import org.jetbrains.kotlin.analysis.api.components.KaScopeContext
-import org.jetbrains.kotlin.analysis.api.components.KaScopeImplicitArgumentValue
-import org.jetbrains.kotlin.analysis.api.components.KaScopeImplicitValue
-import org.jetbrains.kotlin.analysis.api.components.KaScopeWithKind
+import org.jetbrains.kotlin.analysis.api.components.*
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
-import org.jetbrains.kotlin.analysis.api.lifetime.validityAsserted
 import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
 import org.jetbrains.kotlin.analysis.api.symbols.KaContextParameterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
@@ -24,8 +19,11 @@ class KaBaseScopeContext(
     implicitValues: List<KaScopeImplicitValue>,
     override val token: KaLifetimeToken,
 ) : KaScopeContext {
-    override val implicitValues: List<KaScopeImplicitValue> by validityAsserted(implicitValues)
-    override val scopes: List<KaScopeWithKind> by validityAsserted(scopes)
+    private val backingImplicitValues: List<KaScopeImplicitValue> = implicitValues
+    private val backingScopes: List<KaScopeWithKind> = scopes
+
+    override val implicitValues: List<KaScopeImplicitValue> get() = withValidityAssertion { backingImplicitValues }
+    override val scopes: List<KaScopeWithKind> get() = withValidityAssertion { backingScopes }
 }
 
 @KaImplementationDetail
@@ -33,12 +31,17 @@ class KaBaseScopeImplicitReceiverValue(
     private val backingType: KaType,
     ownerSymbol: KaSymbol,
     scopeIndexInTower: Int,
+    label: String?,
 ) : KaImplicitReceiver {
+    private val backingOwnerSymbol: KaSymbol = ownerSymbol
+    private val backingScopeIndexInTower: Int = scopeIndexInTower
+    private val backingLabel: String? = label
     override val token: KaLifetimeToken get() = backingType.token
 
     override val type: KaType get() = withValidityAssertion { backingType }
-    override val ownerSymbol: KaSymbol by validityAsserted(ownerSymbol)
-    override val scopeIndexInTower: Int by validityAsserted(scopeIndexInTower)
+    override val ownerSymbol: KaSymbol get() = withValidityAssertion { backingOwnerSymbol }
+    override val scopeIndexInTower: Int get() = withValidityAssertion { backingScopeIndexInTower }
+    override val label: String? get() = withValidityAssertion { backingLabel }
 }
 
 @KaImplementationDetail
@@ -48,9 +51,11 @@ class KaBaseScopeImplicitArgumentValue(
     scopeIndexInTower: Int,
 ) : KaScopeImplicitArgumentValue {
     override val token: KaLifetimeToken get() = backingType.token
+    private val backingSymbol: KaContextParameterSymbol = symbol
+    private val backingScopeIndexInTower: Int = scopeIndexInTower
 
     override val type: KaType get() = withValidityAssertion { backingType }
-    override val scopeIndexInTower: Int by validityAsserted(scopeIndexInTower)
-    override val symbol: KaContextParameterSymbol by validityAsserted(symbol)
+    override val scopeIndexInTower: Int get() = withValidityAssertion { backingScopeIndexInTower }
+    override val symbol: KaContextParameterSymbol get() = withValidityAssertion { backingSymbol }
 }
 

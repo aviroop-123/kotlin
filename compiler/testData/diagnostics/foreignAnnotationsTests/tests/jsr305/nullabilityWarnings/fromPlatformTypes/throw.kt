@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // JSR305_GLOBAL_REPORT: warn
 
 // FILE: J.java
@@ -16,7 +15,7 @@ fun test() {
 }
 
 fun test1() {
-    throw <!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>J.staticN<!>
+    throw <!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>J.staticN<!>
 }
 
 fun test2() {

@@ -14,6 +14,6 @@ package foo
 
 /*p:foo*/fun testInferredType() {
     /*p:foo*/useListOfA(/*p:foo p:foo(A) p:kotlin.collections(List)*/getListOfA())
-    /*p:foo*/useListOfA(/*p:foo p:foo(B) p:kotlin.collections(List)*/getListOfB())
+    /*p:foo*/useListOfA(/*p:foo p:foo(A) p:foo(B) p:kotlin.collections(List)*/getListOfB())
     /*p:foo*/useListOfB(/*p:foo p:foo(B) p:kotlin.collections(List)*/getListOfB())
 }

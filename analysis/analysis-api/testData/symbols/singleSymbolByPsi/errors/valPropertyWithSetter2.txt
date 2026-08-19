@@ -5,8 +5,10 @@ KaPropertySetterSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isInline: false
   isNotDefault: false
   isOverride: false
@@ -19,11 +21,15 @@ KaPropertySetterSymbol:
     compilerVisibility: Public
     contextReceivers: []
     generatedPrimaryConstructorProperty: null
+    hasDeclaredDefaultValue: false
     hasDefaultValue: false
     isActual: false
+    isCompanion: false
     isCrossinline: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isImplicitLambdaParameter: false
     isNoinline: false
     isVal: true
@@ -42,6 +48,7 @@ KaPropertySetterSymbol:
     getContainingJvmClassName: null
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   receiverParameter: null
   returnType: KaUsualClassType:
     annotations: []
@@ -54,11 +61,15 @@ KaPropertySetterSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -77,9 +88,11 @@ KaPropertySetterSymbol:
       getContainingJvmClassName: null
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(valPropertyWithSetter2.kt)
   getContainingJvmClassName: ValPropertyWithSetter2Kt
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

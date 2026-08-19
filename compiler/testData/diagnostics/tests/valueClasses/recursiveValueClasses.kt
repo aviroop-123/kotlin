@@ -1,7 +1,6 @@
+// LATEST_LV_DIFFERENCE
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 // SKIP_JAVAC
-// LANGUAGE: +InlineClasses
 // ALLOW_KOTLIN_PACKAGE
 
 package kotlin.jvm
@@ -33,7 +32,7 @@ value class TestRecursionInTypeArguments(val x: List<TestRecursionInTypeArgument
 value class TestRecursionInArray(val x: Array<TestRecursionInArray>)
 
 @JvmInline
-value class TestRecursionInUpperBounds<T : TestRecursionInUpperBounds<T>>(val x: T)
+value class TestRecursionInUpperBounds<T : TestRecursionInUpperBounds<T>>(val x: <!VALUE_CLASS_CANNOT_BE_RECURSIVE_VIA_TYPE_PARAMETERS_WARNING!>T<!>)
 
 @JvmInline
 value class Id<T>(val x: T)

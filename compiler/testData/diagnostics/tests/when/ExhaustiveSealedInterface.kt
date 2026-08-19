@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 
 sealed interface SealedInterfaceOverAbstractClass
 abstract class BaseAbstractClass
@@ -14,7 +13,7 @@ fun testExhaustiveByImplementations(x: SealedInterfaceOverAbstractClass): String
 }
 
 fun testExhaustiveBySuperClass(x: SealedInterfaceOverAbstractClass): String {
-    return <!NO_ELSE_IN_WHEN!>when<!> (x) {
+    return when (x) {
         is BaseAbstractClass -> ""
     }
 }

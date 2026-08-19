@@ -1,7 +1,6 @@
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
 }
 
@@ -18,9 +17,15 @@ dependencies {
     testFixturesApi(project(":compiler:frontend.java"))
     testFixturesApi(project(":compiler:util"))
     testFixturesApi(project(":compiler:psi:psi-api"))
-    testFixturesApi(project(":compiler:cli-common"))
     testFixturesApi(project(":compiler:cli"))
+    testFixturesApi(project(":compiler:cli-jvm"))
     testFixturesApi(project(":compiler:cli-js"))
+    testFixturesApi(project(":compiler:cli-metadata"))
+    testFixturesImplementation(project(":analysis:light-classes-base"))
+    testFixturesImplementation(project(":compiler:container"))
+    testFixturesImplementation(project(":compiler:resolution"))
+    testFixturesImplementation(project(":native:native.config"))
+    testFixturesImplementation(project(":native:frontend.native"))
     testFixturesApi(project(":compiler:serialization"))
     testFixturesApi(project(":compiler:fir:entrypoint"))
     testFixturesApi(project(":compiler:fir:fir2ir:jvm-backend"))

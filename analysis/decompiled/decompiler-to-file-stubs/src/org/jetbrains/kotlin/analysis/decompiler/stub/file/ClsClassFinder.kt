@@ -1,20 +1,21 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.decompiler.stub.file
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.ClassFileViewProvider
 import org.jetbrains.kotlin.analysis.decompiler.stub.file.ClsClassFinder.allowMultifileClassPart
-import org.jetbrains.kotlin.analysis.decompiler.stub.file.ClsClassFinder.isKotlinInternalCompiledFile
 import org.jetbrains.kotlin.load.kotlin.KotlinJvmBinaryClass
 import org.jetbrains.kotlin.load.kotlin.findKotlinClass
 import org.jetbrains.kotlin.load.kotlin.header.KotlinClassHeader
 import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.exceptions.rethrowIntellijPlatformExceptionIfNeeded
 
@@ -41,6 +42,8 @@ object ClsClassFinder {
         fileContent: ByteArray? = null,
         multifileClassPartKindStrategy: MultifileClassPartKindStrategy = MultifileClassPartKindStrategy.FROM_STACK,
     ): Boolean {
+        ProgressManager.checkCanceled()
+
         if (!file.isValidAndExists(fileContent)) {
             return false
         }
@@ -55,6 +58,7 @@ object ClsClassFinder {
             if (fileContent == null) {
                 ClassFileViewProvider.isInnerClass(file)
             } else {
+                @Suppress("DEPRECATION") // KT-81203
                 ClassFileViewProvider.isInnerClass(file, fileContent)
             }
         } catch (exception: Exception) {
@@ -72,6 +76,7 @@ object ClsClassFinder {
         }
 
         val header = clsKotlinBinaryClassCache.getKotlinBinaryClassHeaderData(file, fileContent) ?: return false
+        @OptIn(ClassIdBasedLocality::class)
         if (header.classId.isLocal) return true
 
         return when (header.kind) {

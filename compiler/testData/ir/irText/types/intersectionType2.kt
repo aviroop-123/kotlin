@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// LANGUAGE: -ProhibitIntersectionReifiedTypeParameter
 interface A<out T>
 interface Foo
 

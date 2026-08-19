@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.konan.properties.resolvablePropertyList
 import org.jetbrains.kotlin.konan.target.AppleConfigurables
 import org.jetbrains.kotlin.konan.target.Family
 import org.jetbrains.kotlin.konan.target.KonanTarget
+import org.jetbrains.kotlin.konan.target.isMacabi
 import org.jetbrains.kotlin.konan.target.withOSVersion
 import org.jetbrains.kotlin.konan.test.blackbox.support.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.TestCase.*
@@ -27,7 +28,7 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilat
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.*
-import org.jetbrains.kotlin.library.impl.createKotlinLibraryComponents
+import org.jetbrains.kotlin.library.loader.KlibLoader
 import org.jetbrains.kotlin.library.metadata.isCInteropLibrary
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.assertTrue
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.fail
@@ -123,6 +124,15 @@ abstract class BasicCompilation<A : TestCompilationArtifact>(
             .forEach { add(it.asCompilerCliArgument()) }
     }
 
+    protected fun ArgsBuilder.applyMinidumpArgs() {
+        add("-Xbinary=minidumpLocation=${expectedArtifact.logFile.parentFile.absolutePath}")
+
+        // SIGTERM is what happens to the process when it's killed by a timeout. Generate minidumps in this case to help debug.
+        if (targets.testTarget.family == Family.OSX) {
+            add("-Xbinary=minidumpOnSIGTERM=true")
+        }
+    }
+
     protected abstract fun applySpecificArgs(argsBuilder: ArgsBuilder)
     protected open fun applyDependencies(argsBuilder: ArgsBuilder) = with(argsBuilder) {
         if (this@BasicCompilation !is LibraryCompilation) {
@@ -199,7 +209,8 @@ abstract class BasicCompilation<A : TestCompilationArtifact>(
         val testKind = mainSourceModule.testCase.kind
         if (testKind == TestKind.STANDALONE ||
             testKind == TestKind.STANDALONE_NO_TR ||
-            testKind == TestKind.STANDALONE_LLDB
+            testKind == TestKind.STANDALONE_LLDB ||
+            testKind == TestKind.STANDALONE_STEPPING
         ) {
             add("-module-name", mainSourceModule.name)
         }
@@ -213,7 +224,7 @@ abstract class BasicCompilation<A : TestCompilationArtifact>(
         val loggedCompilerInput = LoggedData.CompilerInput(sourceModules)
         val loggedCompilerParameters = LoggedData.CompilerParameters(home, compilerArgs)
 
-        val (loggedCompilerCall: LoggedData, result: TestCompilationResult.ImmediateResult<out A>) = try {
+        val [loggedCompilerCall: LoggedData, result: TestCompilationResult.ImmediateResult<out A>] = try {
             val compilerToolCallResult = when (compilerOutputInterceptor) {
                 CompilerOutputInterceptor.DEFAULT -> callCompiler(
                     compilerArgs = compilerArgs,
@@ -225,7 +236,7 @@ abstract class BasicCompilation<A : TestCompilationArtifact>(
                 )
             }
 
-            val (exitCode, compilerOutput, compilerOutputHasErrors, duration) = compilerToolCallResult
+            (val exitCode, val compilerOutput = toolOutput, val compilerOutputHasErrors = toolOutputHasErrors, val duration) = compilerToolCallResult
 
             val loggedCompilationToolCall = LoggedData.CompilationToolCall(
                 "COMPILER",
@@ -279,7 +290,6 @@ abstract class SourceBasedCompilation<A : TestCompilationArtifact>(
     gcType: GCType,
     gcScheduler: GCScheduler,
     allocator: Allocator,
-    private val pipelineType: PipelineType,
     cacheMode: CacheMode,
     binaryOptions: ExplicitBinaryOptions,
     freeCompilerArgs: TestCompilerArgs,
@@ -306,7 +316,6 @@ abstract class SourceBasedCompilation<A : TestCompilationArtifact>(
     allocator = allocator,
 ) {
     override fun applySpecificArgs(argsBuilder: ArgsBuilder): Unit = with(argsBuilder) {
-        pipelineType.compilerFlags.forEach { compilerFlag -> add(compilerFlag) }
         applyK2MPPArgs(this)
     }
 
@@ -320,7 +329,7 @@ abstract class SourceBasedCompilation<A : TestCompilationArtifact>(
     }
 
     private fun applyK2MPPArgs(argsBuilder: ArgsBuilder): Unit = with(argsBuilder) {
-        if (pipelineType == PipelineType.K2 && freeCompilerArgs.compilerArgs.any { it == "-XXLanguage:+MultiPlatformProjects" }) {
+        if (freeCompilerArgs.compilerArgs.any { it == "-XXLanguage:+MultiPlatformProjects" }) {
             sourceModules.mapToSet { "-Xfragments=${it.name}" }
                 .sorted().forEach { add(it) }
             sourceModules.flatMapToSet { module -> module.directDependsOnDependencies.map { "-Xfragment-refines=${module.name}:${it.name}" } }
@@ -348,7 +357,6 @@ class LibraryCompilation(
     gcType = settings.get(),
     gcScheduler = settings.get(),
     allocator = settings.get(),
-    pipelineType = settings.get(),
     cacheMode = settings.get(),
     binaryOptions = settings.get(),
     freeCompilerArgs = freeCompilerArgs,
@@ -399,7 +407,6 @@ class ObjCFrameworkCompilation(
     gcType = settings.get(),
     gcScheduler = settings.get(),
     allocator = settings.get(),
-    pipelineType = settings.getStageDependentPipelineType(sourceModules),
     cacheMode = settings.get(),
     binaryOptions = settings.get(),
     freeCompilerArgs = freeCompilerArgs,
@@ -412,8 +419,8 @@ class ObjCFrameworkCompilation(
         add(
             "-produce", "framework",
             "-output", expectedArtifact.frameworkDir.absolutePath,
-            "-Xbinary=minidumpLocation=${expectedArtifact.logFile.parentFile.absolutePath}",
         )
+        applyMinidumpArgs()
         super.applySpecificArgs(argsBuilder)
     }
 
@@ -445,7 +452,6 @@ class BinaryLibraryCompilation(
     gcType = settings.get(),
     gcScheduler = settings.get(),
     allocator = settings.get(),
-    pipelineType = settings.getStageDependentPipelineType(sourceModules),
     cacheMode = settings.get(),
     binaryOptions = settings.get(),
     freeCompilerArgs = freeCompilerArgs,
@@ -485,7 +491,7 @@ internal class GivenLibraryCompilation(givenArtifact: KLIB) : TestCompilation<KL
     override val result = TestCompilationResult.Success(givenArtifact, LoggedData.NoopCompilerCall(givenArtifact.klibFile))
 }
 
-internal class CInteropCompilation(
+class CInteropCompilation(
     settings: Settings,
     freeCompilerArgs: TestCompilerArgs,
     defFile: File,
@@ -539,15 +545,24 @@ internal class CInteropCompilation(
             }
             add("-compiler-option")
             add("-I${defFile.parentFile}")
+
+            // Don't reuse the system-wide module cache to make the test run more predictably.
+            // See also KT-68254 and KT-85815.
+            val modulesCache = expectedArtifact.klibFile.resolveSibling("modulesCache")
+            add("-compiler-option")
+            add("-fmodules-cache-path=${modulesCache.absolutePath}")
         }
 
         val loggedCInteropParameters = LoggedData.CInteropParameters(args, defFile)
-        val (loggedCall: LoggedData, immediateResult: TestCompilationResult.ImmediateResult<out KLIB>) = try {
-            val (exitCode, cinteropOutput, cinteropOutputHasErrors, duration) = invokeCInterop(
-                classLoader.classLoader,
-                expectedArtifact.klibFile,
-                args.toTypedArray()
-            )
+        val [loggedCall: LoggedData, immediateResult: TestCompilationResult.ImmediateResult<out KLIB>] = try {
+            (
+                val exitCode, val cinteropOutput = toolOutput, val cinteropOutputHasErrors = toolOutputHasErrors, val duration
+            ) =
+                invokeCInterop(
+                    classLoader.classLoader,
+                    expectedArtifact.klibFile,
+                    args.toTypedArray()
+                )
 
             val loggedInteropCall = LoggedData.CompilationToolCall(
                 toolName = "CINTEROP",
@@ -582,24 +597,47 @@ class SwiftCompilation<T : TestCompilationArtifact>(
     expectedArtifact: T,
     swiftExtraOpts: List<String>,
     outputFile: (T) -> File,
+    minOSVersion: String? = null,
 ) : TestCompilation<T>() {
     override val result: TestCompilationResult<out T> by lazy {
         val configs = testRunSettings.configurables as AppleConfigurables
-        val swiftTarget = configs.targetTriple.withOSVersion(configs.osVersionMin).toString()
+        val effectiveOSVersion = minOSVersion?.let {
+            maxOf(minOSVersion, configs.osVersionMin, compareBy({ it.substringBefore(".").toInt() }, { it.substringAfter(".").toInt() }))
+        } ?: configs.osVersionMin
+        val swiftTarget = configs.targetTriple.withOSVersion(effectiveOSVersion).toString()
 
         val optimizationModeFlags = swiftcOptimizationModeFlags(testRunSettings.get<OptimizationMode>())
 
-        val args = swiftExtraOpts + optimizationModeFlags + sources.map { it.absolutePath } + listOf(
-            "-sdk", configs.absoluteTargetSysRoot, "-target", swiftTarget,
-            "-o", outputFile(expectedArtifact).absolutePath,
-            "-g", // Xcode seems to pass -g even for optimized builds by default.
-            "-Xcc", "-Werror", // To fail compilation on warnings in framework header.
-        )
+        val args = buildList {
+            addAll(
+                listOf(
+                    "-sdk", configs.absoluteTargetSysRoot,
+                    "-target", swiftTarget,
+                    "-o", outputFile(expectedArtifact).absolutePath,
+                    "-g", // Xcode seems to pass -g even for optimized builds by default.
+                    "-Xcc", "-Werror", // To fail compilation on warnings in framework header.
+                )
+            )
+            if (configs.targetTriple.isMacabi) {
+                addAll(
+                    // Since the sysroot is for macOS, we should point the compiler to the directory with iOS system frameworks.
+                    listOf(
+                        "-Fsystem", "${configs.absoluteTargetSysRoot}/System/iOSSupport/System/Library/Frameworks",
+                        "-Xcc", "-isystem", "-Xcc", "${configs.absoluteTargetSysRoot}/System/iOSSupport/usr/include",
+                    )
+                )
+            }
+            addAll(sources.map { it.absolutePath })
+            addAll(optimizationModeFlags)
+            addAll(swiftExtraOpts)
+        }
 
         val loggedSwiftCParameters = LoggedData.SwiftCParameters(args, sources)
-        val (loggedCall: LoggedData, immediateResult: TestCompilationResult.ImmediateResult<out T>) = try {
-            val (exitCode, swiftcOutput, swiftcOutputHasErrors, duration) =
-                invokeSwiftC(testRunSettings, args)
+        val [loggedCall: LoggedData, immediateResult: TestCompilationResult.ImmediateResult<out T>] = try {
+            (val exitCode, val swiftcOutput = toolOutput, val swiftcOutputHasErrors = toolOutputHasErrors, val duration) = invokeSwiftC(
+                testRunSettings,
+                args
+            )
 
             val loggedSwiftCCall = LoggedData.CompilationToolCall(
                 toolName = "SWIFTC",
@@ -662,7 +700,6 @@ abstract class FinalBinaryCompilation<A : TestCompilationArtifact>(
     gcType = settings.get(),
     gcScheduler = settings.get(),
     allocator = settings.get(),
-    pipelineType = settings.getStageDependentPipelineType(sourceModules),
     cacheMode = cacheMode,
     binaryOptions = settings.get(),
     freeCompilerArgs = freeCompilerArgs,
@@ -678,8 +715,7 @@ abstract class FinalBinaryCompilation<A : TestCompilationArtifact>(
 
     override fun applySpecificArgs(argsBuilder: ArgsBuilder) {
         super.applySpecificArgs(argsBuilder)
-
-        argsBuilder.add("-Xbinary=minidumpLocation=${expectedArtifact.logFile.parentFile.absolutePath}")
+        argsBuilder.applyMinidumpArgs()
     }
 }
 
@@ -757,11 +793,7 @@ class ExecutableCompilation(
         }
 
         internal fun ArgsBuilder.applyPartialLinkageArgs(partialLinkageConfig: UsedPartialLinkageConfig) {
-            with(partialLinkageConfig.config) {
-                add("-Xpartial-linkage=${mode.name.lowercase()}")
-                if (mode.isEnabled)
-                    add("-Xpartial-linkage-loglevel=${logLevel.name.lowercase()}")
-            }
+            add("-Xpartial-linkage-loglevel=${partialLinkageConfig.config.logLevel.name.lowercase()}")
         }
 
         internal fun ArgsBuilder.applyFileCheckArgs(fileCheckStage: String?, fileCheckDump: File?) =
@@ -830,10 +862,8 @@ class StaticCacheCompilation(
         )
 
         if (makePerFileCache) {
-            val isCInterop = createKotlinLibraryComponents(
-                org.jetbrains.kotlin.konan.file.File(dependencies.libraryToCache.path)
-            )[0].isCInteropLibrary()
-            if (!isCInterop) // Making per-file cache is not allowed for cinterop klibs.
+            val klib = KlibLoader { libraryPaths(dependencies.libraryToCache.path) }.load().librariesStdlibFirst[0]
+            if (!klib.isCInteropLibrary()) // Making per-file cache is not allowed for cinterop klibs.
                 add("-Xmake-per-file-cache")
         }
 
@@ -961,25 +991,3 @@ class CategorizedDependencies(uncategorizedDependencies: Iterable<TestCompilatio
         return mapNotNull { dependency -> if (dependency.type is T) dependency.artifact as A else null }
     }
 }
-
-// Calculates PipelineType to be used for compilations involving native backend or C/ObjC export.
-// Second stage of TWO_STAGE_MULTI_MODULE must receive PipelineType.DEFAULT to be unaware of the language version used before, during first stage.
-internal fun Settings.getStageDependentPipelineType(sourceModules: Collection<TestModule>): PipelineType =
-    when (get<TestMode>()) {
-        TestMode.ONE_STAGE_MULTI_MODULE -> get<PipelineType>()
-        TestMode.TWO_STAGE_MULTI_MODULE -> {
-            if (sourceModules.isEmpty())
-                PipelineType.DEFAULT // KT-56182: Don't pass "-language_version" option to pure second compilation stage.
-            else {
-                println(  // KT-66014: TODO change println() to fail{} if all testsuites in KT-66014 would be changed
-                    "WARNING: Wrong testing approach for `mode=TWO_STAGE_MULTI_MODULE`: test explicitly uses one-stage compilation for sources:\n" +
-                            "${sourceModules.map { it.files.map { it.location.name } }}\n" +
-                            "Please re-implement test to split compilation to two stages, when `mode=TWO_STAGE_MULTI_MODULE` is specified.\n" +
-                            "TestCompilationFactory provides some tooling for this."
-                )
-                // Provided source modules must be compiled with proper frontend version,
-                // even if this version would be then wrongly passed to backend or C/ObjC generator
-                get<PipelineType>()
-            }
-        }
-    }

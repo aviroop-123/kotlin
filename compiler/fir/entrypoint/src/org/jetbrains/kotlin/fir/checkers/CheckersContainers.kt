@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.fir.checkers
 
 import org.jetbrains.kotlin.fir.analysis.checkers.*
+import org.jetbrains.kotlin.fir.analysis.diagnostics.CliFrontendDiagnostics
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.analysis.diagnostics.js.FirJsErrors
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors
@@ -31,7 +32,7 @@ fun FirSessionConfigurator.registerCommonCheckers() {
     useCheckers(CommonExpressionCheckers)
     useCheckers(CommonTypeCheckers)
     useCheckers(CommonLanguageVersionSettingsCheckers)
-    registerDiagnosticContainers(FirErrors, FirSyntaxErrors)
+    registerDiagnosticContainers(FirErrors, FirSyntaxErrors, CliFrontendDiagnostics)
 }
 
 fun FirSessionConfigurator.registerExtraCommonCheckers() {
@@ -73,19 +74,20 @@ fun FirSessionConfigurator.registerExtraNativeCheckers() {
     registerDiagnosticContainers(FirNativeErrors)
 }
 
-fun FirSessionConfigurator.registerWasmCheckers(target: WasmTarget) {
+fun FirSessionConfigurator.registerWasmJsCheckers() {
     useCheckers(WasmBaseDeclarationCheckers)
     useCheckers(WasmBaseExpressionCheckers)
     useCheckers(WasmBaseTypeCheckers)
     registerDiagnosticContainers(FirWebCommonErrors, FirWasmErrors)
 
-    when (target) {
-        WasmTarget.JS -> {
-            useCheckers(WasmJsDeclarationCheckers)
-            useCheckers(WasmJsExpressionCheckers)
-        }
-        WasmTarget.WASI -> {
-            useCheckers(WasmWasiDeclarationCheckers)
-        }
-    }
+    useCheckers(WasmJsDeclarationCheckers)
+    useCheckers(WasmJsExpressionCheckers)
+}
+
+fun FirSessionConfigurator.registerWasmWasiCheckers() {
+    useCheckers(WasmBaseDeclarationCheckers)
+    useCheckers(WasmBaseExpressionCheckers)
+    useCheckers(WasmBaseTypeCheckers)
+    registerDiagnosticContainers(FirWebCommonErrors, FirWasmErrors)
+    useCheckers(WasmWasiDeclarationCheckers)
 }

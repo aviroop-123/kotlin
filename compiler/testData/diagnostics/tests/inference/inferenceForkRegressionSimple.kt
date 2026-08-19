@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
 // FULL_JDK
 // WITH_STDLIB
 
@@ -15,7 +14,7 @@ fun <K, V> foo(m: MutableMap<K, V>, c: C) {
         // So, we have to apply forks to the system on this completion phase too, so we would have enough information for the input types of lambda
         // Otherwise, OVERLOAD_RESOLUTION_AMBIGUITY happens
         // But we don't do it for PARTIAL completion mode still
-        <!DEBUG_INFO_SMARTCAST!>c<!>.flatMap { _ ->
+        c.flatMap { _ ->
             listOf("")
         }
     }

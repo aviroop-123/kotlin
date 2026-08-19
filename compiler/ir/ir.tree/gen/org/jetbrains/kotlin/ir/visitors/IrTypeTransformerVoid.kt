@@ -155,7 +155,6 @@ abstract class IrTypeTransformerVoid : IrTypeTransformer<Unit, Nothing?>() {
     }
 
     open fun visitReplSnippet(declaration: IrReplSnippet) {
-        declaration.returnType = transformTypeRecursively(declaration, declaration.returnType)
         visitDeclaration(declaration)
     }
 
@@ -275,6 +274,14 @@ abstract class IrTypeTransformerVoid : IrTypeTransformer<Unit, Nothing?>() {
 
     open fun visitConstructorCall(expression: IrConstructorCall) {
         visitFunctionAccess(expression)
+    }
+
+    final override fun visitAnnotation(expression: IrAnnotation, data: Nothing?) {
+        visitAnnotation(expression)
+    }
+
+    open fun visitAnnotation(expression: IrAnnotation) {
+        visitConstructorCall(expression)
     }
 
     final override fun visitSingletonReference(expression: IrGetSingletonValue, data: Nothing?) {

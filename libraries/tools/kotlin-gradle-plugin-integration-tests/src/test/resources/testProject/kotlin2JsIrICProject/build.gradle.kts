@@ -1,5 +1,5 @@
 plugins {
-    kotlin("js")
+    kotlin("multiplatform")
 }
 
 group = "com.example"
@@ -12,7 +12,7 @@ repositories {
 }
 
 kotlin {
-    js(IR) {
+    js {
         binaries.executable()
         nodejs {}
     }

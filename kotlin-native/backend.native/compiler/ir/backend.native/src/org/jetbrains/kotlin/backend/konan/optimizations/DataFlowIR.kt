@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.backend.konan.llvm.localHash
 import org.jetbrains.kotlin.backend.konan.lower.DECLARATION_ORIGIN_BRIDGE_METHOD
 import org.jetbrains.kotlin.backend.konan.lower.bridgeTarget
 import org.jetbrains.kotlin.backend.konan.lower.getDefaultValueForOverriddenBuiltinFunction
+import org.jetbrains.kotlin.backend.konan.lower.isEagerStaticInitializer
 import org.jetbrains.kotlin.backend.konan.util.CustomBitSet
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.IrElement
@@ -35,7 +36,6 @@ import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.library.metadata.impl.KlibResolvedModuleDescriptorsFactoryImpl.Companion.FORWARD_DECLARATIONS_MODULE_NAME
-import java.util.*
 
 internal object DataFlowIR {
     abstract class Type(
@@ -103,6 +103,7 @@ internal object DataFlowIR {
         val RETURNS_UNIT = 4
         val RETURNS_NOTHING = 8
         val EXPLICITLY_EXPORTED = 16
+        val IS_EAGER_STATIC_INITIALIZER = 32
     }
 
     class FunctionParameter(val type: Type, val boxFunction: FunctionSymbol?, val unboxFunction: FunctionSymbol?)
@@ -121,6 +122,7 @@ internal object DataFlowIR {
         val returnsUnit = attributes.and(FunctionAttributes.RETURNS_UNIT) != 0
         val returnsNothing = attributes.and(FunctionAttributes.RETURNS_NOTHING) != 0
         val explicitlyExported = attributes.and(FunctionAttributes.EXPLICITLY_EXPORTED) != 0
+        val isEagerStaticInitializer = attributes.and(FunctionAttributes.IS_EAGER_STATIC_INITIALIZER) != 0
 
         val irFunction: IrSimpleFunction? get() = irDeclaration as? IrSimpleFunction
         val irFile: IrFile? get() = irDeclaration?.fileOrNull
@@ -582,7 +584,7 @@ internal object DataFlowIR {
         private fun choosePrimary(erasure: List<IrClass>): IrClass {
             if (erasure.size == 1) return erasure[0]
             // A parameter with constraints - choose class if exists.
-            return erasure.singleOrNull { !it.isInterface } ?: context.symbols.any.owner
+            return erasure.singleOrNull { !it.isInterface } ?: context.irBuiltIns.anyClass.owner
         }
 
         private fun mapPrimitiveBinaryType(primitiveBinaryType: PrimitiveBinaryType): Type =
@@ -639,9 +641,13 @@ internal object DataFlowIR {
                 attributes = attributes or FunctionAttributes.RETURNS_NOTHING
             if (it.hasAnnotation(RuntimeNames.exportForCppRuntime)
                     || it.hasAnnotation(RuntimeNames.exportedBridge)
+                    || it.hasAnnotation(RuntimeNames.bindReverseBridgeToMethod)
                     || it.getExternalObjCMethodInfo() != null // TODO-DCE-OBJC-INIT
                     || it.hasAnnotation(RuntimeNames.objCMethodImp)) {
                 attributes = attributes or FunctionAttributes.EXPLICITLY_EXPORTED
+            }
+            if (function.isEagerStaticInitializer) {
+                attributes = attributes or FunctionAttributes.IS_EAGER_STATIC_INITIALIZER
             }
             val symbol = when {
                 it.isExternal || it.isBuiltInOperator -> {

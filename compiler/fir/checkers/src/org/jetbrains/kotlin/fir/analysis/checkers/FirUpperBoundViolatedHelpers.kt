@@ -8,20 +8,25 @@ package org.jetbrains.kotlin.fir.analysis.checkers
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
-import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory2
+import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory3
+import org.jetbrains.kotlin.diagnostics.chooseFactory
 import org.jetbrains.kotlin.diagnostics.reportOn
+import org.jetbrains.kotlin.fir.FirComposableSessionComponent
 import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.FirSessionComponent
+import org.jetbrains.kotlin.fir.SessionConfiguration
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.expressions.explicitTypeArgumentIfMadeFlexibleSynthetically
+import org.jetbrains.kotlin.fir.isDisabled
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
 import org.jetbrains.kotlin.fir.resolve.substitution.substitutorByMap
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
+import org.jetbrains.kotlin.fir.scopes.impl.toConeType
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.types.AbstractTypeChecker
+import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 import kotlin.reflect.KClass
 
 /**
@@ -38,12 +43,13 @@ fun checkUpperBoundViolated(
 }
 
 context(context: CheckerContext, reporter: DiagnosticReporter)
-private fun checkUpperBoundViolated(
+internal fun checkUpperBoundViolated(
     typeRef: FirTypeRef?,
     notExpandedType: ConeClassLikeType,
     isIgnoreTypeParameters: Boolean = false,
     fallbackSource: KtSourceElement?,
     isInsideTypeOperatorOrParameterBounds: Boolean = false,
+    mustRelaxDueToArgumentInteractionsBug: Boolean = false,
 ) {
     // If we have FirTypeRef information, add KtSourceElement information to each argument of the type and fully expand.
     val type = if (typeRef != null) {
@@ -77,6 +83,8 @@ private fun checkUpperBoundViolated(
         isIgnoreTypeParameters,
         fallbackSource,
         isInsideTypeOperatorOrParameterBounds,
+        mustRelaxDueToArgumentInteractionsBug = mustRelaxDueToArgumentInteractionsBug,
+        isTypealiasExpansion = notExpandedType.abbreviatedTypeOrSelf.fullyExpandedType() != notExpandedType.abbreviatedTypeOrSelf
     )
 }
 
@@ -99,6 +107,39 @@ fun createSubstitutorForUpperBoundViolationCheck(
     )
 }
 
+/**
+ * Imagine
+ * ```kotlin
+ * class C<X, Y : X>
+ *
+ * typealias TA<T> = C<MutableList<T>, MutableList<Int>>
+ * ```
+ *
+ * In this case, `TA::class` has type `KClass<TA<*>>` which contains upper bound violation.
+ * Currently, we report a warning for this case. In the future, we may reconsider and start
+ * reporting a deprecation warning and eventually error.
+ */
+context(context: CheckerContext, reporter: DiagnosticReporter)
+fun checkUpperBoundViolatedInLhsOfGetClass(
+    typeParameters: List<FirTypeParameterSymbol>,
+    typeArguments: List<ConeTypeProjection>,
+    substitutor: ConeSubstitutor,
+    fallbackSource: KtSourceElement?
+) {
+    checkUpperBoundViolated(
+        typeParameters,
+        typeArguments,
+        substitutor,
+        isReportExpansionError = true,
+        isIgnoreTypeParameters = false,
+        fallbackSource,
+        isInsideTypeOperatorOrParameterBounds = false,
+        mustRelaxDueToArgumentInteractionsBug = false,
+        isTypeAliasExpansionInLhsOfGetClass = true,
+        isTypealiasExpansion = true,
+    )
+}
+
 context(context: CheckerContext, reporter: DiagnosticReporter)
 fun checkUpperBoundViolated(
     typeParameters: List<FirTypeParameterSymbol>,
@@ -108,12 +149,21 @@ fun checkUpperBoundViolated(
     isIgnoreTypeParameters: Boolean = false,
     fallbackSource: KtSourceElement?,
     isInsideTypeOperatorOrParameterBounds: Boolean = false,
+    /**
+     * Relax the diagnostics caused by non-trivial bound violations
+     * involving multiple argument substitutions dependent on one another.
+     * See [LanguageFeature.ReportUpperBoundViolatedInCallArgumentInteractions].
+     */
+    mustRelaxDueToArgumentInteractionsBug: Boolean = false,
+    isTypeAliasExpansionInLhsOfGetClass: Boolean = false,
+    isTypealiasExpansion: Boolean,
 ) {
     val count = minOf(typeParameters.size, typeArguments.size)
     val typeSystemContext = context.session.typeContext
-    val additionalUpperBoundsProvider = context.session.platformUpperBoundsProvider
+    val additionalUpperBoundsProviders = context.session.platformUpperBoundsProviders
 
     for (index in 0 until count) {
+        val parameterSymbol = typeParameters[index]
         val argument = typeArguments[index]
         val argumentType = argument.type
         val sourceAttribute = argumentType?.attributes?.sourceAttribute
@@ -121,18 +171,23 @@ fun checkUpperBoundViolated(
         val argumentSource = sourceAttribute?.source
 
         if (argumentType != null) {
-            val beStrict = context.languageVersionSettings.supportsFeature(LanguageFeature.DontIgnoreUpperBoundViolatedOnImplicitArguments)
+            val mustRelax =
+                !isExplicitTypeArgumentSource(argumentSource) && LanguageFeature.DontIgnoreUpperBoundViolatedOnImplicitArguments.isDisabled()
+                        || mustRelaxDueToArgumentInteractionsBug
             val regularDiagnostic = when {
-                isExplicitTypeArgumentSource(argumentSource) || beStrict -> FirErrors.UPPER_BOUND_VIOLATED
-                else -> FirErrors.UPPER_BOUND_VIOLATED_DEPRECATION_WARNING
+                isInsideTypeOperatorOrParameterBounds ->
+                    FirErrors.UPPER_BOUND_VIOLATED_IN_TYPE_OPERATOR_OR_PARAMETER_BOUNDS.chooseFactory()
+                mustRelax -> FirErrors.UPPER_BOUND_VIOLATED_DEPRECATION_WARNING
+                else -> FirErrors.UPPER_BOUND_VIOLATED
             }
             val typealiasDiagnostic = when {
-                isExplicitTypeArgumentSource(argumentSource) || beStrict -> FirErrors.UPPER_BOUND_VIOLATED_IN_TYPEALIAS_EXPANSION
-                else -> FirErrors.UPPER_BOUND_VIOLATED_IN_TYPEALIAS_EXPANSION_DEPRECATION_WARNING
+                isTypeAliasExpansionInLhsOfGetClass -> FirErrors.UPPER_BOUND_VIOLATED_IN_LHS_OF_CLASS_LITERAL_WARNING
+                mustRelax -> FirErrors.UPPER_BOUND_VIOLATED_IN_TYPEALIAS_EXPANSION_DEPRECATION_WARNING
+                else -> FirErrors.UPPER_BOUND_VIOLATED_IN_TYPEALIAS_EXPANSION
             }
             if (!isIgnoreTypeParameters || (argumentType.typeArguments.isEmpty() && argumentType !is ConeTypeParameterType)) {
                 val intersection =
-                    typeSystemContext.intersectTypes(typeParameters[index].resolvedBounds.map { it.coneType })
+                    typeSystemContext.intersectTypes(parameterSymbol.resolvedBounds.map { it.coneType })
                 val upperBound = substitutor.substituteOrSelf(intersection)
                 if (!AbstractTypeChecker.isSubtypeOf(
                         typeSystemContext,
@@ -141,36 +196,33 @@ fun checkUpperBoundViolated(
                         stubTypesEqualToAnything = true
                     )
                 ) {
-                    if (isReportExpansionError && argumentTypeRef == null) {
+                    if (isReportExpansionError && (argumentTypeRef == null || isTypealiasExpansion)) {
                         reporter.reportOn(
-                            argumentSource ?: fallbackSource, typealiasDiagnostic, upperBound, argumentType
+                            argumentSource ?: fallbackSource, typealiasDiagnostic, upperBound, argumentType, parameterSymbol.toConeType()
                         )
                     } else {
                         val extraMessage =
                             if (upperBound.unwrapToSimpleTypeUsingLowerBound() is ConeCapturedType) "Consider removing the explicit type arguments" else ""
-                        when {
-                            !isInsideTypeOperatorOrParameterBounds -> reporter.reportOn(
-                                argumentSource ?: fallbackSource, regularDiagnostic,
-                                upperBound, argumentType, extraMessage
-                            )
-                            else -> reporter.reportOn(
-                                argumentSource ?: fallbackSource,
-                                FirErrors.UPPER_BOUND_VIOLATED_IN_TYPE_OPERATOR_OR_PARAMETER_BOUNDS,
-                                upperBound, argumentType, extraMessage,
-                            )
-                        }
+                        reporter.reportOn(
+                            argumentSource ?: fallbackSource, regularDiagnostic,
+                            upperBound, argumentType, parameterSymbol.toConeType(), extraMessage,
+                        )
                     }
                 } else {
-                    // Only check if the original check was successful to prevent duplicate diagnostics
-                    reportUpperBoundViolationWarningIfNecessary(
-                        additionalUpperBoundsProvider,
-                        argumentType,
-                        upperBound,
-                        typeSystemContext,
-                        isReportExpansionError,
-                        argumentTypeRef,
-                        argumentSource ?: fallbackSource
-                    )
+                    for (additionalUpperBoundsProvider in additionalUpperBoundsProviders) {
+                        // Only check if the original check was successful to prevent duplicate diagnostics
+                        val reported = reportUpperBoundViolationWarningIfNecessary(
+                            parameterSymbol,
+                            additionalUpperBoundsProvider,
+                            argumentType,
+                            upperBound,
+                            typeSystemContext,
+                            isReportExpansionError,
+                            argumentTypeRef,
+                            argumentSource ?: fallbackSource
+                        )
+                        if (reported) break
+                    }
                 }
             }
 
@@ -181,30 +233,25 @@ fun checkUpperBoundViolated(
     }
 }
 
+/**
+ * @returns true if the diagnostic was reported
+ */
 context(context: CheckerContext, reporter: DiagnosticReporter)
 private fun reportUpperBoundViolationWarningIfNecessary(
-    additionalUpperBoundsProvider: FirPlatformUpperBoundsProvider?,
+    onTypeParameter: FirTypeParameterSymbol,
+    additionalUpperBoundsProvider: FirPlatformUpperBoundsProvider,
     argumentType: ConeKotlinType,
     upperBound: ConeKotlinType,
     typeSystemContext: ConeInferenceContext,
     isReportExpansionError: Boolean,
     argumentTypeRef: FirTypeRef?,
     argumentSource: KtSourceElement?,
-) {
-    if (additionalUpperBoundsProvider == null) return
-    val additionalUpperBound = additionalUpperBoundsProvider.getAdditionalUpperBound(upperBound) ?: return
-
-    /**
-     * While [LanguageFeature.DontMakeExplicitJavaTypeArgumentsFlexible]
-     * is here, to obtain original explicit type arguments, we need to look into special attribute.
-     * TODO: Get rid of this unwrapping once [LanguageFeature.DontMakeExplicitJavaTypeArgumentsFlexible] is removed
-     */
-    val properArgumentType =
-        argumentType.attributes.explicitTypeArgumentIfMadeFlexibleSynthetically?.coneType ?: argumentType
+): Boolean {
+    val additionalUpperBound = additionalUpperBoundsProvider.getAdditionalUpperBound(upperBound) ?: return false
 
     if (!AbstractTypeChecker.isSubtypeOf(
             typeSystemContext,
-            properArgumentType,
+            argumentType,
             additionalUpperBound,
             stubTypesEqualToAnything = true
         )
@@ -213,8 +260,18 @@ private fun reportUpperBoundViolationWarningIfNecessary(
             isReportExpansionError && argumentTypeRef == null -> additionalUpperBoundsProvider.diagnosticForTypeAlias
             else -> additionalUpperBoundsProvider.diagnostic
         }
-        reporter.reportOn(argumentSource, factory, upperBound, properArgumentType)
+
+        /**
+         * While [LanguageFeature.DontMakeExplicitNullableJavaTypeArgumentsFlexible]
+         * is here, to obtain original explicit type arguments, we need to look into special attribute.
+         * TODO: Get rid of this unwrapping once [LanguageFeature.DontMakeExplicitNullableJavaTypeArgumentsFlexible] is removed
+         */
+        val properArgumentType =
+            argumentType.attributes.explicitTypeArgumentIfMadeFlexibleSynthetically?.coneType ?: argumentType
+        reporter.reportOn(argumentSource, factory, upperBound, properArgumentType, onTypeParameter.toConeType())
+        return true
     }
+    return false
 }
 
 fun ConeClassLikeType.fullyExpandedTypeWithSource(
@@ -266,11 +323,40 @@ fun ConeTypeProjection.withSource(source: FirTypeRefSource?): ConeTypeProjection
     }
 }
 
-interface FirPlatformUpperBoundsProvider : FirSessionComponent {
-    val diagnostic: KtDiagnosticFactory2<ConeKotlinType, ConeKotlinType>
-    val diagnosticForTypeAlias: KtDiagnosticFactory2<ConeKotlinType, ConeKotlinType>
+abstract class FirPlatformUpperBoundsProvider : FirComposableSessionComponent<FirPlatformUpperBoundsProvider> {
+    protected typealias PlatformUpperBoundViolatedDiagnosticFactory = KtDiagnosticFactory3<ConeKotlinType, ConeKotlinType, ConeKotlinType>
 
-    fun getAdditionalUpperBound(coneKotlinType: ConeKotlinType): ConeKotlinType?
+    abstract val diagnostic: PlatformUpperBoundViolatedDiagnosticFactory
+    abstract val diagnosticForTypeAlias: PlatformUpperBoundViolatedDiagnosticFactory
+
+    abstract fun getAdditionalUpperBound(coneKotlinType: ConeKotlinType): ConeKotlinType?
+
+    /**
+     * Shouldn't be accessed directly.
+     */
+    class Composed(
+        override val components: List<FirPlatformUpperBoundsProvider>
+    ) : FirPlatformUpperBoundsProvider(), FirComposableSessionComponent.Composed<FirPlatformUpperBoundsProvider> {
+        override val diagnostic: PlatformUpperBoundViolatedDiagnosticFactory
+            get() = shouldNotBeCalled()
+        override val diagnosticForTypeAlias: PlatformUpperBoundViolatedDiagnosticFactory
+            get() = shouldNotBeCalled()
+
+        override fun getAdditionalUpperBound(coneKotlinType: ConeKotlinType): ConeKotlinType {
+            shouldNotBeCalled()
+        }
+    }
+
+    @SessionConfiguration
+    override fun createComposed(components: List<FirPlatformUpperBoundsProvider>): Composed {
+        return Composed(components)
+    }
 }
 
-val FirSession.platformUpperBoundsProvider: FirPlatformUpperBoundsProvider? by FirSession.nullableSessionComponentAccessor()
+private val FirSession.platformUpperBoundsProvider: FirPlatformUpperBoundsProvider? by FirSession.nullableSessionComponentAccessor()
+val FirSession.platformUpperBoundsProviders: List<FirPlatformUpperBoundsProvider>
+    get() = when (val component = platformUpperBoundsProvider) {
+        null -> emptyList()
+        is FirPlatformUpperBoundsProvider.Composed -> component.components
+        else -> listOf(component)
+    }

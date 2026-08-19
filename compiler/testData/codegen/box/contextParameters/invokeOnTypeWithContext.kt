@@ -1,4 +1,3 @@
-// IGNORE_BACKEND_K1: ANY
 // LANGUAGE: +ContextParameters
 fun a(a: String): String {
     return "local fun"

@@ -6,10 +6,7 @@
 package org.jetbrains.kotlin.gradle.abi.utils
 
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidExtension
-import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.testbase.*
-import java.io.File
 
 private const val BCV_PLUGIN_ID = "org.jetbrains.kotlinx.binary-compatibility-validator"
 private const val BCV_PLUGIN_LATEST_VERSION = "0.18.0"
@@ -42,7 +39,7 @@ internal fun KGPBaseTest.androidProject(
 }
 
 /**
- * Creates a test project with Kotlin Multiplatform Gradle Plugin and an Android target.
+ * Creates an empty test project with Kotlin Multiplatform Gradle Plugin and JVM + Android targets.
  */
 internal fun KGPBaseTest.kmpWithAndroidProject(
     gradleVersion: GradleVersion,
@@ -66,8 +63,41 @@ internal fun KGPBaseTest.kmpWithAndroidProject(
             applyDefaultAndroidLibraryConfiguration()
 
             kotlinMultiplatform.jvm()
+            @Suppress("DEPRECATION")
             kotlinMultiplatform.androidTarget()
         }
     }
+    project.configuration()
+}
+
+/**
+ * Creates an empty test project with Kotlin Multiplatform Gradle Plugin.
+ */
+internal fun KGPBaseTest.kmpProject(
+    gradleVersion: GradleVersion,
+    buildCache: Boolean = false,
+    configuration: TestProject.() -> Unit
+) {
+    val project = project(
+        "base-kotlin-multiplatform-library",
+        gradleVersion,
+        buildOptions = defaultBuildOptions.copy(buildCacheEnabled = buildCache)
+    )
+    project.configuration()
+}
+
+/**
+ * Creates an empty test project with Kotlin JVM Gradle Plugin.
+ */
+internal fun KGPBaseTest.jvmProject(
+    gradleVersion: GradleVersion,
+    buildCache: Boolean = false,
+    configuration: TestProject.() -> Unit
+) {
+    val project = project(
+        "base-kotlin-jvm-library",
+        gradleVersion,
+        buildOptions = defaultBuildOptions.copy(buildCacheEnabled = buildCache)
+    )
     project.configuration()
 }

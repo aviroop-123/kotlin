@@ -9,8 +9,11 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL
@@ -25,6 +28,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: lib.LibKt
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
   ]
   contextReceivers: [
     KaContextReceiver:
@@ -37,6 +41,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -61,6 +66,7 @@ KaNamedFunctionSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: LOCAL
       modality: FINAL
@@ -72,11 +78,13 @@ KaNamedFunctionSymbol:
       getContainingFileSymbol: null
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
     KaTypeParameterSymbol:
       annotations: []
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: LOCAL
       modality: FINAL
@@ -88,11 +96,13 @@ KaNamedFunctionSymbol:
       getContainingFileSymbol: null
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
     KaTypeParameterSymbol:
       annotations: []
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: LOCAL
       modality: FINAL
@@ -104,6 +114,7 @@ KaNamedFunctionSymbol:
       getContainingFileSymbol: null
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
   ]
   valueParameters: [
     KaValueParameterSymbol:
@@ -112,11 +123,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -150,23 +165,28 @@ KaNamedFunctionSymbol:
             typeArguments: []
             type: kotlin/Int
         ]
-        type: @ContextFunctionTypeParams(2) @ExtensionFunctionType kotlin/Function4<lib/A, lib/B, kotlin/Int, kotlin/Int, kotlin/Int>
+        type: context(lib/A, lib/B) kotlin/Int.(kotlin/Int) -> kotlin/Int
       visibility: PUBLIC
       getContainingFileSymbol: null
       getContainingJvmClassName: lib.LibKt
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
     KaValueParameterSymbol:
       annotations: []
       callableId: null
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -203,23 +223,28 @@ KaNamedFunctionSymbol:
             typeArguments: []
             type: kotlin/Int
         ]
-        type: @ContextFunctionTypeParams(2) @ExtensionFunctionType @R|lib/MyAnnotation|()  kotlin/Function4<lib/A, lib/B, kotlin/Int, kotlin/Int, kotlin/Int>
+        type: context(lib/A, lib/B) kotlin/Int.(kotlin/Int) -> kotlin/Int
       visibility: PUBLIC
       getContainingFileSymbol: null
       getContainingJvmClassName: lib.LibKt
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
     KaValueParameterSymbol:
       annotations: []
       callableId: null
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -253,23 +278,28 @@ KaNamedFunctionSymbol:
             typeArguments: []
             type: kotlin/Int
         ]
-        type: @ContextFunctionTypeParams(2) @ExtensionFunctionType kotlin/Function4<lib/A, lib/B, kotlin/Int, kotlin/Int, kotlin/Int>?
+        type: (context(lib/A, lib/B) kotlin/Int.(kotlin/Int) -> kotlin/Int)?
       visibility: PUBLIC
       getContainingFileSymbol: null
       getContainingJvmClassName: lib.LibKt
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
     KaValueParameterSymbol:
       annotations: []
       callableId: null
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -303,23 +333,28 @@ KaNamedFunctionSymbol:
             typeArguments: []
             type: kotlin/Int
         ]
-        type: @ContextFunctionTypeParams(2) @ExtensionFunctionType kotlin/coroutines/SuspendFunction4<lib/A, lib/B, kotlin/Int, kotlin/Int, kotlin/Int>
+        type: suspend context(lib/A, lib/B) kotlin/Int.(kotlin/Int) -> kotlin/Int
       visibility: PUBLIC
       getContainingFileSymbol: null
       getContainingJvmClassName: lib.LibKt
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
     KaValueParameterSymbol:
       annotations: []
       callableId: null
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -339,12 +374,13 @@ KaNamedFunctionSymbol:
             annotations: []
             type: R
         ]
-        type: @ContextFunctionTypeParams(1) kotlin/Function1<T2, R>
+        type: context(T2) () -> R
       visibility: PUBLIC
       getContainingFileSymbol: null
       getContainingJvmClassName: lib.LibKt
       getContainingModule: KaLibraryModule "Library lib"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: null
@@ -352,3 +388,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaLibraryModule "Library lib"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: lib.myContext

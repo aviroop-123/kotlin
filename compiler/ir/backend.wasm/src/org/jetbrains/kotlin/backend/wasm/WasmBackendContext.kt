@@ -12,25 +12,30 @@ import org.jetbrains.kotlin.backend.common.linkage.partial.partialLinkageConfig
 import org.jetbrains.kotlin.backend.common.lower.InnerClassesSupport
 import org.jetbrains.kotlin.backend.wasm.ir2wasm.JsModuleAndQualifierReference
 import org.jetbrains.kotlin.backend.wasm.utils.WasmInlineClassesUtils
+import org.jetbrains.kotlin.cli.common.diagnosticsCollector
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.messageCollector
+import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.config.phaseConfig
 import org.jetbrains.kotlin.config.phaser.PhaseConfig
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.ir.IrBuiltIns
+import org.jetbrains.kotlin.ir.KtDiagnosticReporterWithImplicitIrBasedContext
 import org.jetbrains.kotlin.ir.backend.js.JsCommonBackendContext
 import org.jetbrains.kotlin.ir.backend.js.PropertyLazyInitialization
 import org.jetbrains.kotlin.ir.backend.js.ReflectionSymbols
 import org.jetbrains.kotlin.ir.backend.js.lower.JsInnerClassesSupport
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IdSignatureRetriever
 import org.jetbrains.kotlin.ir.declarations.impl.IrExternalPackageFragmentImpl
+import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFileSymbol
-import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.DescriptorlessExternalPackageFragmentSymbol
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContext
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
 import org.jetbrains.kotlin.ir.util.SymbolTable
+import org.jetbrains.kotlin.js.config.propertyLazyInitialization
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.wasm.config.WasmConfigurationKeys
@@ -41,7 +46,6 @@ class WasmBackendContext(
     override val irBuiltIns: IrBuiltIns,
     override val symbolTable: SymbolTable,
     val irModuleFragment: IrModuleFragment,
-    propertyLazyInitialization: Boolean,
     override val configuration: CompilerConfiguration,
 ) : JsCommonBackendContext {
     val phaseConfig = configuration.phaseConfig ?: PhaseConfig()
@@ -50,6 +54,7 @@ class WasmBackendContext(
     override val typeSystem: IrTypeSystemContext = IrTypeSystemContextImpl(irBuiltIns)
     override var inVerbosePhase: Boolean = false
     override val irFactory: IrFactory = symbolTable.irFactory
+    val idSignatureRetriever: IdSignatureRetriever = irFactory as IdSignatureRetriever
 
     val isWasmJsTarget: Boolean = configuration.wasmTarget == WasmTarget.JS
 
@@ -67,8 +72,8 @@ class WasmBackendContext(
 
     class CrossFileContext {
         var mainFunctionWrapper: IrSimpleFunction? = null
-        val closureCallExports = mutableMapOf<String, IrSimpleFunction>()
-        val kotlinClosureToJsConverters = mutableMapOf<String, IrSimpleFunction>()
+        val closureCallTrampolines = mutableMapOf<String, IrSimpleFunction>()
+        val kotlinClosureToJsConverters = mutableMapOf<Int, IrSimpleFunction>()
         val jsClosureCallers = mutableMapOf<String, IrSimpleFunction>()
         val jsToKotlinClosures = mutableMapOf<String, IrSimpleFunction>()
         val jsModuleAndQualifierReferences = mutableSetOf<JsModuleAndQualifierReference>()
@@ -79,13 +84,20 @@ class WasmBackendContext(
         var testFunctionDeclarator: IrSimpleFunction? = null
 
         var objectInstanceFieldInitializer: IrSimpleFunction? = null
-        var stringPoolFieldInitializer: IrSimpleFunction? = null
         var nonConstantFieldInitializer: IrSimpleFunction? = null
+
+        // Map from STATIC_FUNCTION_REFERENCE fields to their initializer expressions. Used by DCE
+        // to visit initializers when the field is accessed
+        val staticFunctionReferenceInitializers = mutableMapOf<IrField, IrExpression>()
     }
 
     val fileContexts = mutableMapOf<IrFile, CrossFileContext>()
     fun getFileContext(irFile: IrFile): CrossFileContext = fileContexts.getOrPut(irFile, ::CrossFileContext)
     inline fun applyIfDefined(irFile: IrFile, body: (CrossFileContext) -> Unit) = fileContexts[irFile]?.apply(body)
+
+    // Functions that are reachable from JavaScript (e.g., closure call trampolines passed as funcref).
+    // They receive a WasmFunctionAnnotation.JsCalled annotation so Binaryen does not treat them as unreachable.
+    val jsCalledFunctions = mutableSetOf<IrFunctionSymbol>()
 
     override val jsPromiseSymbol: IrClassSymbol?
         get() = if (configuration.wasmTarget == WasmTarget.JS) wasmSymbols.jsRelatedSymbols.jsPromise else null
@@ -94,16 +106,16 @@ class WasmBackendContext(
 
     override val internalPackageFqn = FqName("kotlin.wasm")
 
-    val wasmSymbols: WasmSymbols = WasmSymbols(irBuiltIns, configuration)
+    val wasmSymbols: BackendWasmSymbols = BackendWasmSymbols(irBuiltIns, configuration)
     override val symbols = wasmSymbols
     override val sharedVariablesManager = KlibSharedVariablesManager(wasmSymbols)
     override val reflectionSymbols: ReflectionSymbols get() = wasmSymbols.reflectionSymbols
 
-    override val enumEntries = wasmSymbols.enumEntries
-    override val createEnumEntries = wasmSymbols.createEnumEntries
-
     override val propertyLazyInitialization: PropertyLazyInitialization =
-        PropertyLazyInitialization(enabled = propertyLazyInitialization, eagerInitialization = wasmSymbols.eagerInitialization)
+        PropertyLazyInitialization(
+            enabled = configuration.propertyLazyInitialization,
+            eagerInitialization = wasmSymbols.eagerInitialization
+        )
 
     override val shouldGenerateHandlerParameterForDefaultBodyFun: Boolean
         get() = true
@@ -114,15 +126,14 @@ class WasmBackendContext(
     // Unit test support, mostly borrowed from the JS implementation
     //
 
-    override val suiteFun: IrSimpleFunctionSymbol?
-        get() = wasmSymbols.suiteFun
-    override val testFun: IrSimpleFunctionSymbol?
-        get() = wasmSymbols.testFun
+    override val diagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(
+        configuration.diagnosticsCollector,
+        configuration.languageVersionSettings,
+    )
 
     override val partialLinkageSupport = createPartialLinkageSupportForLowerings(
         configuration.partialLinkageConfig,
-        irBuiltIns,
-        configuration.messageCollector
+        diagnosticReporter
     )
 
     override val externalPackageFragment = mutableMapOf<IrFileSymbol, IrFile>()

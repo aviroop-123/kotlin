@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.builtins.functions.FunctionTypeKind
 import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.config.MavenComparableVersion
 import org.jetbrains.kotlin.contracts.description.EventOccurrencesRange
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.EffectiveVisibility
@@ -39,6 +40,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.resolve.ForbiddenNamedArgumentsTarget
+import org.jetbrains.kotlin.resolve.ReturnValueStatus
 import org.jetbrains.kotlin.resolve.multiplatform.ExpectActualAnnotationsIncompatibilityType
 import org.jetbrains.kotlin.resolve.multiplatform.ExpectActualMatchingCompatibility
 import org.jetbrains.kotlin.serialization.deserialization.IncompatibleVersionErrorData
@@ -223,6 +225,14 @@ internal object FirToKtConversionCreator {
                 "org.jetbrains.kotlin.KtPsiSourceElement"
             )
         ),
+        ConeKotlinType::class to HLFunctionCallConversion(
+            "{0}?.let { firSymbolBuilder.typeBuilder.buildKtType(it) }",
+            KaType::class.createType(nullable = true)
+        ),
+        FirTypeRef::class to HLFunctionCallConversion(
+            "{0}?.let { firSymbolBuilder.typeBuilder.buildKtType(it) }",
+            KaType::class.createType(nullable = true)
+        ),
     )
 
     private val typeMapping: Map<KClass<*>, HLFunctionCallConversion> = mapOf(
@@ -389,6 +399,8 @@ internal object FirToKtConversionCreator {
         IncompatibleVersionErrorData::class,
         RelationToType::class,
         KotlinTarget::class,
+        ReturnValueStatus::class,
+        MavenComparableVersion::class,
     )
 
     private val KType.kClass: KClass<*>

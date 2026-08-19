@@ -20,6 +20,10 @@ abstract class TestSymbolTargetResolver<R> {
         is TypeAliasTarget -> resolveTypeAliasTarget(target)
         is ClassLikeTarget -> resolveClassLikeTarget(target)
         is CallableTarget -> resolveCallableTarget(target)
+        is PropertyTarget -> resolvePropertyTarget(target)
+        is FunctionTarget -> resolveFunctionTarget(target)
+        is ConstructorTarget -> resolveConstructorTarget(target)
+        is FieldTarget -> listOfNotNull(resolveFieldTarget(target))
         is EnumEntryInitializerTarget -> resolveEnumEntryInitializerTarget(target)
         is SamConstructorTarget -> resolveSamConstructorTarget(target)
         is TargetWithOwner -> resolveTargetWithOwner(target)
@@ -42,6 +46,15 @@ abstract class TestSymbolTargetResolver<R> {
 
                 is ValueParameterTarget -> resolveValueParameterTarget(target, owner)
                     ?: error("Cannot find a value parameter `${target.name}` in the owner `$owner`.")
+
+                is ContextParameterTarget -> resolveContextParameterTarget(target, owner)
+                    ?: error("Cannot find a context parameter `${target.name}` in the owner `$owner`.")
+
+                is GetterTarget -> resolveGetterTarget(target, owner)
+                    ?: error("Cannot find a getter in the owner `$owner`.")
+
+                is SetterTarget -> resolveSetterTarget(target, owner)
+                    ?: error("Cannot find a setter in the owner `$owner`.")
             }
         }
     }
@@ -51,10 +64,17 @@ abstract class TestSymbolTargetResolver<R> {
     protected open fun resolveScriptTarget(target: ScriptTarget): List<R> = unsupportedTarget(target)
     protected open fun resolveTypeAliasTarget(target: TypeAliasTarget): List<R> = unsupportedTarget(target)
     protected open fun resolveCallableTarget(target: CallableTarget): List<R> = unsupportedTarget(target)
+    protected open fun resolvePropertyTarget(target: PropertyTarget): List<R> = unsupportedTarget(target)
+    protected open fun resolveFunctionTarget(target: FunctionTarget): List<R> = unsupportedTarget(target)
+    protected open fun resolveConstructorTarget(target: ConstructorTarget): List<R> = unsupportedTarget(target)
     protected open fun resolveEnumEntryInitializerTarget(target: EnumEntryInitializerTarget): List<R> = unsupportedTarget(target)
     protected open fun resolveSamConstructorTarget(target: SamConstructorTarget): List<R> = unsupportedTarget(target)
     protected open fun resolveTypeParameterTarget(target: TypeParameterTarget, owner: R): R? = unsupportedTarget(target)
     protected open fun resolveValueParameterTarget(target: ValueParameterTarget, owner: R): R? = unsupportedTarget(target)
+    protected open fun resolveContextParameterTarget(target: ContextParameterTarget, owner: R): R? = unsupportedTarget(target)
+    protected open fun resolveGetterTarget(target: GetterTarget, owner: R): R? = unsupportedTarget(target)
+    protected open fun resolveSetterTarget(target: SetterTarget, owner: R): R? = unsupportedTarget(target)
+    protected open fun resolveFieldTarget(target: FieldTarget): R? = unsupportedTarget(target)
 
     private fun unsupportedTarget(target: TestSymbolTarget): Nothing =
         error("`${this::class.simpleName}` doesn't support `${target::class.simpleName}`.")

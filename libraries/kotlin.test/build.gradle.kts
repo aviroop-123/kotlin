@@ -4,7 +4,9 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import org.gradle.api.publish.internal.PublicationInternal
 import org.gradle.jvm.tasks.Jar
+import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.KotlinCommonCompilerOptions
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.GenerateProjectStructureMetadata
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
@@ -17,9 +19,10 @@ import plugins.publishing.configureMultiModuleMavenPublishing
 plugins {
     kotlin("multiplatform")
     `maven-publish`
-    signing
+    id("signing-convention")
     id("nodejs-cache-redirector-configuration")
     id("binaryen-configuration")
+    id("nodejs-configuration")
 }
 
 description = "Kotlin Test Library"
@@ -40,9 +43,20 @@ enum class JvmTestFramework {
 }
 val jvmTestFrameworks = JvmTestFramework.values().toList()
 
-kotlin {
+fun KotlinCommonCompilerOptions.addReturnValueCheckerInfo() {
+    freeCompilerArgs.add("-Xreturn-value-checker=full")
+}
 
+kotlin {
     explicitApi()
+
+    metadata { // For common sources in IDE
+        compilations.all {
+            compileTaskProvider.configure {
+                compilerOptions.addReturnValueCheckerInfo()
+            }
+        }
+    }
 
     jvm {
         compilations {
@@ -56,6 +70,11 @@ kotlin {
             }
             val main by getting
             val test by getting
+
+            main.compileTaskProvider.configure {
+                compilerOptions.addReturnValueCheckerInfo()
+            }
+
             configureJava9Compilation(
                 "kotlin.test",
                 listOf(main.output.allOutputs),
@@ -94,35 +113,49 @@ kotlin {
         }
     }
     js {
-        if (!kotlinBuildProperties.isTeamcityBuild) {
+        if (!kotlinBuildProperties.isTeamcityBuild.get()) {
             browser {}
         }
         nodejs {}
         compilations["main"].compileTaskProvider.configure {
-            compilerOptions.freeCompilerArgs.add("-Xir-module-name=$KOTLINTEST_MODULE_NAME")
+            compilerOptions.freeCompilerArgs.addAll(
+                "-Xklib-ir-inliner=intra-module",
+                "-Xir-module-name=$KOTLINTEST_MODULE_NAME",
+            )
+            compilerOptions.addReturnValueCheckerInfo()
         }
     }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         nodejs()
-        (this as KotlinJsTargetDsl).compilerOptions {
-            freeCompilerArgs.add("-source-map=false")
-            freeCompilerArgs.add("-source-map-embed-sources=")
+        compilerOptions {
+            sourceMap = false
+            sourceMapEmbedSources.unsetConvention()
+            freeCompilerArgs.addAll(
+                "-Xklib-ir-inliner=intra-module",
+            )
         }
         compilations["main"].compileTaskProvider.configure {
             compilerOptions.freeCompilerArgs.add("-Xir-module-name=$KOTLINTEST_MODULE_NAME")
+            compilerOptions.addReturnValueCheckerInfo()
         }
     }
     @OptIn(ExperimentalWasmDsl::class)
     wasmWasi {
         nodejs()
+        // cast is necessary because of KT-85971
+        // update after bootstrap
         (this as KotlinJsTargetDsl).compilerOptions {
-            freeCompilerArgs.add("-source-map=false")
-            freeCompilerArgs.add("-source-map-embed-sources=")
+            sourceMap = false
+            sourceMapEmbedSources.unsetConvention()
+            freeCompilerArgs.addAll(
+                "-Xklib-ir-inliner=intra-module",
+            )
         }
         compilations["main"].compileTaskProvider.configure {
             compilerOptions.freeCompilerArgs.add("-Xir-module-name=$KOTLINTEST_MODULE_NAME")
+            compilerOptions.addReturnValueCheckerInfo()
         }
     }
 
@@ -408,25 +441,22 @@ configurations {
         }
     }
 
-    for (configurationName in listOf("kotlinTestCommon", "kotlinTestAnnotationsCommon")) {
-        val legacyConfigurationDeps = create("${configurationName}Dependencies") {
-            isCanBeResolved = true
-            isCanBeConsumed = false
+    val legacyConfigurationDeps = dependencyScope("legacyDependencies")
+    resolvable("legacyClasspath") {
+        extendsFrom(legacyConfigurationDeps.get())
+    }
+    consumable("legacyElements") {
+        attributes {
+            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
         }
-        val legacyConfiguration = create("${configurationName}Elements") {
-            isCanBeResolved = false
-            isCanBeConsumed = false
-            attributes {
-                attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
-            }
-            extendsFrom(legacyConfigurationDeps)
-        }
-        dependencies {
-            legacyConfigurationDeps(project)
-        }
+        extendsFrom(legacyConfigurationDeps.get())
+    }
+    dependencies {
+        legacyConfigurationDeps(project)
     }
 
     val jvmMainApi by getting
+    val metadataCompilationApi by configurations.getting
     val nativeApiElements by creating
     for (artifactName in listOf("kotlin-test-common", "kotlin-test-annotations-common")) {
         dependencies {
@@ -435,7 +465,7 @@ configurations {
                 // there is no dependency anymore from kotlin-test to kotlin-test-common and -annotations-common,
                 // but use this constraint to align it if another library brings it transitively
                 jvmMainApi(artifactCoordinates)
-                metadataApiElements(artifactCoordinates)
+                metadataCompilationApi(artifactCoordinates)
                 nativeApiElements(artifactCoordinates)
             }
         }
@@ -526,7 +556,7 @@ publishing {
                 configureKotlinPomAttributes(project, "Legacy artifact of Kotlin Test library. Use kotlin-test instead", packaging = "pom")
                 (this as PublicationInternal<*>).isAlias = true
             }
-            variant("kotlinTestCommonElements")
+            variant("legacyElements")
         }
         module("testAnnotationsCommonModule") {
             mavenPublication {
@@ -534,7 +564,7 @@ publishing {
                 configureKotlinPomAttributes(project, "Legacy artifact of Kotlin Test library. Use kotlin-test instead", packaging = "pom")
                 (this as PublicationInternal<*>).isAlias = true
             }
-            variant("kotlinTestAnnotationsCommonElements")
+            variant("legacyElements")
         }
 
         // Makes all variants from accompanying artifacts visible through `available-at`
@@ -547,8 +577,8 @@ publishing {
             listOf("jsModule", "Js", "kotlin-test-js", "jsRuntimeClasspath"),
             listOf("wasmJsModule", "Wasm-Js", "kotlin-test-wasm-js", "wasmJsRuntimeClasspath"),
             listOf("wasmWasiModule", "Wasm-Wasi", "kotlin-test-wasm-wasi", "wasmWasiRuntimeClasspath"),
-            listOf("testCommonModule", "Common", "kotlin-test-common", "kotlinTestCommonDependencies"),
-            listOf("testAnnotationsCommonModule", "AnnotationsCommon", "kotlin-test-annotations-common", "kotlinTestAnnotationsCommonDependencies"),
+            listOf("testCommonModule", "Common", "kotlin-test-common", "legacyClasspath"),
+            listOf("testAnnotationsCommonModule", "AnnotationsCommon", "kotlin-test-annotations-common", "legacyClasspath"),
         ) + jvmTestFrameworks.map { framework ->
             listOf("${framework.lowercase()}Module", "$framework", "kotlin-test-${framework.lowercase()}", "jvm${framework}RuntimeDependencies")
         }).forEach { (module, sbomTarget, sbomDocument, classpath) ->

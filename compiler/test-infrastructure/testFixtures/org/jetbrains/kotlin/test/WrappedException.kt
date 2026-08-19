@@ -5,8 +5,10 @@
 
 package org.jetbrains.kotlin.test
 
+import org.jetbrains.kotlin.test.model.AbstractGroupingStageTestFacade
 import org.jetbrains.kotlin.test.model.AbstractTestFacade
 import org.jetbrains.kotlin.test.model.AnalysisHandler
+import org.jetbrains.kotlin.test.model.GroupingStageHandler
 import org.jetbrains.kotlin.test.model.TestModule
 
 sealed class WrappedException(
@@ -36,6 +38,21 @@ sealed class WrappedException(
         }
     }
 
+    class FromGroupingFacade(
+        cause: Throwable,
+        val facade: AbstractGroupingStageTestFacade<*, *>,
+    ) : WrappedException(cause, 0, 1) {
+        override val failedModule: TestModule?
+            get() = null
+
+        override val message: String
+            get() = "Exception was thrown"
+
+        override fun withReplacedCause(newCause: Throwable): WrappedException {
+            return FromGroupingFacade(newCause, facade)
+        }
+    }
+
     class FromHandler(
         cause: Throwable,
         override val failedModule: TestModule?,
@@ -46,6 +63,20 @@ sealed class WrappedException(
 
         override fun withReplacedCause(newCause: Throwable): WrappedException {
             return FromHandler(newCause, failedModule, handler)
+        }
+    }
+
+    class FromGroupingHandler(
+        cause: Throwable,
+        val handler: GroupingStageHandler<*>,
+    ) : WrappedException(cause, 1, 3) {
+        override val failedModule: TestModule? get() = null
+
+        override val failureDisablesNextSteps: Boolean
+            get() = handler.failureDisablesNextSteps
+
+        override fun withReplacedCause(newCause: Throwable): WrappedException {
+            return FromGroupingHandler(newCause, handler)
         }
     }
 
@@ -76,11 +107,28 @@ sealed class WrappedException(
         }
     }
 
+    class FromFailingTestSuppressor(cause: Throwable) : WrappedExceptionWithoutModule(cause, 2, 2) {
+        override fun withReplacedCause(newCause: Throwable): WrappedException {
+            return FromFailingTestSuppressor(newCause)
+        }
+    }
+
     class FromModuleStructureTransformer(cause: Throwable) : WrappedExceptionWithoutModule(cause, 2, 1) {
         override fun withReplacedCause(newCause: Throwable): WrappedException {
             return FromModuleStructureTransformer(newCause)
         }
     }
+
+    /**
+     * `true` if this failure originates from the test infrastructure itself rather than from the code under test
+     * (e.g. an internal invariant of the test runner was violated).
+     *
+     * Such failures must never be suppressed by [org.jetbrains.kotlin.test.model.TestFailureSuppressor]s
+     * (for instance, by an `IGNORE_BACKEND` directive). Otherwise an infrastructure problem would be masked as a
+     * green test, hiding the real (unknown) test status.
+     */
+    val isTestInfrastructureFailure: Boolean
+        get() = cause is TestInfrastructureException
 
     final override val cause: Throwable
         get() = super.cause!!

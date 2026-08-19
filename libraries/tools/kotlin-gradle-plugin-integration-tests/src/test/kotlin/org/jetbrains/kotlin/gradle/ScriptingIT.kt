@@ -10,6 +10,7 @@ import org.gradle.api.logging.LogLevel
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinToolingDiagnostics
 import org.jetbrains.kotlin.gradle.testbase.*
+import org.jetbrains.kotlin.testFederation.AffectedByCompiler
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.condition.OS
@@ -20,6 +21,7 @@ import kotlin.io.path.relativeTo
     enabledOnCI = [OS.LINUX], // Compiler plugin is leaking file descriptor preventing cleaning the project on Windows
 )
 @DisplayName("Scripting plugin")
+@AffectedByCompiler
 @OtherGradlePluginTests
 abstract class ScriptingIT : KGPBaseTest() {
 
@@ -29,8 +31,6 @@ abstract class ScriptingIT : KGPBaseTest() {
         project("scripting", gradleVersion) {
             val appSubProject = subProject("app")
             val scriptTemplateSubProject = subProject("script-template")
-            appSubProject.disableLightTreeIfNeeded()
-            scriptTemplateSubProject.disableLightTreeIfNeeded()
             build("assemble", buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
                 assertCompiledKotlinSources(
                     listOf(
@@ -73,7 +73,6 @@ abstract class ScriptingIT : KGPBaseTest() {
             )
         ) {
             val appSubproject = subProject("app")
-            appSubproject.disableLightTreeIfNeeded()
             val bobGreetSource = appSubproject.kotlinSourcesDir().resolve("bob.greet")
             val bobGreet = bobGreetSource.relativeTo(projectPath)
             val aliceGreet = appSubproject.kotlinSourcesDir().resolve("alice.greet").relativeTo(projectPath)
@@ -118,7 +117,6 @@ abstract class ScriptingIT : KGPBaseTest() {
     }
 
     // Compose only works on JDK 11+
-    // compilerOptions("-language-version", "1.9") is set in scriptDef.kt due to KT-64362.
     @DisplayName("Compose compiler plugin should work with scripting")
     @JdkVersions(versions = [JavaVersion.VERSION_11])
     @GradleWithJdkTest
@@ -129,7 +127,6 @@ abstract class ScriptingIT : KGPBaseTest() {
             buildJdk = jdk.location
         ) {
             val appSubProject = subProject("app")
-            appSubProject.disableLightTreeIfNeeded()
             build(":app:test", buildOptions = defaultBuildOptions.copy(
                 logLevel = LogLevel.DEBUG,
             )) {
@@ -142,30 +139,9 @@ abstract class ScriptingIT : KGPBaseTest() {
             }
         }
     }
-
-    open fun GradleProject.disableLightTreeIfNeeded() {
-
-    }
-}
-
-@DisplayName("K1 Scripting plugin")
-class ScriptingK1IT : ScriptingIT() {
-    override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK1()
 }
 
 @DisplayName("K2 Scripting plugin")
 class ScriptingK2IT : ScriptingIT() {
     override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK2()
-
-    override fun GradleProject.disableLightTreeIfNeeded() {
-        buildGradle.append(
-            """
-            tasks.named("compileKotlin", org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-Xuse-fir-lt=false") // Scripts are not yet supported with K2 in LightTree mode
-                }
-            }            
-            """.trimIndent()
-        )
-    }
 }

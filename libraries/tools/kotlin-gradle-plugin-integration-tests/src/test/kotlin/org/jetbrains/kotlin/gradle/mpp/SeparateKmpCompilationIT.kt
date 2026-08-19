@@ -12,7 +12,7 @@ import org.gradle.kotlin.dsl.invoke
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.getValue
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.*
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerArgumentsProducer
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.testbase.*
@@ -57,7 +57,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
             }
         }) { fragmentDependencies ->
             val visitedDependencies = mutableSetOf<String>()
-            for ((_, dependencies) in fragmentDependencies) {
+            for ([_, dependencies] in fragmentDependencies) {
                 for (dependency in dependencies) {
                     assert(visitedDependencies.add(dependency)) {
                         "Duplicate dependency '$dependency' found in fragment dependencies: $fragmentDependencies"
@@ -102,6 +102,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
         assertions: (Map<String, List<String>>) -> Unit,
     ) {
         defaultProject(gradleVersion, additionalProjectConfiguration) {
+            @Suppress("DEPRECATION")
             val compileArgs: List<Pair<String, CommonCompilerArguments>> = providerBuildScriptReturn {
                 val targets = targetsToRun.map { kotlinMultiplatform.targets.getByName(it) }
                 project.provider {
@@ -117,10 +118,9 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
                 *targetsToRun.map { ":compileKotlin${it.capitalize()}" }.toTypedArray(),
                 configurationCache = BuildOptions.ConfigurationCacheValue.DISABLED, // otherwise we would access GMT task outputs before the task execution
             )
-            for ((targetName, particularCompileArgs) in compileArgs) {
+            for ([_, particularCompileArgs] in compileArgs) {
                 val fragmentDependencies = particularCompileArgs.fragmentDependencies
-                assert(fragmentDependencies != null) { "Fragment dependencies are not set for $targetName" }
-                val dependenciesPerFragment = fragmentDependencies!!
+                val dependenciesPerFragment = fragmentDependencies
                     .map { it.replace('\\', '/') }
                     .groupBy({ it.substringBefore(":") }) { it.substringAfter(":") }
                 assertions(dependenciesPerFragment)
@@ -146,7 +146,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
             gradleVersion,
             localRepoDir = localRepository,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.disableIsolatedProjects(),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             plugins {
                 kotlin("multiplatform")
@@ -243,6 +243,8 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
                     ":library:compileNativeMainKotlinMetadata",
                     ":library:exportCommonSourceSetsMetadataLocationsForMetadataApiElements",
                     ":library:exportRootPublicationCoordinatesForMetadataApiElements",
+                    ":library:exportCrossCompilationMetadataForLinuxArm64ApiElements",
+                    ":library:exportCrossCompilationMetadataForLinuxX64ApiElements",
                     ":library:generateProjectStructureMetadata",
                     ":library:generateSourceIn_commonMain_0",
                     ":library:generateSourceIn_jsMain_2",
@@ -263,6 +265,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
                     ":library:transformCommonMainDependenciesMetadata",
                     ":library:transformLinuxMainDependenciesMetadata",
                     ":library:transformNativeMainDependenciesMetadata",
+                    ":library:downloadKotlinNativeDistribution",
                 )
                 val thisProjectTasks = setOf(
                     ":kmpPartiallyResolvedDependenciesChecker",
@@ -289,6 +292,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
                     ":transformLinuxTestDependenciesMetadata",
                     ":transformNativeMainDependenciesMetadata",
                     ":transformNativeTestDependenciesMetadata",
+                    ":downloadKotlinNativeDistribution"
                 )
                 assertExactTasksInGraph(
                     if (localRepository != null) {
@@ -305,7 +309,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
                 )
                 val specificSourceSets = sourceSetNames - "commonMain"
                 val outputPerTask = compileTasks.associateWith { getOutputForTask(it, logLevel = LogLevel.INFO) }
-                for ((task, taskOutput) in outputPerTask) {
+                for ([task, taskOutput] in outputPerTask) {
                     assertFalse(
                         taskOutput.contains("generatedSource_commonMain_\\d+.kt:\\d+:\\d+ Unresolved reference 'commonMain'".toRegex()),
                         "$task should be able to resolve `commonMain()`\n$taskOutput"
@@ -331,6 +335,30 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
     @GradleTest
     fun singleTargetMetadataCurrent(gradleVersion: GradleVersion, @TempDir localRepoDir: Path) {
         doTestSingleTargetMetadata(gradleVersion, localRepoDir, false)
+    }
+
+    @DisplayName("KT-79073 - test compilation compiles with use of internals from main code")
+    @GradleTest
+    fun `KT-79073 - friend fragment dependencies`(gradleVersion: GradleVersion) {
+        defaultProject(
+            gradleVersion = gradleVersion,
+            sourceStubs = false,
+            // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
+            additionalProjectConfiguration = {
+                project.applyMultiplatform {
+                    jvm()
+                    linuxX64()
+                    sourceSets.commonMain.get().compileSource("internal fun commonMain() = 42")
+                    // commonTest sees commonMain's internal
+                    sourceSets.commonTest.get().compileSource("fun commonTest() = commonMain()")
+                    sourceSets.jvmMain.get().compileSource("internal fun jvmMain() = commonMain()")
+                    // jvmTest should see main and test, also internals
+                    sourceSets.jvmTest.get().compileSource("internal fun jvmTest() { commonMain(); commonTest(); jvmMain(); }")
+                }
+            }) {
+            build(":compileTestKotlinJvm")
+        }
     }
 
     private fun doTestSingleTargetMetadata(gradleVersion: GradleVersion, localRepoDir: Path, enableSeparateCompilation: Boolean) {
@@ -402,7 +430,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
             gradleVersion,
             autoEnableSeparateKmpCompilation = false,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             val eventPrefix = "${BooleanMetrics.KOTLIN_SEPARATE_KMP_COMPILATION_ENABLED.name}="
             assertEquals(
@@ -435,6 +463,7 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
         additionalProjectConfiguration: Project.() -> Unit = {},
         autoEnableSeparateKmpCompilation: Boolean = true,
         buildOptions: BuildOptions = defaultBuildOptions,
+        sourceStubs: Boolean = true,
         test: TestProject.() -> Unit,
     ): GradleProject = project("empty", gradleVersion, buildOptions = buildOptions) {
         plugins {
@@ -451,8 +480,10 @@ class SeparateKmpCompilationIT : KGPBaseTest() {
                     linuxX64()
                     linuxArm64()
                     macosArm64()
-                    with(sourceSets) {
-                        commonMain.get().compileStubSourceWithSourceSetName()
+                    if (sourceStubs) {
+                        with(sourceSets) {
+                            commonMain.get().compileStubSourceWithSourceSetName()
+                        }
                     }
                 }
                 additionalProjectConfiguration(this)

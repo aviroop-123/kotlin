@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.gradle.BrokenOnMacosTest
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.KotlinCocoapodsPlugin.Companion.DUMMY_FRAMEWORK_TASK_NAME
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.KotlinCocoapodsPlugin.Companion.POD_INSTALL_TASK_NAME
 import org.jetbrains.kotlin.gradle.testbase.*
+
 import org.jetbrains.kotlin.gradle.util.assertProcessRunResult
 import org.jetbrains.kotlin.gradle.util.runProcess
 import org.junit.jupiter.api.BeforeAll
@@ -115,6 +116,8 @@ class CocoaPodsXcodeIT : KGPBaseTest() {
                 """
                     framework {
                         baseName = "kotlin-library"
+                        // KT-81727 Failing CocoaPodsXcodeIT test
+                        freeCompilerArgs += "-Xbinary=bundleId=kotlin.library"
                     }
                     name = "kotlin-library"
                     podfile = project.file("ios-app/Podfile")
@@ -190,13 +193,13 @@ class CocoaPodsXcodeIT : KGPBaseTest() {
         mode: ImportMode,
         iosAppLocation: String?,
         subprojectsToFrameworkNamesMap: Map<String, String?>,
-        arch: String = "x86_64",
+        arch: String = "arm64",
         podInstall: (taskPrefix: String, iosAppPath: Path) -> Unit = ::gradlePodInstall,
     ) {
 
         prepareForXcodebuild()
 
-        for ((subproject, frameworkName) in subprojectsToFrameworkNamesMap) {
+        for ([subproject, frameworkName] in subprojectsToFrameworkNamesMap) {
 
             val taskPrefix = if (subproject.isNotEmpty()) ":$subproject" else ""
 
@@ -240,11 +243,9 @@ private fun TestProject.manualPodInstall(taskPrefix: String, iosAppPath: Path) {
     val environmentalVariables = environmentVariables.environmentalVariables.toMutableMap()
     environmentalVariables.getOrPut("LC_ALL") { "en_US.UTF-8" }
 
-    assertProcessRunResult(
-        runProcess(
-            cmd = listOf("env", "pod", "install"),
-            environmentVariables = environmentalVariables,
-            workingDir = iosAppPath.toFile(),
-        )
-    ) { assertTrue(isSuccessful) }
+    runProcess(
+        cmd = listOf("env", "pod", "install"),
+        environmentVariables = environmentalVariables,
+        workingDir = iosAppPath.toFile(),
+    ).assertProcessRunResult { assertTrue(isSuccessful) }
 }

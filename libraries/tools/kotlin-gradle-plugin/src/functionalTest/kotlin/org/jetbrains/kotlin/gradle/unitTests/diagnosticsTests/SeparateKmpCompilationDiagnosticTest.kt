@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.gradle.util.buildProject
 import org.jetbrains.kotlin.gradle.util.checkDiagnosticsWithMppProject
 import org.jetbrains.kotlin.gradle.util.kotlin
 import org.jetbrains.kotlin.gradle.utils.named
-import org.junit.Test
+import kotlin.test.Test
 
 /**
  * Verifies we report that the separate KMP compilation scheme is reported as experimental.
@@ -26,7 +26,7 @@ import org.junit.Test
 class SeparateKmpCompilationDiagnosticTest {
     @Test
     fun testSingleTargetKmpProject() {
-        checkDiagnosticsWithMppProject("SeparateKmpCompilation") {
+        checkDiagnosticsWithMppProject("SeparateKmpCompilation-singleTarget") {
             project.extra[PropertiesProvider.PropertyNames.KOTLIN_KMP_SEPARATE_COMPILATION] = "true"
             kotlin {
                 jvm()
@@ -74,6 +74,7 @@ class SeparateKmpCompilationDiagnosticTest {
                     nodejs()
                 }
                 linuxX64()
+                @Suppress("DEPRECATION")
                 androidTarget()
 
                 @OptIn(ExperimentalWasmDsl::class)

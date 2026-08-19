@@ -6,7 +6,6 @@ import org.jetbrains.kotlin.konan.target.HostManager
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("project-tests-convention")
 }
 
@@ -14,6 +13,8 @@ sourceSets {
     "main" { projectDefault() }
     "test" { projectDefault() }
 }
+
+optInToK1Deprecation()
 
 kotlin {
     compilerOptions {
@@ -64,6 +65,7 @@ dependencies {
     testImplementation(kotlinTest("junit5"))
     testImplementation(testFixtures(project(":compiler:tests-common")))
     testImplementation(project(":analysis:analysis-api-standalone"))
+    testImplementation(project(":native:native.config"))
 }
 
 tasks.withType<KotlinJvmCompile>().configureEach {

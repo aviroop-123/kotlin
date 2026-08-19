@@ -13,6 +13,7 @@ import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.Sync
+import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.*
 import org.jetbrains.kotlin.PlatformInfo
@@ -23,6 +24,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanJvmInteropTask
 import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.TargetWithSanitizer
+import org.jetbrains.kotlin.nativeDistribution.registerNativeBootstrapDistribution
 import org.jetbrains.kotlin.tools.NativePlugin
 import org.jetbrains.kotlin.tools.NativeToolsExtension
 import org.jetbrains.kotlin.tools.ToolExecutionTask
@@ -38,6 +40,7 @@ open class NativeInteropPlugin : Plugin<Project> {
         target.apply<NativePlugin>()
 
         val nativeInteropPlugin = target.extensions.create<NativeInteropExtension>("nativeInteropPlugin")
+        nativeInteropPlugin.useBootstrapNativeDistribution.convention(false)
 
         val cppImplementation = target.configurations.create(CPP_IMPLEMENTATION_CONFIGURATION) {
             isCanBeConsumed = false
@@ -98,19 +101,13 @@ open class NativeInteropPlugin : Plugin<Project> {
         }
 
         target.dependencies {
-            interopStubGenerator(project(":kotlin-native:Interop:StubGenerator"))
-            interopStubGenerator(project(":kotlin-native:endorsedLibraries:kotlinx.cli", "jvmRuntimeElements"))
-            interopStubGeneratorCppRuntime(project(":kotlin-native:libclangInterop"))
-            interopStubGeneratorCppRuntime(project(":kotlin-native:Interop:Runtime"))
             "api"(project(":kotlin-native:Interop:Runtime"))
-            "testImplementation"(project(":kotlin-native:Interop:StubGeneratorConsistencyCheck", "tests-jar"))
+            "testImplementation"(testFixtures(project(":kotlin-native:Interop:StubGeneratorConsistencyCheck")))
         }
 
         val genTask = target.tasks.register<KonanJvmInteropTask>("genInteropStubs") {
             dependsOn(target.extensions.getByType<NativeDependenciesExtension>().hostPlatformDependency)
             dependsOn(target.extensions.getByType<NativeDependenciesExtension>().llvmDependency)
-            interopStubGeneratorClasspath.from(interopStubGenerator)
-            interopStubGeneratorNativeLibraries.from(interopStubGeneratorCppRuntime)
             outputDirectory.set(target.layout.buildDirectory.dir("nativeInteropStubs"))
             defFile.set(target.layout.projectDirectory.file(nativeInteropPlugin.defFileName))
             compilerOpts.set(nativeInteropPlugin.cCompilerArgs)
@@ -181,11 +178,15 @@ open class NativeInteropPlugin : Plugin<Project> {
         }
 
         target.afterEvaluate {
-            applyFinish(target, bindingsRoot)
+            applyFinish(target, bindingsRoot, genTask)
         }
     }
 
-    private fun applyFinish(target: Project, bindingsRoot: Provider<Directory>): Unit = with(target) {
+    private fun applyFinish(
+            target: Project,
+            bindingsRoot: Provider<Directory>,
+            genTask: TaskProvider<KonanJvmInteropTask>,
+    ): Unit = with(target) {
         val nativeInteropPlugin = extensions.getByType<NativeInteropExtension>()
 
         val defFileName = nativeInteropPlugin.defFileName.run {
@@ -220,24 +221,55 @@ open class NativeInteropPlugin : Plugin<Project> {
             finalizeValue()
             get()
         }
+        val useBootstrapNativeDistribution = nativeInteropPlugin.useBootstrapNativeDistribution.run {
+            finalizeValue()
+            get()
+        }
 
         val cppImplementation = configurations.getByName(CPP_IMPLEMENTATION_CONFIGURATION)
         val cppLink = configurations.getByName(CPP_LINK_CONFIGURATION)
+        val interopStubGenerator = configurations.getByName(INTEROP_STUB_GENERATOR_CONFIGURATION)
+        val interopStubGeneratorCppRuntime = configurations.getByName(INTEROP_STUB_GENERATOR_CPP_RUNTIME_CONFIGURATION)
+
+        if (useBootstrapNativeDistribution) {
+            val bootstrapDistribution = target.registerNativeBootstrapDistribution()
+            genTask.configure {
+                platformManagerProvider.distributionRoot.set(bootstrapDistribution.map { it.root })
+                interopStubGeneratorClasspath.from(bootstrapDistribution.map { it.compilerClasspath })
+                interopStubGeneratorNativeLibraries.from(target.files(bootstrapDistribution.map {
+                    it.nativeLibs.asFileTree.matching {
+                        include("**/*.dylib", "**/*.so", "**/*.dll")
+                    }
+                }))
+            }
+        } else {
+            target.dependencies {
+                interopStubGenerator(project(":kotlin-native:Interop:StubGenerator"))
+                interopStubGenerator(project(":kotlin-native:endorsedLibraries:kotlinx.cli", "jvmRuntimeElements"))
+                interopStubGeneratorCppRuntime(project(":kotlin-native:libclangInterop"))
+                interopStubGeneratorCppRuntime(project(":kotlin-native:Interop:Runtime"))
+            }
+            genTask.configure {
+                interopStubGeneratorClasspath.from(interopStubGenerator)
+                interopStubGeneratorNativeLibraries.from(interopStubGeneratorCppRuntime)
+            }
+        }
 
         val includeDirs = project.files(*systemIncludeDirs.toTypedArray(), *selfHeaders.toTypedArray(), cppImplementation)
 
         val stubsName = "${defFileName.removeSuffix(".def").split(".").reversed().joinToString(separator = "")}stubs"
         val library = solib(stubsName)
 
-        val linkedStaticLibraries = project.files(cppLink.incoming.artifactView {
+        val linkedStaticLibraries = cppLink.incoming.artifactView {
             attributes {
                 attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.LINK_ARCHIVE))
             }
-        }.files, *additionalLinkedStaticLibraries.toTypedArray())
+        }.files
 
         extensions.getByType<NativeToolsExtension>().apply {
             val obj = if (HostManager.hostIsMingw) "obj" else "o"
             suffixes {
+                val sortedIncludeFlags = reproduciblySortedFilePaths(includeDirs).map { "-I${it.absolutePath}" }
                 (".c" to ".$obj") {
                     tool(*hostPlatform.clangForJni.clangC("").toTypedArray())
 
@@ -262,16 +294,21 @@ open class NativeInteropPlugin : Plugin<Project> {
 
                     val cflags = cCompilerArgs +
                             commonCompilerArgs +
+                            reproducibilityCompilerFlags +
                             ignoreWarningFlags +
                             "-Werror" +
-                            includeDirs.map { "-I${it.absolutePath}" } +
+                            sortedIncludeFlags +
                             hostPlatform.clangForJni.hostCompilerArgsForJni
 
                     flags(*cflags.toTypedArray(), "-c", "-o", ruleOut(), ruleInFirst())
                 }
                 (".cpp" to ".$obj") {
                     tool(*hostPlatform.clang.clangCXX("").toTypedArray())
-                    val cxxflags = cppCompilerArgs + commonCompilerArgs + "-Werror" + includeDirs.map { "-I${it.absolutePath}" }
+                    val cxxflags = cppCompilerArgs +
+                            commonCompilerArgs +
+                            reproducibilityCompilerFlags +
+                            "-Werror" +
+                            sortedIncludeFlags
                     flags(*cxxflags.toTypedArray(), "-c", "-o", ruleOut(), ruleInFirst())
                 }
             }
@@ -289,13 +326,28 @@ open class NativeInteropPlugin : Plugin<Project> {
             target(library, *objSet) {
                 tool(*hostPlatform.clangForJni.clangCXX("").toTypedArray())
                 val ldflags = buildList {
-                    addAll(linkedStaticLibraries.map { it.absolutePath })
-                    cppLink.incoming.artifactView {
+                    addAll(reproduciblySortedFilePaths(linkedStaticLibraries).map { it.absolutePath })
+                    addAll(additionalLinkedStaticLibraries) // Do not additionally sort them, because they may have to be linked in a specific order.
+                    reproduciblySortedFilePaths(cppLink.incoming.artifactView {
                         attributes {
                             attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.DYNAMIC_LIB))
                         }
-                    }.files.flatMapTo(this) { listOf("-L${it.parentFile.absolutePath}", "-l${libname(it)}") }
+                    }.files).flatMapTo(this) { listOf("-L${it.parentFile.absolutePath}", "-l${libname(it)}") }
                     addAll(linkerArgs)
+
+                    if (HostManager.hostIsMac) {
+                        // Set install_name to a non-absolute path.
+                        add("-Wl,-install_name,@rpath/$library")
+                        // Unlike -ffile-prefix-map for clang, it's only possible to add a single directory for -oso_prefix:
+                        // in the `ld_classic`, for example, see
+                        // https://github.com/apple-oss-distributions/ld64/blob/1a4389663d65d6630e4b3e31ace2a86b6183b452/src/ld/Options.cpp#L4249
+                        // Currently, we only need it for dependencies from inside the repo, so strip the root project's absolute path.
+                        add("-Wl,-oso_prefix,${isolated.rootProject.projectDirectory.asFile}")
+                    }
+                    if (HostManager.hostIsMingw) {
+                        // Use binary hash as the timestamp in COFF headers.
+                        add("-Wl,/Brepro")
+                    }
                 }
                 flags("-shared", "-o", ruleOut(), *ruleInAll(), *ldflags.toTypedArray())
             }
@@ -303,6 +355,7 @@ open class NativeInteropPlugin : Plugin<Project> {
 
         tasks.named(library).configure {
             inputs.files(linkedStaticLibraries).withPathSensitivity(PathSensitivity.NONE)
+            inputs.files(additionalLinkedStaticLibraries).withPathSensitivity(PathSensitivity.NONE)
         }
         tasks.named(obj(stubsName)).configure {
             inputs.dir(bindingsRoot.map { it.dir("c") }).withPathSensitivity(PathSensitivity.RELATIVE) // if C file was generated, need to set up task dependency

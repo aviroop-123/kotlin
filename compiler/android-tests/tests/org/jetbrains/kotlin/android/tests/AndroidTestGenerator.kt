@@ -38,9 +38,10 @@ internal fun patchFilesAndAddTest(
     testFile: File,
     module: TestModule,
     services: TestServices,
-    filesHolder: CodegenTestsOnAndroidGenerator.FilesWriter
+    filesHolder: CodegenTestsOnAndroidGenerator.FilesWriter,
+    pathManager: PathManager
 ): FqName {
-    val newPackagePrefix = testFile.path.replace("\\\\|-|\\.|/".toRegex(), "_")
+    val newPackagePrefix = testFile.relativeTo(File("").canonicalFile).path.replace("\\\\|-|\\.|/".toRegex(), "_")
     val oldPackage = Ref<FqName>()
     val isJvmName = Ref<Boolean>(false)
     val testFiles = module.files
@@ -53,7 +54,8 @@ internal fun patchFilesAndAddTest(
             changePackage(newPackagePrefix, content, oldPackage, isJvmName),
             oldPackage.get(),
             isJvmName.get(),
-            getGeneratedClassName(File(fileName), content, newPackagePrefix, oldPackage.get())
+            getGeneratedClassName(File(fileName), content, newPackagePrefix, oldPackage.get()),
+            testFile.path,
         )
     }
     val packages =
@@ -128,7 +130,14 @@ private fun hasBoxMethod(text: String): Boolean {
     return text.contains("fun box()")
 }
 
-class TestClassInfo(val name: String, var content: String, val oldPackage: FqName, val isJvmName: Boolean, val newPackagePartClassId: FqName) {
+class TestClassInfo(
+    val name: String,
+    var content: String,
+    val oldPackage: FqName,
+    val isJvmName: Boolean,
+    val newPackagePartClassId: FqName,
+    val sourceTestDataPath: String,
+) {
     val newPackage = newPackagePartClassId.parent()
 }
 

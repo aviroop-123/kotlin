@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -13,11 +13,11 @@ import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.render
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.quoteIfNeeded
 import org.jetbrains.kotlin.psi.stubs.KotlinFileStubKind
 import org.jetbrains.kotlin.psi.stubs.impl.*
-import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
 import org.jetbrains.kotlin.utils.exceptions.withPsiEntry
 
@@ -25,7 +25,7 @@ private const val DECOMPILED_CODE_COMMENT = "/* compiled code */"
 private const val FLEXIBLE_TYPE_COMMENT = "/* platform type */"
 private const val DECOMPILED_CONTRACT_STUB = "contract { /* compiled contract */ }"
 
-@OptIn(IntellijInternalApi::class, KtImplementationDetail::class)
+@OptIn(IntellijInternalApi::class, KtImplementationDetail::class, KtExperimentalApi::class)
 internal fun buildDecompiledText(fileStub: KotlinFileStubImpl): String = PrettyPrinter(indentSize = 4).apply {
     (fileStub.kind as? KotlinFileStubKind.Invalid)?.errorMessage?.let {
         return it
@@ -74,10 +74,11 @@ internal fun buildDecompiledText(fileStub: KotlinFileStubImpl): String = PrettyP
             appendLine(" {")
             withIndent {
                 val isEnumClass = classOrObject is KtClass && classOrObject.isEnum()
-                val (enumEntries, members) = if (isEnumClass) {
-                    classOrObject.declarations.partition { it is KtEnumEntry }
+                val declarationsAndCompanionBlocks = classOrObject.body?.declarationsAndCompanionBlocks.orEmpty()
+                val [enumEntries, members] = if (isEnumClass) {
+                    declarationsAndCompanionBlocks.partition { it is KtEnumEntry }
                 } else {
-                    emptyList<KtDeclaration>() to classOrObject.declarations
+                    emptyList<KtDeclaration>() to declarationsAndCompanionBlocks
                 }
 
                 withSuffix("\n") {
@@ -92,6 +93,19 @@ internal fun buildDecompiledText(fileStub: KotlinFileStubImpl): String = PrettyP
                 }
             }
             append('}')
+        }
+
+        override fun visitCompanionBlock(companionBlock: KtCompanionBlock) {
+            appendLine("companion {")
+            withIndent {
+                withSuffix("\n") {
+                    printCollectionIfNotEmpty(companionBlock.declarations, separator = "\n\n") {
+                        it.accept(explicitThis)
+                    }
+                }
+            }
+
+            append("}")
         }
 
         override fun visitEnumEntry(enumEntry: KtEnumEntry) {
@@ -115,15 +129,22 @@ internal fun buildDecompiledText(fileStub: KotlinFileStubImpl): String = PrettyP
 
             withPrefix(" ") { function.typeConstraintList?.accept(this) }
 
-            if (function.hasBody()) {
-                append(" { ")
-                if (function.mayHaveContract()) {
-                    append(DECOMPILED_CONTRACT_STUB)
-                    append("; ")
-                }
-                append(DECOMPILED_CODE_COMMENT)
-                append(" }")
+            printBody(function)
+        }
+
+        fun printBody(declaration: KtDeclarationWithBody) {
+            if (!declaration.hasBody()) {
+                return
             }
+
+            append(" { ")
+            if (declaration.mayHaveContract()) {
+                append(DECOMPILED_CONTRACT_STUB)
+                append("; ")
+            }
+
+            append(DECOMPILED_CODE_COMMENT)
+            append(" }")
         }
 
         override fun visitTypeAlias(typeAlias: KtTypeAlias) {
@@ -455,9 +476,7 @@ internal fun buildDecompiledText(fileStub: KotlinFileStubImpl): String = PrettyP
 
             accessor.parameterList?.accept(this)
             withPrefix(": ") { accessor.typeReference?.accept(this) }
-            if (accessor.hasBody()) {
-                append(" { $DECOMPILED_CODE_COMMENT }")
-            }
+            printBody(accessor)
         }
 
         override fun visitParameterList(list: KtParameterList) {
@@ -499,15 +518,15 @@ internal fun buildDecompiledText(fileStub: KotlinFileStubImpl): String = PrettyP
 
         override fun visitModifierList(list: KtModifierList) {
             " ".separated(
-                { list.contextReceiverList?.accept(this) },
+                { list.contextParameterList?.accept(this) },
                 { printAnnotations(list) },
                 { printModifiers(list) },
             )
         }
 
-        override fun visitContextReceiverList(contextReceiverList: KtContextReceiverList) {
-            val contextElements = contextReceiverList.contextParameters().ifEmpty {
-                contextReceiverList.contextReceivers()
+        override fun visitContextParameterList(contextParameterList: KtContextParameterList) {
+            val contextElements = contextParameterList.contextParameters.ifEmpty {
+                contextParameterList.contextReceivers()
             }
 
             printCollection(contextElements, prefix = "context(", postfix = ")") {

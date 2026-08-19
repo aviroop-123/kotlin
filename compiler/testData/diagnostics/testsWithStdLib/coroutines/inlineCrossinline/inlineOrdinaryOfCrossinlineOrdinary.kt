@@ -1,8 +1,6 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +ForbidExtensionCallsOnInlineFunctionalParameters
 // DIAGNOSTICS: -UNUSED_VARIABLE
 // WITH_COROUTINES
-// SKIP_TXT
 import kotlin.coroutines.*
 import kotlin.coroutines.intrinsics.*
 import helpers.*
@@ -23,7 +21,7 @@ inline fun test(crossinline c: () -> Unit) {
         }
     }
     val l = { c() }
-    c.<!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>startCoroutine<!>(EmptyContinuation)
+    <!USAGE_IS_NOT_INLINABLE!>c<!>.startCoroutine(EmptyContinuation)
 }
 
 suspend fun calculate() = "OK"

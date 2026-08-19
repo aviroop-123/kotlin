@@ -8,15 +8,17 @@
 package org.jetbrains.kotlin.diagnostics
 
 import org.jetbrains.kotlin.AbstractKtSourceElement
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 
 // #### KtSourcelessFactory ####
 
+context(context: DiagnosticContext)
 fun DiagnosticReporter.report(
     factory: KtSourcelessDiagnosticFactory,
     message: String,
-    context: DiagnosticContext,
+    location: CompilerMessageSourceLocation? = null,
 ) {
-    report(factory.create(message, context.languageVersionSettings), context)
+    report(factory.create(message, location, context), context)
 }
 
 // #### KtDiagnosticFactory0 ####
@@ -27,21 +29,7 @@ fun DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), positioningStrategy, context.languageVersionSettings), context)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactory0,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null,
-) {
-    report(factory.on(source.requireNotNull(), positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), positioningStrategy, context), context)
 }
 
 context(context: DiagnosticContext)
@@ -50,7 +38,7 @@ fun DiagnosticReporter.reportOn(
     factory: KtDiagnosticFactory0,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), positioningStrategy, context), context)
 }
 
 // #### KtDiagnosticFactory1 ####
@@ -62,22 +50,7 @@ fun <A> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, positioningStrategy, context.languageVersionSettings), context)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactory1<A>,
-    a: A,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    report(factory.on(source.requireNotNull(), a, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, positioningStrategy, context), context)
 }
 
 context(context: DiagnosticContext)
@@ -87,7 +60,7 @@ fun <A> DiagnosticReporter.reportOn(
     a: A,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, positioningStrategy, context), context)
 }
 
 // #### KtDiagnosticFactory2 ####
@@ -100,23 +73,7 @@ fun <A, B> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, b, positioningStrategy, context.languageVersionSettings), context)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, b, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A, B> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactory2<A, B>,
-    a: A,
-    b: B,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    report(factory.on(source.requireNotNull(), a, b, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, b, positioningStrategy, context), context)
 }
 
 context(context: DiagnosticContext)
@@ -127,7 +84,7 @@ fun <A, B> DiagnosticReporter.reportOn(
     b: B,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, b, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, b, positioningStrategy, context), context)
 }
 
 // #### KtDiagnosticFactory3 ####
@@ -141,24 +98,7 @@ fun <A, B, C> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, b, c, positioningStrategy, context.languageVersionSettings), context)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, b, c, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A, B, C> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactory3<A, B, C>,
-    a: A,
-    b: B,
-    c: C,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    report(factory.on(source.requireNotNull(), a, b, c, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, b, c, positioningStrategy, context), context)
 }
 
 context(context: DiagnosticContext)
@@ -170,7 +110,7 @@ fun <A, B, C> DiagnosticReporter.reportOn(
     c: C,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, b, c, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, b, c, positioningStrategy, context), context)
 }
 
 // #### KtDiagnosticFactory4 ####
@@ -185,25 +125,7 @@ fun <A, B, C, D> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, b, c, d, positioningStrategy, context.languageVersionSettings), context)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, b, c, d, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A, B, C, D> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactory4<A, B, C, D>,
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    report(factory.on(source.requireNotNull(), a, b, c, d, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, b, c, d, positioningStrategy, context), context)
 }
 
 context(context: DiagnosticContext)
@@ -216,7 +138,7 @@ fun <A, B, C, D> DiagnosticReporter.reportOn(
     d: D,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    report(factory.on(source.requireNotNull(), a, b, c, d, positioningStrategy, context.languageVersionSettings), context)
+    report(factory.on(source.requireNotNull(), a, b, c, d, positioningStrategy, context), context)
 }
 
 fun AbstractKtSourceElement?.requireNotNull(): AbstractKtSourceElement =
@@ -230,21 +152,7 @@ fun DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), context, positioningStrategy)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactoryForDeprecation0,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    reportOn(source, factory.chooseFactory(context), positioningStrategy)
+    with(context) { reportOn(source, factory.chooseFactory(), positioningStrategy) }
 }
 
 context(context: DiagnosticContext)
@@ -253,7 +161,7 @@ fun DiagnosticReporter.reportOn(
     factory: KtDiagnosticFactoryForDeprecation0,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), positioningStrategy)
+    reportOn(source, factory.chooseFactory(), positioningStrategy)
 }
 
 // #### KtDiagnosticFactoryForDeprecation1 ####
@@ -265,22 +173,7 @@ fun <A> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, context, positioningStrategy)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactoryForDeprecation1<A>,
-    a: A,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    reportOn(source, factory.chooseFactory(context), a, positioningStrategy)
+    with(context) { reportOn(source, factory.chooseFactory(), a, positioningStrategy) }
 }
 
 context(context: DiagnosticContext)
@@ -290,7 +183,7 @@ fun <A> DiagnosticReporter.reportOn(
     a: A,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, positioningStrategy)
+    reportOn(source, factory.chooseFactory(), a, positioningStrategy)
 }
 
 // #### KtDiagnosticFactoryForDeprecation2 ####
@@ -303,23 +196,7 @@ fun <A, B> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, b, context, positioningStrategy)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, b, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A, B> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactoryForDeprecation2<A, B>,
-    a: A,
-    b: B,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    reportOn(source, factory.chooseFactory(context), a, b, positioningStrategy)
+    with(context) { reportOn(source, factory.chooseFactory(), a, b, positioningStrategy) }
 }
 
 context(context: DiagnosticContext)
@@ -330,7 +207,7 @@ fun <A, B> DiagnosticReporter.reportOn(
     b: B,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, b, positioningStrategy)
+    reportOn(source, factory.chooseFactory(), a, b, positioningStrategy)
 }
 
 // #### KtDiagnosticFactoryForDeprecation3 ####
@@ -344,24 +221,7 @@ fun <A, B, C> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, b, c, context, positioningStrategy)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, b, c, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A, B, C> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactoryForDeprecation3<A, B, C>,
-    a: A,
-    b: B,
-    c: C,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    reportOn(source, factory.chooseFactory(context), a, b, c, positioningStrategy)
+    with(context) { reportOn(source, factory.chooseFactory(), a, b, c, positioningStrategy) }
 }
 
 context(context: DiagnosticContext)
@@ -373,7 +233,7 @@ fun <A, B, C> DiagnosticReporter.reportOn(
     c: C,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, b, c, positioningStrategy)
+    reportOn(source, factory.chooseFactory(), a, b, c, positioningStrategy)
 }
 
 // #### KtDiagnosticFactoryForDeprecation4 ####
@@ -388,25 +248,7 @@ fun <A, B, C, D> DiagnosticReporter.reportOn(
     context: DiagnosticContext,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, b, c, d, context, positioningStrategy)
-}
-
-@Deprecated(
-    "When DiagnosticContext is available as context, use overload without context parameter.",
-    replaceWith = ReplaceWith("reportOn(source, factory, a, b, c, d, positioningStrategy)")
-)
-context(_: DiagnosticContext)
-fun <A, B, C, D> DiagnosticReporter.reportOn(
-    source: AbstractKtSourceElement?,
-    factory: KtDiagnosticFactoryForDeprecation4<A, B, C, D>,
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    context: DiagnosticContext,
-    positioningStrategy: AbstractSourceElementPositioningStrategy? = null
-) {
-    reportOn(source, factory.chooseFactory(context), a, b, c, d, positioningStrategy)
+    with(context) { reportOn(source, factory.chooseFactory(), a, b, c, d, positioningStrategy) }
 }
 
 context(context: DiagnosticContext)
@@ -419,10 +261,11 @@ fun <A, B, C, D> DiagnosticReporter.reportOn(
     d: D,
     positioningStrategy: AbstractSourceElementPositioningStrategy? = null
 ) {
-    reportOn(source, factory.chooseFactory(context), a, b, c, d, positioningStrategy)
+    reportOn(source, factory.chooseFactory(), a, b, c, d, positioningStrategy)
 }
 
-fun <F : KtDiagnosticFactoryN> KtDiagnosticFactoryForDeprecation<F>.chooseFactory(context: DiagnosticContext): F {
+context(context: DiagnosticContext)
+fun <F : KtDiagnosticFactoryN> KtDiagnosticFactoryForDeprecation<F>.chooseFactory(): F {
     return if (context.languageVersionSettings.supportsFeature(deprecatingFeature)) {
         errorFactory
     } else {

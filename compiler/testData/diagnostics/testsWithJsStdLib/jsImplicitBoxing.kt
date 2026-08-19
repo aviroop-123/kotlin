@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // ISSUE: KT-69511
 
 fun compareDynamicWithInt(n: dynamic): Boolean {

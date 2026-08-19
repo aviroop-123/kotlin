@@ -20,6 +20,8 @@ import org.jetbrains.kotlin.cli.common.CompilerSystemProperties
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.daemon.client.KotlinCompilerClient.DAEMON_CONNECT_CYCLE_ATTEMPTS
+import org.jetbrains.kotlin.daemon.client.KotlinCompilerClient.JAVA_TOOL_OPTIONS_ENV_VARIABLE
 import org.jetbrains.kotlin.daemon.common.*
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.load.kotlin.incremental.components.IncrementalCompilationComponents
@@ -73,9 +75,10 @@ object KotlinCompilerClient {
         reportingTargets: DaemonReportingTargets,
         autostart: Boolean = true,
         @Suppress("UNUSED_PARAMETER") checkId: Boolean = true,
+        daemonLogOptions: DaemonLogOptions = DaemonLogOptions(),
     ): CompileService? {
         val flagFile = getOrCreateClientFlagFile(daemonOptions)
-        return connectToCompileService(compilerId, flagFile, daemonJVMOptions, daemonOptions, reportingTargets, autostart)
+        return connectToCompileService(compilerId, flagFile, daemonJVMOptions, daemonOptions, reportingTargets, autostart, daemonLogOptions)
     }
 
     fun connectToCompileService(
@@ -85,6 +88,7 @@ object KotlinCompilerClient {
         daemonOptions: DaemonOptions,
         reportingTargets: DaemonReportingTargets,
         autostart: Boolean = true,
+        daemonLogOptions: DaemonLogOptions = DaemonLogOptions(),
     ): CompileService? =
         connectAndLease(
             compilerId,
@@ -94,7 +98,8 @@ object KotlinCompilerClient {
             reportingTargets,
             autostart,
             leaseSession = false,
-            sessionAliveFlagFile = null
+            sessionAliveFlagFile = null,
+            daemonLogOptions,
         )?.compileService
 
 
@@ -107,6 +112,7 @@ object KotlinCompilerClient {
         autostart: Boolean,
         leaseSession: Boolean,
         sessionAliveFlagFile: File? = null,
+        daemonLogOptions: DaemonLogOptions = DaemonLogOptions(),
     ): CompileServiceSession? {
         val ignoredDaemonSessionFiles = mutableSetOf<File>()
         var daemonStartupAttemptsCount = 0
@@ -162,6 +168,7 @@ object KotlinCompilerClient {
                             startDaemon(
                                 compilerId,
                                 result.requiredJvmOptions,
+                                daemonLogOptions,
                                 daemonOptions,
                                 reportingTargets,
                                 daemonStartupAttemptsCount++,
@@ -185,7 +192,7 @@ object KotlinCompilerClient {
             daemonOptions,
             DaemonReportingTargets(out = System.out),
             autostart = false,
-            checkId = false
+            checkId = false,
         )
             ?.shutdown()
     }
@@ -263,6 +270,7 @@ object KotlinCompilerClient {
     @JvmStatic
     fun main(vararg args: String) {
         val compilerId = CompilerId()
+        val daemonLogOptions = DaemonLogOptions()
         val daemonOptions = configureDaemonOptions()
         val daemonLaunchingOptions =
             configureDaemonJVMOptions(inheritMemoryLimits = true, inheritOtherJvmOptions = false, inheritAdditionalProperties = true)
@@ -270,6 +278,7 @@ object KotlinCompilerClient {
         val filteredArgs = args.asIterable().filterExtractProps(
             compilerId,
             daemonOptions,
+            daemonLogOptions,
             daemonLaunchingOptions,
             clientOptions,
             prefix = COMPILE_DAEMON_CMDLINE_OPTIONS_PREFIX
@@ -294,7 +303,8 @@ object KotlinCompilerClient {
             daemonOptions,
             DaemonReportingTargets(out = System.out),
             autostart = !clientOptions.stop,
-            checkId = !clientOptions.stop
+            checkId = !clientOptions.stop,
+            daemonLogOptions,
         )
 
         if (daemon == null) {
@@ -449,9 +459,17 @@ object KotlinCompilerClient {
         report: (DaemonReportCategory, String) -> Unit,
     ): DaemonSearchResult {
         registryDir.mkdirs()
+        val javaLanguageVersion = JavaLanguageVersion.parse(CompilerSystemProperties.JAVA_VERSION.value)
         val timestampMarker = Files.createTempFile(registryDir.toPath(), "kotlin-daemon-client-tsmarker", null).toFile()
         val aliveWithMetadata = try {
-            walkDaemons(registryDir, compilerId, timestampMarker, report = report, filter = { file, _ -> file !in ignoredDaemonSessionFiles }).toList()
+            walkDaemons(
+                registryDir,
+                compilerId,
+                javaLanguageVersion,
+                timestampMarker,
+                report = report,
+                filter = { file, _ -> file !in ignoredDaemonSessionFiles })
+                .toList()
         } finally {
             timestampMarker.delete()
         }
@@ -469,7 +487,7 @@ object KotlinCompilerClient {
 
     internal data class GcAutoConfiguration(
         var shouldAutoConfigureGc: Boolean = true,
-        val preferredGc: String = "Parallel"
+        val preferredGc: String = "Parallel",
     )
 
     private fun getEnvironmentVariablesForTests(reportingTargets: DaemonReportingTargets): Map<String, String> {
@@ -497,7 +515,7 @@ object KotlinCompilerClient {
      * In that case the worst thing we may face, we won't configure the [GcAutoConfiguration.preferredGc] GC.
      * That sounds acceptable.
      */
-    private fun getImplicitJvmArguments(environmentVariablesForTests: Map<String, String>) : List<String> {
+    private fun getImplicitJvmArguments(environmentVariablesForTests: Map<String, String>): List<String> {
         val javaToolOptions = environmentVariablesForTests[JAVA_TOOL_OPTIONS_ENV_VARIABLE]
             ?: System.getenv(JAVA_TOOL_OPTIONS_ENV_VARIABLE)
             ?: return emptyList()
@@ -507,6 +525,7 @@ object KotlinCompilerClient {
     private fun startDaemon(
         compilerId: CompilerId,
         daemonJVMOptions: DaemonJVMOptions,
+        daemonLogOptions: DaemonLogOptions,
         daemonOptions: DaemonOptions,
         reportingTargets: DaemonReportingTargets,
         startupAttempt: Int,
@@ -514,6 +533,7 @@ object KotlinCompilerClient {
         initialClientInfo: InitialClientInformation,
     ): Boolean {
         val javaExecutable = File(File(CompilerSystemProperties.JAVA_HOME.safeValue, "bin"), "java")
+        val javaLanguageVersion = JavaLanguageVersion.parse(CompilerSystemProperties.JAVA_VERSION.value)
         val serverHostname = CompilerSystemProperties.JAVA_RMI_SERVER_HOSTNAME.value
             ?: error("${CompilerSystemProperties.JAVA_RMI_SERVER_HOSTNAME.property} is not set!")
         val platformSpecificOptions = listOf(
@@ -521,9 +541,8 @@ object KotlinCompilerClient {
             "-Djava.awt.headless=true",
             "-D${CompilerSystemProperties.JAVA_RMI_SERVER_HOSTNAME.property}=$serverHostname"
         )
-        val javaVersion = CompilerSystemProperties.JAVA_VERSION.value?.toIntOrNull()
         val javaIllegalAccessWorkaround =
-            if (javaVersion != null && javaVersion >= 16)
+            if (javaLanguageVersion >= JavaLanguageVersion.of(16))
                 listOf("--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED")
             else emptyList()
         val environmentVariablesForTests = getEnvironmentVariablesForTests(reportingTargets)
@@ -554,6 +573,7 @@ object KotlinCompilerClient {
                 initiatorInfoAsSystemProperties +
                 javaIllegalAccessWorkaround +
                 COMPILER_DAEMON_CLASS_FQN +
+                daemonLogOptions.mappers.flatMap { it.toArgs(COMPILE_DAEMON_CMDLINE_OPTIONS_PREFIX) } +
                 daemonOptions.mappers.flatMap { it.toArgs(COMPILE_DAEMON_CMDLINE_OPTIONS_PREFIX) } +
                 compilerId.mappers.flatMap { it.toArgs(COMPILE_DAEMON_CMDLINE_OPTIONS_PREFIX) }
         reportingTargets.report(DaemonReportCategory.INFO, "starting the daemon as: " + args.joinToString(" "))

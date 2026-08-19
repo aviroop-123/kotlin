@@ -1,7 +1,8 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
+    id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 description = "A set of integration tests for Swift Export Standalone"
@@ -13,30 +14,44 @@ kotlin {
 dependencies {
     compileOnly(kotlinStdlib())
 
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.junit.jupiter.api)
 
-    testImplementation(project(":native:swift:swift-export-standalone-integration-tests"))
+    testImplementation(testFixtures(project(":native:swift:swift-export-standalone-integration-tests")))
     testRuntimeOnly(testFixtures(project(":analysis:low-level-api-fir")))
     testRuntimeOnly(testFixtures(project(":analysis:analysis-api-impl-base")))
     testImplementation(testFixtures(project(":analysis:analysis-api-fir")))
     testImplementation(testFixtures(project(":analysis:analysis-test-framework")))
     testImplementation(testFixtures(project(":compiler:tests-common")))
     testImplementation(testFixtures(project(":compiler:tests-common-new")))
+
+    testFixturesImplementation(testFixtures(project(":native:swift:swift-export-standalone-integration-tests")))
+    testFixturesImplementation(testFixtures(project(":generators:test-generator")))
 }
 
 sourceSets {
-    "test" {
-        projectDefault()
-        generatedTestDir()
-    }
+    "test" { projectDefault() }
+    "testFixtures" { projectDefault() }
 }
 
 projectTests {
-    nativeTestTask("test", null, requirePlatformLibs = true) {
-        dependsOn(":kotlin-native:distInvalidateStaleCaches")
-    }
-}
+    testData(isolated, "testData")
+    testData(rootProject.isolated, "native/native.tests/testData/framework")
 
-testsJar()
+    nativeTestTask(
+        "test",
+        requirePlatformLibs = true,
+        allowUnsafe = true, // KT-85212
+    ) {
+        dependsOn(":kotlin-native:distInvalidateStaleCaches")
+        extensions.configure<TestInputsCheckExtension>("testInputsCheck") {
+            allowFlightRecorder.set(true)
+        }
+    }
+
+    testGenerator(
+        "org.jetbrains.kotlin.swiftexport.standalone.test.simple.TestGeneratorKt",
+        generateTestsInBuildDirectory = true,
+    )
+}

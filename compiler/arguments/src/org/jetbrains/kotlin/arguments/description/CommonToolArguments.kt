@@ -8,9 +8,6 @@ package org.jetbrains.kotlin.arguments.description
 import org.jetbrains.kotlin.arguments.dsl.base.*
 import org.jetbrains.kotlin.arguments.dsl.defaultFalse
 import org.jetbrains.kotlin.arguments.dsl.types.BooleanType
-import org.jetbrains.kotlin.cli.common.arguments.DefaultValue
-import org.jetbrains.kotlin.cli.common.arguments.GradleInputTypes
-import org.jetbrains.kotlin.cli.common.arguments.GradleOption
 
 val actualCommonToolsArguments by compilerArgumentsLevel(CompilerArgumentsLevelNames.commonToolArguments) {
     compilerArgument {
@@ -19,6 +16,7 @@ val actualCommonToolsArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         description = "Print a synopsis of standard options.".asReleaseDependent()
 
         valueType = BooleanType.defaultFalse
+        affectsCompilationOutcome = false
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_0,
@@ -32,6 +30,7 @@ val actualCommonToolsArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         description = "Print a synopsis of advanced options.".asReleaseDependent()
 
         valueType = BooleanType.defaultFalse
+        affectsCompilationOutcome = false
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_0,
@@ -44,6 +43,7 @@ val actualCommonToolsArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         description = "Display the compiler version.".asReleaseDependent()
 
         valueType = BooleanType.defaultFalse
+        affectsCompilationOutcome = false
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_0,
@@ -56,6 +56,7 @@ val actualCommonToolsArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         description = "Enable verbose logging output.".asReleaseDependent()
 
         valueType = BooleanType.defaultFalse
+        affectsCompilationOutcome = false
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_0,
@@ -69,6 +70,7 @@ val actualCommonToolsArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         description = "Don't generate any warnings.".asReleaseDependent()
 
         valueType = BooleanType.defaultFalse
+        affectsCompilationOutcome = false
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_0,

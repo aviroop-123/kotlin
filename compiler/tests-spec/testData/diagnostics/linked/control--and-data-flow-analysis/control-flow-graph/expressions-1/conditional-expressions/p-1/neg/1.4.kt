@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNREACHABLE_CODE -IMPLICIT_CAST_TO_ANY -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -22,7 +21,7 @@ fun case1() {
  * ISSUES: KT-35510
  */
 fun case2(nothing: Nothing) {
-    val n1else = if (nothing) true else;
+    val n1else = <!INVALID_IF_AS_EXPRESSION!>if<!> (nothing) true else;
 }
 
 /*
@@ -37,11 +36,11 @@ fun case3(nothing: Nothing) {
 // TESTCASE NUMBER: 4
 
 fun case4(nothing: Nothing) {
-    val x = <!INVALID_IF_AS_EXPRESSION!>if<!> (false) else if (nothing) { "foo"} else
+    val x = if (false) else if (nothing) { "foo"} else
 <!SYNTAX!><!>}
 
 // TESTCASE NUMBER: 5
 
 fun case5(nothing: Nothing) {
-    val x = <!INVALID_IF_AS_EXPRESSION!>if<!> (false) else if (nothing) { "foo"} else ;
+    val x = <!INVALID_IF_AS_EXPRESSION!>if<!> (false) else <!INVALID_IF_AS_EXPRESSION!>if<!> (nothing) { "foo"} else ;
 }

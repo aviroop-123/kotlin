@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
@@ -8,8 +7,10 @@ dependencies {
     api(project(":compiler:psi:psi-impl"))
     api(project(":core:deserialization.common"))
     api(project(":core:deserialization.common.jvm"))
-    api(project(":core:deserialization"))
+    implementation(project(":core:deserialization"))
+    implementation(project(":core:descriptors"))
     implementation(project(":core:compiler.common.jvm"))
+    implementation(project(":kotlin-util-klib"))
     testImplementation(testFixtures(project(":compiler:tests-common-new")))
 
     api(intellijCore())
@@ -20,4 +21,4 @@ sourceSets {
     "test" {}
 }
 
-
+optInToK1Deprecation()

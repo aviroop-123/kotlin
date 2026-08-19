@@ -26,7 +26,6 @@ class NativeIncrementalCompilationIT : KGPBaseTest() {
 
     override val defaultBuildOptions = super.defaultBuildOptions.copy(
         nativeOptions = BuildOptions.NativeOptions(
-            cacheKind = NativeCacheKind.STATIC,
             incremental = true
         )
     )
@@ -189,26 +188,60 @@ class NativeIncrementalCompilationIT : KGPBaseTest() {
         }
     }
 
+    @DisplayName("KT-86798: stale IC cache from a different compiler version is invalidated")
+    @GradleTest
+    fun staleCacheInvalidatedOnCompilerFingerprintMismatch(gradleVersion: GradleVersion) {
+        nativeProject("native-incremental-multifile", gradleVersion) {
+            val mainKtCache = getFileCache("native-incremental-multifile", "src/hostMain/kotlin/main.kt")
+            val fooKtCache = getFileCache("native-incremental-multifile", "src/hostMain/kotlin/foo.kt")
+            build("linkDebugExecutableHost") {
+                assertDirectoryExists(mainKtCache)
+                assertDirectoryExists(fooKtCache)
+            }
+
+            // Simulate switching to a different Kotlin/Native version without running `clean`:
+            // rewrite the recorded compilerFingerprint in every cached file's metadata to a bogus value.
+            val bogusFingerprint = "stale-compiler-fingerprint-4242"
+            val icCacheRoot = projectPath.resolve("build").resolve("kotlin-native-ic-cache").toFile()
+            val tamperedMetadataFiles = icCacheRoot.walkTopDown().filter { it.name == "metadata.properties" }.toList()
+            assert(tamperedMetadataFiles.isNotEmpty()) { "No cache metadata.properties found under $icCacheRoot" }
+            tamperedMetadataFiles.forEach { metadata ->
+                val patched = metadata.readText().lines().joinToString("\n") { line ->
+                    if (line.startsWith("compilerFingerprint=")) "compilerFingerprint=$bogusFingerprint" else line
+                }
+                metadata.writeText(patched)
+            }
+
+            // A real version switch makes the compile task non-up-to-date, so the compiler re-runs
+            // and re-reads the IC cache. Reproduce that by touching a source file.
+            kotlinSourcesDir("hostMain").resolve("main.kt").appendText("\n// force recompile\n")
+
+            build("linkDebugExecutableHost") {
+                // foo.kt is otherwise unchanged, so its content hash still matches. Before the fix its
+                // cache is reused as-is and the bogus fingerprint survives; after the fix the mismatch is
+                // detected, the stale cache is dropped and rebuilt with the real compiler fingerprint.
+                assertFileDoesNotContain(fooKtCache.resolve("metadata.properties"), bogusFingerprint)
+            }
+        }
+    }
+
     @DisplayName("Check dependencies on project level")
     @GradleTest
     fun inProjectDependencies(gradleVersion: GradleVersion) {
         nativeProject("native-incremental-multi-project", gradleVersion, configureSubProjects = true) {
-            // https://github.com/gradle/gradle/issues/33248
-            val libCachePrefix = "MultiProject" + (if (buildOptions.isolatedProjects.toBooleanFlag(gradleVersion)) "." else "")
-
             var fooKtCacheModified = 0L
             var barKtCacheModified = 0L
             var mainKtCacheModified = 0L
             val fooKtCache = getFileCache(
-                "$libCachePrefix:library", "library/src/hostMain/kotlin/foo.kt",
+                "MultiProject:library", "library/src/hostMain/kotlin/foo.kt",
                 executableProjectName = "program"
             )
             val barKtCache = getFileCache(
-                "$libCachePrefix:program", "program/src/hostMain/kotlin/bar.kt",
+                "MultiProject:program", "program/src/hostMain/kotlin/bar.kt",
                 executableProjectName = "program"
             )
             val mainKtCache = getFileCache(
-                "$libCachePrefix:program", "program/src/hostMain/kotlin/main.kt",
+                "MultiProject:program", "program/src/hostMain/kotlin/main.kt",
                 executableProjectName = "program"
             )
             build("linkDebugExecutableHost") {

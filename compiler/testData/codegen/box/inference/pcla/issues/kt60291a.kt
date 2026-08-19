@@ -1,9 +1,6 @@
 // ISSUE: KT-60291
 // WITH_STDLIB
 
-// IGNORE_BACKEND_K1: ANY
-// REASON: red code (see corresponding diagnostic test)
-
 fun box(): String {
     selectBuildee(
         build { setTypeVariable(TargetType()) },

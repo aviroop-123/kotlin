@@ -24,7 +24,7 @@ import org.jetbrains.kotlin.ir.util.transformFlat
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 
-private val SCRIPT_FUNCTION by IrDeclarationOriginImpl
+private val SCRIPT_FUNCTION by IrDeclarationOriginImpl.Regular
 
 /**
  * Creates functions for initializing and evaluating scripts.
@@ -38,7 +38,7 @@ class CreateScriptFunctionsPhase(val context: CommonBackendContext) : FileLoweri
     }
 
     private fun lower(irScript: IrScript): List<IrDeclaration> {
-        val (startOffset, endOffset) = getFunctionBodyOffsets(irScript)
+        val [startOffset, endOffset] = getFunctionBodyOffsets(irScript)
 
         val initializeStatements = irScript.statements
             .asSequence()
@@ -56,7 +56,7 @@ class CreateScriptFunctionsPhase(val context: CommonBackendContext) : FileLoweri
                 initializeStatements.let {
                     if (irScript.resultProperty == null || initializeStatements.lastOrNull()?.first?.correspondingPropertySymbol != irScript.resultProperty) it
                     else it.dropLast(1)
-                }.memoryOptimizedMap { (field, expression) -> createIrSetField(field, expression) }
+                }.memoryOptimizedMap { [field, expression] -> createIrSetField(field, expression) }
             )
         }
 
@@ -106,7 +106,7 @@ class CreateScriptFunctionsPhase(val context: CommonBackendContext) : FileLoweri
 
     private fun createFunction(irScript: IrScript, name: String, returnType: IrType): IrSimpleFunction =
         context.irFactory.buildFun {
-            val (startOffset, endOffset) = getFunctionBodyOffsets(irScript)
+            val [startOffset, endOffset] = getFunctionBodyOffsets(irScript)
             this.startOffset = startOffset
             this.endOffset = endOffset
             this.origin = SCRIPT_FUNCTION

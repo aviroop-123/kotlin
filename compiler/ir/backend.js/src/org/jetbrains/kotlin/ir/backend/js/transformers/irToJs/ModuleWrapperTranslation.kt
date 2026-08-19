@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.ir.backend.js.transformers.irToJs
 
 import org.jetbrains.kotlin.js.backend.ast.*
 import org.jetbrains.kotlin.js.common.isValidES5Identifier
-import org.jetbrains.kotlin.serialization.js.ModuleKind
+import org.jetbrains.kotlin.js.config.ModuleKind
 import org.jetbrains.kotlin.utils.addToStdlib.partitionIsInstance
 
 object ModuleWrapperTranslation {
@@ -129,14 +129,14 @@ object ModuleWrapperTranslation {
     }
 
     private fun wrapEsModule(function: JsFunction): List<JsStatement> {
-        val (alreadyPresentedImportStatements, restStatements) = function.body.statements
+        val [alreadyPresentedImportStatements, restStatements] = function.body.statements
             .flatMap { if (it is JsCompositeBlock) it.statements else listOf(it) }
             .partitionIsInstance<JsStatement, JsImport>()
-        val (multipleElementsImport, defaultImports) = alreadyPresentedImportStatements.partition { it.target is JsImport.Target.Elements }
+        val [multipleElementsImport, defaultImports] = alreadyPresentedImportStatements.partition { it.target is JsImport.Target.Elements }
 
         val mergedImports = multipleElementsImport
             .groupBy { it.module }
-            .map { (module, import) ->
+            .map { [module, import] ->
                 JsImport(module, *import.flatMap { it.elements }.distinctBy { it.name.ident }.toTypedArray())
             }
 

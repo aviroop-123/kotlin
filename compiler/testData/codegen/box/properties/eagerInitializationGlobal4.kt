@@ -1,6 +1,8 @@
-// TARGET_BACKEND: JS_IR, JS_IR_ES6, WASM, NATIVE
+// DONT_TARGET_EXACT_BACKEND: JVM_IR
+// ^EagerInitialization is not supported
 // PROPERTY_LAZY_INITIALIZATION
-
+// WASM_IGNORE_FOR: mode=single-module
+// WASM_IGNORE_FOR: mode=multi-module
 // MODULE: lib1
 // FILE: lib.kt
 var z1 = false

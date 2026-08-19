@@ -9,33 +9,34 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.classKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.isExtensionMember
-import org.jetbrains.kotlin.fir.analysis.checkers.declaration.isLocalMember
-import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
+import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess
-import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.unwrapSmartcastExpression
+import org.jetbrains.kotlin.fir.isDisabled
 import org.jetbrains.kotlin.fir.isEnabled
 import org.jetbrains.kotlin.fir.references.resolved
+import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.hasContextParameters
-import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.fir.types.hasCapture
+import org.jetbrains.kotlin.fir.types.isKMutableProperty
+import org.jetbrains.kotlin.fir.types.resolvedType
 
-object FirCallableReferenceChecker : FirQualifiedAccessExpressionChecker(MppCheckerKind.Common) {
+object FirCallableReferenceChecker : FirCallableReferenceAccessChecker(MppCheckerKind.Common) {
     context(context: CheckerContext, reporter: DiagnosticReporter)
-    override fun check(expression: FirQualifiedAccessExpression) {
-        if (expression !is FirCallableReferenceAccess) return
-
-        if (expression.hasQuestionMarkAtLHS && expression.explicitReceiver?.unwrapSmartcastExpression() !is FirResolvedQualifier) {
+    override fun check(expression: FirCallableReferenceAccess) {
+        if (expression.hasQuestionMarkAtLhs && expression.explicitReceiver?.unwrapSmartcastExpression() !is FirResolvedQualifier) {
             reporter.reportOn(expression.source, FirErrors.SAFE_CALLABLE_REFERENCE_CALL)
         }
 
@@ -50,7 +51,6 @@ object FirCallableReferenceChecker : FirQualifiedAccessExpressionChecker(MppChec
     }
 
     context(context: CheckerContext, reporter: DiagnosticReporter)
-// See FE 1.0 [DoubleColonExpressionResolver#checkReferenceIsToAllowedMember]
     private fun checkReferenceIsToAllowedMember(
         referredSymbol: FirBasedSymbol<*>,
         source: KtSourceElement,
@@ -60,11 +60,11 @@ object FirCallableReferenceChecker : FirQualifiedAccessExpressionChecker(MppChec
         }
 
         if (referredSymbol is FirCallableSymbol) {
-            if (referredSymbol.isExtensionMember && !referredSymbol.isLocalMember) {
+            if (referredSymbol.isExtensionMember && referredSymbol.visibility != Visibilities.Local) {
                 reporter.reportOn(source, FirErrors.EXTENSION_IN_CLASS_REFERENCE_NOT_ALLOWED, referredSymbol)
             }
 
-            if (referredSymbol.hasContextParameters && LanguageFeature.ContextParameters.isEnabled()) {
+            if (referredSymbol.hasContextParameters && LanguageFeature.ContextParameters.isEnabled() && LanguageFeature.CallableReferencesToContextual.isDisabled()) {
                 reporter.reportOn(source, FirErrors.CALLABLE_REFERENCE_TO_CONTEXTUAL_DECLARATION, referredSymbol)
             }
         }

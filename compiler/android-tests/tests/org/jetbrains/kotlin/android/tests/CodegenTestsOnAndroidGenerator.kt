@@ -13,12 +13,15 @@ import org.jetbrains.kotlin.cli.common.disposeRootInWriteAction
 import org.jetbrains.kotlin.cli.common.output.writeAllTo
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
 import org.jetbrains.kotlin.codegen.CodegenTestFiles
 import org.jetbrains.kotlin.codegen.GenerationUtils
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JvmTarget
+import org.jetbrains.kotlin.config.additionalIrCheckers
+import org.jetbrains.kotlin.config.disableIrCheckers
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
@@ -33,6 +36,7 @@ import org.jetbrains.kotlin.test.model.DependencyKind
 import org.jetbrains.kotlin.test.model.FrontendKinds
 import org.jetbrains.kotlin.test.model.ResultingArtifact
 import org.jetbrains.kotlin.test.model.TestFile
+import org.jetbrains.kotlin.test.preprocessors.JvmInlineSourceTransformer
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.services.*
 import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
@@ -56,14 +60,14 @@ data class ConfigurationKey(val kind: ConfigurationKind, val jdkKind: TestJdkKin
 class CodegenTestsOnAndroidGenerator private constructor(private val pathManager: PathManager) {
     private var currentModuleIndex = 1
 
-    private val pathFilter: String? = System.getProperties().getProperty("kotlin.test.android.path.filter")
+    private val pathFilter: String? = System.getProperty("kotlin.test.android.path.filter")
 
     private val pendingUnitTestGenerators = hashMapOf<String, UnitTestFileWriter>()
 
     //keep it globally to avoid test grouping on TC
     private val generatedTestNames = hashSetOf<String>()
 
-    private val commonFlavor = FlavorConfig(TargetBackend.ANDROID, "common", 4)
+    private val commonFlavor = FlavorConfig(TargetBackend.ANDROID, "common", 5)
     private val reflectFlavor = FlavorConfig(TargetBackend.ANDROID, "reflect", 1)
 
     class FlavorConfig(private val backend: TargetBackend, private val prefix: String, val limit: Int) {
@@ -108,16 +112,19 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
     }
 
     private fun copyGradleWrapperAndPatch() {
+        val gradleWrapper = File(System.getProperty("kotlin.test.android.gradleWrapper"))
+        val gradlew = File(System.getProperty("kotlin.test.android.gradlew"))
+        val gradlewBat = File(System.getProperty("kotlin.test.android.gradlewBat"))
+
         val projectRoot = File(pathManager.tmpFolder)
         val target = File(projectRoot, "gradle/wrapper")
-        File("./gradle/wrapper/").copyRecursively(target)
-        val gradlew = File(projectRoot, "gradlew")
-        File("./gradlew").copyTo(gradlew).also {
+        gradleWrapper.copyRecursively(target)
+        gradlew.copyTo(File(projectRoot, "gradlew")).also {
             if (!SystemInfo.isWindows) {
                 it.setExecutable(true)
             }
         }
-        File("./gradlew.bat").copyTo(File(projectRoot, "gradlew.bat"))
+        gradlewBat.copyTo(File(projectRoot, "gradlew.bat"))
         val file = File(target, "gradle-wrapper.properties")
         file.readLines().map {
             when {
@@ -155,8 +162,9 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
         println("Generating test files...")
 
         val folders = arrayOf(
-            File("compiler/testData/codegen/box"),
-            File("compiler/testData/codegen/boxInline")
+            ForTestCompileRuntime.transformTestDataPath("compiler/testData/codegen/box"),
+            ForTestCompileRuntime.transformTestDataPath("compiler/testData/codegen/boxJvm"),
+            ForTestCompileRuntime.transformTestDataPath("compiler/testData/codegen/boxInline")
         )
 
         generateTestMethodsForDirectories(commonFlavor, reflectFlavor, *folders)
@@ -205,6 +213,9 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
                 disposable,
                 configuration.copy().apply {
                     put(CommonConfigurationKeys.MODULE_NAME, "android-module-" + currentModuleIndex++)
+                    // KT-84021 Use full K/JVM stdlib, not minimal K/JVM stdlib
+                    addJvmClasspathRoot(ForTestCompileRuntime.runtimeJarForTests())
+                    addJvmClasspathRoot(ForTestCompileRuntime.kotlinTestJarForTests())
                 },
                 EnvironmentConfigFiles.JVM_CONFIG_FILES
             )
@@ -236,7 +247,7 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
             val flavorName = flavorConfig.getFlavorForNewFiles(filesToCompile.size)
 
             val outputDir = File(pathManager.getOutputForCompiledFiles(flavorName))
-            println("Generating ${filesToCompile.size} files into ${outputDir.name}, configuration: '${environment.configuration}'...")
+            println("Generating ${filesToCompile.size} from ${unitTestDescriptions.joinToString { it.fqName.asString() }} files into ${outputDir.name}, configuration: '${environment.configuration}'...")
 
             val state = GenerationUtils.compileFiles(filesToCompile, environment)
 
@@ -302,17 +313,14 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
 
                 val fullFileText = FileUtil.loadFile(file, true)
 
-                if (fullFileText.contains("// WITH_COROUTINES")) {
-                    if (fullFileText.contains("kotlin.coroutines.experimental")) continue
-                    if (fullFileText.contains("// LANGUAGE_VERSION: 1.2")) continue
-                }
+                // Cannot dex -> cannot run
+                if (fullFileText.contains("// IGNORE_DEXING")) continue
 
                 //TODO support JvmPackageName
                 if (fullFileText.contains("@file:JvmPackageName(")) continue
                 // TODO: Support jvm assertions
                 if (fullFileText.contains("// ASSERTIONS_MODE: jvm")) continue
                 if (fullFileText.contains("// MODULE: ")) continue
-                if (fullFileText.contains("// IGNORE_BACKEND_K1")) continue
                 val targets = InTextDirectivesUtils.findLinesWithPrefixesRemoved(fullFileText, "// JVM_TARGET:")
 
                 val isAtLeastJvm8Target = !targets.contains(JvmTarget.JVM_1_6.description)
@@ -342,8 +350,12 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
                     val module = moduleStructure.modules.singleOrNull() ?: continue
                     if (module.files.any { it.isJavaFile || it.isKtsFile }) continue
                     if (module.files.isEmpty()) continue
-                    services.registerArtifactsProvider(ArtifactsProvider(services, moduleStructure.modules))
+                    services.registerArtifactsProvider(ArtifactsProvider())
 
+                    // The configuration is used as a key here and not used for the actual compiler invocation
+                    // So if the configuration is created with default services inside, it messes up the
+                    // equals/hashcode.
+                    @OptIn(CompilerConfiguration.Internals::class)
                     val keyConfiguration = CompilerConfiguration()
                     val configuratorForFlags = JvmEnvironmentConfigurator(services)
                     with(configuratorForFlags) {
@@ -355,20 +367,17 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
                     val jdkKind = JvmEnvironmentConfigurator.extractJdkKind(module.directives)
 
                     keyConfiguration.languageVersionSettings = module.languageVersionSettings
-                    keyConfiguration.put(
-                        CommonConfigurationKeys.ENABLE_IR_VISIBILITY_CHECKS,
-                        !CodegenTestDirectives.DISABLE_IR_VISIBILITY_CHECKS.isApplicableTo(module, services),
-                    )
-                    keyConfiguration.put(
-                        CommonConfigurationKeys.ENABLE_IR_VARARG_TYPES_CHECKS,
-                        !CodegenTestDirectives.DISABLE_IR_VARARG_TYPE_CHECKS.isApplicableTo(module, services),
-                    )
+                    keyConfiguration.disableIrCheckers = IrCheckersDisabledByTestDirectives.filter { it.key.isApplicableTo(module, services) }.values.toList()
+                    keyConfiguration.additionalIrCheckers = IrCheckersEnabledByTestDirectives.filter { module.directives.contains(it.key) }.values.toList()
 
                     val key = ConfigurationKey(kind, jdkKind, keyConfiguration.toString())
                     val compiler = if (kind.withReflection) reflectionFlavor else commonFlavor
                     val compilerConfigurationProvider = services.compilerConfigurationProvider as CompilerConfigurationProviderImpl
                     val filesHolder = holders.getOrPut(key) {
-                        FilesWriter(compiler, compilerConfigurationProvider.createCompilerConfiguration(module)).also {
+                        FilesWriter(
+                            compiler,
+                            compilerConfigurationProvider.createCompilerConfiguration(module, CompilationStage.FIRST),
+                        ).also {
                             println("Creating new configuration by $key")
                         }
                     }
@@ -377,13 +386,13 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
                         continue
                     }
 
-                    patchFilesAndAddTest(file, module, services, filesHolder)
+                    patchFilesAndAddTest(file, module, services, filesHolder, pathManager)
                 }
             }
         }
     }
 
-    private fun createTestConfiguration(testDataFile: File): TestConfiguration {
+    private fun createTestConfiguration(testDataFile: File): NonGroupingStageTestConfiguration {
         return TestConfigurationBuilder().apply {
             configure()
             testInfo = KotlinTestInfo(
@@ -392,12 +401,14 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
                 emptySet()
             )
             startingArtifactFactory = { ResultingArtifact.Source() }
+            @OptIn(TestInfrastructureInternals::class)
+            useCustomCompilerConfigurationProvider(::CompilerConfigurationProviderImpl)
         }.build(testDataFile.path)
     }
 
     private fun TestConfigurationBuilder.configure() {
         globalDefaults {
-            frontend = FrontendKinds.ClassicFrontend
+            frontend = FrontendKinds.FIR
             targetBackend = TargetBackend.ANDROID
             targetPlatform = JvmPlatforms.defaultJvmPlatform
             dependencyKind = DependencyKind.Binary
@@ -427,17 +438,14 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
                 return transformers.fold(content) { text, transformer -> transformer(text) }
             }
         }
-        useSourcePreprocessor({ AndroidTransformingPreprocessor(it) })
+        useSourcePreprocessor({ AndroidTransformingPreprocessor(it) }, ::JvmInlineSourceTransformer)
         useMetaTestConfigurators(::ClassicUnstableAndK2LanguageFeaturesSkipConfigurator)
     }
 
     companion object {
-        const val GRADLE_VERSION = "6.8.1" // update GRADLE_SHA_256 on change
-        const val GRADLE_SHA_256 = "fd591a34af7385730970399f473afabdb8b28d57fd97d6625c388d090039d6fd"
+        const val GRADLE_VERSION = "8.14" // update GRADLE_SHA_256 on change
+        const val GRADLE_SHA_256 = "61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa"
         const val testClassPackage = "org.jetbrains.kotlin.android.tests"
-        const val testClassName = "CodegenTestCaseOnAndroid"
-        const val baseTestClassPackage = "org.jetbrains.kotlin.android.tests"
-        const val baseTestClassName = "AbstractCodegenTestCaseOnAndroid"
 
 
         @JvmOverloads
@@ -465,7 +473,7 @@ class CodegenTestsOnAndroidGenerator private constructor(private val pathManager
             val tmpFolder = createTempDirectory().toAbsolutePath().toString()
             println("Created temporary folder for android tests: $tmpFolder")
             val rootFolder = Path("").toAbsolutePath().toString()
-            val pathManager = PathManager(rootFolder, tmpFolder)
+            val pathManager = PathManager(tmpFolder)
             generate(pathManager, true)
             println("Android test project is generated into $tmpFolder folder")
         }

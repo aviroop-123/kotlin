@@ -95,11 +95,6 @@ abstract class IncrementalJavaChangeDefaultIT : IncrementalCompilationJavaChange
     }
 }
 
-@DisplayName("Default incremental compilation with default precise java tracking on K1")
-class IncrementalK1JavaChangeDefaultIT : IncrementalJavaChangeDefaultIT() {
-    override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK1()
-}
-
 @DisplayName("Default incremental compilation with default precise java tracking on K2")
 open class IncrementalK2JavaChangeDefaultIT : IncrementalJavaChangeDefaultIT() {
     override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK2()
@@ -202,51 +197,6 @@ class IncrementalK2JavaChangeUsingFirRunnerBuildToolsApiInProcessIT : Incrementa
     override val defaultBuildOptions = super.defaultBuildOptions.copy(useFirJvmRunner = true)
 }
 
-@DisplayName("Default incremental compilation with disabled precise compilation outputs backup")
-abstract class IncrementalJavaChangeWithoutPreciseCompilationBackupIT : IncrementalJavaChangeDefaultIT() {
-    override val defaultBuildOptions = super.defaultBuildOptions.copy(usePreciseOutputsBackup = false, keepIncrementalCompilationCachesInMemory = false)
-}
-
-@DisplayName("Default incremental compilation with disabled precise compilation outputs backup on K1")
-class IncrementalK1JavaChangeWithoutPreciseCompilationBackupIT : IncrementalJavaChangeWithoutPreciseCompilationBackupIT() {
-    override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK1()
-}
-
-@DisplayName("Default incremental compilation with disabled precise compilation outputs backup on K2")
-open class IncrementalK2JavaChangeWithoutPreciseCompilationBackupIT : IncrementalJavaChangeWithoutPreciseCompilationBackupIT() {
-    override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK2()
-
-    @Disabled("KT-57147")
-    @GradleTest
-    override fun testAbiChangeInLib_changeMethodSignature_tracked(gradleVersion: GradleVersion) {
-        super.testAbiChangeInLib_changeMethodSignature_tracked(gradleVersion)
-    }
-
-    @Disabled("KT-57147")
-    @GradleTest
-    override fun testNonAbiChangeInLib_changeMethodBody_tracked(gradleVersion: GradleVersion) {
-        super.testNonAbiChangeInLib_changeMethodBody_tracked(gradleVersion)
-    }
-
-    @Disabled("KT-57147")
-    @GradleTest
-    override fun testAbiChangeInLib_changeMethodSignature(gradleVersion: GradleVersion) {
-        super.testAbiChangeInLib_changeMethodSignature(gradleVersion)
-    }
-
-    @Disabled("KT-57147")
-    @GradleTest
-    override fun testNonAbiChangeInLib_changeMethodBody(gradleVersion: GradleVersion) {
-        super.testNonAbiChangeInLib_changeMethodBody(gradleVersion)
-    }
-}
-
-@DisplayName("Default incremental compilation with FIR runner and disabled precise compilation outputs backup on K2")
-class IncrementalK2JavaChangeWithFirRunnerAndWithoutPreciseCompilationBackupIT :
-    IncrementalK2JavaChangeWithoutPreciseCompilationBackupIT() {
-    override val defaultBuildOptions: BuildOptions = super.defaultBuildOptions.copy(useFirJvmRunner = true)
-}
-
 @DisplayName("Default incremental compilation with enabled precise java tracking")
 class IncrementalJavaChangePreciseIT : IncrementalCompilationJavaChangesBase(
     usePreciseJavaTracking = true
@@ -333,11 +283,6 @@ abstract class IncrementalJavaChangeDisablePreciseIT : IncrementalCompilationJav
     }
 }
 
-@DisplayName("Default incremental compilation with disabled precise java tracking and enabled K1")
-class IncrementalK1JavaChangeDisablePreciseIT : IncrementalJavaChangeDisablePreciseIT() {
-    override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK1()
-}
-
 @DisplayName("Default incremental compilation with disabled precise java tracking and enabled K2")
 open class IncrementalK2JavaChangeDisablePreciseIT : IncrementalJavaChangeDisablePreciseIT() {
     override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK2()
@@ -408,6 +353,12 @@ class BasicIncrementalJavaInteropIT : KGPBaseTest() {
     @GradleTest
     fun testKotlinConstantTrackingJavaConstant(gradleVersion: GradleVersion) {
         project("kt-69042-basic-java-interop", gradleVersion) {
+            buildGradleKts.appendText(
+                """
+                // Hack: Read property to ensure Gradle 9.1.0+ invalidates CC when it changes
+                providers.gradleProperty("invalidateCC").orNull
+                """.trimIndent()
+            )
             build("assemble")
 
             val javaSource = projectPath.resolve("src/main/java/JavaConstants.java")
@@ -416,7 +367,7 @@ class BasicIncrementalJavaInteropIT : KGPBaseTest() {
             // KT-75850: we need to explicitly invalidate the CC here, as changing the logLevel doesn't trigger it
             build(
                 "assemble",
-                "-PinvalidateCC${generateIdentifier()}",
+                "-PinvalidateCC=${generateIdentifier()}", // Now this will actually trigger invalidation
                 buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG),
             ) {
                 assertTasksExecuted(":compileJava", ":compileKotlin")

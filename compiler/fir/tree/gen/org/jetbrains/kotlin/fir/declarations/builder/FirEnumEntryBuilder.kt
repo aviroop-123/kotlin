@@ -32,6 +32,7 @@ class FirEnumEntryBuilder : FirAnnotationContainerBuilder {
     lateinit var origin: FirDeclarationOrigin
     var attributes: FirDeclarationAttributes = FirDeclarationAttributes()
     lateinit var status: FirDeclarationStatus
+    var isLocal: Boolean by kotlin.properties.Delegates.notNull<Boolean>()
     lateinit var returnTypeRef: FirTypeRef
     var deprecationsProvider: DeprecationsProvider = UnresolvedDeprecationProvider
     lateinit var name: Name
@@ -47,6 +48,7 @@ class FirEnumEntryBuilder : FirAnnotationContainerBuilder {
             origin,
             attributes,
             status,
+            isLocal,
             returnTypeRef,
             deprecationsProvider,
             name,
@@ -64,24 +66,4 @@ inline fun buildEnumEntry(init: FirEnumEntryBuilder.() -> Unit): FirEnumEntry {
         callsInPlace(init, InvocationKind.EXACTLY_ONCE)
     }
     return FirEnumEntryBuilder().apply(init).build()
-}
-
-@OptIn(ExperimentalContracts::class)
-inline fun buildEnumEntryCopy(original: FirEnumEntry, init: FirEnumEntryBuilder.() -> Unit): FirEnumEntry {
-    contract {
-        callsInPlace(init, InvocationKind.EXACTLY_ONCE)
-    }
-    val copyBuilder = FirEnumEntryBuilder()
-    copyBuilder.source = original.source
-    copyBuilder.resolvePhase = original.resolvePhase
-    copyBuilder.moduleData = original.moduleData
-    copyBuilder.origin = original.origin
-    copyBuilder.attributes = original.attributes.copy()
-    copyBuilder.status = original.status
-    copyBuilder.returnTypeRef = original.returnTypeRef
-    copyBuilder.deprecationsProvider = original.deprecationsProvider
-    copyBuilder.name = original.name
-    copyBuilder.initializer = original.initializer
-    copyBuilder.annotations.addAll(original.annotations)
-    return copyBuilder.apply(init).build()
 }

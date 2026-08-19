@@ -1,6 +1,4 @@
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION -EXTENSION_SHADOWED_BY_MEMBER
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -39,8 +37,8 @@ class Case1() {
 
     fun case1() {
         val a = A()
-        a <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
-        A() <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
+        a <!NONE_APPLICABLE!>foo<!> 1
+        A() <!NONE_APPLICABLE!>foo<!> 1
     }
 }
 // FILE: TestCase2.kt
@@ -54,8 +52,8 @@ interface Case2 {
 
     fun case2() {
         val a = A()
-        a <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
-        A() <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
+        a <!NONE_APPLICABLE!>foo<!> 1
+        A() <!NONE_APPLICABLE!>foo<!> 1
     }
 }
 
@@ -71,8 +69,8 @@ fun case3() {
     fun A.foo(x: Int) ="my local scope contains"
 
     val a = A()
-    a <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
-    A() <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
+    a <!NONE_APPLICABLE!>foo<!> 1
+    A() <!NONE_APPLICABLE!>foo<!> 1
 }
 
 // FILE: TestCase4.kt
@@ -90,7 +88,7 @@ fun case4() {
     fun subfun() {
         fun A.foo(x: Int) = "my local contains"
         val a = A()
-        a <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
-        A() <!INFIX_MODIFIER_REQUIRED!>foo<!> 1
+        a <!NONE_APPLICABLE!>foo<!> 1
+        A() <!NONE_APPLICABLE!>foo<!> 1
     }
 }

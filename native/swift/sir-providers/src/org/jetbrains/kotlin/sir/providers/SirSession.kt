@@ -10,10 +10,16 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.scopes.KaScope
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.types.KaUsualClassType
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.sir.*
+import org.jetbrains.kotlin.sir.providers.impl.BridgeProvider.BidirectionalBridge
+import org.jetbrains.kotlin.sir.providers.impl.BridgeProvider.Bridge
 import org.jetbrains.kotlin.sir.providers.impl.BridgeProvider.BridgeFunctionProxy
+import org.jetbrains.kotlin.sir.providers.impl.SirTypeProviderImpl.TypeTranslationCtx
 import org.jetbrains.kotlin.sir.providers.impl.StandaloneSirTypeNamer
 
 
@@ -33,12 +39,14 @@ public interface SirSession :
     SirTypeProvider,
     SirVisibilityChecker,
     SirChildrenProvider,
-    SirBridgeProvider
+    SirBridgeProvider,
+    SirCustomTypeTranslator
 {
     public val sirSession: SirSession
         get() = this
 
     public val useSiteModule: KaModule
+    public val moduleToTranslate: KaModule
 
     public val enumGenerator: SirEnumGenerator
 
@@ -48,6 +56,7 @@ public interface SirSession :
     public val trampolineDeclarationsProvider: SirTrampolineDeclarationsProvider
     public val moduleProvider: SirModuleProvider
     public val typeProvider: SirTypeProvider
+    public val customTypeTranslator: SirCustomTypeTranslator
     public val visibilityChecker: SirVisibilityChecker
     public val childrenProvider: SirChildrenProvider
     public val bridgeProvider: SirBridgeProvider
@@ -79,6 +88,7 @@ public interface SirSession :
         reportErrorType: (String) -> Nothing,
         reportUnsupportedType: () -> Nothing,
         processTypeImports: (List<SirImport>) -> Unit,
+        requiresHashableAsAny: Boolean,
     ): SirType =
         with(typeProvider) {
             this@translateType.translateType(
@@ -86,7 +96,8 @@ public interface SirSession :
                 position,
                 reportErrorType,
                 reportUnsupportedType,
-                processTypeImports
+                processTypeImports,
+                requiresHashableAsAny,
             )
         }
 
@@ -101,32 +112,53 @@ public interface SirSession :
     override fun Sequence<KaDeclarationSymbol>.extractDeclarations(): Sequence<SirDeclaration> =
         with(childrenProvider) { this@extractDeclarations.extractDeclarations() }
 
+    override fun isFqNameSupported(fqName: FqName): Boolean =
+        with(customTypeTranslator) { isFqNameSupported(fqName) }
+
+    public fun isClassIdSupported(classId: ClassId): Boolean = isFqNameSupported(classId.asSingleFqName())
+
+    public fun isTypeSupported(type: KaType): Boolean = type is KaClassType && isClassIdSupported(type.classId)
+
+    context(kaSession: KaSession)
+    override fun KaUsualClassType.toSirTypeBridge(ctx: TypeTranslationCtx): SirCustomTypeTranslator.BridgeWrapper? =
+        with(customTypeTranslator) { toSirTypeBridge(ctx) }
+
+    override fun SirNominalType.toBridge(): SirCustomTypeTranslator.BridgeWrapper? =
+        with(customTypeTranslator) { toBridge() }
+
     override fun generateFunctionBridge(
         baseBridgeName: String,
         explicitParameters: List<SirParameter>,
         returnType: SirType,
-        kotlinFqName: List<String>,
+        kotlinFqName: FqName,
+        kotlinOptIns: List<ClassId>,
         selfParameter: SirParameter?,
+        contextParameters: List<SirParameter>,
         extensionReceiverParameter: SirParameter?,
-        errorParameter: SirParameter?
+        errorParameter: SirParameter?,
+        isAsync: Boolean,
     ): BridgeFunctionProxy? = with(bridgeProvider) {
         generateFunctionBridge(
             baseBridgeName,
             explicitParameters,
             returnType,
             kotlinFqName,
+            kotlinOptIns,
             selfParameter,
+            contextParameters,
             extensionReceiverParameter,
-            errorParameter
+            errorParameter,
+            isAsync,
         )
     }
 
     override fun generateTypeBridge(
-        kotlinFqName: List<String>,
+        kotlinFqName: FqName?,
+        kotlinOptIns: List<ClassId>,
         swiftFqName: String,
         swiftSymbolName: String,
     ): SirTypeBindingBridge? = with(bridgeProvider) {
-        generateTypeBridge(kotlinFqName, swiftFqName, swiftSymbolName)
+        generateTypeBridge(kotlinFqName, kotlinOptIns, swiftFqName, swiftSymbolName)
     }
 }
 
@@ -153,7 +185,7 @@ public sealed interface SirTranslationResult {
     public val primaryDeclaration: SirDeclaration?
 
     public sealed interface TypeDeclaration : SirTranslationResult {
-        public val declaration: SirNamedDeclaration
+        public val declaration: SirScopeDefiningDeclaration
         override val primaryDeclaration: SirDeclaration? get() = declaration
     }
 
@@ -168,6 +200,15 @@ public sealed interface SirTranslationResult {
 
     public data class TypeAlias(public override val declaration: SirTypealias) : TypeDeclaration {
         override val allDeclarations: List<SirDeclaration> = listOf(declaration)
+    }
+
+    public data class Enum(public override val declaration: SirEnum) : TypeDeclaration {
+        override val allDeclarations: List<SirDeclaration> = listOf(declaration)
+    }
+
+    public data class EnumCase(public val declaration: SirEnumCase) : SirTranslationResult {
+        override val allDeclarations: List<SirDeclaration> = listOf(declaration)
+        override val primaryDeclaration: SirDeclaration get() = declaration
     }
 
     public data class Constructor(public val declaration: SirInit) : SirTranslationResult {
@@ -212,6 +253,7 @@ public sealed interface SirTranslationResult {
         public val bridgedImplementation: SirExtension?,
         public val markerDeclaration: SirProtocol,
         public val existentialExtension: SirExtension,
+        public val auxExtension: SirExtension,
         public val samConverter: SirDeclaration?,
     ) : SirTranslationResult {
         override val primaryDeclaration: SirDeclaration get() = declaration
@@ -221,6 +263,7 @@ public sealed interface SirTranslationResult {
                 bridgedImplementation,
                 markerDeclaration,
                 existentialExtension,
+                auxExtension,
                 samConverter,
             )
     }
@@ -344,6 +387,7 @@ public interface SirTypeProvider {
         reportErrorType: (String) -> Nothing,
         reportUnsupportedType: () -> Nothing,
         processTypeImports: (List<SirImport>) -> Unit,
+        requiresHashableAsAny: Boolean = false,
     ): SirType
 }
 
@@ -355,6 +399,25 @@ public fun KaType.translateType(
     processTypeImports: (List<SirImport>) -> Unit,
 ): SirType = with(sir) { translateType(ka, position, reportErrorType, reportUnsupportedType, processTypeImports) }
 
+context(kaSession: KaSession, sir: SirSession)
+public fun KaUsualClassType.toSirTypeBridge(ctx: TypeTranslationCtx): SirCustomTypeTranslator.BridgeWrapper? =
+    with(sir) { toSirTypeBridge(ctx) }
+
+context(sir: SirSession)
+public fun SirNominalType.toBridge(): SirCustomTypeTranslator.BridgeWrapper? =
+    with(sir) { toBridge() }
+
+public interface SirCustomTypeTranslator {
+    public fun isFqNameSupported(fqName: FqName): Boolean
+
+    context(kaSession: KaSession)
+    public fun KaUsualClassType.toSirTypeBridge(ctx: TypeTranslationCtx): BridgeWrapper?
+
+    public fun SirNominalType.toBridge(): BridgeWrapper?
+
+    public class BridgeWrapper internal constructor(internal val bridge: BidirectionalBridge)
+}
+
 /**
  * Generates a list of [SirBridge] for given [SirDeclaration].
  */
@@ -363,14 +426,18 @@ public interface SirBridgeProvider {
         baseBridgeName: String,
         explicitParameters: List<SirParameter>,
         returnType: SirType,
-        kotlinFqName: List<String>,
+        kotlinFqName: FqName,
+        kotlinOptIns: List<ClassId>,
         selfParameter: SirParameter?,
+        contextParameters: List<SirParameter>,
         extensionReceiverParameter: SirParameter?,
-        errorParameter: SirParameter?
+        errorParameter: SirParameter?,
+        isAsync: Boolean,
     ): BridgeFunctionProxy?
 
     public fun generateTypeBridge(
-        kotlinFqName: List<String>,
+        kotlinFqName: FqName?,
+        kotlinOptIns: List<ClassId>,
         swiftFqName: String,
         swiftSymbolName: String,
     ): SirTypeBindingBridge?
@@ -381,25 +448,31 @@ public fun generateFunctionBridge(
     baseBridgeName: String,
     explicitParameters: List<SirParameter>,
     returnType: SirType,
-    kotlinFqName: List<String>,
+    kotlinFqName: FqName,
+    kotlinOptIns: List<ClassId>,
     selfParameter: SirParameter?,
+    contextParameters: List<SirParameter>,
     extensionReceiverParameter: SirParameter?,
-    errorParameter: SirParameter?
+    errorParameter: SirParameter?,
+    isAsync: Boolean,
 ): BridgeFunctionProxy? = with(sir) {
     generateFunctionBridge(
         baseBridgeName,
         explicitParameters,
         returnType,
         kotlinFqName,
+        kotlinOptIns,
         selfParameter,
+        contextParameters,
         extensionReceiverParameter,
-        errorParameter
+        errorParameter,
+        isAsync,
     )
 }
 
 context(sir: SirSession)
 public fun generateTypeBridge(
-    kotlinFqName: List<String>,
+    kotlinFqName: FqName?,
     swiftFqName: String,
     swiftSymbolName: String,
 ): SirTypeBindingBridge? = with(sir) { generateTypeBridge(kotlinFqName, swiftFqName, swiftSymbolName) }
@@ -414,6 +487,7 @@ public interface SirTypeNamer {
 
     public fun swiftFqName(type: SirType): String
     public fun kotlinFqName(sirType: SirType, nameType: KotlinNameType): String
+    public fun kotlinPrimitiveFqNameIfAny(sirType: SirType): String?
 }
 
 public fun SirTypeNamer(): SirTypeNamer = StandaloneSirTypeNamer

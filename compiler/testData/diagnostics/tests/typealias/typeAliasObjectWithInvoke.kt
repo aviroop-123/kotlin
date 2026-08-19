@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// NI_EXPECTED_FILE
 
 object ObjectWithInvoke {
     operator fun invoke() = this

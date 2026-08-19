@@ -5,8 +5,11 @@
 
 package org.jetbrains.kotlin.psi2ir.descriptors
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImplWithShape
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImplWithShape
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
@@ -25,6 +28,7 @@ import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 
 @ObsoleteDescriptorBasedAPI
+@K1Deprecation
 fun IrCallImpl.Companion.fromSymbolDescriptor(
     startOffset: Int,
     endOffset: Int,
@@ -47,6 +51,34 @@ fun IrCallImpl.Companion.fromSymbolDescriptor(
 }
 
 @ObsoleteDescriptorBasedAPI
+@K1Deprecation
+fun IrAnnotationImpl.Companion.fromSymbolDescriptor(
+    startOffset: Int,
+    endOffset: Int,
+    type: IrType,
+    constructorSymbol: IrConstructorSymbol,
+    origin: IrStatementOrigin? = null,
+): IrAnnotationImpl {
+    val constructorDescriptor = constructorSymbol.descriptor
+    val classTypeParametersCount = constructorDescriptor.constructedClass.original.declaredTypeParameters.size
+    val totalTypeParametersCount = constructorDescriptor.typeParameters.size
+    val valueParametersCount = constructorDescriptor.valueParameters.size + constructorDescriptor.contextReceiverParameters.size
+    return IrAnnotationImplWithShape(
+        startOffset, endOffset,
+        type,
+        constructorSymbol,
+        typeArgumentsCount = totalTypeParametersCount,
+        constructorTypeArgumentsCount = totalTypeParametersCount - classTypeParametersCount,
+        valueArgumentsCount = valueParametersCount,
+        contextParameterCount = constructorDescriptor.contextReceiverParameters.size,
+        hasDispatchReceiver = constructorDescriptor.dispatchReceiverParameter != null,
+        hasExtensionReceiver = constructorDescriptor.extensionReceiverParameter != null,
+        origin = origin,
+    )
+}
+
+@ObsoleteDescriptorBasedAPI
+@K1Deprecation
 fun IrConstructorCallImpl.Companion.fromSymbolDescriptor(
     startOffset: Int,
     endOffset: Int,
@@ -73,6 +105,7 @@ fun IrConstructorCallImpl.Companion.fromSymbolDescriptor(
 }
 
 @ObsoleteDescriptorBasedAPI
+@K1Deprecation
 fun IrEnumConstructorCallImpl.Companion.fromSymbolDescriptor(
     startOffset: Int,
     endOffset: Int,
@@ -92,6 +125,7 @@ fun IrEnumConstructorCallImpl.Companion.fromSymbolDescriptor(
 }
 
 @ObsoleteDescriptorBasedAPI
+@K1Deprecation
 fun IrDelegatingConstructorCallImpl.Companion.fromSymbolDescriptor(
     startOffset: Int,
     endOffset: Int,
@@ -110,6 +144,7 @@ fun IrDelegatingConstructorCallImpl.Companion.fromSymbolDescriptor(
 }
 
 @ObsoleteDescriptorBasedAPI
+@K1Deprecation
 fun IrFunctionReferenceImpl.Companion.fromSymbolDescriptor(
     startOffset: Int,
     endOffset: Int,

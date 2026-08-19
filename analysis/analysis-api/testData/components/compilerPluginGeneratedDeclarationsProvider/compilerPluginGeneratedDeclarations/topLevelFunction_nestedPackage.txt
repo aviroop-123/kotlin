@@ -11,6 +11,7 @@ callables: 1
     hasStableParameterNames: true
     isActual: false
     isBuiltinFunctionInvoke: false
+    isCompanion: false
     isExpect: false
     isExtension: false
     isExternal: false
@@ -38,11 +39,15 @@ callables: 1
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true

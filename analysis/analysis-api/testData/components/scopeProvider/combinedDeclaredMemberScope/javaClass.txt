@@ -4,8 +4,11 @@ KaJavaFieldSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: true
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isStatic: true
   isVal: false
   location: CLASS
@@ -22,6 +25,7 @@ KaJavaFieldSymbol:
   getContainingJvmClassName: JavaClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: JavaClass.foo
 
 KaJavaFieldSymbol:
   annotations: []
@@ -29,8 +33,11 @@ KaJavaFieldSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isStatic: false
   isVal: false
   location: CLASS
@@ -51,6 +58,7 @@ KaJavaFieldSymbol:
   getContainingJvmClassName: JavaClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -62,6 +70,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: false
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: true
   isExpect: false
   isExtension: false
   isExternal: false
@@ -88,6 +97,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: JavaClass.bar
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -99,6 +110,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: false
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -130,6 +142,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -161,6 +175,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: JavaClass.NestedClass
 
 KaNamedClassSymbol:
   annotations: []
@@ -192,6 +207,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: JavaClass.InnerClass
 
 KaConstructorSymbol:
   annotations: []
@@ -201,8 +217,10 @@ KaConstructorSymbol:
   contextReceivers: []
   hasStableParameterNames: false
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isPrimary: true
   location: CLASS
   modality: FINAL
@@ -219,3 +237,4 @@ KaConstructorSymbol:
   getContainingJvmClassName: JavaClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: JavaClass

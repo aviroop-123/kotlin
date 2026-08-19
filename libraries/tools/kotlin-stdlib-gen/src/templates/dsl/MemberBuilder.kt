@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -144,7 +144,6 @@ class MemberBuilder(
     fun sample(vararg sampleRef: String) {
         samples = sampleRef.asList()
     }
-
     fun body(valueBuilder: () -> String) {
         body = valueBuilder()
     }
@@ -318,7 +317,7 @@ class MemberBuilder(
             }
             if (throwsExceptions.any()) {
                 builder.append(" * \n")
-                throwsExceptions.forEach { (type, reason) -> builder.append(" * @throws $type $reason\n") }
+                throwsExceptions.forEach { (val exceptionType, val reason) -> builder.append(" * @throws $exceptionType $reason\n") }
             }
             if (samples.any()) {
                 builder.append(" * \n")

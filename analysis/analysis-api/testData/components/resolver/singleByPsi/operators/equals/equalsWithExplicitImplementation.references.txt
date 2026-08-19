@@ -1,3 +1,0 @@
-KtOperationReferenceExpression(119,121): '=='
-  KtSimpleNameReference:
-    (in MyClass) override operator fun equals(other: kotlin.Any?): kotlin.Boolean

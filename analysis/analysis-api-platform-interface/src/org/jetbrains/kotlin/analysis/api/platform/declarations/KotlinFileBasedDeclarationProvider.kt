@@ -1,25 +1,25 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.api.platform.declarations
 
+import org.jetbrains.kotlin.analysis.api.KaPlatformInterface
 import org.jetbrains.kotlin.fileClasses.javaFileFacadeFqName
-import org.jetbrains.kotlin.name.CallableId
-import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.*
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.utils.addIfNotNull
 import org.jetbrains.kotlin.utils.yieldIfNotNull
 
+@KaPlatformInterface
 public class KotlinFileBasedDeclarationProvider(public val kotlinFile: KtFile) : KotlinDeclarationProvider {
     private val topLevelDeclarations: Sequence<KtDeclaration>
         get() {
             return sequence {
                 for (child in kotlinFile.declarations) {
-                    if (child is KtScript) {
+                    @OptIn(KtExperimentalApi::class)
+                    if (child is KtScript && !child.isReplSnippet) {
                         yieldAll(child.declarations)
                     } else {
                         yield(child)
@@ -29,14 +29,15 @@ public class KotlinFileBasedDeclarationProvider(public val kotlinFile: KtFile) :
         }
 
     override fun getClassLikeDeclarationByClassId(classId: ClassId): KtClassLikeDeclaration? {
-        return getClassLikeDeclarationsByClassId(classId).firstOrNull()
+        return getDeclarationsByClassId(classId).filterIsInstance<KtClassLikeDeclaration>().firstOrNull()
     }
 
     override fun getAllClassesByClassId(classId: ClassId): Collection<KtClassOrObject> {
-        return getClassLikeDeclarationsByClassId(classId).filterIsInstance<KtClassOrObject>().toList()
+        return getDeclarationsByClassId(classId).filterIsInstance<KtClassOrObject>().toList()
     }
 
-    private fun getClassLikeDeclarationsByClassId(classId: ClassId): Sequence<KtClassLikeDeclaration> {
+    private fun getDeclarationsByClassId(classId: ClassId): Sequence<KtNamedDeclaration> {
+        @OptIn(ClassIdBasedLocality::class)
         if (classId.isLocal) {
             return emptySequence()
         }
@@ -66,7 +67,7 @@ public class KotlinFileBasedDeclarationProvider(public val kotlinFile: KtFile) :
                 }
 
                 if (chunks.size == 1) {
-                    yieldIfNotNull(element as? KtClassLikeDeclaration)
+                    yieldIfNotNull(element)
                     continue
                 }
 
@@ -81,11 +82,11 @@ public class KotlinFileBasedDeclarationProvider(public val kotlinFile: KtFile) :
     }
 
     override fun getAllTypeAliasesByClassId(classId: ClassId): Collection<KtTypeAlias> {
-        return getClassLikeDeclarationsByClassId(classId).filterIsInstance<KtTypeAlias>().toList()
+        return getDeclarationsByClassId(classId).filterIsInstance<KtTypeAlias>().toList()
     }
 
     override fun getTopLevelKotlinClassLikeDeclarationNamesInPackage(packageFqName: FqName): Set<Name> {
-        return getTopLevelDeclarationNames<KtClassLikeDeclaration>(packageFqName)
+        return getTopLevelDeclarationNames(packageFqName) { it is KtClassLikeDeclaration || it is KtScript }
     }
 
     override fun getTopLevelProperties(callableId: CallableId): Collection<KtProperty> {
@@ -104,7 +105,7 @@ public class KotlinFileBasedDeclarationProvider(public val kotlinFile: KtFile) :
     }
 
     override fun getTopLevelCallableNamesInPackage(packageFqName: FqName): Set<Name> {
-        return getTopLevelDeclarationNames<KtCallableDeclaration>(packageFqName)
+        return getTopLevelDeclarationNames(packageFqName) { it is KtCallableDeclaration }
     }
 
     override fun findFilesForFacadeByPackage(packageFqName: FqName): Collection<KtFile> {
@@ -156,14 +157,14 @@ public class KotlinFileBasedDeclarationProvider(public val kotlinFile: KtFile) :
         }
     }
 
-    private inline fun <reified T : KtNamedDeclaration> getTopLevelDeclarationNames(packageFqName: FqName): Set<Name> {
+    private inline fun getTopLevelDeclarationNames(packageFqName: FqName, filter: (KtNamedDeclaration) -> Boolean): Set<Name> {
         if (kotlinFile.packageFqName != packageFqName) {
             return emptySet()
         }
 
         return buildSet {
             for (declaration in topLevelDeclarations) {
-                if (declaration is T) {
+                if (declaration is KtNamedDeclaration && filter(declaration)) {
                     addIfNotNull(declaration.nameAsName)
                 }
             }

@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.library.metadata
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.serialization.deserialization.DeserializationConfigu
 import org.jetbrains.kotlin.serialization.deserialization.FlexibleTypeDeserializer
 import org.jetbrains.kotlin.storage.StorageManager
 
+@K1Deprecation
 interface KlibMetadataModuleDescriptorFactory {
 
     val descriptorFactory: KlibModuleDescriptorFactory
@@ -27,13 +29,11 @@ interface KlibMetadataModuleDescriptorFactory {
         languageVersionSettings: LanguageVersionSettings,
         storageManager: StorageManager,
         builtIns: KotlinBuiltIns,
-        packageAccessHandler: PackageAccessHandler?
     ) = createDescriptorOptionalBuiltIns(
         library,
         languageVersionSettings,
         storageManager,
         builtIns,
-        packageAccessHandler,
         LookupTracker.DO_NOTHING
     )
 
@@ -41,11 +41,15 @@ interface KlibMetadataModuleDescriptorFactory {
         library: KotlinLibrary,
         languageVersionSettings: LanguageVersionSettings,
         storageManager: StorageManager,
-        packageAccessHandler: PackageAccessHandler?
     ) = createDescriptorOptionalBuiltIns(
-        library, languageVersionSettings, storageManager, null, packageAccessHandler, LookupTracker.DO_NOTHING
+        library, languageVersionSettings, storageManager, null, LookupTracker.DO_NOTHING
     )
 
+    @Deprecated(
+        "Preserved for binary compatibility with existing versions of the kotlinx-benchmarks Gradle plugin. See KT-82882.",
+        level = DeprecationLevel.HIDDEN
+    )
+    @Suppress("DEPRECATION_ERROR")
     fun createDescriptorOptionalBuiltIns(
         library: KotlinLibrary,
         languageVersionSettings: LanguageVersionSettings,
@@ -53,12 +57,19 @@ interface KlibMetadataModuleDescriptorFactory {
         builtIns: KotlinBuiltIns?,
         packageAccessHandler: PackageAccessHandler?,
         lookupTracker: LookupTracker
+    ): ModuleDescriptorImpl = createDescriptorOptionalBuiltIns(library, languageVersionSettings, storageManager, builtIns, lookupTracker)
+
+    fun createDescriptorOptionalBuiltIns(
+        library: KotlinLibrary,
+        languageVersionSettings: LanguageVersionSettings,
+        storageManager: StorageManager,
+        builtIns: KotlinBuiltIns?,
+        lookupTracker: LookupTracker
     ): ModuleDescriptorImpl
 
     fun createPackageFragmentProvider(
         library: KotlinLibrary,
-        packageAccessHandler: PackageAccessHandler?,
-        packageFragmentNames: List<String>,
+        customMetadataProtoLoader: CustomMetadataProtoLoader?,
         storageManager: StorageManager,
         moduleDescriptor: ModuleDescriptor,
         configuration: DeserializationConfiguration,

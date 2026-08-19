@@ -1,4 +1,3 @@
-// FIR_DIFFERENCE
 package test
 
 class ClassA {

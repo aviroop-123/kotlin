@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -39,6 +40,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaEnumEntrySymbol:
   annotations: []
@@ -47,8 +50,11 @@ KaEnumEntrySymbol:
   contextReceivers: []
   enumEntryInitializer: KaAnonymousObjectSymbol(<local>/<no name provided>)
   isActual: false
+  isCompanion: true
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: CLASS
   modality: FINAL
@@ -64,6 +70,7 @@ KaEnumEntrySymbol:
   getContainingJvmClassName: MyEnumClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: MyEnumClass.FirstEntry
 
 KaEnumEntrySymbol:
   annotations: []
@@ -72,8 +79,11 @@ KaEnumEntrySymbol:
   contextReceivers: []
   enumEntryInitializer: null
   isActual: false
+  isCompanion: true
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: CLASS
   modality: FINAL
@@ -89,6 +99,7 @@ KaEnumEntrySymbol:
   getContainingJvmClassName: MyEnumClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: MyEnumClass.SecondEntry
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -100,6 +111,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -131,6 +143,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -142,6 +156,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -169,11 +184,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -192,6 +211,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: null
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getDispatchReceiver(): KaUsualClassType:
@@ -203,6 +223,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaEnumEntrySymbol:
   annotations: []
@@ -211,8 +233,11 @@ KaEnumEntrySymbol:
   contextReceivers: []
   enumEntryInitializer: KaAnonymousObjectSymbol(<local>/<no name provided>)
   isActual: false
+  isCompanion: true
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: CLASS
   modality: FINAL
@@ -228,6 +253,7 @@ KaEnumEntrySymbol:
   getContainingJvmClassName: MyEnumClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: MyEnumClass.ThirdEntry
 
 KaNamedClassSymbol:
   annotations: []
@@ -264,3 +290,4 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: MyEnumClass

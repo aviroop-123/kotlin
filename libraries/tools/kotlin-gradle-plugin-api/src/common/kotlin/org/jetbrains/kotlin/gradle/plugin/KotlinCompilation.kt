@@ -17,7 +17,6 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.InternalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.KOTLIN_OPTIONS_DEPRECATION_MESSAGE
 import org.jetbrains.kotlin.gradle.dsl.*
-import org.jetbrains.kotlin.gradle.dsl.KotlinGradlePluginDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation.Companion.MAIN_COMPILATION_NAME
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import org.jetbrains.kotlin.tooling.core.HasMutableExtras
@@ -125,6 +124,7 @@ interface KotlinCompilation<UNUSED : KotlinAnyOptionsDeprecated> : Named,
     /**
      * @suppress
      */
+    // This API is used in IDEA to create run tasks, should be fixed via KTIJ-38347
     @Deprecated(
         "Use defaultSourceSet.name instead. Scheduled for removal in Kotlin 2.3",
         ReplaceWith("defaultSourceSet.name"),
@@ -202,28 +202,6 @@ interface KotlinCompilation<UNUSED : KotlinAnyOptionsDeprecated> : Named,
     )
     @Suppress("DEPRECATION_ERROR")
     val compilerOptions: HasCompilerOptions<*>
-
-    /**
-     * @suppress
-     */
-    @Suppress("DEPRECATION", "TYPEALIAS_EXPANSION_DEPRECATION_ERROR")
-    @Deprecated(
-        message = "Accessing task instance directly is deprecated. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compileTaskProvider"),
-        level = DeprecationLevel.ERROR,
-    )
-    val compileKotlinTask: KotlinCompileDeprecated<KotlinCommonOptionsDeprecated>
-
-    /**
-     * @suppress
-     */
-    @Suppress("DEPRECATION", "TYPEALIAS_EXPANSION_DEPRECATION_ERROR")
-    @Deprecated(
-        message = "Replaced with compileTaskProvider. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compileTaskProvider"),
-        level = DeprecationLevel.ERROR,
-    )
-    val compileKotlinTaskProvider: TaskProvider<out KotlinCompileDeprecated<KotlinCommonOptionsDeprecated>>
 
     /**
      * @suppress
@@ -307,6 +285,15 @@ interface KotlinCompilation<UNUSED : KotlinAnyOptionsDeprecated> : Named,
     fun associateWith(other: KotlinCompilation<*>)
 
     /**
+     * @suppress
+     */
+    @Deprecated(
+        "Used in IDEA Import",
+        level = DeprecationLevel.HIDDEN
+    )
+    val associateWith: List<KotlinCompilation<*>> get() = associatedCompilations.toList()
+
+    /**
      * A list of all compilations that were previously associated with this compilation using [associateWith].
      *
      * For exmaple, 'test' compilations return 'setOf(main)' by default.
@@ -338,6 +325,48 @@ interface KotlinCompilation<UNUSED : KotlinAnyOptionsDeprecated> : Named,
      */
     val disambiguatedName
         get() = target.disambiguationClassifier + name.replaceFirstChar { it.titlecase(getDefault()) }
+
+    @Deprecated(
+        "Declaring dependencies on Compilation level is deprecated, please declare on related source set",
+        ReplaceWith("defaultSourceSet.dependencies"),
+        level = DeprecationLevel.WARNING
+    )
+    override fun dependencies(configure: KotlinDependencyHandler.() -> Unit)
+
+    @Deprecated(
+        "Declaring dependencies on Compilation level is deprecated, please declare on related source set",
+        ReplaceWith("defaultSourceSet.dependencies"),
+        level = DeprecationLevel.WARNING
+    )
+    override fun dependencies(configure: Action<KotlinDependencyHandler>)
+
+    @Deprecated(
+        "Accessing apiConfigurationName on Compilation level is deprecated, please use default source set instead",
+        ReplaceWith("defaultSourceSet.apiConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
+    override val apiConfigurationName: String
+
+    @Deprecated(
+        "Accessing implementationConfigurationName on Compilation level is deprecated, please use default source set instead",
+        ReplaceWith("defaultSourceSet.implementationConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
+    override val implementationConfigurationName: String
+
+    @Deprecated(
+        "Accessing compileOnlyConfigurationName on Compilation level is deprecated, please use default source set instead",
+        ReplaceWith("defaultSourceSet.compileOnlyConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
+    override val compileOnlyConfigurationName: String
+
+    @Deprecated(
+        "Accessing runtimeOnlyConfigurationName on Compilation level is deprecated, please use default source set instead",
+        ReplaceWith("defaultSourceSet.runtimeOnlyConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
+    override val runtimeOnlyConfigurationName: String
 }
 
 /**

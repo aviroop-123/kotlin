@@ -1,7 +1,9 @@
 // WITH_STDLIB
 // WITH_COROUTINES
-// IGNORE_BACKEND_K1: ANY
 // LANGUAGE: +ContextParameters
+// NO_CHECK_LAMBDA_INLINING
+
+// FILE: lib.kt
 import helpers.*
 import kotlin.coroutines.*
 
@@ -22,6 +24,7 @@ val c: context(String)() -> Unit = { test3 = implicit<String>() }
 
 suspend inline fun invokeSuspend(fn: suspend context(String)() -> Unit) { fn("OK") }
 
+// FILE: main.kt
 fun box(): String {
     runSuspend {
         invokeSuspend(::a.get())

@@ -1,11 +1,13 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.light.classes.symbol.base
 
 import com.intellij.openapi.project.Project
+import org.jetbrains.kotlin.analysis.test.data.manager.TestVariantChain
+import org.jetbrains.kotlin.analysis.test.data.manager.withAdditionalVariant
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
 import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfigurator
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
@@ -19,9 +21,11 @@ import java.nio.file.Path
 
 abstract class AbstractSymbolLightClassesNestedClassesConsistencyTestBase(
     configurator: AnalysisApiTestConfigurator,
-    override val currentExtension: String,
     override val isTestAgainstCompiledCode: Boolean,
 ) : AbstractSymbolLightClassesTestBase(configurator) {
+    override val variantChain: TestVariantChain
+        get() = super.variantChain.withAdditionalVariant("consistency")
+
     override fun doLightClassTest(ktFiles: List<KtFile>, module: KtTestModule, testServices: TestServices) {
         val assertions = testServices.assertions
         for (file in ktFiles) {

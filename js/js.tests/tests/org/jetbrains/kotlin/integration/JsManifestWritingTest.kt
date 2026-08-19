@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.cliArgument
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.js.K2JSCompiler
+import org.jetbrains.kotlin.codegen.forTestCompile.TestCompilePaths.KOTLIN_JS_STDLIB_KLIB_PATH
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.forcesPreReleaseBinariesIfEnabled
@@ -19,22 +20,24 @@ import org.jetbrains.kotlin.library.KLIB_PROPERTY_MANUALLY_ENABLED_POISONING_LAN
 import org.jetbrains.kotlin.test.CompilerTestUtil
 import org.jetbrains.kotlin.test.TestCaseWithTmpdir
 import org.jetbrains.kotlin.test.services.JUnit5Assertions
+import org.jetbrains.kotlin.testFederation.SmokeTest
 import java.io.File
 import java.util.*
 import kotlin.test.assertContains
 
 private val foo = TestKtFile("foo.kt", "fun foo() = 42")
 
+@SmokeTest
 class JsManifestWritingTest : TestCaseWithTmpdir() {
     private val jsStdlib: String?
-        get() = System.getProperty("kotlin.js.full.stdlib.path")
+        get() = System.getProperty(KOTLIN_JS_STDLIB_KLIB_PATH)
     private val outKlibDir: String
         get() = tmpdir.resolve("out").absolutePath
 
     fun testEnableAndDisableLanguageFeatures() {
         jsStdlib?.let { lib ->
             val poisoningFeature =
-                LanguageFeature.entries.first { it.forcesPreReleaseBinariesIfEnabled() }
+                LanguageFeature.entries.first { it.forcesPreReleaseBinariesIfEnabled(LanguageVersion.LATEST_STABLE) }
             val enabledLanguageFeature = LanguageFeature.entries.first { it.sinceVersion == LanguageVersion.FIRST_SUPPORTED }
 
             runCompiler(
@@ -74,7 +77,7 @@ class JsManifestWritingTest : TestCaseWithTmpdir() {
             K2JSCompilerArguments::outputDir.cliArgument(outputFile.path),
             K2JSCompilerArguments::moduleName.cliArgument(outputFile.nameWithoutExtension),
             K2JSCompilerArguments::languageVersion.cliArgument(LanguageVersion.LATEST_STABLE.versionString),
-            K2JSCompilerArguments::irProduceKlibDir.cliArgument,
+            K2JSCompilerArguments::nopack.cliArgument,
         )
         CompilerTestUtil.executeCompilerAssertSuccessful(compiler, args + extras, messageRenderer)
     }
@@ -87,7 +90,7 @@ class JsManifestWritingTest : TestCaseWithTmpdir() {
             expectedNegativeValue: String?,
         ) {
             val propertyValues = properties.propertyList(propertyName)
-            val (positiveValues, negativeValues) = propertyValues.partition { it.startsWith("+") }
+            val [positiveValues, negativeValues] = propertyValues.partition { it.startsWith("+") }
             // The assert checks for conclusion rather than equality due to the presence of an extra feature in testing environment:
             // JsAllowValueClassesInExternals
             assertContains(

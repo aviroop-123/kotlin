@@ -162,7 +162,7 @@ extern "C" {
 struct MemoryState;
 
 MemoryState* InitMemory();
-void DeinitMemory(MemoryState*, bool destroyRuntime);
+void DeinitMemory(MemoryState*);
 void ClearMemoryForTests(MemoryState*);
 
 //
@@ -182,10 +182,7 @@ OBJ_GETTER(AllocInstance, const TypeInfo* type_info) RUNTIME_NOTHROW;
 OBJ_GETTER(AllocArrayInstance, const TypeInfo* type_info, int32_t elements);
 
 
-// `initialValue` may be `nullptr`, which signifies that the appropriate initial value was already
-// set by static initialization.
-// TODO: When global initialization becomes lazy, this signature won't do.
-void InitAndRegisterGlobal(ObjHeader** location, const ObjHeader* initialValue) RUNTIME_NOTHROW;
+void RegisterGlobal(ObjHeader** location) RUNTIME_NOTHROW;
 
 //
 // Object reference management.
@@ -320,7 +317,7 @@ public:
     ObjHeader* GetExceptionObject() noexcept;
 
     // Exceptions are not on a hot path, so having virtual dispatch is fine.
-    virtual ~ExceptionObjHolder() = default;
+    virtual ~ExceptionObjHolder();
 };
 
 namespace kotlin {
@@ -456,9 +453,6 @@ private:
 };
 
 void initGlobalMemory() noexcept;
-
-void StartFinalizerThreadIfNeeded() noexcept;
-bool FinalizersThreadIsRunning() noexcept;
 
 void OnMemoryAllocation(size_t totalAllocatedBytes) noexcept;
 

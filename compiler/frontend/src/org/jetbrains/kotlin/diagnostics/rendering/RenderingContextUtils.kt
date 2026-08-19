@@ -5,8 +5,10 @@
 
 package org.jetbrains.kotlin.diagnostics.rendering
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.diagnostics.*
 
+@K1Deprecation
 fun RenderingContext.Companion.parameters(d: Diagnostic): List<Any> = when (d) {
     is SimpleDiagnostic<*> -> listOf()
     is DiagnosticWithParameters1<*, *> -> listOf(d.a)
@@ -17,4 +19,6 @@ fun RenderingContext.Companion.parameters(d: Diagnostic): List<Any> = when (d) {
     else -> listOf()
 }
 
+@OptIn(LegacyRenderingContextApi::class)
+@K1Deprecation
 fun RenderingContext.Companion.fromDiagnostic(d: Diagnostic): RenderingContext = RenderingContext.Impl(parameters(d))

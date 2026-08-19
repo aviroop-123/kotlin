@@ -1,13 +1,13 @@
-import org.jetbrains.kotlin.gradle.dsl.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
     kotlin("multiplatform")
     id("nodejs-cache-redirector-configuration")
+    id("nodejs-configuration")
 }
 
 kotlin {
-    js(IR) {
+    js {
         nodejs()
     }
 }
@@ -204,9 +204,10 @@ kotlin {
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {
     compilerOptions {
-        compilerOptions.languageVersion = KotlinVersion.KOTLIN_2_3
-        compilerOptions.apiVersion = KotlinVersion.KOTLIN_2_3
-        compilerOptions.freeCompilerArgs.addAll(
+        // Use this to override language and API versions for stdlib compared to the version used to build the whole Kotlin
+        // languageVersion = KotlinVersion.KOTLIN_...
+        // apiVersion = KotlinVersion.KOTLIN_...
+        freeCompilerArgs.addAll(
             listOf(
                 "-Xallow-kotlin-package",
                 "-Xexpect-actual-classes",
@@ -215,9 +216,7 @@ tasks.withType<KotlinCompilationTask<*>>().configureEach {
                 "-opt-in=kotlin.ExperimentalMultiplatform",
                 "-opt-in=kotlin.contracts.ExperimentalContracts",
                 "-Xcontext-parameters",
-                // See allowReturnValueCheckerButNotReport() in libraries/stdlib/build.gradle.kts:
-                "-Xreturn-value-checker=check",
-                "-Xwarning-level=RETURN_VALUE_NOT_USED:disabled",
+                "-Xreturn-value-checker=full",
             )
         )
     }
@@ -229,6 +228,14 @@ tasks {
     }
 
     named<KotlinCompilationTask<*>>("compileKotlinJs") {
-        compilerOptions.freeCompilerArgs.add("-Xir-module-name=kotlin")
+        compilerOptions {
+            freeCompilerArgs.addAll(
+                "-Xir-module-name=kotlin",
+                // Use the same name as the full stdlib. This is so that in per-module box tests, the JS module corresponding
+                // to the standard library would have a predicatable name, no matter which flavor of stdlib the test is compiled against.
+                // In some test logic, there are certain assumptions about that name. For example, see `JsWrongModuleHandler`.
+                "-Xir-per-module-output-name=kotlin-kotlin-stdlib"
+            )
+        }
     }
 }

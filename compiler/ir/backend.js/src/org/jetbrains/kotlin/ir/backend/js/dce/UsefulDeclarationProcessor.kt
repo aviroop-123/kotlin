@@ -151,7 +151,7 @@ abstract class UsefulDeclarationProcessor(
         }
 
         irClass.annotations.forEach {
-            val annotationClass = it.symbol.owner.constructedClass
+            val annotationClass = it.classSymbol.owner
             if (annotationClass.isAssociatedObjectAnnotatedAnnotation) {
                 classesWithObjectAssociations += irClass
                 annotationClass.enqueue(irClass, "@AssociatedObject annotated annotation class")
@@ -170,6 +170,9 @@ abstract class UsefulDeclarationProcessor(
             irFunction.overriddenSymbols.forEach {
                 it.owner.enqueue(irFunction, "overridden by a useful fake override", isContagious = false)
             }
+        }
+        if (irFunction.isEffectivelyExternal()) {
+            irFunction.correspondingPropertySymbol?.owner?.enqueue(irFunction, "(accessor) for external property")
         }
     }
 
@@ -248,6 +251,8 @@ abstract class UsefulDeclarationProcessor(
                     is IrConstructor -> processConstructor(declaration)
                     is IrField -> processField(declaration)
                 }
+
+                if (declaration.isEffectivelyExternal()) continue
 
                 val body = when (declaration) {
                     is IrFunction -> declaration.body

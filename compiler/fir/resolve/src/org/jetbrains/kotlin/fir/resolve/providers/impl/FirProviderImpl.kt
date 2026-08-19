@@ -41,7 +41,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
     }
 
     override fun getFirScriptByFilePath(path: String): FirScriptSymbol? {
-        return state.scriptByFilePathMap[path]
+        return state.scriptByFilePathMap[toSystemIndependentScriptPath(path)]
     }
 
     override fun getFirReplSnippetContainerFile(symbol: FirReplSnippetSymbol): FirFile? {
@@ -120,7 +120,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
     private class FirRecorderData(
         val state: State,
         val file: FirFile,
-        val nameConflictsTracker: FirNameConflictsTracker?
+        val nameConflictsTracker: FirNameConflictsTracker?,
     )
 
     private object FirRecorder : FirDefaultVisitor<Unit, FirRecorderData>() {
@@ -161,7 +161,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
 
         override fun visitPropertyAccessor(
             propertyAccessor: FirPropertyAccessor,
-            data: FirRecorderData
+            data: FirRecorderData,
         ) {
             val symbol = propertyAccessor.symbol
             data.state.callableContainerMap[symbol] = data.file
@@ -170,7 +170,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
         private inline fun <reified D : FirCallableDeclaration, S : FirCallableSymbol<D>> registerCallable(
             symbol: S,
             data: FirRecorderData,
-            map: MutableMap<CallableId, List<S>>
+            map: MutableMap<CallableId, List<S>>,
         ) {
             // TODO: KT-78984: we shouldn't call this function for symbols with callableId == null
             val callableId = symbol.callableId
@@ -184,8 +184,8 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
             registerCallable(symbol, data, data.state.constructorMap)
         }
 
-        override fun visitSimpleFunction(simpleFunction: FirSimpleFunction, data: FirRecorderData) {
-            val symbol = simpleFunction.symbol
+        override fun visitNamedFunction(namedFunction: FirNamedFunction, data: FirRecorderData) {
+            val symbol = namedFunction.symbol
             registerCallable(symbol, data, data.state.functionMap)
         }
 
@@ -204,7 +204,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
         override fun visitScript(script: FirScript, data: FirRecorderData) {
             val symbol = script.symbol
             data.state.scriptContainerMap[symbol] = data.file
-            data.file.sourceFile?.path?.let { data.state.scriptByFilePathMap[it] = symbol }
+            data.file.sourceFile?.path?.let { data.state.scriptByFilePathMap[toSystemIndependentScriptPath(it)] = symbol }
             script.acceptChildren(this, data)
         }
 
@@ -213,7 +213,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
             data: FirRecorderData,
         ) {
             data.state.snippetContainerMap[replSnippet.symbol] = data.file
-            replSnippet.body.acceptChildren(this, data)
+            visitRegularClass(replSnippet.snippetClass, data)
             super.visitReplSnippet(replSnippet, data)
         }
     }
@@ -269,6 +269,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
     }
 
     override fun getFirClassifierByFqName(classId: ClassId): FirClassLikeDeclaration? {
+        @OptIn(ClassIdBasedLocality::class)
         require(!classId.isLocal) {
             "Local $classId should never be used to find its corresponding classifier"
         }
@@ -286,12 +287,12 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
             title: String,
             a: Map<K, V>,
             b: Map<K, V>,
-            equal: (old: V?, new: V?) -> Boolean = { old, new -> old === new }
+            equal: (old: V?, new: V?) -> Boolean = { old, new -> old === new },
         ) {
             var hasTitle = false
             val unionKeys = a.keys + b.keys
 
-            for ((key, aValue, bValue) in unionKeys.map { Triple(it, a[it], b[it]) }) {
+            for ([key, aValue, bValue] in unionKeys.map { Triple(it, a[it], b[it]) }) {
                 if (!equal(aValue, bValue)) {
                     if (!hasTitle) {
                         failures += title
@@ -305,7 +306,7 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
         fun <K, V> checkMMapDiff(title: String, a: Map<K, List<V>>, b: Map<K, List<V>>) {
             var hasTitle = false
             val unionKeys = a.keys + b.keys
-            for ((key, aValue, bValue) in unionKeys.map { Triple(it, a[it], b[it]) }) {
+            for ([key, aValue, bValue] in unionKeys.map { Triple(it, a[it], b[it]) }) {
                 if (aValue == null || bValue == null) {
                     if (!hasTitle) {
                         failures += title
@@ -350,7 +351,8 @@ class FirProviderImpl(val session: FirSession, val kotlinScopeProvider: FirKotli
     override fun getClassNamesInPackage(fqName: FqName): Set<Name> {
         return state.classesInPackage[fqName] ?: emptySet()
     }
-
 }
 
 private const val rebuildIndex = true
+
+private fun toSystemIndependentScriptPath(path: String): String = path.replace('\\', '/')

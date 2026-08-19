@@ -37,7 +37,6 @@ internal class FirValueParameterImpl(
     override val origin: FirDeclarationOrigin,
     override val attributes: FirDeclarationAttributes,
     override var returnTypeRef: FirTypeRef,
-    override var deprecationsProvider: DeprecationsProvider,
     override val name: Name,
     override var annotations: MutableOrEmptyList<FirAnnotation>,
     override val symbol: FirValueParameterSymbol,
@@ -51,8 +50,12 @@ internal class FirValueParameterImpl(
     override val typeParameters: List<FirTypeParameterRef>
         get() = emptyList()
     override var status: FirDeclarationStatus = FirResolvedDeclarationStatusImpl.DEFAULT_STATUS_FOR_STATUSLESS_DECLARATIONS
+    override val isLocal: Boolean
+        get() = true
     override val receiverParameter: FirReceiverParameter?
         get() = null
+    override val deprecationsProvider: DeprecationsProvider
+        get() = EmptyDeprecationsProvider
     override val containerSource: DeserializedContainerSource?
         get() = null
     override val dispatchReceiverType: ConeSimpleKotlinType?
@@ -161,9 +164,7 @@ internal class FirValueParameterImpl(
 
     override fun replaceReceiverParameter(newReceiverParameter: FirReceiverParameter?) {}
 
-    override fun replaceDeprecationsProvider(newDeprecationsProvider: DeprecationsProvider) {
-        deprecationsProvider = newDeprecationsProvider
-    }
+    override fun replaceDeprecationsProvider(newDeprecationsProvider: DeprecationsProvider) {}
 
     override fun replaceContextParameters(newContextParameters: List<FirValueParameter>) {}
 

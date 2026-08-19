@@ -10,25 +10,20 @@ import org.jetbrains.kotlin.builtins.StandardNames.DATA_CLASS_COPY
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.fir.*
-import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.backend.generators.isExternalParent
 import org.jetbrains.kotlin.fir.backend.utils.ConversionTypeOrigin
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.synthetic.FirSyntheticProperty
-import org.jetbrains.kotlin.fir.declarations.utils.contextParametersForFunctionOrContainingProperty
-import org.jetbrains.kotlin.fir.declarations.utils.isExpect
-import org.jetbrains.kotlin.fir.declarations.utils.isStatic
-import org.jetbrains.kotlin.fir.declarations.utils.nameOrSpecialName
-import org.jetbrains.kotlin.fir.declarations.utils.visibility
+import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.descriptors.FirBuiltInsPackageFragment
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyClass
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyConstructor
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyProperty
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazySimpleFunction
-import org.jetbrains.kotlin.fir.render
 import org.jetbrains.kotlin.fir.resolve.calls.FirSimpleSyntheticPropertySymbol
 import org.jetbrains.kotlin.fir.resolve.getContainingClass
+import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.firProvider
 import org.jetbrains.kotlin.fir.resolve.toClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
@@ -116,7 +111,7 @@ class Fir2IrDeclarationStorage(
          * That's why, we are using original java function as a key in that case.
          */
         data class SyntheticPropertyKey(
-            val originalFunction: FirSimpleFunction,
+            val originalFunction: FirNamedFunction,
             val dispatchReceiverLookupTag: ConeClassLikeLookupTag?,
         )
 
@@ -308,12 +303,12 @@ class Fir2IrDeclarationStorage(
         function: FirFunction,
         fakeOverrideOwnerLookupTag: ConeClassLikeLookupTag? = null,
     ): IrSimpleFunctionSymbol? {
-        return if (function is FirSimpleFunction) getCachedIrFunctionSymbol(function, fakeOverrideOwnerLookupTag)
+        return if (function is FirNamedFunction) getCachedIrFunctionSymbol(function, fakeOverrideOwnerLookupTag)
         else localStorage.getLocalFunctionSymbol(function)
     }
 
     fun getCachedIrFunctionSymbol(
-        function: FirSimpleFunction,
+        function: FirNamedFunction,
         fakeOverrideOwnerLookupTag: ConeClassLikeLookupTag? = null,
     ): IrSimpleFunctionSymbol? {
         if (function.visibility == Visibilities.Local) {
@@ -372,7 +367,7 @@ class Fir2IrDeclarationStorage(
     ): IrSimpleFunctionSymbol {
         if (
             parentIsExternal ||
-            function !is FirSimpleFunction ||
+            function !is FirNamedFunction ||
             !function.isFakeOverrideOrDelegated(fakeOverrideOwnerLookupTag)
         ) {
             return createFunctionSymbol()
@@ -452,19 +447,17 @@ class Fir2IrDeclarationStorage(
     fun <T : IrFunction> T.putParametersInScope(function: FirFunction): T {
         val contextParameters = function.contextParametersForFunctionOrContainingProperty()
 
-        for ((firParameter, irParameter) in contextParameters.zip(this.parameters.filter { it.kind == IrParameterKind.Context })) {
-            if (!firParameter.isLegacyContextReceiver()) {
-                localStorage.putParameter(firParameter, irParameter.symbol)
-            }
+        for ([firParameter, irParameter] in contextParameters.zip(this.parameters.filter { it.kind == IrParameterKind.Context })) {
+            localStorage.putParameter(firParameter, irParameter.symbol)
         }
 
-        for ((firParameter, irParameter) in function.valueParameters.zip(parameters.filter { it.kind == IrParameterKind.Regular })) {
+        for ([firParameter, irParameter] in function.valueParameters.zip(parameters.filter { it.kind == IrParameterKind.Regular })) {
             localStorage.putParameter(firParameter, irParameter.symbol)
         }
         return this
     }
 
-    internal fun cacheGeneratedFunction(firFunction: FirSimpleFunction, irFunction: IrSimpleFunction) {
+    internal fun cacheGeneratedFunction(firFunction: FirNamedFunction, irFunction: IrSimpleFunction) {
         val containingClass = firFunction.getContainingClass()!!
         val cache = dataClassGeneratedFunctionsCache.computeIfAbsent(containingClass) { DataClassGeneratedFunctionsStorage() }
         val irSymbol = irFunction.symbol
@@ -513,6 +506,7 @@ class Fir2IrDeclarationStorage(
 
         // caching of created constructor is not called here, because `callablesGenerator` calls `cacheIrConstructor` by itself
         val symbol = IrConstructorSymbolImpl()
+        cacheIrConstructorSymbol(constructor, symbol)
         if (potentiallyExternal) {
             val irParent = findIrParent(constructor, fakeOverrideOwnerLookupTag = null)
             if (irParent.isExternalParent()) {
@@ -527,7 +521,6 @@ class Fir2IrDeclarationStorage(
                 }
             }
         }
-        cacheIrConstructorSymbol(constructor, symbol)
 
         return symbol
     }
@@ -553,8 +546,8 @@ class Fir2IrDeclarationStorage(
      */
     @Suppress("KDocUnresolvedReference")
     private data class FirSyntheticPropertyKey(
-        val originalForGetter: FirSimpleFunction,
-        val originalForSetter: FirSimpleFunction?,
+        val originalForGetter: FirNamedFunction,
+        val originalForSetter: FirNamedFunction?,
     ) {
         constructor(property: FirSyntheticProperty) : this(property.getter.delegate, property.setter?.delegate)
     }
@@ -674,7 +667,7 @@ class Fir2IrDeclarationStorage(
         fakeOverrideOwnerLookupTag: ConeClassLikeLookupTag? = null,
     ): IrSymbol {
         val property = prepareProperty(firPropertySymbol.fir)
-        if (property.isLocal) {
+        if (property.symbol is FirLocalPropertySymbol) {
             return localStorage.getDelegatedProperty(property) ?: getIrVariableSymbol(property)
         }
         getCachedIrPropertySymbol(property, fakeOverrideOwnerLookupTag)?.let { return it }
@@ -944,12 +937,16 @@ class Fir2IrDeclarationStorage(
         return getIrPropertyForwardedSymbol(firBackingFieldSymbol.fir.propertySymbol.fir)
     }
 
+    internal fun getIrBackingFieldSymbol(firPropertySymbol: FirPropertySymbol): IrSymbol {
+        return getIrPropertyForwardedSymbol(firPropertySymbol.fir)
+    }
+
     fun getIrDelegateFieldSymbol(delegateFieldSymbol: FirDelegateFieldSymbol): IrSymbol {
         return getIrPropertyForwardedSymbol(delegateFieldSymbol.fir)
     }
 
     private fun getIrPropertyForwardedSymbol(fir: FirProperty): IrSymbol {
-        if (fir.isLocal) {
+        if (fir.symbol is FirLocalPropertySymbol) {
             // local property cannot be referenced before declaration, so it's safe to take an owner from the symbol
             @OptIn(UnsafeDuringIrConstructionAPI::class)
             val delegatedProperty = localStorage.getDelegatedProperty(fir)?.owner
@@ -1129,7 +1126,7 @@ class Fir2IrDeclarationStorage(
         }
 
         getCachedIrFunctionSymbol(function, fakeOverrideOwnerLookupTag)?.let { return it }
-        if (function is FirSimpleFunction && !isLocal) {
+        if (function is FirNamedFunction && !isLocal) {
             val irParent = findIrParent(function, fakeOverrideOwnerLookupTag)
             if (irParent?.isExternalParent() == true) {
                 val symbol = createMemberFunctionSymbol(function, fakeOverrideOwnerLookupTag, parentIsExternal = true)
@@ -1241,7 +1238,7 @@ class Fir2IrDeclarationStorage(
 
     @LeakedDeclarationCaches
     private fun fillUnboundSymbols(cache: Map<out FirCallableDeclaration, IrSymbol>) {
-        for ((firDeclaration, irSymbol) in cache) {
+        for ([firDeclaration, irSymbol] in cache) {
             if (irSymbol.isBound) continue
             // To generate a declaration, we should assure its signature resolve is over here (KT-70856)
             firDeclaration.lazyResolveToPhase(FirResolvePhase.ANNOTATION_ARGUMENTS)

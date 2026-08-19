@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // JSPECIFY_STATE: warn
 // ALLOW_KOTLIN_PACKAGE
 
@@ -22,5 +21,5 @@ public class Test {
 import my.test.Test
 
 fun main(x: Test) {
-    x.foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
+    x.foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -15,6 +15,16 @@ import org.jetbrains.kotlin.psi.psiUtil.ClassIdCalculator
 import org.jetbrains.kotlin.psi.psiUtil.isKtFile
 import org.jetbrains.kotlin.psi.stubs.KotlinTypeAliasStub
 
+/**
+ * Represents a type alias declaration.
+ *
+ * ### Example:
+ *
+ * ```kotlin
+ *    typealias StringList = List<String>
+ * // ^_________________________________^
+ * ```
+ */
 class KtTypeAlias : KtTypeParameterListOwnerStub<KotlinTypeAliasStub>, KtNamedDeclaration, KtClassLikeDeclaration {
     constructor(node: ASTNode) : super(node)
     constructor(stub: KotlinTypeAliasStub) : super(stub, KtStubBasedElementTypes.TYPEALIAS)
@@ -29,7 +39,9 @@ class KtTypeAlias : KtTypeParameterListOwnerStub<KotlinTypeAliasStub>, KtNamedDe
         findChildByType(KtTokens.TYPE_ALIAS_KEYWORD)
 
     @IfNotParsed
-    fun getTypeReference(): KtTypeReference? = getStubOrPsiChild<KtTypeReference>(KtStubBasedElementTypes.TYPE_REFERENCE)
+    fun getTypeReference(): KtTypeReference? =
+        @Suppress("DEPRECATION") // KT-78356
+        getStubOrPsiChild<KtTypeReference>(KtStubBasedElementTypes.TYPE_REFERENCE)
 
     override fun getClassId(): ClassId? {
         greenStub?.let { return it.classId }

@@ -35,6 +35,9 @@ class CoroutineTransformer(
     // state-machine for further transformation/inlining.
     private val generateForInline = inliningContext.callSiteInfo.isInlineOrInsideInline
 
+    // filled by CoroutineTransformerMethodVisitor when it generates a state machine for a node being transformed
+    private val methodsWithGeneratedStateMachine = hashSetOf<MethodKey>()
+
     fun shouldSkip(node: MethodNode): Boolean = methods.any { it.name == node.name + FOR_INLINE_SUFFIX && it.desc == node.desc }
 
     fun shouldGenerateStateMachine(node: MethodNode): Boolean {
@@ -64,7 +67,7 @@ class CoroutineTransformer(
                 newStateMachineForLambda(node)
             }
             isSuspendFunctionWithFakeConstructorCall(node) -> newStateMachineForNamedFunction(node)
-            else -> error("no need to generate state maching for ${node.name}")
+            else -> error("no need to generate state machine for ${node.name}")
         }
     }
 
@@ -87,8 +90,8 @@ class CoroutineTransformer(
                 containingClassInternalName = classBuilder.thisName,
                 obtainClassBuilderForCoroutineState = { classBuilder },
                 isForNamedFunction = false,
-                disableTailCallOptimizationForFunctionReturningUnit = false,
                 reportSuspensionPointInsideMonitor = { sourceCompilerForInline.reportSuspensionPointInsideMonitor(it) },
+                onStateMachineGenerated = { methodsWithGeneratedStateMachine += it },
                 // TODO: this linenumbers might not be correct and since they are used only for step-over, check them.
                 lineNumber = inliningContext.callSiteInfo.lineNumber,
                 sourceFile = inliningContext.callSiteInfo.file?.name ?: "",
@@ -112,16 +115,14 @@ class CoroutineTransformer(
                 ArrayUtil.toStringArray(node.exceptions)
             )
         ) {
-            // If the node already has state-machine, it is safer to generate state-machine.
-            val disableTailCallOptimization = methods.find { it.name == name && it.desc == node.desc }?.let { isStateMachine(it) } ?: false
             val sourceCompilerForInline = inliningContext.root.sourceCompilerForInline
             val stateMachineBuilder = CoroutineTransformerMethodVisitor(
                 createNewMethodFrom(node, name), node.access, name, node.desc, null, null,
                 containingClassInternalName = classBuilder.thisName,
                 obtainClassBuilderForCoroutineState = { (inliningContext as RegeneratedClassContext).continuationBuilders[continuationClassName]!! },
                 isForNamedFunction = true,
-                disableTailCallOptimizationForFunctionReturningUnit = disableTailCallOptimization,
                 reportSuspensionPointInsideMonitor = { sourceCompilerForInline.reportSuspensionPointInsideMonitor(it) },
+                onStateMachineGenerated = { methodsWithGeneratedStateMachine += it },
                 lineNumber = inliningContext.callSiteInfo.lineNumber,
                 sourceFile = inliningContext.callSiteInfo.file?.name ?: "",
                 config = state.config,
@@ -158,7 +159,8 @@ class CoroutineTransformer(
         (inliningContext as RegeneratedClassContext).continuationBuilders.remove(continuationClassName)
 
     // If tail-call optimization took place, we do not need continuation class anymore, unless it is used by $$forInline method
-    fun safeToRemoveContinuationClass(method: MethodNode): Boolean = !generateForInline && !isStateMachine(method)
+    fun safeToRemoveContinuationClass(methodKey: MethodKey): Boolean =
+        !generateForInline && !methodsWithGeneratedStateMachine.contains(methodKey)
 
     fun oldContinuationFrom(method: MethodNode): String? =
         methods.find { it.name == method.name + FOR_INLINE_SUFFIX && it.desc == method.desc }
@@ -204,7 +206,7 @@ fun surroundInvokesWithSuspendMarkersIfNeeded(node: MethodNode) {
         }
         receiver
     }
-    for ((marker, load) in markers.zip(loads)) {
+    for ([marker, load] in markers.zip(loads)) {
         val conditional = (marker as MethodInsnNode).name == "conditional"
         val invoke = marker.next as MethodInsnNode
         node.instructions.remove(marker)
@@ -214,6 +216,8 @@ fun surroundInvokesWithSuspendMarkersIfNeeded(node: MethodNode) {
         node.instructions.insertBefore(load, withInstructionAdapter {
             addInlineMarker(this, isStartNotEnd = true)
         })
+        // We cannot add INLINE_MARKER_BEFORE_SUSPEND_UNIT_CALL here, as we do not know the type of the non-inlined lambda.
+        // But it seems fine, as it won't happen for inlined lambdas
         node.instructions.insertBefore(invoke, withInstructionAdapter {
             addSuspendMarker(this, isStartNotEnd = true, inlinable = conditional)
         })

@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.test.directives.model
 
 import org.jetbrains.kotlin.test.util.joinToArrayString
+import org.jetbrains.kotlin.test.testInfraError
 
 // --------------------------- Directive declaration ---------------------------
 
@@ -43,14 +44,16 @@ class ValueDirective<T : Any>(
     name: String,
     description: String,
     applicability: DirectiveApplicability,
-    val parser: (String) -> T?
+    val parser: (String) -> T?,
+    val splitValuesOnSpaces: Boolean,
 ) : Directive(name, description, applicability)
 
 // --------------------------- Registered directive ---------------------------
 
 abstract class RegisteredDirectives : Iterable<Directive> {
     companion object {
-        val Empty = RegisteredDirectivesImpl(emptyList(), emptyMap(), emptyMap())
+        // Made lazy to break a class initialization cycle (similar to KT-82886)
+        val Empty by lazy { RegisteredDirectivesImpl(emptyList(), emptyMap(), emptyMap()) }
     }
 
     abstract operator fun contains(directive: Directive): Boolean
@@ -89,8 +92,8 @@ class RegisteredDirectivesImpl(
     override fun toString(): String {
         return buildString {
             simpleDirectives.forEach { appendLine("  $it") }
-            stringDirectives.forEach { (d, v) -> appendLine("  $d: ${v.joinToArrayString()}") }
-            valueDirectives.forEach { (d, v) -> appendLine("  $d: ${v.joinToArrayString()}") }
+            stringDirectives.forEach { [d, v] -> appendLine("  $d: ${v.joinToArrayString()}") }
+            valueDirectives.forEach { [d, v] -> appendLine("  $d: ${v.joinToArrayString()}") }
         }
     }
 
@@ -162,7 +165,7 @@ fun RegisteredDirectives.suppressIf(suppressionDirective: Directive, filter: (Th
 }
 
 fun RegisteredDirectives.singleValue(directive: StringDirective): String {
-    return singleOrZeroValue(directive) ?: error("No values passed to $directive")
+    return singleOrZeroValue(directive) ?: testInfraError("No values passed to $directive")
 }
 
 fun RegisteredDirectives.singleOrZeroValue(directive: StringDirective): String? {
@@ -170,27 +173,27 @@ fun RegisteredDirectives.singleOrZeroValue(directive: StringDirective): String? 
     return when (values.size) {
         0 -> null
         1 -> values.single()
-        else -> error("Too many values passed to $directive")
+        else -> testInfraError("Too many values passed to $directive")
     }
 }
 
 fun RegisteredDirectives.notEmptyValues(directive: StringDirective): List<String> = this[directive].ifEmpty {
-    error("No values passed to $directive")
+    testInfraError("No values passed to $directive")
 }
 
 fun <T : Any> RegisteredDirectives.singleValue(directive: ValueDirective<T>): T {
-    return singleOrZeroValue(directive) ?: error("No values passed to $directive")
+    return singleOrZeroValue(directive) ?: testInfraError("No values passed to $directive")
 }
 
 fun <T : Any> RegisteredDirectives.singleOrZeroValue(directive: ValueDirective<T>): T? {
-    val values = this[directive]
+    val values = this[directive].distinct()
     return when (values.size) {
         0 -> null
         1 -> values.single()
-        else -> error("Too many values passed to $directive: ${values.joinToArrayString()}")
+        else -> testInfraError("Too many values passed to $directive: ${values.joinToArrayString()}")
     }
 }
 
 fun <T : Any> RegisteredDirectives.notEmptyValues(directive: ValueDirective<T>): List<T> = this[directive].ifEmpty {
-    error("No values passed to $directive")
+    testInfraError("No values passed to $directive")
 }

@@ -15,7 +15,7 @@ import java.net.URI
  * Stores type information about processed and generated sources. For .java files a fine-grained type information
  * exists i.e we know all referenced types. For .class files we only know which type is defined in the .class file.
  */
-class JavaClassCache() : Serializable {
+class JavaClassCache : Serializable {
     private var sourceCache = mutableMapOf<URI, JavaFileStructure>()
 
     /** Map from types to files they are mentioned in. */
@@ -40,6 +40,7 @@ class JavaClassCache() : Serializable {
         return typesFromFiles
     }
 
+    @Suppress("unused")
     private fun readObject(input: ObjectInputStream) {
         @Suppress("UNCHECKED_CAST")
         sourceCache = input.readObject() as MutableMap<URI, JavaFileStructure>
@@ -70,6 +71,7 @@ class JavaClassCache() : Serializable {
         }
     }
 
+    @Suppress("unused")
     private fun writeObject(output: ObjectOutputStream) {
         output.writeObject(sourceCache)
     }
@@ -85,7 +87,7 @@ class JavaClassCache() : Serializable {
         }
         return try {
             sourceCache.containsKey(sourceFile)
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             // unable to create File instance, avoid processing these files
             true
         }
@@ -138,7 +140,7 @@ class JavaClassCache() : Serializable {
     }
 
     fun getSourceForType(type: String): File {
-        sourceCache.forEach { (fileUri, typeInfo) ->
+        sourceCache.forEach { [fileUri, typeInfo] ->
             if (type in typeInfo.declaredTypes) {
                 return File(fileUri)
             }
@@ -148,7 +150,7 @@ class JavaClassCache() : Serializable {
 
     fun invalidateDataForTypes(impactedTypes: MutableSet<String>) {
         val allSources = mutableSetOf<URI>()
-        sourceCache.forEach { (fileUri, typeInfo) ->
+        sourceCache.forEach { [fileUri, typeInfo] ->
             if (typeInfo.declaredTypes.any { it in impactedTypes }) {
                 allSources.add(fileUri)
             }
@@ -227,6 +229,5 @@ class SourceFileStructure(
         }
     }
 }
-
 
 class Changes(val sourceChanges: Collection<File>, val dirtyFqNamesFromClasspath: Set<String>)

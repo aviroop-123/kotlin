@@ -1,3 +1,0 @@
-KDocName(102,110): 'AInt.foo'
-  KDocReference:
-    Nothing (Unresolved reference)

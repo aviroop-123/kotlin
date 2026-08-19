@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.gradle.util.buildProjectWithJvm
 import org.jetbrains.kotlin.gradle.util.buildProjectWithMPP
 import org.jetbrains.kotlin.gradle.util.kotlin
 import org.jetbrains.kotlin.gradle.utils.createConsumable
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.fail
 
 class KotlinPublishingAdhocSoftwareComponentTest {
@@ -41,7 +41,7 @@ class KotlinPublishingAdhocSoftwareComponentTest {
                 linuxX64()
 
                 val customAttribute = Attribute.of("customAttribute", String::class.java)
-                val customConfiguration = configurations.createConsumable("customConfiguration")
+                val customConfiguration = configurations.createConsumable("customConfiguration").get()
                 customConfiguration.attributes.attribute(customAttribute, "customValue")
                 val artifact1 = project.artifacts.add(customConfiguration.name, file("customConfigurationArtifact1.txt"))
                 val artifact2 = project.artifacts.add(customConfiguration.name, file("customConfigurationArtifact2.txt"))

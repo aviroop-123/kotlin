@@ -5,38 +5,95 @@
 
 package org.jetbrains.kotlin.generators.model
 
-interface TestEntityModel {
-    val name: String
-    val dataString: String?
-    val tags: List<String>
+import org.jetbrains.kotlin.generators.MethodGenerator
+import org.jetbrains.kotlin.test.TestMetadata
+import org.jetbrains.kotlin.utils.Printer
+import org.junit.jupiter.api.Tag
+import com.intellij.testFramework.TestDataPath
+import org.jetbrains.kotlin.testFederation.SmokeTest
+
+/**
+ * Base class for test entities of the test generator, which are either test classes or test methods.
+ *
+ * @property name if a name of the class/method;
+ * @property dataString contains string, which will be put into @[TestMetadata] annotation (if present).
+ *   usually it contains path to the corresponding testdata;
+ * @property tags contains a list of JUnit5 tags, which will be put into @[Tag] annotation (if present).
+ */
+sealed class TestEntityModel {
+    abstract val name: String
+    abstract val dataString: String?
+    abstract val tags: List<String>
 }
 
-interface ClassModel : TestEntityModel {
-    val innerTestClasses: Collection<TestClassModel>
-    val methods: Collection<MethodModel>
-    val isEmpty: Boolean
-    val dataPathRoot: String?
-    val annotations: Collection<AnnotationModel>
+/**
+ * The model which represents a test class. It could contain [innerTestClasses] and test [methods].
+ *
+ * @property dataPathRoot is a value which will be put into @[TestDataPath] annotation (if present).
+ *   This annotation is used for IDE integration, and in combination with the @[TestMetadata] annotation
+ *   allows IDE navigating from the test declaration to a corresponding testdata file.
+ *
+ * @property annotations is a list of annotations, which will be added to the generated test
+ *   class in addition to the default set of annotations.
+ *
+ * @property isSmokeTest is a flag indicating whether the test class is used as 'SmokeTest'
+ *   See 'repo/TEST_FEDERATION.md' for additional details.
+ *
+ * @property smokeTestLimit limits the number of 'SmokeTets' within a given test class.
+ *   Typically running just a subset (even just any single representative) test is enough when running smoke tests.
+ *
+ * Note that all kinds are generated in the same way regardless of the specific implementation.
+ * @see org.jetbrains.kotlin.generators.dsl.junit4.TestGeneratorForJUnit4Instance.generateTestClass
+ * @see org.jetbrains.kotlin.generators.dsl.junit5.TestGeneratorForJUnit5.TestGeneratorInstance.generateTestClass
+ */
+abstract class TestClassModel : TestEntityModel() {
+    abstract val innerTestClasses: Collection<TestClassModel>
+    abstract val methods: Collection<MethodModel<*>>
+    abstract val isEmpty: Boolean
+    abstract val dataPathRoot: String?
+    abstract val annotations: Collection<AnnotationModel>
+    abstract val testKClass: Class<*>
+    abstract val isSmokeTest: Boolean
+    abstract val smokeTestLimit: Int
+
     val imports: Set<Class<*>>
-}
-
-abstract class TestClassModel : ClassModel {
-    override val imports: Set<Class<*>>
         get() {
             return mutableSetOf<Class<*>>().also { allImports ->
                 annotations.flatMapTo(allImports) { it.imports() }
                 methods.flatMapTo(allImports) { it.imports() }
                 innerTestClasses.flatMapTo(allImports) { it.imports }
+                if (isSmokeTest) {
+                    allImports.add(SmokeTest::class.java)
+                }
             }
         }
 }
 
-interface MethodModel : TestEntityModel {
-    abstract class Kind
+/**
+ * The model which represents a method inside the test class.
+ *
+ * @property generator defines how exactly the specific kind of the MethodModel should be generated
+ */
+abstract class MethodModel<M : MethodModel<M>> : TestEntityModel() {
+    abstract val generator: MethodGenerator<M>
 
-    val kind: Kind
-    fun isTestMethod(): Boolean = true
-    fun shouldBeGeneratedForInnerTestClass(): Boolean = true
-    fun shouldBeGenerated(): Boolean = true
-    fun imports(): Collection<Class<*>> = emptyList()
+    /**
+     * If false then no test annotations would be generated for the method (including `@Test`)
+     */
+    open val isTestMethod: Boolean get() = true
+    open val shouldBeGeneratedForInnerTestClass: Boolean get() = true
+    open val isSmokeTest: Boolean get() = false
+
+
+    open fun imports(): Collection<Class<*>> = emptyList()
+
+    fun generateBody(p: Printer) {
+        @Suppress("UNCHECKED_CAST")
+        generator.generateBody(this as M, p)
+    }
+
+    fun generateSignature(p: Printer) {
+        @Suppress("UNCHECKED_CAST")
+        generator.generateSignature(this as M, p)
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -53,8 +53,12 @@ public abstract class KaAnonymousFunctionSymbol : KaFunctionSymbol(), KaContextP
     final override val callableId: CallableId? get() = withValidityAssertion { null }
     final override val isActual: Boolean get() = withValidityAssertion { false }
     final override val isExpect: Boolean get() = withValidityAssertion { false }
+    final override val isExternal: Boolean get() = withValidityAssertion { false }
     final override val hasStableParameterNames: Boolean get() = withValidityAssertion { true }
     final override val modality: KaSymbolModality get() = withValidityAssertion { KaSymbolModality.FINAL }
+
+    @KaExperimentalApi
+    final override val isCompanion: Boolean get() = withValidityAssertion { false }
 
     abstract override fun createPointer(): KaSymbolPointer<KaAnonymousFunctionSymbol>
 }
@@ -86,6 +90,10 @@ public abstract class KaAnonymousFunctionSymbol : KaFunctionSymbol(), KaContextP
 public abstract class KaSamConstructorSymbol : KaFunctionSymbol(), KaNamedSymbol, KaTypeParameterOwnerSymbol {
     final override val location: KaSymbolLocation get() = withValidityAssertion { KaSymbolLocation.TOP_LEVEL }
     final override val receiverParameter: KaReceiverParameterSymbol? get() = withValidityAssertion { null }
+    final override val isExternal: Boolean get() = withValidityAssertion { false }
+
+    @KaExperimentalApi
+    final override val isCompanion: Boolean get() = withValidityAssertion { false }
 
     abstract override fun createPointer(): KaSymbolPointer<KaSamConstructorSymbol>
 }
@@ -108,12 +116,6 @@ public abstract class KaNamedFunctionSymbol : KaFunctionSymbol(), KaNamedSymbol,
     public abstract val isOperator: Boolean
 
     /**
-     * Whether the function is implemented outside of Kotlin (accessible through [JNI](https://kotlinlang.org/docs/java-interop.html#using-jni-with-kotlin)
-     * or [JavaScript](https://kotlinlang.org/docs/js-interop.html#external-modifier)).
-     */
-    public abstract val isExternal: Boolean
-
-    /**
      * Whether the function is an [inline function](https://kotlinlang.org/docs/inline-functions.html).
      */
     public abstract val isInline: Boolean
@@ -129,7 +131,14 @@ public abstract class KaNamedFunctionSymbol : KaFunctionSymbol(), KaNamedSymbol,
     public abstract val isInfix: Boolean
 
     /**
-     * Whether the function is static. While Kotlin functions cannot be static, the function symbol may represent e.g. a static Java method.
+     * Whether the function is [static](https://docs.oracle.com/javase/specs/jls/se23/html/jls-8.html#jls-8.4.3.2).
+     *
+     * While Kotlin functions cannot be declared as static, the function symbol may represent, e.g., a static Java method.
+     *
+     * **Note**: **true** doesn't guarantee the function is a Java one as Kotlin functions internally might be treated as static,
+     * but their behavior is not specified. Consider using [isCompanion].
+     *
+     * @see isCompanion
      */
     public abstract val isStatic: Boolean
 
@@ -177,6 +186,9 @@ public abstract class KaConstructorSymbol : KaFunctionSymbol(), KaTypeParameterO
     final override val location: KaSymbolLocation get() = withValidityAssertion { KaSymbolLocation.CLASS }
     final override val isExtension: Boolean get() = withValidityAssertion { false }
     final override val receiverParameter: KaReceiverParameterSymbol? get() = withValidityAssertion { null }
+
+    @KaExperimentalApi
+    final override val isCompanion: Boolean get() = withValidityAssertion { false }
 
     @KaExperimentalApi
     final override val contextReceivers: List<KaContextReceiver> get() = withValidityAssertion { emptyList() }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -10,8 +10,11 @@ import com.intellij.psi.JavaElementVisitor
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiEnumConstant
+import com.intellij.psi.PsiRecordHeader
 import org.jetbrains.kotlin.analysis.api.platform.modification.publishGlobalModuleStateModificationEvent
 import org.jetbrains.kotlin.analysis.api.platform.modification.publishGlobalSourceOutOfBlockModificationEvent
+import org.jetbrains.kotlin.analysis.test.data.manager.TestVariantChain
+import org.jetbrains.kotlin.analysis.test.data.manager.withAdditionalVariant
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
 import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfigurator
 import org.jetbrains.kotlin.psi.KtFile
@@ -23,9 +26,11 @@ import java.nio.file.Path
 
 abstract class AbstractSymbolLightClassesEqualityTestBase(
     configurator: AnalysisApiTestConfigurator,
-    override val currentExtension: String,
     override val isTestAgainstCompiledCode: Boolean,
 ) : AbstractSymbolLightClassesTestBase(configurator) {
+    override val variantChain: TestVariantChain
+        get() = super.variantChain.withAdditionalVariant("equality")
+
     override fun getRenderResult(
         ktFile: KtFile,
         ktFiles: List<KtFile>,
@@ -61,11 +66,19 @@ abstract class AbstractSymbolLightClassesEqualityTestBase(
         assertions: AssertionsService,
     ): PsiElementVisitor = object : JavaElementVisitor() {
         override fun visitClass(aClass: PsiClass) {
+            compareElementsWithInvalidation(aClass, PsiClass::getRecordHeader)
+            compareArrayElementsWithInvalidation(aClass, PsiClass::getRecordComponents)
             compareArrayElementsWithInvalidation(aClass, PsiClass::getMethods)
             compareArrayElementsWithInvalidation(aClass, PsiClass::getFields)
             compareArrayElementsWithInvalidation(aClass, PsiClass::getInnerClasses)
 
             super.visitClass(aClass)
+        }
+
+        override fun visitRecordHeader(recordHeader: PsiRecordHeader) {
+            compareArrayElementsWithInvalidation(recordHeader, PsiRecordHeader::getRecordComponents)
+
+            super.visitRecordHeader(recordHeader)
         }
 
         override fun visitEnumConstant(enumConstant: PsiEnumConstant) {
@@ -106,7 +119,7 @@ abstract class AbstractSymbolLightClassesEqualityTestBase(
                     }
                 }
 
-                for ((index, expected) in before.withIndex()) {
+                for ([index, expected] in before.withIndex()) {
                     val actual = after[index]
                     assertions.assertEquals(expected, actual) {
                         "Element: $element"

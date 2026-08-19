@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.fir.copy
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.utils.isCompanion
 import org.jetbrains.kotlin.fir.extensions.*
 import org.jetbrains.kotlin.fir.plugin.*
@@ -160,8 +160,18 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
         val scopes = lookupSuperTypes(
             owner, lookupInterfaces = true, deep = false, useSiteSession = session
         ).mapNotNull { useSiteSuperType ->
-            useSiteSuperType.scopeForSupertype(session, scopeSession, owner.fir, memberRequiredPhase = null)
+            useSiteSuperType.scopeForSupertype(
+                useSiteSession = session,
+                scopeSession = scopeSession,
+                derivedClass = owner.fir,
+                // The STATUS phase is required to safely iterate through super class members.
+                // It is legal to request it since the compiler guaranties that the class could be resolved to the STATUS phase
+                // only after all its super types are resolved to the STATUS phase.
+                // And this function (getFromSupertype) is supposed to be called not earlier than the STATUS phase as well.
+                memberRequiredPhase = FirResolvePhase.STATUS,
+            )
         }
+
         val targets = scopes.flatMap { extractor(it) }
         return targets.singleOrNull() ?: error("Zero or multiple overrides found for ${callableId.callableName} in $owner")
     }
@@ -221,7 +231,7 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
     private fun generateSerializerFactoryVararg(
         owner: FirClassSymbol<*>,
         callableId: CallableId,
-        original: FirSimpleFunction
+        original: FirNamedFunction
     ): FirNamedFunctionSymbol =
         createMemberFunction(owner, SerializationPluginKey, callableId.callableName, original.returnTypeRef.coneType) {
             val vpo = original.valueParameters.single()
@@ -342,6 +352,8 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
                 superType(serializerFactoryClassId.constructClassLikeType(emptyArray(), false))
             }
         }
+
+        companion.excludeFromJsExport(session)
 
         return companion.symbol
     }

@@ -1,5 +1,4 @@
 // OPT_IN: kotlin.contracts.ExperimentalContracts
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (POSITIVE)
@@ -16,7 +15,7 @@ fun case_1(b: Boolean?, c: Boolean) {
         if (b == null) return
 
         try {
-            <!DEBUG_INFO_IMPLICIT_EXHAUSTIVE!>when (<!DEBUG_INFO_SMARTCAST!>b<!>) {
+            when (b) {
                 true -> {
                     println(1)
                     return
@@ -25,7 +24,7 @@ fun case_1(b: Boolean?, c: Boolean) {
                     println(2)
                     throw Exception()
                 }
-            }<!>
+            }
         } catch (e: Exception) {
             if (c) {
                 return@funWithExactlyOnceCallsInPlace
@@ -33,7 +32,7 @@ fun case_1(b: Boolean?, c: Boolean) {
                 return
             }
         }
-        <!UNREACHABLE_CODE!>println(3)<!>
+        println(3)
     }
     println(3)
 }

@@ -1,9 +1,6 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 // ALLOW_KOTLIN_PACKAGE
 // SKIP_JAVAC
-// SKIP_TXT
-// LANGUAGE: +InlineClasses
 
 package kotlin.jvm
 

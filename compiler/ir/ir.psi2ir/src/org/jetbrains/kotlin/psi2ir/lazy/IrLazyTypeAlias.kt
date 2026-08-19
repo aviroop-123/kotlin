@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.psi2ir.lazy
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
 import org.jetbrains.kotlin.ir.IrElement
@@ -14,13 +15,14 @@ import org.jetbrains.kotlin.ir.declarations.IrTypeAlias
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.declarations.MetadataSource
 import org.jetbrains.kotlin.ir.declarations.lazy.lazyVar
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.util.DeclarationStubGenerator
 import org.jetbrains.kotlin.ir.util.TypeTranslator
 import org.jetbrains.kotlin.name.Name
 
+@K1Deprecation
 class IrLazyTypeAlias(
     override var startOffset: Int,
     override var endOffset: Int,
@@ -38,7 +40,7 @@ class IrLazyTypeAlias(
         symbol.bind(this)
     }
 
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+    override var annotations: List<IrAnnotation> by createLazyAnnotations()
 
     override var typeParameters: List<IrTypeParameter> by lazyVar(stubGenerator.lock) {
         descriptor.declaredTypeParameters.mapTo(arrayListOf()) {

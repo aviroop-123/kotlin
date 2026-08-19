@@ -3,18 +3,22 @@ plugins {
 }
 
 val commonCompilerModules: Array<String> by rootProject.extra
+val descriptorsCompilerModules: Array<String> by rootProject.extra
+val analysisApiModules: Array<String> by rootProject.extra
 
-val excludedCompilerModules = listOf(
-    ":compiler:cli",
-    ":compiler:javac-wrapper",
-    ":compiler:incremental-compilation-impl"
+val excludedAnalysisApiModules = listOf(
+    ":analysis:decompiled",
 )
 
-val projects = commonCompilerModules.asList() - excludedCompilerModules + listOf(
+val projects = commonCompilerModules.asList() + descriptorsCompilerModules + analysisApiModules - excludedAnalysisApiModules + listOf(
+    ":compiler:arguments.common",
+    ":compiler:cli-base",
+    ":kotlin-build-common",
     ":kotlin-compiler-runner-unshaded",
     ":kotlin-preloader",
     ":daemon-common",
-    ":kotlin-daemon-client"
+    ":kotlin-daemon-client",
+    ":compiler:build-tools:kotlin-build-tools-api",
 )
 
 publishJarsForIde(

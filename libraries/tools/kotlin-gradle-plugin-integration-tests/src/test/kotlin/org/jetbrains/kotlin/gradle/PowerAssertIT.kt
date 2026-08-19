@@ -20,7 +20,7 @@ class PowerAssertIT : KGPBaseTest() {
             "powerAssertSimple",
             gradleVersion,
             // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
+            buildOptions = defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899(),
         ) {
             build("check")
         }
@@ -31,6 +31,33 @@ class PowerAssertIT : KGPBaseTest() {
     @GradleTest
     fun testPowerAssertSourceSets(gradleVersion: GradleVersion) {
         project("powerAssertSourceSets", gradleVersion) {
+            build("check")
+        }
+    }
+
+    @OtherGradlePluginTests
+    @DisplayName("power-assert applied to all compilations")
+    @GradleTest
+    fun testPowerAssertCompilationFilter_ALL(gradleVersion: GradleVersion) {
+        project("powerAssertCompilationFilter-all", gradleVersion) {
+            build("check")
+        }
+    }
+
+    @OtherGradlePluginTests
+    @DisplayName("power-assert applied to test compilations")
+    @GradleTest
+    fun testPowerAssertCompilationFilter_TEST(gradleVersion: GradleVersion) {
+        project("powerAssertCompilationFilter-test", gradleVersion) {
+            build("check")
+        }
+    }
+
+    @OtherGradlePluginTests
+    @DisplayName("power-assert applied to no compilations")
+    @GradleTest
+    fun testPowerAssertCompilationFilter_NONE(gradleVersion: GradleVersion) {
+        project("powerAssertCompilationFilter-none", gradleVersion) {
             build("check")
         }
     }

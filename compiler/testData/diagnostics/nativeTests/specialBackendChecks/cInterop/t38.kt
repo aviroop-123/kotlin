@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // OPT_IN: kotlin.native.internal.InternalForKotlinNative
 import kotlinx.cinterop.*
 import kotlinx.cinterop.internal.*

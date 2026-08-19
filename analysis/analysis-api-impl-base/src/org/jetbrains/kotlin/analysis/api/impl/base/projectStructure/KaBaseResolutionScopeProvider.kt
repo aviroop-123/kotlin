@@ -19,12 +19,12 @@ import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.decompiler.psi.BuiltinsVirtualFileProvider
 import java.time.Duration
 
-class KaBaseResolutionScopeProvider : KaResolutionScopeProvider {
+internal class KaBaseResolutionScopeProvider : KaResolutionScopeProvider {
     override fun getResolutionScope(module: KaModule): KaResolutionScope {
         return resolutionScopeCache.getOrPut(module) { module ->
             val analyzableModules = getAnalyzableModules(module)
             val searchScope = buildSearchScope(module, analyzableModules)
-            KaBaseResolutionScope(module, searchScope, analyzableModules)
+            KaBaseResolutionScope(module, searchScope)
         }
     }
 

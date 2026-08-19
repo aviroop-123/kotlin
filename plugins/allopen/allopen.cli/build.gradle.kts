@@ -2,7 +2,6 @@ description = "Kotlin AllOpen Compiler Plugin (CLI)"
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
@@ -30,6 +29,8 @@ sourceSets {
     "main" { projectDefault() }
     "test" { none() }
 }
+
+optInToK1Deprecation()
 
 runtimeJar()
 sourcesJar()

@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -UNUSED_VARIABLE -CAST_NEVER_SUCCEEDS -CANNOT_CHECK_FOR_ERASED -UNCHECKED_CAST -UNUSED_ANONYMOUS_PARAMETER
-// SKIP_TXT
 // Issue: KT-31734
 
 @Target(AnnotationTarget.TYPE, AnnotationTarget.CLASS)
@@ -13,7 +12,7 @@ fun foo1(x: @Foo() () -> Unit) = x as Iterable<@Foo() () -> Unit>?
 fun foo2() = null as @Foo() () -> Unit
 
 fun foo3(x: Any?) {
-    if (x is (@<!DEBUG_INFO_MISSING_UNRESOLVED!>Foo<!>() () -> Unit)?) {
+    if (x is (@Foo() () -> Unit)?) {
 
     }
 }

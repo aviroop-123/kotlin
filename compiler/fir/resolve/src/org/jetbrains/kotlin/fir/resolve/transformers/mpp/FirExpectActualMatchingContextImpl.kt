@@ -9,13 +9,14 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.*
+import org.jetbrains.kotlin.fir.caches.getValue
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isActual
 import org.jetbrains.kotlin.fir.declarations.utils.isExpect
 import org.jetbrains.kotlin.fir.declarations.utils.isJava
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.resolve.*
-import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
+import org.jetbrains.kotlin.fir.resolve.substitution.asCone
 import org.jetbrains.kotlin.fir.scopes.*
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.*
@@ -26,6 +27,7 @@ import org.jetbrains.kotlin.mpp.*
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.resolve.calls.mpp.ExpectActualCollectionArgumentsCompatibilityCheckStrategy
 import org.jetbrains.kotlin.resolve.calls.mpp.ExpectActualMatchingContext
 import org.jetbrains.kotlin.resolve.calls.mpp.ExpectActualMatchingContext.AnnotationCallInfo
@@ -40,6 +42,7 @@ import org.jetbrains.kotlin.types.model.SimpleTypeMarker
 import org.jetbrains.kotlin.types.model.TypeSubstitutorMarker
 import org.jetbrains.kotlin.types.model.TypeSystemContext
 import org.jetbrains.kotlin.utils.zipIfSizesAreEqual
+import java.util.concurrent.ConcurrentHashMap
 
 class FirExpectActualMatchingContextImpl private constructor(
     private val actualSession: FirSession,
@@ -109,6 +112,19 @@ class FirExpectActualMatchingContextImpl private constructor(
     override val CallableSymbolMarker.visibility: Visibility
         get() = asSymbol().resolvedStatus.visibility
 
+    override val mustUseMatcher: ExpectActualMatchingContext.MustUseMatcher = object : ExpectActualMatchingContext.MustUseMatcher {
+        override fun matches(
+            expectCallable: CallableSymbolMarker,
+            actualCallable: CallableSymbolMarker,
+            containingExpectClass: RegularClassSymbolMarker?,
+        ): Boolean = actualSession.mustUseReturnValueStatusComponent.isExpectActualIgnorabilityCompatible(
+            actualSession,
+            expectCallable.asSymbol(),
+            actualCallable.asSymbol(),
+            containingExpectClass?.asSymbol()
+        )
+    }
+
     override val CallableSymbolMarker.isExpect: Boolean
         get() = asSymbol().resolvedStatus.isExpect
     override val CallableSymbolMarker.isInline: Boolean
@@ -148,7 +164,7 @@ class FirExpectActualMatchingContextImpl private constructor(
         return createExpectActualTypeParameterSubstitutor(
             expectActualTypeParameters as List<Pair<FirTypeParameterSymbol, FirTypeParameterSymbol>>,
             actualSession,
-            parentSubstitutor as ConeSubstitutor?
+            parentSubstitutor?.asCone()
         )
     }
 
@@ -183,7 +199,7 @@ class FirExpectActualMatchingContextImpl private constructor(
             for (name in scope.getClassifierNames()) {
                 scope.processClassifiersByName(name) {
                     // We should skip nested class like declarations from supertypes here
-                    if (it is FirClassLikeSymbol<*> && it.classId.parentClassId == symbol.classId) {
+                    if (it is FirClassLikeSymbol<*> && it.classId.outerClassId == symbol.classId) {
                         add(it)
                     }
                 }
@@ -340,8 +356,8 @@ class FirExpectActualMatchingContextImpl private constructor(
                 return false
             }
         }
-        val actualizedExpectType = (expectType as ConeKotlinType).actualize()
-        val actualizedActualType = (actualType as ConeKotlinType).actualize()
+        val actualizedExpectType = expectType.asCone().actualize()
+        val actualizedActualType = actualType.asCone().actualize()
 
         if (parameterOfAnnotationComparisonMode && actualizedExpectType is ConeClassLikeType && actualizedExpectType.isArrayType &&
             actualizedActualType is ConeClassLikeType && actualizedActualType.isArrayType
@@ -440,7 +456,7 @@ class FirExpectActualMatchingContextImpl private constructor(
         }
         val symbol = asSymbol()
         val classSymbol = containingExpectClass.asSymbol()
-        if (symbol !is FirConstructorSymbol && symbol.dispatchReceiverType?.classId != classSymbol.classId) {
+        if (symbol !is FirConstructorSymbol && symbol.dispatchReceiverType.let { it != null && it.classId != classSymbol.classId }) {
             return true
         }
         return symbol.isSubstitutionOrIntersectionOverride
@@ -451,6 +467,9 @@ class FirExpectActualMatchingContextImpl private constructor(
 
     override val CallableSymbolMarker.hasStableParameterNames: Boolean
         get() = asSymbol().rawStatus.hasStableParameterNames
+
+    override val CallableSymbolMarker.shouldMatchByParameterNames: Boolean
+        get() = false
 
     override val CallableSymbolMarker.isJavaField: Boolean
         get() = this is FirFieldSymbol && this.fir.unwrapFakeOverrides().isJava
@@ -472,8 +491,7 @@ class FirExpectActualMatchingContextImpl private constructor(
         return areFirAnnotationsEqual(
             expectAnnotation.getFirAnnotation(),
             actualAnnotation.getFirAnnotation(),
-            collectionArgumentsCompatibilityCheckStrategy,
-            actualSession
+            collectionArgumentsCompatibilityCheckStrategy
         )
     }
 
@@ -488,6 +506,9 @@ class FirExpectActualMatchingContextImpl private constructor(
 
         override val isOptIn: Boolean
             get() = getAnnotationClass()?.hasAnnotation(OptInNames.REQUIRES_OPT_IN_CLASS_ID, actualSession) ?: false
+
+        override val isOptionalExpectation: Boolean
+            get() = getAnnotationClass()?.hasAnnotation(StandardClassIds.Annotations.OptionalExpectation, actualSession) ?: false
 
         private fun getAnnotationClass(): FirRegularClassSymbol? =
             getAnnotationConeType()?.toRegularClassSymbol(actualSession)
@@ -531,7 +552,7 @@ class FirExpectActualMatchingContextImpl private constructor(
     ) {
         if (containingExpectClassSymbol == null || containingActualClassSymbol == null) return
 
-        for ((incompatibility, actualSymbols) in actualSymbolsByIncompatibility.entries) {
+        for ([incompatibility, actualSymbols] in actualSymbolsByIncompatibility.entries) {
             for (actualSymbol in actualSymbols) {
                 containingActualClassSymbol.asSymbol().addMemberExpectForActualMapping(
                     expectSymbol.asSymbol(),
@@ -548,12 +569,10 @@ class FirExpectActualMatchingContextImpl private constructor(
         expectClassSymbol: FirRegularClassSymbol, compatibility: ExpectActualMatchingCompatibility,
     ) {
         check(allowedWritingMemberExpectForActualMapping) { "Writing memberExpectForActual is not allowed in this context" }
-        val fir = fir
-        val expectForActualMap = fir.memberExpectForActual ?: mutableMapOf()
-        fir.memberExpectForActual = expectForActualMap
+        val expectForActualMap = actualSession.expectActualMappingStorage.cache.getValue(this)
 
-        val expectToCompatibilityMap = expectForActualMap.asMutableMap()
-            .computeIfAbsent(actualMember to expectClassSymbol) { mutableMapOf() }
+        val expectToCompatibilityMap = expectForActualMap
+            .computeIfAbsent(actualMember to expectClassSymbol) { ConcurrentHashMap() }
 
         /*
         Don't report when value is overwritten, because it's the case for actual inner classes:
@@ -564,10 +583,8 @@ class FirExpectActualMatchingContextImpl private constructor(
         }
         Can be fixed after KT-61361.
          */
-        expectToCompatibilityMap.asMutableMap()[expectMember] = compatibility
+        expectToCompatibilityMap[expectMember] = compatibility
     }
-
-    private fun <K, V> Map<K, V>.asMutableMap(): MutableMap<K, V> = this as MutableMap
 
     override val checkClassScopesForAnnotationCompatibility: Boolean = true
 
@@ -580,7 +597,7 @@ class FirExpectActualMatchingContextImpl private constructor(
         actualClass: RegularClassSymbolMarker,
         actualMember: DeclarationSymbolMarker,
     ): Map<FirBasedSymbol<*>, ExpectActualMatchingCompatibility> {
-        val mapping = actualClass.asSymbol().fir.memberExpectForActual
+        val mapping = actualSession.expectActualMappingStorage.cache.getValueIfComputed(actualClass.asSymbol())
         return mapping?.get(actualMember to expectClass) ?: emptyMap()
     }
 
@@ -628,11 +645,11 @@ class FirExpectActualMatchingContextImpl private constructor(
             expectDelegatedTypeRef is FirUserTypeRef && actualDelegatedTypeRef is FirUserTypeRef -> {
                 val expectQualifier = expectDelegatedTypeRef.qualifier
                 val actualQualifier = actualDelegatedTypeRef.qualifier
-                for ((expectPart, actualPart) in expectQualifier.zipIfSizesAreEqual(actualQualifier).orEmpty()) {
+                for ([expectPart, actualPart] in expectQualifier.zipIfSizesAreEqual(actualQualifier).orEmpty()) {
                     val expectPartTypeArguments = expectPart.typeArgumentList.typeArguments
                     val actualPartTypeArguments = actualPart.typeArgumentList.typeArguments
                     val zippedArgs = expectPartTypeArguments.zipIfSizesAreEqual(actualPartTypeArguments).orEmpty()
-                    for ((expectTypeArgument, actualTypeArgument) in zippedArgs) {
+                    for ([expectTypeArgument, actualTypeArgument] in zippedArgs) {
                         if (expectTypeArgument !is FirTypeProjectionWithVariance || actualTypeArgument !is FirTypeProjectionWithVariance) {
                             continue
                         }
@@ -655,10 +672,18 @@ class FirExpectActualMatchingContextImpl private constructor(
 
                 val expectParams = expectDelegatedTypeRef.parameters
                 val actualParams = actualDelegatedTypeRef.parameters
-                for ((expectParam, actualParam) in expectParams.zipIfSizesAreEqual(actualParams).orEmpty()) {
+                for ([expectParam, actualParam] in expectParams.zipIfSizesAreEqual(actualParams).orEmpty()) {
                     checkAnnotationsOnTypeRefAndArgumentsImpl(
                         expectContainingSymbol, actualContainingSymbol,
                         expectParam.returnTypeRef, actualParam.returnTypeRef, checker
+                    )
+                }
+                val expectContextParameters = expectDelegatedTypeRef.contextParameterTypeRefs
+                val actualContextParameters = actualDelegatedTypeRef.contextParameterTypeRefs
+                for ([expectParam, actualParam] in expectContextParameters.zipIfSizesAreEqual(actualContextParameters).orEmpty()) {
+                    checkAnnotationsOnTypeRefAndArgumentsImpl(
+                        expectContainingSymbol, actualContainingSymbol,
+                        expectParam, actualParam, checker
                     )
                 }
             }

@@ -1,0 +1,1309 @@
+KtFile: 'multiEquals.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtClass(0,103): 'abstract class ItemCallback<T> {'
+  null
+
+KtDeclarationModifierList(0,8): 'abstract'
+  null
+
+KtTypeParameterList(27,30): '<T>'
+  null
+
+KtTypeParameter(28,29): 'T'
+  null
+
+KtClassBody(31,103): '{'
+  null
+
+KtNamedFunction(37,101): 'abstract fun areContentsTheSame(oldItem: T, newItem: T): Boolean'
+  null
+
+KtDeclarationModifierList(37,45): 'abstract'
+  null
+
+KtParameterList(68,92): '(oldItem: T, newItem: T)'
+  null
+
+KtParameter(69,79): 'oldItem: T'
+  null
+
+KtTypeReference(78,79): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(78,79): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(78,79): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtParameter(81,91): 'newItem: T'
+  null
+
+KtTypeReference(90,91): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(90,91): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(90,91): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(94,101): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtUserType(94,101): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtNameReferenceExpression(94,101): 'Boolean'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtClass(105,191): 'sealed class MessagePreview {'
+  null
+
+KtDeclarationModifierList(105,111): 'sealed'
+  null
+
+KtClassBody(133,191): '{'
+  null
+
+KtNamedFunction(139,189): 'abstract override fun equals(other: Any?): Boolean'
+  null
+
+KtDeclarationModifierList(139,156): 'abstract override'
+  null
+
+KtParameterList(167,180): '(other: Any?)'
+  null
+
+KtParameter(168,179): 'other: Any?'
+  null
+
+KtTypeReference(175,179): 'Any?'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtNullableType(175,179): 'Any?'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtUserType(175,178): 'Any'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtNameReferenceExpression(175,178): 'Any'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtTypeReference(182,189): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtUserType(182,189): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtNameReferenceExpression(182,189): 'Boolean'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtClass(193,272): 'interface InterfaceWithEquals {'
+  null
+
+KtClassBody(223,272): '{'
+  null
+
+KtNamedFunction(229,270): 'override fun equals(other: Any?): Boolean'
+  null
+
+KtDeclarationModifierList(229,237): 'override'
+  null
+
+KtParameterList(248,261): '(other: Any?)'
+  null
+
+KtParameter(249,260): 'other: Any?'
+  null
+
+KtTypeReference(256,260): 'Any?'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtNullableType(256,260): 'Any?'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtUserType(256,259): 'Any'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtNameReferenceExpression(256,259): 'Any'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtTypeReference(263,270): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtUserType(263,270): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtNameReferenceExpression(263,270): 'Boolean'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtNamedFunction(274,499): 'private fun <T> interfaceAndClass(): ItemCallback<T> where T : InterfaceWithEquals, T : MessagePreview = object : ItemCallback<T>() {'
+  null
+
+KtDeclarationModifierList(274,281): 'private'
+  null
+
+KtTypeParameterList(286,289): '<T>'
+  null
+
+KtTypeParameter(287,288): 'T'
+  null
+
+KtParameterList(307,309): '()'
+  null
+
+KtTypeReference(311,326): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtUserType(311,326): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtNameReferenceExpression(311,323): 'ItemCallback'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtTypeArgumentList(323,326): '<T>'
+  null
+
+KtTypeProjection(324,325): 'T'
+  null
+
+KtTypeReference(324,325): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(324,325): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(324,325): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeConstraintList(333,376): 'T : InterfaceWithEquals, T : MessagePreview'
+  null
+
+KtTypeConstraint(333,356): 'T : InterfaceWithEquals'
+  null
+
+KtNameReferenceExpression(333,334): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(337,356): 'InterfaceWithEquals'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtUserType(337,356): 'InterfaceWithEquals'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtNameReferenceExpression(337,356): 'InterfaceWithEquals'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtTypeConstraint(358,376): 'T : MessagePreview'
+  null
+
+KtNameReferenceExpression(358,359): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(362,376): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtUserType(362,376): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtNameReferenceExpression(362,376): 'MessagePreview'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtObjectLiteralExpression(379,499): 'object : ItemCallback<T>() {'
+  null
+
+KtObjectDeclaration(379,499): 'object : ItemCallback<T>() {'
+  null
+
+KtSuperTypeList(388,405): 'ItemCallback<T>()'
+  null
+
+KtSuperTypeCallEntry(388,405): 'ItemCallback<T>()'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): ItemCallback<T>
+    ]
+
+KtConstructorCalleeExpression(388,403): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): ItemCallback<T>
+    ]
+
+KtTypeReference(388,403): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtUserType(388,403): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtNameReferenceExpression(388,400): 'ItemCallback'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtTypeArgumentList(400,403): '<T>'
+  null
+
+KtTypeProjection(401,402): 'T'
+  null
+
+KtTypeReference(401,402): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(401,402): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(401,402): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtValueArgumentList(403,405): '()'
+  null
+
+KtClassBody(406,499): '{'
+  null
+
+KtNamedFunction(412,497): 'override fun areContentsTheSame(oldItem: T, newItem: T): Boolean = oldItem == newItem'
+  null
+
+KtDeclarationModifierList(412,420): 'override'
+  null
+
+KtParameterList(443,467): '(oldItem: T, newItem: T)'
+  null
+
+KtParameter(444,454): 'oldItem: T'
+  null
+
+KtTypeReference(453,454): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(453,454): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(453,454): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtParameter(456,466): 'newItem: T'
+  null
+
+KtTypeReference(465,466): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(465,466): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(465,466): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(469,476): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtUserType(469,476): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtNameReferenceExpression(469,476): 'Boolean'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtBinaryExpression(479,497): 'oldItem == newItem'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(479,486): 'oldItem'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      oldItem: T
+    ]
+
+KtOperationReferenceExpression(487,489): '=='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(490,497): 'newItem'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      newItem: T
+    ]
+
+KtNamedFunction(501,726): 'private fun <T> classAndInterface(): ItemCallback<T> where T : MessagePreview, T : InterfaceWithEquals = object : ItemCallback<T>() {'
+  null
+
+KtDeclarationModifierList(501,508): 'private'
+  null
+
+KtTypeParameterList(513,516): '<T>'
+  null
+
+KtTypeParameter(514,515): 'T'
+  null
+
+KtParameterList(534,536): '()'
+  null
+
+KtTypeReference(538,553): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtUserType(538,553): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtNameReferenceExpression(538,550): 'ItemCallback'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtTypeArgumentList(550,553): '<T>'
+  null
+
+KtTypeProjection(551,552): 'T'
+  null
+
+KtTypeReference(551,552): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(551,552): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(551,552): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeConstraintList(560,603): 'T : MessagePreview, T : InterfaceWithEquals'
+  null
+
+KtTypeConstraint(560,578): 'T : MessagePreview'
+  null
+
+KtNameReferenceExpression(560,561): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(564,578): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtUserType(564,578): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtNameReferenceExpression(564,578): 'MessagePreview'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtTypeConstraint(580,603): 'T : InterfaceWithEquals'
+  null
+
+KtNameReferenceExpression(580,581): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(584,603): 'InterfaceWithEquals'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtUserType(584,603): 'InterfaceWithEquals'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtNameReferenceExpression(584,603): 'InterfaceWithEquals'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtObjectLiteralExpression(606,726): 'object : ItemCallback<T>() {'
+  null
+
+KtObjectDeclaration(606,726): 'object : ItemCallback<T>() {'
+  null
+
+KtSuperTypeList(615,632): 'ItemCallback<T>()'
+  null
+
+KtSuperTypeCallEntry(615,632): 'ItemCallback<T>()'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): ItemCallback<T>
+    ]
+
+KtConstructorCalleeExpression(615,630): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): ItemCallback<T>
+    ]
+
+KtTypeReference(615,630): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtUserType(615,630): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtNameReferenceExpression(615,627): 'ItemCallback'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtTypeArgumentList(627,630): '<T>'
+  null
+
+KtTypeProjection(628,629): 'T'
+  null
+
+KtTypeReference(628,629): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(628,629): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(628,629): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtValueArgumentList(630,632): '()'
+  null
+
+KtClassBody(633,726): '{'
+  null
+
+KtNamedFunction(639,724): 'override fun areContentsTheSame(oldItem: T, newItem: T): Boolean = oldItem == newItem'
+  null
+
+KtDeclarationModifierList(639,647): 'override'
+  null
+
+KtParameterList(670,694): '(oldItem: T, newItem: T)'
+  null
+
+KtParameter(671,681): 'oldItem: T'
+  null
+
+KtTypeReference(680,681): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(680,681): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(680,681): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtParameter(683,693): 'newItem: T'
+  null
+
+KtTypeReference(692,693): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(692,693): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(692,693): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(696,703): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtUserType(696,703): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtNameReferenceExpression(696,703): 'Boolean'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtBinaryExpression(706,724): 'oldItem == newItem'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(706,713): 'oldItem'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      oldItem: T
+    ]
+
+KtOperationReferenceExpression(714,716): '=='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(717,724): 'newItem'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      newItem: T
+    ]
+
+KtNamedFunction(728,895): 'private fun <T : MessagePreview> classOnly() = object : ItemCallback<T>() {'
+  null
+
+KtDeclarationModifierList(728,735): 'private'
+  null
+
+KtTypeParameterList(740,760): '<T : MessagePreview>'
+  null
+
+KtTypeParameter(741,759): 'T : MessagePreview'
+  null
+
+KtTypeReference(745,759): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtUserType(745,759): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtNameReferenceExpression(745,759): 'MessagePreview'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtParameterList(770,772): '()'
+  null
+
+KtObjectLiteralExpression(775,895): 'object : ItemCallback<T>() {'
+  null
+
+KtObjectDeclaration(775,895): 'object : ItemCallback<T>() {'
+  null
+
+KtSuperTypeList(784,801): 'ItemCallback<T>()'
+  null
+
+KtSuperTypeCallEntry(784,801): 'ItemCallback<T>()'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): ItemCallback<T>
+    ]
+
+KtConstructorCalleeExpression(784,799): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): ItemCallback<T>
+    ]
+
+KtTypeReference(784,799): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtUserType(784,799): 'ItemCallback<T>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtNameReferenceExpression(784,796): 'ItemCallback'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /ItemCallback
+    ]
+
+KtTypeArgumentList(796,799): '<T>'
+  null
+
+KtTypeProjection(797,798): 'T'
+  null
+
+KtTypeReference(797,798): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(797,798): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(797,798): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtValueArgumentList(799,801): '()'
+  null
+
+KtClassBody(802,895): '{'
+  null
+
+KtNamedFunction(808,893): 'override fun areContentsTheSame(oldItem: T, newItem: T): Boolean = oldItem == newItem'
+  null
+
+KtDeclarationModifierList(808,816): 'override'
+  null
+
+KtParameterList(839,863): '(oldItem: T, newItem: T)'
+  null
+
+KtParameter(840,850): 'oldItem: T'
+  null
+
+KtTypeReference(849,850): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(849,850): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(849,850): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtParameter(852,862): 'newItem: T'
+  null
+
+KtTypeReference(861,862): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(861,862): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(861,862): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(865,872): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtUserType(865,872): 'Boolean'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtNameReferenceExpression(865,872): 'Boolean'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Boolean
+    ]
+
+KtBinaryExpression(875,893): 'oldItem == newItem'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(875,882): 'oldItem'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      oldItem: T
+    ]
+
+KtOperationReferenceExpression(883,885): '=='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(886,893): 'newItem'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      newItem: T
+    ]
+
+KtNamedFunction(897,1031): 'fun check(i: InterfaceWithEquals, m: MessagePreview) {'
+  null
+
+KtParameterList(906,949): '(i: InterfaceWithEquals, m: MessagePreview)'
+  null
+
+KtParameter(907,929): 'i: InterfaceWithEquals'
+  null
+
+KtTypeReference(910,929): 'InterfaceWithEquals'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtUserType(910,929): 'InterfaceWithEquals'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtNameReferenceExpression(910,929): 'InterfaceWithEquals'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals
+    ]
+
+KtParameter(931,948): 'm: MessagePreview'
+  null
+
+KtTypeReference(934,948): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtUserType(934,948): 'MessagePreview'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtNameReferenceExpression(934,948): 'MessagePreview'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview
+    ]
+
+KtBlockExpression(950,1031): '{'
+  null
+
+KtBinaryExpression(956,962): 'i == m'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(956,957): 'i'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      i: InterfaceWithEquals
+    ]
+
+KtOperationReferenceExpression(958,960): '=='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(961,962): 'm'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      m: MessagePreview
+    ]
+
+KtBinaryExpression(967,973): 'i != m'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(967,968): 'i'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      i: InterfaceWithEquals
+    ]
+
+KtOperationReferenceExpression(969,971): '!='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(972,973): 'm'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      m: MessagePreview
+    ]
+
+KtBinaryExpression(979,985): 'm == i'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(979,980): 'm'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      m: MessagePreview
+    ]
+
+KtOperationReferenceExpression(981,983): '=='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(984,985): 'i'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      i: InterfaceWithEquals
+    ]
+
+KtBinaryExpression(990,996): 'm != i'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(990,991): 'm'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      m: MessagePreview
+    ]
+
+KtOperationReferenceExpression(992,994): '!='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(995,996): 'i'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      i: InterfaceWithEquals
+    ]
+
+KtDotQualifiedExpression(1002,1013): 'i.equals(m)'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(1002,1003): 'i'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      i: InterfaceWithEquals
+    ]
+
+KtCallExpression(1004,1013): 'equals(m)'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(1004,1010): 'equals'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /InterfaceWithEquals.equals(<dispatch receiver>: InterfaceWithEquals, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtValueArgumentList(1010,1013): '(m)'
+  null
+
+KtValueArgument(1011,1012): 'm'
+  null
+
+KtNameReferenceExpression(1011,1012): 'm'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      m: MessagePreview
+    ]
+
+KtDotQualifiedExpression(1018,1029): 'm.equals(i)'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(1018,1019): 'm'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      m: MessagePreview
+    ]
+
+KtCallExpression(1020,1029): 'equals(i)'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtNameReferenceExpression(1020,1026): 'equals'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MessagePreview.equals(<dispatch receiver>: MessagePreview, other: kotlin.Any?): kotlin.Boolean
+    ]
+
+KtValueArgumentList(1026,1029): '(i)'
+  null
+
+KtValueArgument(1027,1028): 'i'
+  null
+
+KtNameReferenceExpression(1027,1028): 'i'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      i: InterfaceWithEquals
+    ]

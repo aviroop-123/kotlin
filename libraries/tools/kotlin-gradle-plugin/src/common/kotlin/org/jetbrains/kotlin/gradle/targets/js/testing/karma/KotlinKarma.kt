@@ -12,11 +12,9 @@ import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.internal.tasks.testing.TestResultProcessor
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
-import org.gradle.api.provider.ProviderFactory
 import org.gradle.internal.logging.progress.ProgressLogger
-import org.gradle.internal.service.ServiceRegistry
-import org.gradle.process.ProcessForkOptions
 import org.jetbrains.kotlin.gradle.internal.*
 import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesClientSettings
 import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesTestExecutionSpec
@@ -35,18 +33,15 @@ import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProject
 import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProjectModules
 import org.jetbrains.kotlin.gradle.targets.js.npm.npmProject
 import org.jetbrains.kotlin.gradle.targets.js.testing.*
-import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTestFramework.Companion.CREATE_TEST_EXEC_SPEC_DEPRECATION_MSG
-import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTestFramework.Companion.createTestExecutionSpecDeprecated
 import org.jetbrains.kotlin.gradle.targets.js.webTargetVariant
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
+import org.jetbrains.kotlin.gradle.targets.wasm.internal.isWasm
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.web.nodejs.BaseNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.web.nodejs.BaseNodeJsRootExtension
-import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 import org.jetbrains.kotlin.gradle.utils.appendLine
 import org.jetbrains.kotlin.gradle.utils.getFile
 import org.jetbrains.kotlin.gradle.utils.getValue
-import org.jetbrains.kotlin.gradle.utils.processes.ExecAsyncHandle
 import org.jetbrains.kotlin.gradle.utils.processes.ProcessLaunchOptions
 import org.jetbrains.kotlin.gradle.utils.property
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
@@ -61,21 +56,7 @@ class KotlinKarma internal constructor(
     override val compilation: KotlinJsIrCompilation,
     private val basePath: String,
     private val objects: ObjectFactory,
-    private val providers: ProviderFactory,
 ) : KotlinJsTestFramework {
-
-    @Deprecated("Manually creating instances of this class is deprecated. Scheduled for removal in Kotlin 2.4.")
-    constructor(
-        compilation: KotlinJsIrCompilation,
-        @Suppress("UNUSED_PARAMETER")
-        services: () -> ServiceRegistry,
-        basePath: String,
-    ) : this(
-        compilation = compilation,
-        basePath = basePath,
-        objects = compilation.target.project.objects,
-        providers = compilation.target.project.providers,
-    )
 
     @Transient
     private val project: Project = compilation.target.project
@@ -122,15 +103,13 @@ class KotlinKarma internal constructor(
 
     override val executable: Provider<String> = nodeJsEnvSpec.executable
 
+    @Deprecated("No longer used. Scheduled for removal in Kotlin 2.7.")
     override fun getPath() = "$basePath:kotlinKarma"
 
     override val settingsState: String
         get() = "KotlinKarma($config)"
 
-    internal val isWasm: Boolean = compilation.webTargetVariant(
-        jsVariant = false,
-        wasmVariant = true,
-    )
+    internal val isWasm: Boolean = compilation.isWasm
 
     internal val npmToolingDir: DirectoryProperty = project.objects.directoryProperty().fileProvider(
         compilation.webTargetVariant(
@@ -138,6 +117,17 @@ class KotlinKarma internal constructor(
             { (nodeJsRoot as WasmNodeJsRootExtension).npmTooling.map { it.dir } },
         )
     )
+
+    /**
+     * Used by IntelliJ IDEA to determine which Karma URL should be opened in a browser when starting a debug session.
+     *
+     * Historically, debugging opened the dedicated Karma debug page "/debug.html". We now default to the main page "/".
+     * If you prefer the previous behavior, you can override this property to "/debug.html" (or any other valid Karma page).
+     *
+     * Note: This property is read by IntelliJ IDEA on debugging; changing it affects which page IDEA opens for Karma WASM/JS tests in debug case.
+     */
+    @Suppress("unused")
+    val debugPath: Property<String> = project.objects.property<String>().convention("/")
 
     val webpackConfig = KotlinWebpackConfig(
         npmProjectDir = npmProjectDir.map { it.asFile },
@@ -152,7 +142,8 @@ class KotlinKarma internal constructor(
         progressReporter = true,
         rules = project.objects.webpackRulesContainer(),
         experiments = mutableSetOf("topLevelAwait"),
-        resolveLoadersFromKotlinToolingDir = isWasm
+        resolveLoadersFromKotlinToolingDir = isWasm,
+        defineNonBrowserEnvironmentProperties = objects.property<Boolean>().convention(isWasm),
     )
 
     init {
@@ -174,7 +165,7 @@ class KotlinKarma internal constructor(
         val propValue = project.kotlinPropertiesProvider.jsKarmaBrowsers(compilation.target)
         val propBrowsers = propValue?.split(",")
         propBrowsers?.map(String::trim)?.forEach {
-            @Suppress("DEPRECATION")
+            @Suppress("DEPRECATION_ERROR")
             when (it.toLowerCaseAsciiOnly()) {
                 "chrome" -> useChrome()
                 "chrome-canary" -> useChromeCanary()
@@ -193,7 +184,6 @@ class KotlinKarma internal constructor(
                 "firefox-nightly-headless" -> useFirefoxNightlyHeadless()
                 "ie" -> useIe()
                 "opera" -> useOpera()
-                "phantom-js" -> usePhantomJS()
                 "safari" -> useSafari()
                 else -> project.logger.warn("Unrecognised `kotlin.js.browser.karma.browsers` value [$it]. Ignoring...")
             }
@@ -283,11 +273,6 @@ class KotlinKarma internal constructor(
         }
 
         useChromeLike(debuggableChrome)
-    }
-
-    @Deprecated("It is not supported anymore. Scheduled for removal in Kotlin 2.4.")
-    fun usePhantomJS() {
-        project.logger.warn("PhantomJS is not supported anymore. Use other browsers instead.")
     }
 
     private fun useFirefoxLike(id: String) = useBrowser(id, versions.karmaFirefoxLauncher)
@@ -552,9 +537,9 @@ class KotlinKarma internal constructor(
                             }
                     }
 
-                    override fun testFailedMessage(execHandle: ExecAsyncHandle, exitValue: Int): String {
+                    override fun testFailedMessage(displayName: String, exitValue: Int): String {
                         if (failedBrowsers.isEmpty()) {
-                            return super.testFailedMessage(execHandle, exitValue)
+                            return super.testFailedMessage(displayName, exitValue)
                         }
 
                         val failedBrowsers = failedBrowsers
@@ -619,26 +604,6 @@ class KotlinKarma internal constructor(
         appendConfigsFromDir(configDirectory)
         appendLine()
     }
-
-    @Deprecated(
-        CREATE_TEST_EXEC_SPEC_DEPRECATION_MSG,
-        ReplaceWith("createTestExecutionSpec(task, launchOpts, nodeJsArgs, debug)"),
-        DeprecationLevel.ERROR
-    )
-    override fun createTestExecutionSpec(
-        task: KotlinJsTest,
-        forkOptions: ProcessForkOptions,
-        nodeJsArgs: MutableList<String>,
-        debug: Boolean,
-    ): TCServiceMessagesTestExecutionSpec =
-        createTestExecutionSpecDeprecated(
-            task = task,
-            forkOptions = forkOptions,
-            nodeJsArgs = nodeJsArgs,
-            debug = debug,
-            objects = objects,
-            providers = providers,
-        )
 }
 
 // In Karma config it means relative path based on basePath which is configured inside Karma config
@@ -693,11 +658,23 @@ internal fun writeConfig(
 
     config.files.add(modules.require("kotlin-web-helpers/dist/kotlin-test-karma-runner.js"))
 
-    if (debug) {
-        config.singleRun = false
-        config.autoWatch = true
+    val newConfJsWriters = confJsWriters.toMutableList()
 
+    if (debug) {
         config.browsers.clear()
+
+        newConfJsWriters.add {
+            //language=ES6
+            it.appendLine(
+                """
+                        config.plugins = config.plugins || [];
+                        
+                        config.plugins.push('kotlin-web-helpers/dist/karma-kotlin-debug-plugin.js');
+                    """.trimIndent()
+            )
+        }
+
+        config.frameworks.add("karma-kotlin-debug")
     }
 
     if (platformType != KotlinPlatformType.wasm) {
@@ -748,7 +725,7 @@ internal fun writeConfig(
             .toJson(config, confWriter)
         confWriter.println(");")
 
-        confJsWriters.forEach { it(confWriter) }
+        newConfJsWriters.forEach { it(confWriter) }
 
         writerAction(confWriter)
 

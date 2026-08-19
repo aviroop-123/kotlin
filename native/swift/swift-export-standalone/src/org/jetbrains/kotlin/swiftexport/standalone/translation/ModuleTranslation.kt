@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.swiftexport.standalone.translation
 
 import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.klib.reader.getAllClassifiers
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaLibraryModule
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassLikeSymbol
 import org.jetbrains.kotlin.name.FqName
@@ -28,7 +29,6 @@ import org.jetbrains.kotlin.swiftexport.standalone.builders.buildSirSession
 import org.jetbrains.kotlin.swiftexport.standalone.builders.translateModule
 import org.jetbrains.kotlin.swiftexport.standalone.config.SwiftExportConfig
 import org.jetbrains.kotlin.swiftexport.standalone.config.SwiftModuleConfig
-import org.jetbrains.kotlin.swiftexport.standalone.klib.getAllClassifiers
 import org.jetbrains.kotlin.swiftexport.standalone.writer.BridgeSources
 import org.jetbrains.kotlin.utils.addIfNotNull
 import org.jetbrains.sir.printer.SirPrinter
@@ -53,7 +53,7 @@ internal fun translateModulePublicApi(module: InputModule, kaModules: KaModules,
             val sirModule = translateModule(
                 module = kaModules.mainModules.single { it.libraryName == module.name }
             )
-            createTranslationResult(sirModule, config, module.config, externalTypeDeclarationReferences)
+            createTranslationResult(sirModule, config, module.config, kaModules, externalTypeDeclarationReferences)
         }
     }
 }
@@ -85,7 +85,7 @@ internal fun translateCrossReferencingModulesTransitively(
     config: SwiftExportConfig,
 ): List<TranslationResult> {
     val translationStates = typeDeclarationReferences
-        .map { (module, references) ->
+        .map { [module, references] ->
             ModuleTransitiveTranslationState(
                 kaModule = module,
                 moduleConfig = kaModules.configFor(module),
@@ -141,6 +141,7 @@ internal fun translateCrossReferencingModulesTransitively(
                 sirModule,
                 config,
                 it.moduleConfig,
+                kaModules,
                 emptyMap(),
             )
         }
@@ -152,11 +153,15 @@ private fun createTranslationResult(
     sirModule: SirModule,
     config: SwiftExportConfig,
     moduleConfig: SwiftModuleConfig,
+    kaModules: KaModules,
     externalTypeDeclarationReferences: Map<KaLibraryModule, List<FqName>>,
 ): TranslationResult {
     // Assume that parts of the KotlinRuntimeSupport and KotlinRuntime module are used.
     // It might not be the case, but precise tracking seems like an overkill at the moment.
     sirModule.updateImport(SirImport(config.runtimeSupportModuleName))
+    if (config.enableCoroutinesSupport) {
+        sirModule.updateImport(SirImport(config.coroutineSupportModuleName, SirImport.Mode.Exported))
+    }
     sirModule.updateImport(SirImport(config.runtimeModuleName))
 
     // Conflicts may have arisen from the package flattening process
@@ -172,7 +177,9 @@ private fun createTranslationResult(
     // Serialize SirModule to sources to avoid leakage of SirSession (and KaSession, likely) outside the analyze call.
     val swiftSourceCode = printer.print(sirModule).swiftSource.joinToString("\n")
 
-    val knownModuleNames = setOf(KotlinRuntimeModule.name, bridgeModuleName) + config.platformLibsInputModule.map { it.name }
+    val knownModuleNames = setOf(KotlinRuntimeModule.name, bridgeModuleName) +
+            kaModules.platformLibraries.map { it.libraryName } +
+            kaModules.cinteropReexportLibraries.map { it.libraryName }
     val referencedSwiftModules = sirModule.imports
         .filter { it.moduleName !in knownModuleNames }
         .map { SwiftExportModule.Reference(it.moduleName) }
@@ -276,7 +283,7 @@ private fun SirMutableDeclarationContainer.removeConflicts(logger: SwiftExportLo
 private val SirDeclaration.priority: Int get() = when (this) {
         is SirVariable -> 10
         is SirFunction -> 20
-        is SirNamedDeclaration -> 30
+        is SirScopeDefiningDeclaration -> 30
         else -> 0
     }.let {
         if (this.origin is SirOrigin.Trampoline)

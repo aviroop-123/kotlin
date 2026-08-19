@@ -9,16 +9,21 @@ import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.LowMemoryWatcher
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.fir.utils.KaFirCacheCleaner
 import org.jetbrains.kotlin.analysis.api.impl.base.sessions.KaBaseSessionProvider
+import org.jetbrains.kotlin.analysis.api.impl.base.util.withKaModuleEntry
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
 import org.jetbrains.kotlin.analysis.api.permissions.KaAnalysisPermissionRegistry
+import org.jetbrains.kotlin.analysis.api.platform.KotlinAnalysisInWriteActionListener
 import org.jetbrains.kotlin.analysis.api.platform.KaCachedService
+import org.jetbrains.kotlin.analysis.api.platform.analysisMessageBus
 import org.jetbrains.kotlin.analysis.api.platform.lifetime.KotlinReadActionConfinementLifetimeToken
 import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileModule
@@ -28,12 +33,17 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirInternals
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.file.structure.LLFirDeclarationModificationService
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionCache
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationListener
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationTopics
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCache
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationListener
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationTopics
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.structure.LLSessionStructureWriter
 import org.jetbrains.kotlin.analysis.low.level.api.fir.statistics.LLStatisticsService
 import org.jetbrains.kotlin.analysis.low.level.api.fir.statistics.domains.LLAnalysisSessionStatistics
 import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
+import java.nio.file.Files
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
@@ -51,7 +61,7 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
      * [KaFirSession]s will be removed even when the cache is not accessed. While the [KaFirSession] will have been garbage-collected, the
      * maintenance also frees up the strong [KaModule] key, which can hold references to PSI.
      */
-    private val cache: Cache<KaModule, KaSession> = Caffeine.newBuilder().weakValues().build()
+    private val cache: Cache<KaModule, KaFirSession> = Caffeine.newBuilder().weakValues().build()
 
     private val lowMemoryWatcher: LowMemoryWatcher
 
@@ -65,6 +75,10 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
     @KaCachedService
     private val analysisSessionStatistics: LLAnalysisSessionStatistics? by lazy(LazyThreadSafetyMode.PUBLICATION) {
         LLStatisticsService.getInstance(project)?.analysisSessions
+    }
+
+    private val isSessionStructureLoggingEnabled by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        Registry.`is`("kotlin.analysis.sessionStructureLogging", false)
     }
 
     init {
@@ -103,9 +117,13 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
             }
 
             val identifier = tokenFactory.identifier
-            identifier.flushPendingChanges(project)
+            identifier.handleEnteringAnalysisInWriteAction(project)
 
-            return cache.get(useSiteModule, ::createAnalysisSession) ?: error("`createAnalysisSession` must not return `null`.")
+            val session = cache.get(useSiteModule, ::createAnalysisSession)
+                ?: error("`createAnalysisSession` must not return `null`.")
+
+            checkSessionValidity(session)
+            return session
         } catch (e: Throwable) {
             cacheCleaner.exitAnalysis()
             throw e
@@ -116,6 +134,14 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
         val resolutionFacade = useSiteKtModule.getResolutionFacade(project)
         val validityToken = tokenFactory.create(project, resolutionFacade.useSiteFirSession.createValidityTracker())
         return KaFirSession.createAnalysisSessionByResolutionFacade(resolutionFacade, validityToken)
+    }
+
+    private fun checkSessionValidity(session: KaFirSession) {
+        requireWithAttachment(session.token.isValid(), { "An analysis session acquired via `getAnalysisSession` must be valid." }) {
+            withKaModuleEntry("module", session.useSiteModule)
+            withEntry("firSessionIsValid", session.firSession.isValid.toString())
+            withEntry("firSessionInvalidationInformation", session.firSession.invalidationInformation)
+        }
     }
 
     override fun beforeEnteringAnalysis(session: KaSession, useSiteElement: KtElement) {
@@ -141,16 +167,20 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
     }
 
     override fun afterLeavingAnalysis(session: KaSession, useSiteElement: KtElement) {
-        try {
-            super.afterLeavingAnalysis(session, useSiteElement)
-        } finally {
-            cacheCleaner.exitAnalysis()
-        }
+        afterLeavingAnalysisImpl { super.afterLeavingAnalysis(session, useSiteElement) }
     }
 
     override fun afterLeavingAnalysis(session: KaSession, useSiteModule: KaModule) {
+        afterLeavingAnalysisImpl { super.afterLeavingAnalysis(session, useSiteModule) }
+    }
+
+    private inline fun afterLeavingAnalysisImpl(superCall: () -> Unit) {
         try {
-            super.afterLeavingAnalysis(session, useSiteModule)
+            try {
+                superCall()
+            } finally {
+                tokenFactory.identifier.handleLeavingAnalysisInWriteAction(project)
+            }
         } finally {
             cacheCleaner.exitAnalysis()
         }
@@ -160,12 +190,48 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
      * Schedules cache removal on a low-memory event.
      *
      * We ask the cache cleaner to schedule a global cache cleanup. It has to wait until there is no ongoing analysis as
-     * [LLFirSessionCleaner][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionCleaner] called from [LLFirSessionCache]
+     * [LLFirSessionCleaner][org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCleaner] called from [LLFirSessionCache]
      * marks sessions invalid (and analyses in progress will be very surprised). [KaFirSession]s will also be invalidated during this step.
      */
     private fun handleLowMemoryEvent() {
         performCacheMaintenance()
+
+        // We have to log the session structure before all caches (including sessions) are cleaned.
+        logSessionStructure()
+
         cacheCleaner.scheduleCleanup()
+    }
+
+    /**
+     * Writes the *current* session structure to a GraphML file if `kotlin.analysis.sessionStructureLogging`. This feature is only intended
+     * for development purposes and can potentially lead to exceptions (e.g., during FIR element traversal). It must not be enabled in
+     * production.
+     *
+     * See [LLSessionStructureWriter] for a guide about how to use the GraphML file. The file itself is written to IntelliJ's log folder, or
+     * otherwise the log directory provided by [PathManager.getLogDir].
+     */
+    @OptIn(LLFirInternals::class)
+    private fun logSessionStructure() {
+        if (!isSessionStructureLoggingEnabled) return
+
+        val sessionCacheStorage = LLFirSessionCache.getInstance(project).storage
+        val analysisSessions = cache.asMap().values.toList()
+
+        val logDir = PathManager.getLogDir().resolve("session-structure")
+        Files.createDirectories(logDir)
+
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss-SSS"))
+        val logFile = logDir.resolve("session-structure-$timestamp.graphml")
+
+        // The cache traversal should NOT be executed in a read action. Otherwise, we might accidentally perform computations, which we want
+        // to avoid when logging the *current* session structure.
+        Files.newBufferedWriter(logFile).use { writer ->
+            LLSessionStructureWriter.writeSessionStructure(
+                storage = sessionCacheStorage,
+                analysisRoots = analysisSessions.map { it.firSession },
+                writer = writer,
+            )
+        }
     }
 
     override fun clearCaches() {
@@ -187,7 +253,8 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
                 ?: error("Expected the analysis session provider to be a `${KaFirSessionProvider::class.simpleName}`.")
 
         override fun afterInvalidation(modules: Set<KaModule>) {
-            modules.forEach { analysisSessionProvider.cache.invalidate(it) }
+            val cache = analysisSessionProvider.cache
+            modules.forEach { cache.invalidate(it) }
         }
 
         override fun afterGlobalInvalidation() {
@@ -201,13 +268,22 @@ internal class KaFirSessionProvider(project: Project) : KaBaseSessionProvider(pr
     }
 }
 
-private fun KClass<out KaLifetimeToken>.flushPendingChanges(project: Project) {
-    if (this == KotlinReadActionConfinementLifetimeToken::class &&
-        KaAnalysisPermissionRegistry.getInstance().isAnalysisAllowedInWriteAction &&
-        ApplicationManager.getApplication().isWriteAccessAllowed
-    ) {
-        // We must flush modifications to publish local modifications into FIR tree
-        @OptIn(LLFirInternals::class)
-        LLFirDeclarationModificationService.getInstance(project).flushModifications()
+private fun KClass<out KaLifetimeToken>.handleEnteringAnalysisInWriteAction(project: Project) {
+    if (isAnalysisInWriteAction(this)) {
+        // As we are inside a write action, we must flush deferred modifications to materialize its effects up to this point.
+        LLFirDeclarationModificationService.getInstance(project).flushDeferredModifications()
+
+        project.analysisMessageBus.syncPublisher(KotlinAnalysisInWriteActionListener.TOPIC).onEnteringAnalysisInWriteAction()
     }
 }
+
+private fun KClass<out KaLifetimeToken>.handleLeavingAnalysisInWriteAction(project: Project) {
+    if (isAnalysisInWriteAction(this)) {
+        project.analysisMessageBus.syncPublisher(KotlinAnalysisInWriteActionListener.TOPIC).afterLeavingAnalysisInWriteAction()
+    }
+}
+
+private fun isAnalysisInWriteAction(lifetimeTokenIdentifier: KClass<out KaLifetimeToken>): Boolean =
+    lifetimeTokenIdentifier == KotlinReadActionConfinementLifetimeToken::class &&
+            KaAnalysisPermissionRegistry.getInstance().isAnalysisAllowedInWriteAction &&
+            ApplicationManager.getApplication().isWriteAccessAllowed

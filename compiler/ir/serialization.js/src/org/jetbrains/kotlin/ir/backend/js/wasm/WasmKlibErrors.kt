@@ -10,20 +10,29 @@ import org.jetbrains.kotlin.diagnostics.*
 import org.jetbrains.kotlin.diagnostics.rendering.BaseDiagnosticRendererFactory
 import org.jetbrains.kotlin.diagnostics.rendering.CommonRenderers
 import org.jetbrains.kotlin.diagnostics.rendering.Renderer
-import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibExport
+
+context(container: KtDiagnosticsContainer)
+private fun exportClashError() =
+    error3<PsiElement, String, String, List<WasmKlibExportingDeclaration>>()
 
 object WasmKlibErrors : KtDiagnosticsContainer() {
 
-    val EXPORTING_JS_NAME_CLASH by error2<PsiElement, String, List<JsKlibExport>>()
+    val EXPORTING_JS_NAME_CLASH by exportClashError()
+
+    val WASM_EXPORT_CLASH by exportClashError()
+
+    val EXPORTING_JS_NAME_WASM_EXPORT_CLASH by exportClashError()
+
+    val WASM_EXPORT_EXPORTING_JS_NAME_CLASH by exportClashError()
 
     override fun getRendererFactory(): BaseDiagnosticRendererFactory {
-        return KtDefaultJsKlibErrorMessages
+        return KtDefaultWasmKlibErrorMessages
     }
 }
 
-private object KtDefaultJsKlibErrorMessages : BaseDiagnosticRendererFactory() {
+private object KtDefaultWasmKlibErrorMessages : BaseDiagnosticRendererFactory() {
     @JvmField
-    val JS_KLIB_EXPORTS = Renderer<List<JsKlibExport>> { exports ->
+    val KLIB_EXPORTS_LIST = Renderer<List<WasmKlibExportingDeclaration>> { exports ->
         if (exports.size == 1) {
             exports.single().render()
         } else {
@@ -34,9 +43,31 @@ private object KtDefaultJsKlibErrorMessages : BaseDiagnosticRendererFactory() {
     override val MAP by KtDiagnosticFactoryToRendererMap("KT") { map ->
         map.put(
             WasmKlibErrors.EXPORTING_JS_NAME_CLASH,
-            "Exporting name ''{0}'' clashes with {1}",
+            "JsExport exporting name ''{0}'' of ''{1}'' clashes with exporting name(s) of JsExport(s) {2}",
             CommonRenderers.STRING,
-            JS_KLIB_EXPORTS
+            CommonRenderers.STRING,
+            KLIB_EXPORTS_LIST
+        )
+        map.put(
+            WasmKlibErrors.WASM_EXPORT_CLASH,
+            "WasmExport exporting name ''{0}'' of ''{1}'' clashes with exporting name(s) of WasmExport(s) {2}",
+            CommonRenderers.STRING,
+            CommonRenderers.STRING,
+            KLIB_EXPORTS_LIST
+        )
+        map.put(
+            WasmKlibErrors.EXPORTING_JS_NAME_WASM_EXPORT_CLASH,
+            "JsExport exporting name ''{0}'' of ''{1}'' clashes with exporting name(s) of WasmExport(s) {2}",
+            CommonRenderers.STRING,
+            CommonRenderers.STRING,
+            KLIB_EXPORTS_LIST
+        )
+        map.put(
+            WasmKlibErrors.WASM_EXPORT_EXPORTING_JS_NAME_CLASH,
+            "WasmExport exporting name ''{0}'' of ''{1}'' clashes with exporting name(s) of JsExport(s) {2}",
+            CommonRenderers.STRING,
+            CommonRenderers.STRING,
+            KLIB_EXPORTS_LIST
         )
     }
 }

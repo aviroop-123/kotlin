@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.compilerRunner
 
 import org.jetbrains.kotlin.cli.common.arguments.*
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Named
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -19,6 +20,7 @@ import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.withNullability
 import kotlin.reflect.jvm.javaField
 import kotlin.test.assertContentEquals
+import kotlin.test.assertNull
 import kotlin.test.fail
 
 class CompilerArgumentParsingTest {
@@ -47,6 +49,70 @@ class CompilerArgumentParsingTest {
                 compactArgumentValues = compactArgumentValues
             )
         )
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
+    fun `test - parsing argfile in compiler argument value results in error`(
+        type: KClass<out CommonToolArguments>,
+        seed: Int,
+        shortArgumentKeys: Boolean,
+        compactArgumentValues: Boolean,
+    ) {
+        val [_, parsedArguments, _] = runArgFileExpansionTest(type, shortArgumentKeys, compactArgumentValues, true)
+        assertEquals(
+            true,
+            parsedArguments.errors?.argumentsWithoutValue?.isNotEmpty() == true,
+            "Expected parsedArguments.errors.argumentsWithoutValue to be non-empty."
+        )
+    }
+
+
+    @ParameterizedTest
+    @MethodSource("parameters")
+    fun `test - parsing argfile in compiler argument value is correct with expandArgFileInValues=false`(
+        type: KClass<out CommonToolArguments>,
+        seed: Int,
+        shortArgumentKeys: Boolean,
+        compactArgumentValues: Boolean,
+    ) {
+        val [arguments, parsedArguments, argumentsAsStrings] = runArgFileExpansionTest(
+            type,
+            shortArgumentKeys,
+            compactArgumentValues,
+            false
+        )
+        assertNull(
+            parsedArguments.errors,
+            "Expected parsedArguments.errors to be null."
+        )
+        assertEqualArguments(arguments, parsedArguments)
+        assertEquals(
+            argumentsAsStrings,
+            parsedArguments.toArgumentStrings(
+                shortArgumentKeys = shortArgumentKeys,
+                compactArgumentValues = compactArgumentValues,
+                allowArgFileInValues = false
+            )
+        )
+    }
+
+    private fun runArgFileExpansionTest(
+        type: KClass<out CommonToolArguments>,
+        shortArgumentKeys: Boolean,
+        compactArgumentValues: Boolean,
+        expandArgFileInValues: Boolean,
+    ): Triple<CommonToolArguments, CommonToolArguments, List<String>> {
+        val constructor = type.constructors.find { it.parameters.isEmpty() } ?: error("Missing empty constructor on $type")
+        val arguments = constructor.call()
+        arguments.fillArgFileInStringArgument()
+        val argumentsAsStrings = arguments.toArgumentStrings(
+            shortArgumentKeys = shortArgumentKeys,
+            compactArgumentValues = compactArgumentValues,
+            allowArgFileInValues = expandArgFileInValues
+        )
+        val parsedArguments = parseCommandLineArguments(type, argumentsAsStrings)
+        return Triple(arguments, parsedArguments, argumentsAsStrings)
     }
 
     companion object {
@@ -106,6 +172,22 @@ private fun CommonToolArguments.fillRandomValues(random: Random) {
     }
 }
 
+private fun CommonToolArguments.fillArgFileInStringArgument() {
+    val property =
+        this::class.memberProperties.filterIsInstance<KMutableProperty1<*, String>>().firstOrNull {
+            it.returnType.withNullability(false) == typeOf<String>()
+                    && it.javaField?.declaredAnnotations?.filterIsInstance<Argument>()?.singleOrNull()?.value?.startsWith("-X") != true
+        }
+    Assumptions.assumeTrue(property != null)
+    @Suppress("UNCHECKED_CAST")
+    property as KMutableProperty1<Any, String>
+    runCatching {
+        property.set(this, "@unexistent_file")
+    }.getOrElse {
+        throw Throwable("Failed setting random value for: ${property.name}: ${property.returnType}", it)
+    }
+}
+
 private fun Random.randomString() = nextBytes(nextInt(8, 12)).let { data ->
     getEncoder().withoutPadding().encodeToString(data)
 }
@@ -134,8 +216,9 @@ fun Random.randomValue(type: KType): Any? {
         type == typeOf<Boolean>() -> randomBoolean()
         type == typeOf<Array<String>>() -> randomStringArray()
         type.isSubtypeOf(typeOf<List<*>>()) -> randomList(type.arguments.first().type ?: error("Missing elementType on $type"))
-        type == typeOf<InternalArgument>() -> return null
+        type == typeOf<ManualLanguageFeatureSetting>() -> null
         (type.classifier as? KClass<*>)?.isData == true -> null
+        type == typeOf<Map<ArgumentField, List<Any>>>() -> null
         else -> error("Unsupported type '$type'")
     }
 }

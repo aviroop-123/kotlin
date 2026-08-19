@@ -40,7 +40,7 @@ class ConeSubstitutorByMap private constructor(
 
             if (!allowIdenticalSubstitution) {
                 // If all arguments match parameters, then substitutor isn't needed
-                val substitutionIsIdentical = substitution.all { (parameterSymbol, argumentType) ->
+                val substitutionIsIdentical = substitution.all { [parameterSymbol, argumentType] ->
                     (argumentType as? ConeTypeParameterType)?.lookupTag?.typeParameterSymbol == parameterSymbol && !argumentType.isMarkedNullable
                 }
                 if (substitutionIsIdentical) {
@@ -59,7 +59,6 @@ class ConeSubstitutorByMap private constructor(
         if (type !is ConeTypeParameterType) return null
         return substitution[type.lookupTag.symbol]?.updateNullabilityIfNeeded(type)
             ?.withCombinedAttributesFrom(type)
-            ?: return null
     }
 
     override fun equals(other: Any?): Boolean {
@@ -76,7 +75,7 @@ class ConeSubstitutorByMap private constructor(
     override fun hashCode(): Int = hashCode
 
     override fun toString(): String {
-        return substitution.entries.joinToString(prefix = "{", postfix = "}", separator = " | ") { (param, type) ->
+        return substitution.entries.joinToString(prefix = "{", postfix = "}", separator = " | ") { [param, type] ->
             "${param.name} -> ${type.renderForDebugging()}"
         }
     }

@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.extractTypeParameters
 import org.jetbrains.kotlin.ir.util.getPackageFragment
 import org.jetbrains.kotlin.ir.util.hasAnnotation
+import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.types.Variance
@@ -152,15 +153,10 @@ abstract class FakeOverrideBuilderStrategy {
             property.acquireSymbol(IrPropertySymbolImpl())
 
             property.getter?.let {
-                it.correspondingPropertySymbol = property.symbol
                 linkFunctionFakeOverride(it as? IrFunctionWithLateBinding ?: error("Unexpected fake override getter: $it"), manglerCompatibleMode)
             }
             property.setter?.let {
-                it.correspondingPropertySymbol = property.symbol
                 linkFunctionFakeOverride(it as? IrFunctionWithLateBinding ?: error("Unexpected fake override setter: $it"), manglerCompatibleMode)
-            }
-            property.backingField?.let {
-                it.correspondingPropertySymbol = property.symbol
             }
         }
 
@@ -195,7 +191,10 @@ fun buildFakeOverrideMember(
 
     return CopyIrTreeWithSymbolsForFakeOverrides(member, substitutionMap, clazz)
         .copy()
-        .apply { makeExternal(clazz.isExternal) }
+        .apply {
+            if (clazz.isExternal) makeExternal(true)
+            else if (member.parentAsClass.isExternal) makeExternal(false)
+        }
 }
 
 // TODO: this is JS-specific functionality which should be moved out of the common ir.tree.

@@ -14,7 +14,9 @@ import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildConstructor
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
 import org.jetbrains.kotlin.ir.irAttribute
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
@@ -54,7 +56,7 @@ class KlibSyntheticAccessorGenerator(
             accessor.parent = parent
 
             accessor.copyTypeParametersFrom(source, IrDeclarationOrigin.SYNTHETIC_ACCESSOR)
-            accessor.copyValueParametersToStatic(source, IrDeclarationOrigin.SYNTHETIC_ACCESSOR)
+            accessor.copyParametersFrom(source)
             accessor.returnType = source.returnType.remapTypeParameters(source, accessor)
 
             accessor.addValueParameter(
@@ -93,6 +95,18 @@ class KlibSyntheticAccessorGenerator(
         contribute(PROPERTY_MARKER)
         contributeTopLevelDeclarationSuffix(field)
     }
+
+    override fun capturedTypeParametersOfSyntheticAccessor(declaration: IrDeclaration): List<IrTypeParameter> {
+        val classParent = declaration.parent as? IrClass ?: return listOf()
+        return if (classParent.isInner) {
+            classParent.typeParameters + capturedTypeParametersOfSyntheticAccessor(classParent)
+        } else {
+            classParent.typeParameters
+        }
+    }
+
+    override fun createAccessorMarkerArgument(): IrConst =
+        IrConstImpl.constNull(UNDEFINED_OFFSET, UNDEFINED_OFFSET, context.symbols.syntheticConstructorMarker.defaultType.makeNullable())
 
     private fun AccessorNameBuilder.contributeTopLevelDeclarationSuffix(declaration: IrDeclaration) {
         val parent = declaration.parent

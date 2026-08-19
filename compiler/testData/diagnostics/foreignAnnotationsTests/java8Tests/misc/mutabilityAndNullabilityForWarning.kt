@@ -1,7 +1,7 @@
-// NULLABILITY_ANNOTATIONS: @org.jetbrains.annotations:warn
+// NULLABILITY_ANNOTATIONS: @org.jetbrains.annotations.Nullable:warn
 // DIAGNOSTICS: -UNUSED_PARAMETER
 
-// FILE: ReadOnly.java
+// FILE: org/jetbrains/annotations/ReadOnly.java
 package org.jetbrains.annotations;
 
 public @interface ReadOnly {}
@@ -21,7 +21,7 @@ public class J {
 
 // FILE: main.kt
 fun main() {
-    takeMutable(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>J.foo()<!>)
+    takeMutable(<!ARGUMENT_TYPE_MISMATCH!>J.foo()<!>)
 }
 
 fun takeMutable(l: MutableList<String>) {}

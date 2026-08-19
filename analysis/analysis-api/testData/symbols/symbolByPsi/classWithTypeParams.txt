@@ -6,6 +6,7 @@ KaTypeParameterSymbol:
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   isReified: false
   location: CLASS
   modality: FINAL
@@ -17,12 +18,14 @@ KaTypeParameterSymbol:
   getContainingFileSymbol: KaFileSymbol(classWithTypeParams.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaTypeParameterSymbol:
   annotations: []
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   isReified: false
   location: CLASS
   modality: FINAL
@@ -34,6 +37,7 @@ KaTypeParameterSymbol:
   getContainingFileSymbol: KaFileSymbol(classWithTypeParams.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -68,6 +72,7 @@ KaNamedClassSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: CLASS
       modality: FINAL
@@ -79,11 +84,13 @@ KaNamedClassSymbol:
       getContainingFileSymbol: KaFileSymbol(classWithTypeParams.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     KaTypeParameterSymbol:
       annotations: []
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: CLASS
       modality: FINAL
@@ -95,9 +102,11 @@ KaNamedClassSymbol:
       getContainingFileSymbol: KaFileSymbol(classWithTypeParams.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(classWithTypeParams.kt)
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: A

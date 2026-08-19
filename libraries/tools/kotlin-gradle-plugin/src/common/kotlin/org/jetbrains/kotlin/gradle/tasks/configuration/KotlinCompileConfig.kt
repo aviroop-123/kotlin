@@ -12,21 +12,18 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.transform.TransformSpec
 import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.provider.Provider
+import org.jetbrains.kotlin.compilerRunner.btapi.BuildSessionService
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.internal.ClassLoadersCachingBuildService
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_BUILD_TOOLS_API_IMPL
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_MODULE_GROUP
-import org.jetbrains.kotlin.gradle.internal.transforms.BuildToolsApiClasspathEntrySnapshotTransform
-import org.jetbrains.kotlin.gradle.plugin.BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME
-import org.jetbrains.kotlin.gradle.plugin.KotlinCompilationInfo
+import org.jetbrains.kotlin.gradle.internal.transforms.ClasspathEntrySnapshotTransform
+import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.setupKotlinToolingDiagnosticsParameters
-import org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion
-import org.jetbrains.kotlin.gradle.plugin.kotlinToolingVersion
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmAndroidCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinWithJavaCompilation
-import org.jetbrains.kotlin.gradle.plugin.tcs
 import org.jetbrains.kotlin.gradle.tasks.DefaultKotlinJavaToolchain
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.utils.detachedResolvable
@@ -43,7 +40,7 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
         configureTaskProvider { taskProvider ->
 
             val jvmToolchain = taskProvider.flatMap { it.defaultKotlinJavaToolchain }
-            val runKotlinCompilerViaBuildToolsApi = propertiesProvider.runKotlinCompilerViaBuildToolsApi
+            @Suppress("DEPRECATION") val runKotlinCompilerViaBuildToolsApi = propertiesProvider.runKotlinCompilerViaBuildToolsApi
             registerTransformsOnce(project, jvmToolchain, runKotlinCompilerViaBuildToolsApi)
             // Note: Creating configurations should be done during build configuration, not task configuration, to avoid issues with
             // composite builds (e.g., https://issuetracker.google.com/183952598).
@@ -62,7 +59,9 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
                     it.attributes.attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, CLASSPATH_ENTRY_SNAPSHOT_ARTIFACT_TYPE)
                 }.files
                 task.classpathSnapshotProperties.classpathSnapshot.from(classpathEntrySnapshotFiles).disallowChanges()
+                @Suppress("DEPRECATION")
                 task.classpathSnapshotProperties.classpathSnapshotDir.value(getClasspathSnapshotDir(task)).disallowChanges()
+                @Suppress("DEPRECATION")
                 task.taskOutputsBackupExcludes.addAll(
                     task.classpathSnapshotProperties.classpathSnapshotDir.asFile.flatMap {
                         // it looks weird, but it's required to work around this issue: https://github.com/gradle/gradle/issues/17704
@@ -110,8 +109,6 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
                     task.associatedJavaCompileTaskTargetCompatibility.value(javaTask.map { it.targetCompatibility })
                     task.associatedJavaCompileTaskName.value(javaTask.map { it.name })
                 }
-
-                task.nagTaskModuleNameUsage.value(true).disallowChanges()
             }
         }
     }
@@ -146,12 +143,13 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
         registerBuildToolsApiTransformations(project, jvmToolchain, runKotlinCompilerViaBuildToolsApi)
     }
 
-    private fun TransformSpec<BuildToolsApiClasspathEntrySnapshotTransform.Parameters>.configureCommonParameters(
+    private fun TransformSpec<ClasspathEntrySnapshotTransform.Parameters>.configureCommonParameters(
         kgpVersion: String,
         classLoadersCachingService: Provider<ClassLoadersCachingBuildService>,
         classpath: Provider<out Configuration>,
         jvmToolchain: Provider<DefaultKotlinJavaToolchain>,
         runKotlinCompilerViaBuildToolsApi: Provider<Boolean>,
+        buildSessionService: Provider<BuildSessionService>,
     ) {
         parameters.gradleUserHomeDir.set(project.gradle.gradleUserHomeDir)
         val roDepCachePath = System.getenv(READONLY_CACHE_ENV_VAR)
@@ -177,6 +175,7 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
             parameters.buildToolsImplVersion.set(classpath.map { configuration -> configuration.findBuildToolsApiImplVersion() })
         }
         parameters.suppressVersionInconsistencyChecks.set(suppressVersionInconsistencyChecks)
+        parameters.buildSessionService.set(buildSessionService)
     }
 
     private fun Configuration.findBuildToolsApiImplVersion() = incoming.resolutionResult.allDependencies
@@ -194,8 +193,9 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
         val classLoadersCachingService = ClassLoadersCachingBuildService.registerIfAbsent(project)
         val classpath = project.configurations.named(BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME)
         val kgpVersion = project.getKotlinPluginVersion()
+        val buildSessionService = BuildSessionService.registerIfAbsent(project)
         project.dependencies.registerTransformForArtifactType(
-            BuildToolsApiClasspathEntrySnapshotTransform::class.java,
+            ClasspathEntrySnapshotTransform::class.java,
             fromArtifactType = ArtifactTypeDefinition.JAR_TYPE,
             toArtifactType = CLASSPATH_ENTRY_SNAPSHOT_ARTIFACT_TYPE
         ) {
@@ -205,11 +205,12 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
                 classpath,
                 jvmToolchain,
                 runKotlinCompilerViaBuildToolsApi,
+                buildSessionService,
             )
             it.parameters.setupKotlinToolingDiagnosticsParameters(project)
         }
         project.dependencies.registerTransformForArtifactType(
-            BuildToolsApiClasspathEntrySnapshotTransform::class.java,
+            ClasspathEntrySnapshotTransform::class.java,
             fromArtifactType = ArtifactTypeDefinition.DIRECTORY_TYPE,
             toArtifactType = CLASSPATH_ENTRY_SNAPSHOT_ARTIFACT_TYPE
         ) {
@@ -219,6 +220,7 @@ internal open class BaseKotlinCompileConfig<TASK : KotlinCompile> : AbstractKotl
                 classpath,
                 jvmToolchain,
                 runKotlinCompilerViaBuildToolsApi,
+                buildSessionService,
             )
             it.parameters.setupKotlinToolingDiagnosticsParameters(project)
         }

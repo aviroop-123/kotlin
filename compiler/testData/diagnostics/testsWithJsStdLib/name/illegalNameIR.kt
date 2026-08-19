@@ -1,5 +1,5 @@
-// FIR_IDENTICAL
-// SKIP_TXT
+// RUN_PIPELINE_TILL: FRONTEND
+// IGNORE_NON_REVERSED_RESOLVE: KT-62937
 // LANGUAGE: +JsAllowInvalidCharsIdentifiersEscaping
 
 private fun ` .private `(): String = TODO("")

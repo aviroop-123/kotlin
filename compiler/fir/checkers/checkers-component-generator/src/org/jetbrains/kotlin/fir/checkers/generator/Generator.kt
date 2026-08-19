@@ -14,7 +14,6 @@ import org.jetbrains.kotlin.utils.SmartPrinter
 import org.jetbrains.kotlin.utils.withIndent
 import java.io.File
 import kotlin.reflect.KClass
-import kotlin.text.removeSuffix
 
 internal typealias Alias = String
 private typealias Fqn = String
@@ -28,7 +27,7 @@ private const val MPP_CHECKER_WITH_KIND_FQN = "org.jetbrains.kotlin.fir.analysis
 
 // DiagnosticComponent
 private const val FIR_SESSION_FQN = "org.jetbrains.kotlin.fir.FirSession"
-private const val DIAGNOSTIC_REPORTER_FQN = "org.jetbrains.kotlin.diagnostics.DiagnosticReporter"
+private const val DIAGNOSTIC_REPORTER_FQN = "org.jetbrains.kotlin.diagnostics.PendingDiagnosticReporter"
 private const val ABSTRACT_DIAGNOSTIC_REPORTER_FQN =
     "org.jetbrains.kotlin.fir.analysis.collectors.components.AbstractDiagnosticCollectorComponent"
 private const val CHECKER_CONTEXT_FQN = "org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext"
@@ -58,7 +57,7 @@ class Generator(
                 .sorted()
                 .forEach { println("import $it") }
             println()
-            for ((kClass, alias) in configuration.aliases) {
+            for ([kClass, alias] in configuration.aliases) {
                 val typeParameters =
                     if (kClass.typeParameters.isEmpty()) ""
                     else kClass.typeParameters.joinToString(separator = ",", prefix = "<", postfix = ">") { "*" }
@@ -84,12 +83,12 @@ class Generator(
                 println("}")
                 println()
 
-                for ((alias, _) in configuration.aliases.values) {
+                for ([alias, _] in configuration.aliases.values) {
                     println("open ${alias.valDeclaration} = emptySet()")
                 }
                 println()
 
-                for ((fieldName, classFqn) in configuration.additionalCheckers) {
+                for ([fieldName, classFqn] in configuration.additionalCheckers) {
                     val fieldClassName = classFqn.simpleName
                     println("open val $fieldName: ${fieldClassName.setType} = emptySet()")
                 }
@@ -97,7 +96,7 @@ class Generator(
                     println()
                 }
 
-                for ((kClass, alias) in configuration.aliases) {
+                for ([kClass, alias] in configuration.aliases) {
                     print("$CHECKERS_COMPONENT_INTERNAL_ANNOTATION internal val ${alias.component1().allFieldName}: ${alias.component1().arrayType} by lazy { ")
                     val parents = configuration.parentsMap.getValue(kClass)
                     if (parents.isNotEmpty()) {
@@ -142,13 +141,13 @@ class Generator(
                 println()
 
                 // public overrides
-                for ((alias, _) in configuration.aliases.values) {
+                for ([alias, _] in configuration.aliases.values) {
                     println("override ${alias.valDeclaration}")
                     withIndent {
                         println("get() = _${alias.fieldName}")
                     }
                 }
-                for ((fieldName, classFqn) in configuration.additionalCheckers) {
+                for ([fieldName, classFqn] in configuration.additionalCheckers) {
                     println("override val $fieldName: ${classFqn.simpleName.setType}")
                     withIndent {
                         println("get() = _$fieldName")
@@ -157,10 +156,10 @@ class Generator(
                 println()
 
                 // private mutable delegates
-                for ((alias, _) in configuration.aliases.values) {
+                for ([alias, _] in configuration.aliases.values) {
                     println("private val _${alias.fieldName}: ${alias.mutableSetType} = mutableSetOf()")
                 }
-                for ((fieldName, classFqn) in configuration.additionalCheckers) {
+                for ([fieldName, classFqn] in configuration.additionalCheckers) {
                     println("private val _$fieldName: ${classFqn.simpleName.mutableSetType} = mutableSetOf()")
                 }
                 println()
@@ -169,7 +168,7 @@ class Generator(
                 println(CHECKERS_COMPONENT_INTERNAL_ANNOTATION)
                 println("fun register(checkers: $checkersComponentName) {")
                 withIndent {
-                    for ((alias, _) in configuration.aliases.values) {
+                    for ([alias, _] in configuration.aliases.values) {
                         println("checkers.${alias.fieldName}.filterTo(_${alias.fieldName}, predicate)")
                     }
                     for (fieldName in configuration.additionalCheckers.keys) {
@@ -177,6 +176,29 @@ class Generator(
                     }
                 }
                 println("}")
+            }
+            println("}")
+        }
+    }
+
+    private fun generateFilteredComponent() {
+        val filteredComponentName = "Filtered$checkersComponentName"
+        val filename = "${filteredComponentName}.kt"
+        generationPath.resolve(filename).writeToFileUsingSmartPrinterIfFileContentChanged {
+            printPackageAndCopyright()
+            printImports(true, MPP_CHECKER_KIND_FQN, MPP_CHECKER_WITH_KIND_FQN)
+            printGeneratedMessage()
+            println("class $filteredComponentName(")
+            withIndent {
+                println("val delegate: $checkersComponentName,")
+                println("val predicate: ($abstractCheckerName<*>) -> Boolean",)
+            }
+            println(") : $checkersComponentName() {")
+            withIndent {
+                // public overrides
+                for ([alias, _] in configuration.aliases.values) {
+                    println("override ${alias.valDeclaration} = delegate.${alias.fieldName}.filterTo(mutableSetOf(), predicate)")
+                }
             }
             println("}")
         }
@@ -205,7 +227,7 @@ class Generator(
             println("class $diagnosticComponentName(")
             withIndent {
                 println("session: FirSession,")
-                println("reporter: DiagnosticReporter,")
+                println("reporter: PendingDiagnosticReporter,")
                 println("private val checkers: $checkersComponentName,")
             }
             println(") : AbstractDiagnosticCollectorComponent(session, reporter) {")
@@ -215,14 +237,14 @@ class Generator(
                 println()
                 printDiagnosticComponentVisitElementMethod()
                 println()
-                for ((checker, value) in configuration.aliases) {
+                for ([checker, value] in configuration.aliases) {
                     if (value.component2()) {
                         printDiagnosticComponentVisitMethod(checker, value.component1())
                         println()
                     }
                 }
 
-                for ((checker, value) in configuration.visitAlso) {
+                for ([checker, value] in configuration.visitAlso) {
                     printDiagnosticComponentVisitMethod(checker, value)
                     println()
                 }
@@ -266,7 +288,7 @@ class Generator(
     }
 
     private fun SmartPrinter.printDiagnosticComponentConstructor() {
-        println("constructor(session: FirSession, reporter: DiagnosticReporter, mppKind: MppCheckerKind) : this(")
+        println("constructor(session: FirSession, reporter: PendingDiagnosticReporter, mppKind: MppCheckerKind) : this(")
         withIndent {
             println("session,")
             println("reporter,")
@@ -366,6 +388,7 @@ class Generator(
         generateAliases()
         generateAbstractCheckersComponent()
         generateComposedComponent()
+        generateFilteredComponent()
         generateDiagnosticComponent()
     }
 }

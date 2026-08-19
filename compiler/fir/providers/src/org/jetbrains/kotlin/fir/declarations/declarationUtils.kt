@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.fir.declarations
 
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.SessionAndScopeSessionHolder
 import org.jetbrains.kotlin.fir.SessionHolder
 import org.jetbrains.kotlin.fir.declarations.utils.isInlineOrValue
 import org.jetbrains.kotlin.fir.declarations.utils.isSealed
@@ -25,6 +26,8 @@ import org.jetbrains.kotlin.fir.types.isNullableAny
 import org.jetbrains.kotlin.fir.unwrapSubstitutionOverrides
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.util.PrivateForInline
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 /**
  * Returns all constructors of a given class, including generated ones. Resolve phase is not guaranteed.
@@ -249,32 +252,23 @@ fun FirClassLikeSymbol<*>.fullyExpandedClass(): FirRegularClassSymbol? {
     return fullyExpandedClass(useSiteSession = sessionHolder.session)
 }
 
-@Deprecated("Use parameterless overload", replaceWith = ReplaceWith("fullyExpandedClass()"))
-context(sessionHolder: SessionHolder)
-fun FirClassLikeSymbol<*>.fullyExpandedClass(@Suppress("unused") s: FirSession): FirRegularClassSymbol? {
-    return fullyExpandedClass()
-}
-
 fun FirBasedSymbol<*>.isAnnotationConstructor(session: FirSession): Boolean {
     if (this !is FirConstructorSymbol) return false
     return getConstructedClass(session)?.classKind == ClassKind.ANNOTATION_CLASS
 }
 
+@OptIn(ExperimentalContracts::class)
 fun FirBasedSymbol<*>.isPrimaryConstructorOfInlineOrValueClass(session: FirSession): Boolean {
+    contract { returns(true) implies (this@isPrimaryConstructorOfInlineOrValueClass is FirConstructorSymbol) }
     if (this !is FirConstructorSymbol) return false
-    return getConstructedClass(session)?.isInlineOrValueClass() == true && this.isPrimary
+    val constructedClass = getConstructedClass(session) ?: return false
+    return constructedClass.isInlineOrValue && this.isPrimary
 }
 
 fun FirConstructorSymbol.getConstructedClass(session: FirSession): FirRegularClassSymbol? {
     return resolvedReturnTypeRef.coneType
         .fullyExpandedType(session)
         .toRegularClassSymbol(session)
-}
-
-fun FirRegularClassSymbol.isInlineOrValueClass(): Boolean {
-    if (this.classKind != ClassKind.CLASS) return false
-
-    return isInlineOrValue
 }
 
 @PrivateForInline
@@ -340,13 +334,11 @@ fun MemberWithBaseScope<FirCallableSymbol<*>>.isTrivialIntersection(): Boolean {
 }
 
 @ScopeFunctionRequiresPrewarm
-fun FirIntersectionCallableSymbol.getNonSubsumedOverriddenSymbols(
-    session: FirSession,
-    scopeSession: ScopeSession,
-): List<FirCallableSymbol<*>> {
+context(c: SessionAndScopeSessionHolder)
+fun FirIntersectionCallableSymbol.getNonSubsumedOverriddenSymbols(): List<FirCallableSymbol<*>> {
     require(this is FirCallableSymbol<*>)
 
-    val dispatchReceiverScope = dispatchReceiverScope(session, scopeSession)
+    val dispatchReceiverScope = dispatchReceiverScope()
     return MemberWithBaseScope(this, dispatchReceiverScope).getNonSubsumedOverriddenSymbols()
 }
 
@@ -371,11 +363,10 @@ fun Collection<MemberWithBaseScope<FirCallableSymbol<*>>>.getNonSubsumedNonPhant
         .distinctBy { it.member.unwrapSubstitutionOverrides<FirCallableSymbol<*>>() }
 }
 
-fun FirCallableSymbol<*>.dispatchReceiverScope(session: FirSession, scopeSession: ScopeSession): FirTypeScope {
+context(c: SessionAndScopeSessionHolder)
+fun FirCallableSymbol<*>.dispatchReceiverScope(): FirTypeScope {
     val dispatchReceiverType = requireNotNull(dispatchReceiverType)
     return dispatchReceiverType.scope(
-        session,
-        scopeSession,
         CallableCopyTypeCalculator.DoNothing,
         FirResolvePhase.STATUS
     ) ?: FirTypeScope.Empty
@@ -406,7 +397,7 @@ fun MemberWithBaseScope<FirCallableSymbol<*>>.flattenPhantomIntersectionsRecursi
 @ScopeFunctionRequiresPrewarm
 fun Collection<MemberWithBaseScope<FirCallableSymbol<*>>>.nonSubsumed(): List<MemberWithBaseScope<FirCallableSymbol<*>>> {
     val baseMembers = mutableSetOf<FirCallableSymbol<*>>()
-    for ((member, scope) in this) {
+    for ((val member, val scope = baseScope) in this) {
         val unwrapped = member.unwrapSubstitutionOverrides<FirCallableSymbol<*>>()
         val addIfDifferent = { it: FirCallableSymbol<*> ->
             val symbol = it.unwrapSubstitutionOverrides()
@@ -421,7 +412,7 @@ fun Collection<MemberWithBaseScope<FirCallableSymbol<*>>>.nonSubsumed(): List<Me
             scope.processOverriddenProperties(member, addIfDifferent)
         }
     }
-    return filter { (member, _) -> member.unwrapSubstitutionOverrides<FirCallableSymbol<*>>() !in baseMembers }
+    return filter { (val member, val _ = baseScope) -> member.unwrapSubstitutionOverrides<FirCallableSymbol<*>>() !in baseMembers }
 }
 
 fun FirValueParameter.isInlinable(session: FirSession): Boolean {

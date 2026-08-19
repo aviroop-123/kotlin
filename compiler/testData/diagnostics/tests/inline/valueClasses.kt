@@ -1,9 +1,7 @@
 // RUN_PIPELINE_TILL: BACKEND
-// LANGUAGE: +ValueClasses
+// LANGUAGE: +JvmInlineMultiFieldValueClasses
 // TARGET_BACKEND: JVM_IR
 // WITH_STDLIB
-// SKIP_TXT
-// FIR_IDENTICAL
 
 @JvmInline
 value class DPoint(val x: Double, val y: Double)

@@ -1,12 +1,11 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi;
 
 import com.intellij.lang.ASTNode;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.LocalSearchScope;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -17,6 +16,15 @@ import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.stubs.KotlinTypeParameterStub;
 import org.jetbrains.kotlin.types.Variance;
 
+/**
+ * Represents a type parameter in a generic declaration.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ * class Box<T>(val value: T)
+ * //        ^
+ * }</pre>
+ */
 public class KtTypeParameter extends KtNamedDeclarationStub<KotlinTypeParameterStub> {
 
     public KtTypeParameter(@NotNull ASTNode node) {
@@ -42,28 +50,18 @@ public class KtTypeParameter extends KtNamedDeclarationStub<KotlinTypeParameterS
         return Variance.INVARIANT;
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.setTypeParameterExtendsBound(this, typeReference)}
+     * instead.
+     */
     @Nullable
+    @Deprecated
     public KtTypeReference setExtendsBound(@Nullable KtTypeReference typeReference) {
-        KtTypeReference currentExtendsBound = getExtendsBound();
-        if (currentExtendsBound != null) {
-            if (typeReference == null) {
-                PsiElement colon = findChildByType(KtTokens.COLON);
-                if (colon != null) colon.delete();
-                currentExtendsBound.delete();
-                return null;
-            }
-            return (KtTypeReference) currentExtendsBound.replace(typeReference);
-        }
-
-        if (typeReference != null) {
-            PsiElement colon = addAfter(new KtPsiFactory(getProject()).createColon(), getNameIdentifier());
-            return (KtTypeReference) addAfter(typeReference, colon);
-        }
-
-        return null;
+        return KtPsiMutationService.getInstance().setTypeParameterExtendsBound(this, typeReference);
     }
 
     @Nullable
+    @SuppressWarnings("deprecation") // KT-78356
     public KtTypeReference getExtendsBound() {
         return getStubOrPsiChild(KtStubBasedElementTypes.TYPE_REFERENCE);
     }

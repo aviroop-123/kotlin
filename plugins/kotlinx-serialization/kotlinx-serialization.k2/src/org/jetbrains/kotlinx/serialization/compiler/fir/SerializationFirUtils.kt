@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
+import org.jetbrains.kotlin.platform.isCommon
 import org.jetbrains.kotlin.platform.isJs
 import org.jetbrains.kotlin.platform.isWasm
 import org.jetbrains.kotlin.platform.konan.isNative
@@ -65,7 +66,7 @@ fun FirBasedSymbol<*>.getSerialNameAnnotation(session: FirSession): FirAnnotatio
     resolvedAnnotationsWithArguments.getAnnotationByClassId(serialNameAnnotationClassId, session)
 
 fun FirBasedSymbol<*>.getSerialNameValue(session: FirSession): String? =
-    getSerialNameAnnotation(session)?.getStringArgument(AnnotationParameterNames.VALUE, session)
+    getSerialNameAnnotation(session)?.getStringArgument(AnnotationParameterNames.VALUE)
 
 fun FirBasedSymbol<*>.getSerialRequired(session: FirSession): Boolean =
     hasAnnotation(SerializationAnnotations.requiredAnnotationClassId, session)
@@ -111,10 +112,10 @@ fun FirClassSymbol<*>.hasSerializableAnnotationWithArgs(session: FirSession): Bo
 }
 
 internal fun FirBasedSymbol<*>.getSerializableWith(session: FirSession): ConeKotlinType? =
-    serializableAnnotation(needArguments = true, session)?.getKClassArgument(AnnotationParameterNames.WITH, session)
+    serializableAnnotation(needArguments = true, session)?.getKClassArgument(AnnotationParameterNames.WITH)
 
 internal fun List<FirAnnotation>.getSerializableWith(session: FirSession): ConeKotlinType? =
-    serializableAnnotation(session)?.getKClassArgument(AnnotationParameterNames.WITH, session)
+    serializableAnnotation(session)?.getKClassArgument(AnnotationParameterNames.WITH)
 
 fun FirAnnotation.getGetKClassArgument(name: Name): FirGetClassCall? {
     return findArgumentByName(name) as? FirGetClassCall
@@ -126,7 +127,7 @@ internal fun FirClassSymbol<*>.getSerializerAnnotation(session: FirSession): Fir
 // ---------------------- class utils ----------------------
 internal fun FirClassSymbol<*>.getSerializerForClass(session: FirSession): ConeKotlinType? = resolvedAnnotationsWithArguments
     .getAnnotationByClassId(SerializationAnnotations.serializerAnnotationClassId, session)
-    ?.getKClassArgument(AnnotationParameterNames.FOR_CLASS, session)
+    ?.getKClassArgument(AnnotationParameterNames.FOR_CLASS)
 
 internal fun FirClassLikeDeclaration.getSerializerFor(session: FirSession): FirGetClassCall? =
     getAnnotationByClassId(SerializationAnnotations.serializerAnnotationClassId, session)
@@ -290,7 +291,7 @@ fun ConeKotlinType.classSymbolOrUpperBound(session: FirSession): FirClassSymbol<
 
 @DirectDeclarationsAccess
 fun FirDeclaration.excludeFromJsExport(session: FirSession) {
-    if (!session.moduleData.platform.isJs()) {
+    if (!session.moduleData.platform.isJs() && !session.moduleData.platform.isCommon()) {
         return
     }
     val jsExportIgnore = session.symbolProvider.getClassLikeSymbolByClassId(SerializationJsDependenciesClassIds.jsExportIgnore)

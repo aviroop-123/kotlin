@@ -5,19 +5,17 @@
 
 package org.jetbrains.kotlin.js.test.converters
 
-import org.jetbrains.kotlin.cli.pipeline.web.JsFir2IrPipelineArtifact
+import org.jetbrains.kotlin.cli.pipeline.web.WebFir2IrPipelineArtifact
 import org.jetbrains.kotlin.cli.pipeline.web.WebKlibInliningPipelinePhase
-import org.jetbrains.kotlin.config.LanguageFeature
-import org.jetbrains.kotlin.config.messageCollector
-import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory
+import org.jetbrains.kotlin.cli.pipeline.withNewDiagnosticCollector
+import org.jetbrains.kotlin.diagnostics.impl.DiagnosticsCollectorImpl
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
+import org.jetbrains.kotlin.test.checkTestInfrastructure
 import org.jetbrains.kotlin.test.frontend.fir.Fir2IrCliBasedOutputArtifact
 import org.jetbrains.kotlin.test.model.BackendKinds
 import org.jetbrains.kotlin.test.model.IrPreSerializationLoweringFacade
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestServices
-import org.jetbrains.kotlin.test.services.compilerConfigurationProvider
-import org.jetbrains.kotlin.utils.addToStdlib.applyIf
 
 class JsIrPreSerializationLoweringFacade(
     testServices: TestServices,
@@ -27,25 +25,19 @@ class JsIrPreSerializationLoweringFacade(
     }
 
     override fun transform(module: TestModule, inputArtifact: IrBackendInput): IrBackendInput {
-        require(module.languageVersionSettings.languageVersion.usesK2)
-        require(inputArtifact is Fir2IrCliBasedOutputArtifact<*>) {
+        checkTestInfrastructure(module.languageVersionSettings.languageVersion.usesK2) { "Use K2" }
+        checkTestInfrastructure(inputArtifact is Fir2IrCliBasedOutputArtifact<*>) {
             "${this::class} expects Fir2IrCliBasedOutputArtifact as input, but ${inputArtifact::class} was found"
         }
 
         val cliArtifact = inputArtifact.cliArtifact
-        require(cliArtifact is JsFir2IrPipelineArtifact) {
-            "Fir2IrCliBasedOutputArtifact should have JsFir2IrPipelineArtifact as cliArtifact, but has ${cliArtifact::class}"
+        checkTestInfrastructure(cliArtifact is WebFir2IrPipelineArtifact) {
+            "Fir2IrCliBasedOutputArtifact should have WebFir2IrPipelineArtifact as cliArtifact, but has ${cliArtifact::class}"
         }
         // Attach a new empty diagnosticReporter to prevent double-reporting of diagnostics from Fir2IR phase.
-        val configuration = testServices.compilerConfigurationProvider.getCompilerConfiguration(module)
-        val diagnosticReporter = DiagnosticReporterFactory.createReporter(configuration.messageCollector)
-        val input = cliArtifact.copy(diagnosticCollector = diagnosticReporter)
+        val input = cliArtifact.withNewDiagnosticCollector(DiagnosticsCollectorImpl())
 
-        val output = input.applyIf(
-            module.languageVersionSettings.supportsFeature(LanguageFeature.IrIntraModuleInlinerBeforeKlibSerialization)
-        ) {
-            WebKlibInliningPipelinePhase.executePhase(this)
-        }
+        val output = WebKlibInliningPipelinePhase.executePhase(input)
 
         // The returned artifact will be stored in dependencyProvider instead of `inputArtifact`, with same kind=BackendKinds.IrBackend
         // Later, third artifact of class `JsIrDeserializedFromKlibBackendInput` might replace it again during some test pipelines.

@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// SKIP_TXT
 
 open class A {
     fun <T> some(s: String): T = null!!
@@ -10,7 +9,7 @@ interface I {
 }
 
 open <!CONFLICTING_INHERITED_MEMBERS!>class X1<!> : A(), I
-open class X2 : X1()
+open <!CONFLICTING_INHERITED_MEMBERS!>class X2<!> : X1()
 
 // for some reason no error in K1
 open class B {
@@ -29,7 +28,7 @@ open class C {
 open class X5 : C() {
     <!CONFLICTING_OVERLOADS!>fun some(text: String)<!> = ""
 }
-open class X6 : X5()
+open <!CONFLICTING_INHERITED_MEMBERS!>class X6<!> : X5()
 
 /* GENERATED_FIR_TAGS: checkNotNullCall, classDeclaration, functionDeclaration, interfaceDeclaration, nullableType,
 stringLiteral, typeParameter */

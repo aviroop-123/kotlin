@@ -8,7 +8,8 @@ package org.jetbrains.kotlin.analysis.api.annotations
 import org.jetbrains.kotlin.analysis.api.types.*
 import org.jetbrains.kotlin.analysis.api.types.KaStarTypeProjection
 import org.jetbrains.kotlin.analysis.api.types.KaTypeArgumentWithVariance
-import org.jetbrains.kotlin.renderer.render
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
+import org.jetbrains.kotlin.name.render
 
 internal object KaAnnotationValueRenderer {
     fun render(value: KaAnnotationValue): String = buildString {
@@ -55,6 +56,7 @@ internal object KaAnnotationValueRenderer {
         when (type) {
             is KaUsualClassType -> {
                 val classId = type.classId
+                @OptIn(ClassIdBasedLocality::class)
                 if (classId.isLocal) {
                     append(classId.shortClassName.render())
                 } else {

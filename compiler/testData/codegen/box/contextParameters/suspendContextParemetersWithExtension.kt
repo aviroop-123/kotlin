@@ -1,6 +1,5 @@
 // KT-76232
 // LANGUAGE: +ContextParameters
-// IGNORE_BACKEND_K1: ANY
 // WITH_COROUTINES
 // WITH_STDLIB
 

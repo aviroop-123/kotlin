@@ -105,7 +105,7 @@ object PositioningStrategies {
         }
 
         private fun getElementToMark(declaration: KtDeclaration): PsiElement {
-            val (returnTypeRef, nameIdentifierOrPlaceholder) = when (declaration) {
+            val [returnTypeRef, nameIdentifierOrPlaceholder] = when (declaration) {
                 is KtCallableDeclaration -> Pair(declaration.typeReference, declaration.nameIdentifier)
                 is KtPropertyAccessor -> Pair(declaration.typeReference, declaration.namePlaceholder)
                 else -> Pair(null, null)
@@ -160,7 +160,7 @@ object PositioningStrategies {
     @JvmField
     val CONTEXT_KEYWORD: PositioningStrategy<PsiElement> = object : PositioningStrategy<PsiElement>() {
         override fun mark(element: PsiElement): List<TextRange> =
-            element.descendants().firstIsInstanceOrNull<KtContextReceiverList>()?.firstChild?.textRange?.let(::markRange)
+            element.descendants().firstIsInstanceOrNull<KtContextParameterList>()?.firstChild?.textRange?.let(::markRange)
                 ?: DEFAULT.mark(element)
     }
 
@@ -680,7 +680,7 @@ object PositioningStrategies {
                 is KtParameter -> markElement(element.valOrVarKeyword ?: element)
                 is KtProperty -> markElement(element.valOrVarKeyword)
                 is KtDestructuringDeclaration -> markElement(element.valOrVarKeyword ?: element)
-                else -> error("Declaration is neither a parameter nor a property: " + element.getElementTextWithContext())
+                else -> markElement(element)
             }
         }
     }
@@ -796,22 +796,18 @@ object PositioningStrategies {
             }
             val argumentList = qualifiedAccess as? KtValueArgumentList
                 ?: qualifiedAccess.getChildOfType()
-            return when {
-                argumentList != null -> {
-                    val rightParenthesis = argumentList.rightParenthesis ?: return markElement(qualifiedAccess)
-                    val lastArgument = argumentList.children.findLast { it is KtValueArgument }
-                    if (lastArgument != null) {
-                        markRange(lastArgument, rightParenthesis)
-                    } else {
-                        val leftParenthesis = argumentList.leftParenthesis
-                        markRange(leftParenthesis ?: qualifiedAccess, rightParenthesis)
-                    }
+
+            if (argumentList != null) {
+                val rightParenthesis = argumentList.rightParenthesis ?: return markElement(qualifiedAccess)
+                if (!argumentList.children.any { it is KtValueArgument }) {
+                    val leftParenthesis = argumentList.leftParenthesis
+                    return markRange(leftParenthesis ?: qualifiedAccess, rightParenthesis)
                 }
+            }
 
-                qualifiedAccess is KtCallExpression -> markElement(
-                    qualifiedAccess.getChildOfType<KtNameReferenceExpression>() ?: qualifiedAccess
-                )
-
+            return when (qualifiedAccess) {
+                is KtCallExpression -> markElement(qualifiedAccess.getChildOfType<KtNameReferenceExpression>() ?: qualifiedAccess)
+                is KtAnnotationEntry -> markElement(qualifiedAccess.calleeExpression?.constructorReferenceExpression ?: qualifiedAccess)
                 else -> markElement(qualifiedAccess)
             }
         }
@@ -1036,6 +1032,7 @@ object PositioningStrategies {
         }
     }
 
+    @JvmField
     val SPREAD_OPERATOR: PositioningStrategy<PsiElement> = object : PositioningStrategy<PsiElement>() {
         override fun mark(element: PsiElement): List<TextRange> {
             return super.mark((element as? KtValueArgument)?.getSpreadElement()?.node?.psi ?: element)
@@ -1064,21 +1061,29 @@ object PositioningStrategies {
     val REFERENCE_BY_QUALIFIED: PositioningStrategy<PsiElement> = FindReferencePositioningStrategy(false)
     val REFERENCED_NAME_BY_QUALIFIED: PositioningStrategy<PsiElement> = FindReferencePositioningStrategy(true)
 
+    val RECEIVER_OF_DOT_QUALIFIED: PositioningStrategy<PsiElement> = object : PositioningStrategy<PsiElement>() {
+        override fun mark(element: PsiElement): List<TextRange> {
+            if (element is KtDotQualifiedExpression) {
+                return mark(element.receiverExpression)
+            }
+            return DEFAULT.mark(element)
+        }
+    }
+
     val REIFIED_MODIFIER: PositioningStrategy<KtModifierListOwner> =
         ModifierSetBasedPositioningStrategy(KtTokens.REIFIED_KEYWORD)
 
-    val PROPERTY_INITIALIZER: PositioningStrategy<KtNamedDeclaration> = object : PositioningStrategy<KtNamedDeclaration>() {
-        override fun mark(element: KtNamedDeclaration): List<TextRange> {
-            return markElement(
-                when (element) {
-                    is KtProperty -> element.initializer ?: element
-                    // Type reference is used as a target for loop variable type mismatches
-                    is KtParameter -> element.defaultValue ?: element.typeReference ?: element
-                    is KtDestructuringDeclarationEntry -> element.initializer ?: element.typeReference ?: element
-                    else -> element
-                }
-            )
-        }
+    val VARIABLE_INITIALIZER: PositioningStrategy<KtElement> = object : PositioningStrategy<KtElement>() {
+        override fun mark(element: KtElement): List<TextRange> = markElement(
+            when (element) {
+                is KtProperty -> element.equalsToken ?: element.initializer ?: element
+                // Type reference is used as a target for loop variable type mismatches
+                is KtParameter -> element.equalsToken ?: element.defaultValue ?: element.typeReference ?: element
+                is KtDestructuringDeclarationEntry -> element.equalsToken ?: element.initializer ?: element.typeReference ?: element
+                is KtBackingField -> element.equalsToken ?: element.initializer ?: element
+                else -> element
+            }
+        )
     }
 
     val WHOLE_ELEMENT: PositioningStrategy<KtElement> = object : PositioningStrategy<KtElement>() {}
@@ -1233,7 +1238,12 @@ object PositioningStrategies {
                 is KtCallableReferenceExpression -> element.callableReference
                 is KtCallExpression -> element.calleeExpression ?: element
                 is KtConstructorDelegationCall -> element.calleeExpression ?: element
-                is KtSuperTypeCallEntry -> element.calleeExpression
+                is KtSuperTypeCallEntry -> element.calleeExpression.also {
+                    if (it.textRange.isEmpty) {
+                        val grandParent = element.parent.parent
+                        if (grandParent is KtEnumEntry) return mark(grandParent)
+                    }
+                }
                 is KtOperationExpression -> element.operationReference
                 is KtWhenConditionInRange -> element.operationReference
                 is KtAnnotationEntry -> element.calleeExpression ?: element
@@ -1253,6 +1263,19 @@ object PositioningStrategies {
     val TYPE_ARGUMENT_LIST_OR_SELF = object : PositioningStrategy<PsiElement>() {
         override fun mark(element: PsiElement): List<TextRange> {
             ((element as? KtQualifiedExpression)?.selectorExpression ?: element).getChildOfType<KtTypeArgumentList>()?.let {
+                return markElement(it)
+            }
+            return super.mark(element)
+        }
+    }
+
+    val TYPE_ARGUMENT_LIST_OR_WITHOUT_RECEIVER = object : PositioningStrategy<PsiElement>() {
+        override fun mark(element: PsiElement): List<TextRange> {
+            val selector = (element as? KtQualifiedExpression)?.selectorExpression
+            (selector ?: element).getChildOfType<KtTypeArgumentList>()?.let {
+                return markElement(it)
+            }
+            selector?.let {
                 return markElement(it)
             }
             return super.mark(element)

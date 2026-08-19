@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.fir.analysis.checkers.declaration
 
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
@@ -116,28 +117,30 @@ internal fun FirCallableSymbol<*>.isEffectivelyExternal(
 
 internal val FirClass.canHaveOpenMembers: Boolean get() = modality() != Modality.FINAL || classKind == ClassKind.ENUM_CLASS
 
-// contract: returns(true) implies (this is FirMemberDeclaration<*>)
-val FirDeclaration.isLocalMember: Boolean
-    get() = symbol.isLocalMember
-
-internal val FirBasedSymbol<*>.isLocalMember: Boolean
-    get() = when (this) {
-        is FirPropertySymbol -> this.isLocal
-        is FirClassLikeSymbol -> this.isLocal
-        is FirNamedFunctionSymbol -> this.isLocal
+/**
+ * Similar to [FirMemberDeclaration.isLocal], but returns false for callable members of local classes.
+ *
+ * @return true for local classes, including nested ones, and for local callables declared inside a block
+ * (e.g., inside a function / accessor / initializer body), excluding callable members of local classes
+ */
+val FirDeclaration.isLocalDeclaredInBlock: Boolean
+    // contract: returns(true) implies (this is FirMemberDeclaration<*>)
+    get() = if (this is FirClassLikeDeclaration) isLocal else when (val symbol = symbol) {
+        is FirLocalPropertySymbol -> true
+        is FirNamedFunctionSymbol -> symbol.rawStatus.visibility == Visibilities.Local
         // Anonymous functions and lambdas use DEFAULT_STATUS_FOR_STATUSLESS_DECLARATIONS which has visibility public.
         is FirAnonymousFunctionSymbol -> true
-        is FirBackingFieldSymbol -> this.propertySymbol.isLocal
+        is FirBackingFieldSymbol -> symbol.propertySymbol is FirLocalPropertySymbol
         else -> false
     }
 
 internal val FirCallableSymbol<*>.isExtensionMember: Boolean
     get() = resolvedReceiverTypeRef != null && dispatchReceiverType != null
 
-fun FirTypeRef.needsMultiFieldValueClassFlattening(session: FirSession): Boolean = coneType.needsMultiFieldValueClassFlattening(session)
+fun FirTypeRef.needsJvmInlineMultiFieldValueClassFlattening(session: FirSession): Boolean = coneType.needsJvmInlineMultiFieldValueClassFlattening(session)
 
-fun ConeKotlinType.needsMultiFieldValueClassFlattening(session: FirSession): Boolean = with(session.typeContext) {
-    typeConstructor().isMultiFieldValueClass() && !fullyExpandedType(session).isMarkedNullable
+fun ConeKotlinType.needsJvmInlineMultiFieldValueClassFlattening(session: FirSession): Boolean = with(session.typeContext) {
+    typeConstructor().isJvmInlineMultiFieldValueClass() && !fullyExpandedType().isMarkedNullable
 }
 
 val FirCallableSymbol<*>.hasExplicitReturnType: Boolean
@@ -148,12 +151,22 @@ val FirCallableSymbol<*>.hasExplicitReturnType: Boolean
 
 fun FirNamedFunctionSymbol.checkValueParameterNamesWith(
     otherFunctionSymbol: FirNamedFunctionSymbol,
-    reportAction: (currentParameter: FirValueParameterSymbol, conflictingParameter: FirValueParameterSymbol, parameterIndex: Int) -> Unit
+    reportAction: (currentParameter: FirValueParameterSymbol, conflictingParameter: FirValueParameterSymbol, parameterIndex: Int) -> Unit,
 ) {
-    // We don't handle context parameters here because we specifically allow renaming them in overrides (KT-75815).
-    val valueParameterPairs = valueParameterSymbols.zip(otherFunctionSymbol.valueParameterSymbols)
-    for ((index, valueParameterPair) in valueParameterPairs.withIndex()) {
-        val (currentValueParameter, otherValueParameter) = valueParameterPair
+    checkValueParameterNamesWith(valueParameterSymbols, otherFunctionSymbol.valueParameterSymbols, reportAction)
+    checkValueParameterNamesWith(contextParameterSymbols, otherFunctionSymbol.contextParameterSymbols, reportAction)
+}
+
+@OptIn(SymbolInternals::class)
+private fun checkValueParameterNamesWith(
+    symbols: List<FirValueParameterSymbol>,
+    otherSymbols: List<FirValueParameterSymbol>,
+    reportAction: (FirValueParameterSymbol, FirValueParameterSymbol, Int) -> Unit,
+) {
+    val valueParameterPairs = symbols.zip(otherSymbols)
+    for ([index, valueParameterPair] in valueParameterPairs.withIndex()) {
+        val [currentValueParameter, otherValueParameter] = valueParameterPair
+        if (currentValueParameter.fir.isLegacyContextReceiver() || otherValueParameter.fir.isLegacyContextReceiver()) continue
         if (currentValueParameter.name != otherValueParameter.name) {
             reportAction(currentValueParameter, otherValueParameter, index)
         }

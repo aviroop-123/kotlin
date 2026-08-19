@@ -53,6 +53,11 @@ object ComposeErrorMessages : BaseDiagnosticRendererFactory() {
         )
 
         map.put(
+            ComposeErrors.ILLEGAL_RUN_CATCHING_AROUND_COMPOSABLE,
+            "runCatching call is not allowed to contain @Composable function invocations"
+        )
+
+        map.put(
             ComposeErrors.MISSING_DISALLOW_COMPOSABLE_CALLS_ANNOTATION,
             "Parameter {0} cannot be inlined inside of lambda argument {1} of {2} " +
                     "without also being annotated with @DisallowComposableCalls",
@@ -138,6 +143,20 @@ object ComposeErrorMessages : BaseDiagnosticRendererFactory() {
             ComposeErrors.OPEN_COMPOSABLE_DEFAULT_PARAMETER_VALUE,
             "Default parameters in open @Composable functions are not supported before language version 2.2 (configured version is {0})",
             KtDiagnosticRenderers.TO_STRING
+        )
+
+        map.put(
+            ComposeErrors.KEY_CALL_WITH_NO_ARGUMENTS,
+            "key requires at least one argument."
+        )
+
+        map.put(
+            ComposeErrors.COMPOSE_CONFIGURATION_ERROR,
+            "{0}",
+        )
+        map.put(
+            ComposeErrors.COMPOSE_CONFIGURATION_WARNING,
+            "{0}",
         )
     }
 }

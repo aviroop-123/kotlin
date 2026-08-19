@@ -1,2 +1,39 @@
-KtProperty(114,135): 'val foo: Int by Bar()'
-  null
+KtPropertyDelegate(127,135): 'by Bar()'
+  KaDelegatedPropertyCallResolutionAttempt:
+    provideDelegateCallAttempt = KaCallResolutionSuccess:
+      call = KaSimpleFunctionCall:
+        contextArgumentMapping = {}
+        contextArguments = []
+        dispatchReceiver = null
+        extensionReceiver = KaExplicitReceiverValue:
+          expression = Bar()
+          isSafeNavigation = false
+          type = Bar
+        signature = KaFunctionSignature:
+          receiverType = Bar
+          returnType = NoDelegate
+          symbol = /provideDelegate(<extension receiver>: Bar, _this: kotlin.Any?, p: kotlin.Any?): NoDelegate
+          valueParameters = [
+            KaVariableSignature:
+              name = _this
+              receiverType = null
+              returnType = kotlin.Any?
+              symbol = _this: kotlin.Any?
+              contextParameters = []
+              callableId = null,
+            KaVariableSignature:
+              name = p
+              receiverType = null
+              returnType = kotlin.Any?
+              symbol = p: kotlin.Any?
+              contextParameters = []
+              callableId = null
+          ]
+          contextParameters = []
+          callableId = /provideDelegate
+        typeArgumentsMapping = {}
+        valueArgumentMapping = {}
+    valueGetterCallAttempt = KaCallResolutionError:
+      candidateCalls = []
+      diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'getValue' on receiver of type 'NoDelegate'.>
+    valueSetterCallAttempt = null

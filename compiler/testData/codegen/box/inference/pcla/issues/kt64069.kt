@@ -1,13 +1,12 @@
 // ISSUE: KT-64069
 // WITH_STDLIB
-
-// IGNORE_BACKEND_K1: JVM_IR, WASM
-// REASON: java.lang.ClassCastException: class java.lang.String cannot be cast to class java.lang.Void (see corresponding issue)
+// IGNORE_KLIB_RUNTIME_ERRORS_WITH_CUSTOM_FIRST_STAGE: Wasm-JS:1.9
+// ^^^ KT-64069 is fixed in 2.0.0
 
 private var enable: Boolean = true
 private val string: String? by lazy {
     if (enable) {
-        getT()  // No warning, but class cast exception
+        getT()
     } else {
         null
     }

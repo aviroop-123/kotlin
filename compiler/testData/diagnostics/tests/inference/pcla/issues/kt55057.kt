@@ -2,6 +2,7 @@
 // ISSUE: KT-55057
 // CHECK_TYPE_WITH_EXACT
 // WITH_STDLIB
+// API_VERSION: 1.9
 
 import kotlin.experimental.ExperimentalTypeInference
 
@@ -12,13 +13,13 @@ fun <ETV> Buildee<ETV>.yieldWithoutAnnotation(value: ETV) {}
 fun <ETV> Buildee<ETV>.yieldWithAnnotation(t: ETV) {}
 
 fun test() {
-    val buildeeA = <!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>build<!> {
+    val buildeeA = build {
         yieldWithoutAnnotation(materializeBuildee<TargetType>())
-        yieldWithoutAnnotation(<!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>materializeBuildee<!>())
+        yieldWithoutAnnotation(materializeBuildee())
     }
     // exact type equality check — turns unexpected compile-time behavior into red code
     // considered to be non-user-reproducible code for the purposes of these tests
-    checkExactType<Buildee<Buildee<TargetType>>>(<!DEBUG_INFO_ELEMENT_WITH_ERROR_TYPE!>buildeeA<!>)
+    checkExactType<Buildee<Buildee<TargetType>>>(buildeeA)
 
     val buildeeB = build {
         yieldWithAnnotation(materializeBuildee<TargetType>())

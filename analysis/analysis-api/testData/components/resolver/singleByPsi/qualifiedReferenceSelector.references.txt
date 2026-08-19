@@ -1,3 +1,0 @@
-KtNameReferenceExpression(44,45): 'y'
-  KtSimpleNameReference:
-    (in A) val y: kotlin.Int

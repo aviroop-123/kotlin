@@ -1,4 +1,4 @@
-FILE: entriesPropertyWithJvmStaticClashOn.fir.kt
+FILE: entriesPropertyWithJvmStaticClashOn.kt
     public final enum class A : R|kotlin/Enum<A>| {
         private constructor(): R|A| {
             super<R|kotlin/Enum<A>|>()
@@ -21,7 +21,7 @@ FILE: entriesPropertyWithJvmStaticClashOn.fir.kt
         }
 
         public final static val entries: R|kotlin/enums/EnumEntries<A>|
-            public get(): R|kotlin/enums/EnumEntries<A>|
+            public static get(): R|kotlin/enums/EnumEntries<A>|
 
     }
     public final fun test(): R|kotlin/Unit| {

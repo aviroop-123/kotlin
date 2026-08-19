@@ -1,11 +1,6 @@
-/*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the LICENSE file.
- */
 // WITH_STDLIB
 
-import kotlin.test.*
-
+// FILE: lib.kt
 val sb = StringBuilder()
 
 class ReceiveChannel<out E>
@@ -25,6 +20,9 @@ inline fun <E> ReceiveChannel<E>.elementAtOrElse(index: Int, defaultValue: (Int)
                 return defaultValue(index)
             return 42 as E
         }
+
+// FILE: main.kt
+import kotlin.test.*
 
 fun <E> ReceiveChannel<E>.elementAt(index: Int): E =
         elementAtOrElse(index) { throw IndexOutOfBoundsException("qxx") }

@@ -110,8 +110,14 @@ open class HostManager() {
 
         @JvmStatic
         fun platformName(): String {
-            val hostOs = hostOs()
-            val arch = hostArch()
+            val hostOs = runCatching {
+                HostManager.hostOs()
+            }.getOrDefault(System.getProperty("os.name", "unknown_os"))
+
+            val arch = runCatching {
+                HostManager.hostArch()
+            }.getOrDefault(System.getProperty("os.arch", "unknown_arch"))
+
             return when (hostOs) {
                 "osx" -> "macos-$arch"
                 else -> "$hostOs-$arch"
@@ -167,18 +173,16 @@ open class HostManager() {
             hostMapping[os to arch]?.let {
                 return it
             }
-            // https://youtrack.jetbrains.com/issue/KT-48566.
-            // Workaround for unsupported host architectures.
-            // It is obviously incorrect, but makes Gradle plugin work.
-            hostMapping.entries.firstOrNull { (host, _) -> host.first == os }?.let {
-                return it.value
-            }
+
             throw TargetSupportException("Unknown host target: $os $arch")
         }
 
         // Note Hotspot-specific VM option enforcing C1-only, critical for decent compilation speed.
         val defaultJvmArgs = listOf("-XX:TieredStopAtLevel=1", "-ea", "-Dfile.encoding=UTF-8")
         val regularJvmArgs = defaultJvmArgs + "-Xmx3G"
+
+        @JvmStatic
+        val hostIsSupported: Boolean get() = hostOrNull != null
 
         @JvmStatic
         val hostIsMac get() = hostOrNull?.family == Family.OSX

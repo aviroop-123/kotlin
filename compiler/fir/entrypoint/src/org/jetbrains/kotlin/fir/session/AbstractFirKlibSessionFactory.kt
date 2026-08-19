@@ -21,7 +21,7 @@ import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.name.Name
 
 @OptIn(SessionConfiguration::class)
-abstract class AbstractFirKlibSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> : FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT>() {
+abstract class AbstractFirKlibSessionFactory<CONTEXT> : FirAbstractSessionFactory<CONTEXT>() {
 
     // ==================================== Shared library session ====================================
 
@@ -45,7 +45,7 @@ abstract class AbstractFirKlibSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> : 
         session: FirSession,
         moduleData: FirModuleData,
         scopeProvider: FirKotlinScopeProvider,
-        context: LIBRARY_CONTEXT,
+        context: CONTEXT,
     ): List<FirSymbolProvider> {
         return emptyList()
     }
@@ -82,13 +82,13 @@ abstract class AbstractFirKlibSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> : 
         )
     }
 
-    protected abstract fun createLibraryContext(configuration: CompilerConfiguration): LIBRARY_CONTEXT
+    protected abstract fun createLibraryContext(configuration: CompilerConfiguration): CONTEXT
 
     protected open fun createFlexibleTypeFactory(session: FirSession): FirTypeDeserializer.FlexibleTypeFactory {
         return FirTypeDeserializer.FlexibleTypeFactory.Default
     }
 
-    protected open fun createAdditionalDependencyProviders(
+    open fun createAdditionalDependencyProviders(
         session: FirSession,
         moduleDataProvider: ModuleDataProvider,
         kotlinScopeProvider: FirKotlinScopeProvider,
@@ -110,7 +110,7 @@ abstract class AbstractFirKlibSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> : 
         moduleData: FirModuleData,
         extensionRegistrars: List<FirExtensionRegistrar>,
         configuration: CompilerConfiguration,
-        isForLeafHmppModule: Boolean,
+        kmpModuleKind: KmpModuleKind,
         icData: KlibIcData? = null,
         init: FirSessionConfigurator.() -> Unit
     ): FirSession {
@@ -120,7 +120,7 @@ abstract class AbstractFirKlibSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> : 
             context,
             extensionRegistrars,
             configuration,
-            isForLeafHmppModule,
+            kmpModuleKind,
             init,
             createProviders = { session, kotlinScopeProvider, symbolProvider, generatedSymbolsProvider ->
                 SourceProviders(
@@ -142,7 +142,7 @@ abstract class AbstractFirKlibSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> : 
         )
     }
 
-    protected abstract fun createSourceContext(configuration: CompilerConfiguration): SOURCE_CONTEXT
+    protected abstract fun createSourceContext(configuration: CompilerConfiguration): CONTEXT
 
     final override fun createKotlinScopeProviderForSourceSession(
         moduleData: FirModuleData,
@@ -153,4 +153,7 @@ abstract class AbstractFirKlibSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> : 
 
     override val requiresSpecialSetupOfSourceProvidersInHmppCompilation: Boolean
         get() = true
+
+    override val isFactoryForMetadataCompilation: Boolean
+        get() = false
 }

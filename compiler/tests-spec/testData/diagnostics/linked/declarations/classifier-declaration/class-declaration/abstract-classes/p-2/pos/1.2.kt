@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -15,7 +14,7 @@
 // TESTCASE NUMBER: 1
 
 fun case1(){
-    <!DEBUG_INFO_EXPRESSION_TYPE("OtherClass.ImplBase2")!>OtherClass().zoooo()<!>
+    OtherClass().zoooo()
     checkSubtype<MainClass.Base2>(OtherClass().zoooo())
 }
 

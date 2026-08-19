@@ -21,14 +21,14 @@ public interface VoidProcessor extends Processor<Void> {
 
 // FILE: Lib.kt
 
-@MustUseReturnValue
+@MustUseReturnValues
 class KotlinNullableProcessorImpl: VoidProcessor {
     override fun process(t: Void?): Void? {
         TODO("Not yet implemented")
     }
 }
 
-@MustUseReturnValue
+@MustUseReturnValues
 class KotlinVoidProcessorImpl: VoidProcessor {
     override fun process(t: Void): Void {
         TODO("Not yet implemented")
@@ -49,7 +49,7 @@ fun test() {
     val kotlinVoidProcessorImpl = KotlinVoidProcessorImpl()
     val kotlinNullableProcessorImpl = KotlinNullableProcessorImpl()
     useProcessor(kotlinVoidProcessorImpl) // Void!
-    kotlinNullableProcessorImpl.process(null) // Void? is not ignorable just as Unit?
+    kotlinNullableProcessorImpl.<!RETURN_VALUE_NOT_USED!>process<!>(null) // Void? is not ignorable just as Unit?
     kotlinVoidProcessorImpl.process(getVoid()) // Void
 
     id(Processor.makePlatform(Unit))
@@ -64,7 +64,7 @@ fun testApp() {
     val kotlinVoidProcessorImpl = KotlinVoidProcessorImpl()
     val kotlinNullableProcessorImpl = KotlinNullableProcessorImpl()
     useProcessor(kotlinVoidProcessorImpl) // Void!
-    kotlinNullableProcessorImpl.process(null) // Void? is not ignorable just as Unit?
+    kotlinNullableProcessorImpl.<!RETURN_VALUE_NOT_USED!>process<!>(null) // Void? is not ignorable just as Unit?
     kotlinVoidProcessorImpl.process(getVoid()) // Void
 
     id(Processor.makePlatform(Unit))

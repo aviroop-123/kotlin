@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.gradle.util.cartesianProductOf
 import org.jetbrains.kotlin.gradle.util.isTeamCityRun
 import org.jetbrains.kotlin.gradle.util.x
+import org.jetbrains.kotlin.test.TestDataAssertions.assertEqualsToFile
 import org.jetbrains.kotlin.test.TestMetadata
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.extension.ExtendWith
@@ -29,7 +30,10 @@ class MppPublicationCompatibilityIT : KGPBaseTest() {
     companion object {
         private val agpVersions = listOf(
             TestVersions.AGP.MIN_SUPPORTED,
-            TestVersions.AGP.MAX_SUPPORTED,
+            // AGP 9+ rejects the KMP+`com.android.library` and standalone `kotlin("android")` combinations
+            // used by the sample projects under `mppPublicationCompatibility/sampleProjects/`.
+            // Cap at the last AGP 8 release until the fixtures migrate to `com.android.kotlin.multiplatform.library`.
+            TestVersions.AGP.AGP_813,
         )
 
         private val kotlinVersions = listOf(
@@ -60,7 +64,7 @@ class MppPublicationCompatibilityIT : KGPBaseTest() {
                 .toSet()
 
             val scenarios = (projects x projects)
-                .map { (consumer, producer) -> Scenario(consumer, producer) }
+                .map { [consumer, producer] -> Scenario(consumer, producer) }
                 .filter(Scenario::hasMasterKmp) // we are not interested in AndroidOnly <-> JavaOnly compatibility
                 .filter(Scenario::isConsumable)
                 .toSet()
@@ -212,7 +216,9 @@ class MppPublicationCompatibilityIT : KGPBaseTest() {
                     .map { it.replace(TestVersions.Kotlin.CURRENT, "SNAPSHOT") }
                     .joinToString("\n")
 
-                assertEqualsToFile(expectedReportFile.toFile(), actualReportSanitized, withTrailingEOF = false)
+                assertEqualsToFile(expectedReportFile.toFile(), actualReportSanitized) {
+                    if (it.endsWith("\n")) it.dropLast(1) else it
+                }
             }
             assertAll(consumer.resolvedConfigurationsNames.map { configurationName -> { assertResolvedDependencies(configurationName) } })
         }

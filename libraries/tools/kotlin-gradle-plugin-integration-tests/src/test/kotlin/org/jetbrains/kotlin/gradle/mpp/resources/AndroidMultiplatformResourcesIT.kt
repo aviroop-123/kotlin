@@ -21,13 +21,11 @@ import java.nio.file.Path
 class AndroidMultiplatformResourcesIT : KGPBaseTest() {
 
     override val defaultBuildOptions: BuildOptions
-        get() = super.defaultBuildOptions.copy(
-            // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-            isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED,
-        )
+        get() = super.defaultBuildOptions.disableIsolatedProjectsBecauseOfJsAndWasmKT75899()
 
     @DisplayName("Multiplatform resources consumption from self, published and project dependencies for Android target")
     @GradleAndroidTest
+    @AndroidTestVersions(maxVersion = TestVersions.AGP.AGP_813)
     fun testConsumption(
         gradleVersion: GradleVersion,
         androidVersion: String,

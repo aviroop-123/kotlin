@@ -75,6 +75,7 @@ callables: 5
     hasStableParameterNames: true
     isActual: false
     isBuiltinFunctionInvoke: false
+    isCompanion: false
     isExpect: false
     isExtension: false
     isExternal: false
@@ -102,11 +103,15 @@ callables: 5
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -137,6 +142,7 @@ callables: 5
     hasStableParameterNames: true
     isActual: false
     isBuiltinFunctionInvoke: false
+    isCompanion: false
     isExpect: false
     isExtension: true
     isExternal: false
@@ -157,8 +163,11 @@ callables: 5
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL
@@ -190,8 +199,12 @@ callables: 5
       compilerVisibility: Private
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
+      isNotDefault: false
       isVal: true
       location: PROPERTY
       modality: FINAL
@@ -215,8 +228,10 @@ callables: 5
       contextReceivers: []
       hasStableParameterNames: true
       isActual: false
+      isCompanion: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isInline: false
       isNotDefault: false
       isOverride: false
@@ -235,8 +250,9 @@ callables: 5
     hasSetter: false
     initializer: KaConstantInitializerValue("baz")
     isActual: false
+    isCompanion: false
     isConst: false
-    isDelegatedProperty: false
+    isDelegated: false
     isExpect: false
     isExtension: false
     isExternal: false
@@ -269,8 +285,12 @@ callables: 5
       compilerVisibility: Private
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
+      isNotDefault: false
       isVal: false
       location: PROPERTY
       modality: FINAL
@@ -294,8 +314,10 @@ callables: 5
       contextReceivers: []
       hasStableParameterNames: true
       isActual: false
+      isCompanion: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isInline: false
       isNotDefault: false
       isOverride: false
@@ -314,8 +336,9 @@ callables: 5
     hasSetter: true
     initializer: KaConstantInitializerValue("quux")
     isActual: false
+    isCompanion: false
     isConst: false
-    isDelegatedProperty: false
+    isDelegated: false
     isExpect: false
     isExtension: false
     isExternal: false
@@ -340,8 +363,10 @@ callables: 5
       contextReceivers: []
       hasStableParameterNames: true
       isActual: false
+      isCompanion: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isInline: false
       isNotDefault: false
       isOverride: false
@@ -354,11 +379,15 @@ callables: 5
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -385,11 +414,15 @@ callables: 5
           compilerVisibility: Public
           contextReceivers: []
           generatedPrimaryConstructorProperty: null
+          hasDeclaredDefaultValue: false
           hasDefaultValue: false
           isActual: false
+          isCompanion: false
           isCrossinline: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isImplicitLambdaParameter: false
           isNoinline: false
           isVal: true
@@ -420,8 +453,12 @@ callables: 5
       compilerVisibility: Private
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
+      isNotDefault: false
       isVal: true
       location: PROPERTY
       modality: FINAL
@@ -445,8 +482,10 @@ callables: 5
       contextReceivers: []
       hasStableParameterNames: true
       isActual: false
+      isCompanion: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isInline: false
       isNotDefault: true
       isOverride: false
@@ -459,8 +498,11 @@ callables: 5
         compilerVisibility: Public
         contextReceivers: []
         isActual: false
+        isCompanion: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isVal: true
         location: LOCAL
         modality: FINAL
@@ -484,8 +526,9 @@ callables: 5
     hasSetter: false
     initializer: null
     isActual: false
+    isCompanion: false
     isConst: false
-    isDelegatedProperty: false
+    isDelegated: false
     isExpect: false
     isExtension: true
     isExternal: false
@@ -504,8 +547,11 @@ callables: 5
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL

@@ -3,21 +3,22 @@ To run testsuit locally, make sure the above is executed first:
 - `./gradlew :kotlin-native:platformLibs:macos_arm64Install` and 
 - `./gradlew :kotlin-native:platformLibs:linux_x64Install`
 
-This testsuit is run differently for K1 and K2 frontends:
-- K1/N manual: run `compiler/testData/diagnostics/nativeTests/specialBackendChecks/runtests.sh -language-version 1.9`, 
-- K2/N manual: run `compiler/testData/diagnostics/nativeTests/specialBackendChecks/runtests.sh`,
-- K2/N tests are also run in scope of `FirLightTreeOldFrontendNativeDiagnosticsTestGenerated` and `FirPsiOldFrontendNativeDiagnosticsTestGenerated`.
+This testsuit can be run:
+- manually: run `compiler/testData/diagnostics/nativeTests/specialBackendChecks/runtests.sh`,
+- automatically: `LightTreeNativeKlibDiagnosticsTestGenerated` and `PsiNativeKlibDiagnosticsTestGenerated`.
 
-Reference output for K2/N manual run is provided below.
-
-Reference output for K1/N manual run is slightly different for newly-migrated Fir checks: source lines are not displayed.
-For not yet migrated checks, the output must be the same as below.
+Reference output for the manual run is provided below. Should source lines be not displayed,
+it indicates the diagnostic is emitted by `SpecialBackendChecksTraversal`, and requires migration to FIR checks. 
 
 ```text
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/cInterop/t1.kt
-/tmp/t1.kt:12:5: error: variadic function pointers are not supported
+/tmp/t1.kt:12:21: error: variadic function pointers are not supported: fun foo(x: Int, vararg s: String): Int
+    staticCFunction(::foo)
+                    ^^^^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/cInterop/t1.kt -target linux_x64
-/tmp/t1.kt:12:5: error: variadic function pointers are not supported
+/tmp/t1.kt:12:21: error: variadic function pointers are not supported: fun foo(x: Int, vararg s: String): Int
+    staticCFunction(::foo)
+                    ^^^^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/cInterop/t10.kt
 /tmp/t10.kt:8:5: error: type kotlin.Function1<*, kotlin.Int>  of callback parameter 1 is not supported here: * as 1 parameter type
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/cInterop/t10.kt -target linux_x64
@@ -178,7 +179,7 @@ compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t23.k
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t24.kt
 /tmp/t24.kt:6:1: error: only companion objects of subclasses of Objective-C classes can inherit from Objective-C metaclasses
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t25.kt
-/tmp/t25.kt:7:5: error: can't override 'toString', override 'description' instead
+/tmp/t25.kt:7:14: error: can't override 'toString', override 'description' instead
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t26.kt
 /tmp/t26.kt:11:9: error: '@kotlinx.cinterop.ObjCAction method' cannot have extension receiver.
     fun String.foo() = println(this)
@@ -220,23 +221,47 @@ compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t34.k
     @OptIn(kotlinx.cinterop.BetaInteropApi::class)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t35.kt
-/tmp/t35.kt:7:13: error: unable to call non-designated initializer as super constructor
+/tmp/t35.kt:7:1: error: unable to call non-designated initializer as super constructor
+compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t36.kt
+/tmp/t36.kt:10:76: error: a local Kotlin Obj-C class 'Foo' with an @kotlinx.cinterop.ObjCObjectBase.OverrideInit constructor cannot capture values from the enclosing scope. Captured: 'x'
+compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t37.kt
+/tmp/t37.kt:9:76: error: a local Kotlin Obj-C class 'Foo' with an @kotlinx.cinterop.ObjCObjectBase.OverrideInit constructor cannot capture values from the enclosing scope. Captured: 'T'
+compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t38.kt
+/tmp/t38.kt:10:76: error: a local Kotlin Obj-C class 'Foo' with an @kotlinx.cinterop.ObjCObjectBase.OverrideInit constructor cannot capture values from the enclosing scope. Captured: 'x', 'T'
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t4.kt
-/tmp/t4.kt:6:21: error: callable references to variadic Objective-C methods are not supported
+/tmp/t4.kt:7:21: error: callable references to variadic Objective-C methods are not supported: fun handleFailureInFunction(functionName: String, file: String, lineNumber: Long, description: String?, vararg args: Any?): Unit
+fun foo() = println(NSAssertionHandler()::handleFailureInFunction)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t5.kt
-/tmp/t5.kt:6:81: error: passing String as variadic Objective-C argument is ambiguous; cast it to NSString or pass with '.cstr' as C string
+/tmp/t5.kt:7:81: error: passing String as variadic Objective-C argument is ambiguous; cast it to NSString or pass with '.cstr' as C string.
+fun foo() = NSAssertionHandler().handleFailureInFunction("zzz", "zzz", 0, null, "qzz")
+                                                                                ^^^^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t6.kt
-/tmp/t6.kt:6:95: error: when calling variadic Objective-C methods spread operator is supported only for *arrayOf(...)
+/tmp/t6.kt:7:95: error: when calling variadic Objective-C methods spread operator is supported only for *arrayOf(...).
+fun foo(s: Array<Any?>) = NSAssertionHandler().handleFailureInFunction("zzz", "zzz", 0, null, *s)
+                                                                                              ^^
+/tmp/t6.kt:8:113: error: when calling variadic Objective-C methods spread operator is supported only for *arrayOf(...).
+fun bar(s: Array<Any?>) = NSAssertionHandler().handleFailureInFunction("zzz", "zzz", 0, null, *arrayOf(*arrayOf(*s)))
+                                                                                                                ^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t61.kt
 /tmp/t61.kt:5:5: error: only companion objects of subclasses of Objective-C classes can inherit from Objective-C metaclasses
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t62.kt
 /tmp/t62.kt:4:1: error: only companion objects of subclasses of Objective-C classes can inherit from Objective-C metaclasses
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/objCInterop/t7.kt
-/tmp/t7.kt:6:40: error: when calling variadic C functions spread operator is supported only for *arrayOf(...)
+/tmp/t7.kt:7:40: error: when calling variadic C functions spread operator is supported only for *arrayOf(...).
+fun foo(s: Array<Any?>) = NSLog("zzz", *s)
+                                       ^^
+/tmp/t7.kt:8:58: error: when calling variadic C functions spread operator is supported only for *arrayOf(...).
+fun bar(s: Array<Any?>) = NSLog("zzz", *arrayOf(*arrayOf(*s)))
+                                                         ^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/posix/t3.kt
-/tmp/t3.kt:6:13: error: callable references to variadic C functions are not supported
+/tmp/t3.kt:7:13: error: callable references to variadic C functions are not supported: fun printf(arg0: String?, vararg variadicArguments: Any?): Int
+    println(::printf)
+            ^^^^^^^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/posix/t3.kt -target linux_x64
-/tmp/t3.kt:6:13: error: callable references to variadic C functions are not supported
+/tmp/t3.kt:7:13: error: callable references to variadic C functions are not supported: fun printf(__format: String?, vararg variadicArguments: Any?): Int
+    println(::printf)
+            ^^^^^^^^
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/posix/t36.kt
 /tmp/t36.kt:7:13: error: native interop types constructors must not be called directly
 compiler/testData/diagnostics/nativeTests/specialBackendChecks/posix/t36.kt -target linux_x64

@@ -9,6 +9,8 @@ plugins {
     alias(libs.plugins.gradle.node)
 }
 
+val nodejsVersion = nodejsVersionForBuildingWasmDebugBrowsers
+
 node {
     version.set(nodejsVersion)
     download.set(true)
@@ -53,7 +55,7 @@ val npmBuild by tasks.registering(NpxTask::class) {
 
     command.set("rollup")
     workingDir.set(projectDir)
-    args.set(listOf("-c", rollupConfigMjsFile.name, "--silent"))
+    args.set(listOf("-c", rollupConfigMjsFile.name))
     environment.set(mapOf("NODE_OPTIONS" to "--disable-warning=ExperimentalWarning"))
 
     outputs.file("build/out/custom-formatters.js")

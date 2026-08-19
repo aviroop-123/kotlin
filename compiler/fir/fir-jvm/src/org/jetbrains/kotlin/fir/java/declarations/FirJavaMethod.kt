@@ -52,7 +52,7 @@ class FirJavaMethod @FirImplementationDetail constructor(
     val annotationList: FirJavaAnnotationList,
     override val dispatchReceiverType: ConeSimpleKotlinType?,
     val containingClassSymbol: FirClassSymbol<*>,
-) : FirSimpleFunction() {
+) : FirNamedFunction() {
     init {
         @OptIn(FirImplementationDetail::class)
         symbol.bind(this)
@@ -92,6 +92,9 @@ class FirJavaMethod @FirImplementationDetail constructor(
     //not used actually, because get 'enhanced' into regular FirSimpleFunction
     override var deprecationsProvider: DeprecationsProvider = UnresolvedDeprecationProvider
 
+    override val isLocal: Boolean
+        get() = false
+
     internal fun withTypeParameterBoundsResolveLock(f: () -> Unit) {
         // TODO: KT-68587
         typeParameterBoundsResolveLock.withLock(f)
@@ -108,7 +111,7 @@ class FirJavaMethod @FirImplementationDetail constructor(
         typeParameters.forEach { it.accept(visitor, data) }
     }
 
-    override fun <D> transformChildren(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformChildren(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         transformReturnTypeRef(transformer, data)
         controlFlowGraphReference = controlFlowGraphReference?.transformSingle(transformer, data)
         transformValueParameters(transformer, data)
@@ -116,33 +119,33 @@ class FirJavaMethod @FirImplementationDetail constructor(
         return this
     }
 
-    override fun <D> transformReturnTypeRef(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformReturnTypeRef(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         returnTypeRef = returnTypeRef.transformSingle(transformer, data)
         return this
     }
 
-    override fun <D> transformReceiverParameter(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformReceiverParameter(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         return this
     }
 
-    override fun <D> transformContextParameters(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformContextParameters(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         return this
     }
 
-    override fun <D> transformValueParameters(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformValueParameters(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         valueParameters.transformInplace(transformer, data)
         return this
     }
 
-    override fun <D> transformBody(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformBody(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         return this
     }
 
-    override fun <D> transformStatus(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformStatus(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         return this
     }
 
-    override fun <D> transformContractDescription(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformContractDescription(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         return this
     }
 
@@ -150,11 +153,11 @@ class FirJavaMethod @FirImplementationDetail constructor(
         shouldNotBeCalled(::replaceAnnotations, ::annotations)
     }
 
-    override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         return this
     }
 
-    override fun <D> transformTypeParameters(transformer: FirTransformer<D>, data: D): FirSimpleFunction {
+    override fun <D> transformTypeParameters(transformer: FirTransformer<D>, data: D): FirNamedFunction {
         typeParameters.transformInplace(transformer, data)
         return this
     }
@@ -208,7 +211,6 @@ class FirJavaMethodBuilder : FirFunctionBuilder, FirTypeParametersOwnerBuilder, 
     lateinit var symbol: FirNamedFunctionSymbol
     override val annotations: MutableList<FirAnnotation> get() = shouldNotBeCalled()
     override val typeParameters: MutableList<FirTypeParameter> = mutableListOf()
-    var isStatic: Boolean by Delegates.notNull()
     override var resolvePhase: FirResolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
     var isFromSource: Boolean by Delegates.notNull()
     var annotationList: FirJavaAnnotationList = FirEmptyJavaAnnotationList
@@ -238,6 +240,13 @@ class FirJavaMethodBuilder : FirFunctionBuilder, FirTypeParametersOwnerBuilder, 
     @Deprecated("Modification of 'contextParameters' has no impact for FirJavaFunctionBuilder", level = DeprecationLevel.HIDDEN)
     override val contextParameters: MutableList<FirValueParameter>
         get() = throw IllegalStateException()
+
+    @Deprecated("Modification of 'isLocal' has no impact for FirJavaFunctionBuilder", level = DeprecationLevel.HIDDEN)
+    override var isLocal: Boolean
+        get() = throw IllegalStateException()
+        set(_) {
+            throw IllegalStateException()
+        }
 
     @OptIn(FirImplementationDetail::class)
     override fun build(): FirJavaMethod {

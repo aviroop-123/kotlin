@@ -1,7 +1,0 @@
-KtNameReferenceExpression(8,11): 'one'
-  KtSimpleNameReference:
-    package one
-
-KtNameReferenceExpression(37,41): 'Anno'
-  KtSimpleNameReference:
-    (in one.Anno) constructor()

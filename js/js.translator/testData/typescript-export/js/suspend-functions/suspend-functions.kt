@@ -2,7 +2,7 @@
 // RUN_PLAIN_BOX_FUNCTION
 // SKIP_NODE_JS
 // INFER_MAIN_MODULE
-// LANGUAGE: +JsAllowExportingSuspendFunctions
+// LANGUAGE: +JsAllowExportingSuspendFunctions +ContextParameters
 // MODULE: JS_TESTS
 // FILE: suspend-functions.kt
 
@@ -59,9 +59,36 @@ suspend fun <T> genericWithMultipleConstraints(x: T): T
 suspend fun <A, B, C, D, E> forth(a: A, b: B, c: C, d: D): E? = null
 
 @JsExport
-suspend inline fun inlineFun(x: Int, callback: (Int) -> Unit) {
-    callback(x)
+suspend inline fun inlineFun(x: Int, callback: (Int) -> Int): Int = callback(x)
+
+@JsExport
+suspend fun simpleSuspendFun(x: Int) = x
+
+@JsExport
+suspend inline fun inlineChain(x: Int) = inlineFun(x) { x -> simpleSuspendFun(x) }
+
+@JsExport
+suspend fun Int.suspendExtensionFun() = this
+
+@JsExport
+context(ctx: Int)
+suspend fun suspendFunWithContext() = ctx
+
+@JsExport
+class WithSuspendExtensionFunAndContext {
+    context(ctx: Int)
+    suspend fun Int.suspendFun() = this + ctx
 }
+
+@JsExport
+class WithSuspendFunInsideInnerClass {
+    inner class Inner {
+        suspend fun suspendFun() = 42
+    }
+}
+
+@JsExport.Ignore
+fun suspendParameter(call: suspend () -> Int) = <!ILLEGAL_SUSPEND_FUNCTION_CALL!>call<!>()
 
 @JsExport
 external interface SomeExternalInterface
@@ -70,6 +97,25 @@ external interface SomeExternalInterface
 interface HolderOfSum {
     suspend fun sum(x: Int, y: Int): Int
     suspend fun sumNullable(x: Int?, y: Int?): Int
+
+    suspend fun defaultSum(x: Int, y: Int) = 0xffff
+}
+
+@JsExport
+suspend fun acceptHolderOfSum(test: HolderOfSum) {
+    assert(test.sum(1, 2) == when (test::class.js) {
+        NotExportedTestChild::class.js -> 42
+        Test::class.js, TestChild::class.js -> 3
+        else /* TypeScript */ -> 53
+    })
+
+    assert(test.sumNullable(null, 5) == when (test) {
+        is TestChild -> 6
+        is NotExportedTestChild -> 44
+        else -> 5
+    })
+
+    assert(test.defaultSum(1, 2) == 0xffff)
 }
 
 @JsExport
@@ -118,9 +164,10 @@ open class TestChild : Test() {
     override suspend fun sumNullable(x: Int?, y: Int?): Int =
         (x ?: 1) + (y ?: 1)
 
-    override suspend fun <A, B, C, D, E> forth(a: A, b: B, c: C, d: D): E? = js("'OK'").unsafeCast<E>()
+    override suspend fun <A, B, C, D, E> forth(a: A, b: B, c: C, d: D): E = js("'OK'").unsafeCast<E>()
 }
 
+@JsExport.Ignore
 open class NotExportedTestChild : Test() {
     override suspend fun sum(x: Int, y: Int): Int = 42
     override suspend fun varargNullableInt(vararg x: Int?): Int = 43
@@ -131,10 +178,12 @@ open class NotExportedTestChild : Test() {
 @JsExport
 fun generateOneMoreChildOfTest(): Test = NotExportedTestChild()
 
-@JsExport suspend fun acceptTest(test: Test) {
-    assert(test.sum(1, 2) == when (test) {
-        is NotExportedTestChild -> 42
-        else -> 3
+@JsExport
+suspend fun acceptTest(test: Test) {
+    assert(test.sum(1, 2) == when (test::class.js) {
+        NotExportedTestChild::class.js -> 42
+        Test::class.js, TestChild::class.js -> 3
+        else /* TypeScript */ -> 53
     })
 
     assert(test.varargInt(1, 2, 3) == when (test::class.js) {
@@ -193,8 +242,20 @@ fun generateOneMoreChildOfTest(): Test = NotExportedTestChild()
     assert(test.genericWithMultipleConstraints(error) == error)
 }
 
-open class NotExportedParent {
-    open suspend fun parentSuspendFun1() = "NotExportedParent 1"
+@JsExport
+interface HolderOfParentSuspendFun1<T> {
+    suspend fun parentSuspendFun1(someValue: String = "1"): T
+}
+
+@JsExport.Ignore
+interface IntermediateNotExportedInterface<T> : HolderOfParentSuspendFun1<T>
+
+@JsExport
+fun getHolderOfParentSuspendFun1(): HolderOfParentSuspendFun1<String> = NotExportedParent()
+
+@JsExport.Ignore
+open class NotExportedParent : IntermediateNotExportedInterface<String> {
+    override suspend fun parentSuspendFun1(someValue: String) = "NotExportedParent $someValue"
     open suspend fun parentSuspendFun2() = "NotExportedParent 2"
 }
 
@@ -209,13 +270,51 @@ suspend fun acceptExportedChild(child: ExportedChild) {
     val parent = NotExportedParent()
 
     assert(parent.parentSuspendFun1() == "NotExportedParent 1")
+    assert(parent.parentSuspendFun1("Another") == "NotExportedParent Another")
     assert(parent.parentSuspendFun2() == "NotExportedParent 2")
 
-    assert(child.parentSuspendFun1() == "NotExportedParent 1")
+    assertIntermediateNotExportedInterface(parent)
+
+    assert(child.parentSuspendFun1() == when (child::class.js) {
+        ExportedChild::class.js -> "NotExportedParent 1"
+        else /* TypeScript */ -> "TypeScriptSuspendFun1"
+    })
+
+    assert(child.parentSuspendFun1("OneMore") == when (child::class.js) {
+        ExportedChild::class.js -> "NotExportedParent OneMore"
+        else /* TypeScript */ -> "OneMoreTypeScriptSuspendFun1"
+    })
+
     assert(child.parentSuspendFun2() == "ExportedChild 2")
+
+    assertIntermediateNotExportedInterface(child)
 
     assert(child.childSuspendFun() == when (child::class.js) {
         ExportedChild::class.js -> "ExportedChild"
         else /* TypeScript */ -> "TypeScriptChild"
+    })
+}
+
+@JsExport
+suspend fun acceptHolderOfParentSuspendFun1(holder: HolderOfParentSuspendFun1<String>) {
+    assert(holder.parentSuspendFun1() == when (holder::class.js) {
+        NotExportedParent::class.js, ExportedChild::class.js -> "NotExportedParent 1"
+        else /* TypeScript */ -> "TypeScriptSuspendFun1"
+    })
+    assert(holder.parentSuspendFun1("Test") == when (holder::class.js) {
+        NotExportedParent::class.js, ExportedChild::class.js -> "NotExportedParent Test"
+        else /* TypeScript */ -> "TestTypeScriptSuspendFun1"
+    })
+}
+
+@JsExport.Ignore
+suspend fun assertIntermediateNotExportedInterface(holder: IntermediateNotExportedInterface<String>) {
+    assert(holder.parentSuspendFun1() == when (holder::class.js) {
+        NotExportedParent::class.js, ExportedChild::class.js -> "NotExportedParent 1"
+        else /* TypeScript */ -> "TypeScriptSuspendFun1"
+    })
+    assert(holder.parentSuspendFun1("Intermediate") == when (holder::class.js) {
+        NotExportedParent::class.js, ExportedChild::class.js -> "NotExportedParent Intermediate"
+        else /* TypeScript */ -> "IntermediateTypeScriptSuspendFun1"
     })
 }

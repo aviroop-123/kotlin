@@ -2,6 +2,7 @@
 // RUN_PLAIN_BOX_FUNCTION
 // SKIP_NODE_JS
 // INFER_MAIN_MODULE
+// DIAGNOSTICS: -REPEATED_ANNOTATION
 
 // MODULE: JS_TESTS
 // FILE: file1.kt
@@ -21,17 +22,21 @@ class ExportedClass {
 @JsExport
 external interface ExportedInternalInterface
 
+@JsExport.Ignore
 val _val = 10
 
+@JsExport.Ignore
 fun _fun() = 10
 
+@JsExport.Ignore
 class Class
 
+@JsExport.Ignore
 external interface ExternalInterface
 
+@JsExport.Ignore
 @JsName("bbb")
 fun zzz(x: Int = 10) {}
-
 // FILE: file2.kt
 
 @file:JsExport
@@ -43,6 +48,10 @@ fun fileLevelExportedFun() = 10
 class FileLevelExportedClass {
     val value = 10
 }
+
+value class FileLevelExportedValueClass(val value: Int)
+
+fun createFileLevelExportedValueClass(value: Int): FileLevelExportedValueClass =
+    FileLevelExportedValueClass(value)
+
 external interface FileLevelExportedExternalInterface
-
-

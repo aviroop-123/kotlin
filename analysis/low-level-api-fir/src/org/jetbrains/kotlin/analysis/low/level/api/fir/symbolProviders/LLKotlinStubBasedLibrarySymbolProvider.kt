@@ -7,19 +7,23 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders
 
 import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.util.containers.addIfNotNull
+import org.jetbrains.kotlin.analysis.api.impl.base.util.withPsiEntry
 import org.jetbrains.kotlin.analysis.api.platform.declarations.createDeclarationProvider
 import org.jetbrains.kotlin.analysis.api.platform.packages.createPackageProvider
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.api.utils.errors.withPsiEntry
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.LLFirModuleData
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.llFirModuleData
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
+import org.jetbrains.kotlin.analysis.low.level.api.fir.statistics.LLStatisticsOnlyApi
 import org.jetbrains.kotlin.analysis.low.level.api.fir.stubBased.deserialization.*
 import org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders.caches.LLPsiAwareClassLikeSymbolCache
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.caches.FirCache
+import org.jetbrains.kotlin.fir.caches.FirCacheInternals
 import org.jetbrains.kotlin.fir.caches.firCachesFactory
 import org.jetbrains.kotlin.fir.caches.getValue
+import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.moduleData
 import org.jetbrains.kotlin.fir.realPsi
@@ -28,7 +32,6 @@ import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProviderInternals
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider
 import org.jetbrains.kotlin.fir.scopes.kotlinScopeProvider
 import org.jetbrains.kotlin.fir.symbols.impl.*
-import org.jetbrains.kotlin.load.kotlin.FacadeClassSource
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
@@ -41,7 +44,7 @@ import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerial
 import org.jetbrains.kotlin.utils.addToStdlib.ifNotEmpty
 import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
 
-typealias DeserializedTypeAliasPostProcessor = (FirTypeAliasSymbol) -> Unit
+internal typealias DeserializedTypeAliasPostProcessor = (FirTypeAliasSymbol) -> Unit
 
 /**
  * [LLKotlinStubBasedLibrarySymbolProvider] deserializes FIR symbols from existing stubs, retrieving them by [ClassId]/[CallableId] from a
@@ -462,6 +465,20 @@ internal open class LLKotlinStubBasedLibrarySymbolProvider(
 
         return callableSymbols?.singleOrNull { it.fir.realPsi == callableDeclaration }
     }
+
+    @OptIn(FirCacheInternals::class)
+    @LLStatisticsOnlyApi
+    internal val cachedDeclarations: List<FirDeclaration>
+        get() = buildList {
+            typeAliasCache.cachedValues.forEach { addIfNotNull(it?.fir) }
+            classCache.cachedValues.forEach { addIfNotNull(it?.fir) }
+            functionCache.cachedValues.forEach { functions ->
+                functions.forEach { add(it.fir) }
+            }
+            propertyCache.cachedValues.forEach { properties ->
+                properties.forEach { add(it.fir) }
+            }
+        }
 
     companion object {
         fun loadProperty(

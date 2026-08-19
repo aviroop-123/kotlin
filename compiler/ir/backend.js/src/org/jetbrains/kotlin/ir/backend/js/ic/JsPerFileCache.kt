@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,6 +7,9 @@ package org.jetbrains.kotlin.ir.backend.js.ic
 
 import org.jetbrains.kotlin.backend.common.serialization.cityHash64
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.*
+import org.jetbrains.kotlin.js.artifacts.CachedTestFunctionsWithTheirPackage
+import org.jetbrains.kotlin.js.artifacts.PerFileGenerator
+import org.jetbrains.kotlin.js.config.WebArtifactConfiguration
 import org.jetbrains.kotlin.protobuf.CodedInputStream
 import org.jetbrains.kotlin.protobuf.CodedOutputStream
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
@@ -15,7 +18,10 @@ import java.io.File
 /**
  * This class maintains incremental cache files used by [JsExecutableProducer] for per-file compilation mode.
  */
-class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMultiArtifactCache<JsPerFileCache.CachedFileInfo>() {
+class JsPerFileCache(
+    private val artifactConfiguration: WebArtifactConfiguration,
+    private val moduleArtifacts: List<JsModuleArtifact>,
+) : JsMultiArtifactCache<JsPerFileCache.CachedFileInfo>() {
     companion object {
         private const val JS_MODULE_HEADER = "js.module.header.bin"
         private const val CACHED_FILE_JS = "file.js"
@@ -304,7 +310,7 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
 
     private fun CodedOutputStream.writeTestFunctions(cachedTestFunctionsWithTheirPackage: CachedTestFunctionsWithTheirPackage) {
         writeInt32NoTag(cachedTestFunctionsWithTheirPackage.size)
-        cachedTestFunctionsWithTheirPackage.forEach { (key, value) ->
+        cachedTestFunctionsWithTheirPackage.forEach { [key, value] ->
             writeStringNoTag(key)
             writeInt32NoTag(value.size)
             value.forEach(::writeStringNoTag)
@@ -386,7 +392,7 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
     private fun JsIrModuleHeader.areNameBindingsChanged(other: JsIrModuleHeader): Boolean {
         if (nameBindings.size != other.nameBindings.size) return true
 
-        for ((name, tag) in nameBindings) {
+        for ([name, tag] in nameBindings) {
             val otherTag = other.nameBindings[name] ?: return true
             if (tag != otherTag) return true
         }
@@ -401,11 +407,19 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
             is CachedFileInfo.ModuleProxyFileCachedInfo -> jsFileArtifact?.let { CachedFileArtifacts(it, null, dtsFileArtifact) }
         }
 
-    override fun fetchCompiledJsCode(cacheInfo: CachedFileInfo) =
-        cacheInfo.cachedFiles?.let { (jsCodeFile, sourceMapFile, tsDeclarationsFile) ->
-            jsCodeFile.ifExists { this }
-                ?.let { CompilationOutputsCached(it, sourceMapFile?.ifExists { this }, tsDeclarationsFile?.ifExists { this }) }
-        }
+    override fun fetchCompiledJsCode(cacheInfo: CachedFileInfo): CompilationOutputsCached? {
+        val (jsCodeFile, sourceMapFile, tsDeclarationsFile) = cacheInfo.cachedFiles ?: return null
+        if (!jsCodeFile.exists()) return null
+        return CompilationOutputsCached(
+            artifactConfiguration.copy(
+                moduleName = cacheInfo.jsIrHeader.moduleName,
+                outputName = cacheInfo.jsIrHeader.externalModuleName,
+            ),
+            jsCodeFile,
+            sourceMapFile?.ifExists { this },
+            tsDeclarationsFile?.ifExists { this },
+        )
+    }
 
     override fun commitOnyTypeScriptFiles(cacheInfo: CachedFileInfo): Boolean {
         if (cacheInfo !is CachedFileInfo.ExportFileCachedInfo || !cacheInfo.onlyDtsWereChanged) return false
@@ -414,7 +428,7 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
     }
 
     override fun commitCompiledJsCode(cacheInfo: CachedFileInfo, compilationOutputs: CompilationOutputsBuilt) =
-        cacheInfo.cachedFiles?.let { (jsCodeFile, jsMapFile, tsDeclarationsFile) ->
+        cacheInfo.cachedFiles?.let { (val jsCodeFile, val jsMapFile = sourceMapFile, val tsDeclarationsFile) ->
             compilationOutputs.writeJsCodeIntoModuleCache(jsCodeFile, tsDeclarationsFile, jsMapFile)
         } ?: compilationOutputs
 
@@ -423,7 +437,7 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
     override fun loadProgramHeadersFromCache(): List<CachedFileInfo> {
         val mainModuleArtifact = moduleArtifacts.last()
 
-        val perFileGenerator = object : PerFileGenerator<JsModuleArtifact, JsSrcFileArtifact, CachedFileInfo> {
+        val perFileGenerator = object : PerFileGenerator<JsModuleArtifact, JsSrcFileArtifact, CachedFileInfo, JsIrProgramTestEnvironment> {
             override val mainModuleName get() = mainModuleArtifact.moduleExternalName
 
             override val JsModuleArtifact.isMain get() = this === mainModuleArtifact
@@ -443,6 +457,12 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
             override fun CachedFileInfo.takeTestEnvironmentOwnership() =
                 (this as CachedFileInfo.MainFileCachedInfo).testEnvironment
 
+            override val JsIrProgramTestEnvironment.testFunctionTag: String
+                get() = testFunctionTag
+
+            override val JsIrProgramTestEnvironment.suiteFunctionTag: String
+                get() = suiteFunctionTag
+
             override fun JsSrcFileArtifact.generateArtifact(module: JsModuleArtifact) = when {
                 isModified() -> module.loadFileInfoFor(this)
                 else -> module.fetchFileInfoFor(this) ?: module.loadFileInfoFor(this)
@@ -454,7 +474,7 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
                 else -> CachedFileInfo.MainFileCachedInfo.Merged(map { it as CachedFileInfo.MainFileCachedInfo })
             }
 
-            override fun JsModuleArtifact.generateArtifact(
+            override fun JsModuleArtifact.generateProxyArtifact(
                 mainFunctionTag: String?,
                 suiteFunctionTag: String?,
                 testFunctions: CachedTestFunctionsWithTheirPackage,
@@ -474,7 +494,7 @@ class JsPerFileCache(private val moduleArtifacts: List<JsModuleArtifact>) : JsMu
     }
 
     override fun loadRequiredJsIrModules(crossModuleReferences: Map<JsIrModuleHeader, CrossModuleReferences>) {
-        for ((header, references) in crossModuleReferences) {
+        for ([header, references] in crossModuleReferences) {
             val cachedInfo = headerToCachedInfo[header] ?: notFoundIcError("artifact for module ${header.moduleName}")
 
             val actualCrossModuleHash = references.crossModuleReferencesHashForIC()

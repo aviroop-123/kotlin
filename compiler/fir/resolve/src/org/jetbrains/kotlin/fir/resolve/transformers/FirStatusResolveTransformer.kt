@@ -369,8 +369,8 @@ abstract class AbstractFirStatusResolveTransformer(
     override fun transformReplSnippet(
         replSnippet: FirReplSnippet,
         data: FirResolvedDeclarationStatus?,
-    ): FirReplSnippet {
-        // Processing snippet declarations as local ones
+    ): FirReplSnippet = whileAnalysing(session, replSnippet) {
+        transformRegularClass(replSnippet.snippetClass, data)
         return replSnippet
     }
 
@@ -406,29 +406,29 @@ abstract class AbstractFirStatusResolveTransformer(
         data: FirResolvedDeclarationStatus?,
     ): FirStatement = transformConstructor(errorPrimaryConstructor, data)
 
-    override fun transformSimpleFunction(
-        simpleFunction: FirSimpleFunction,
+    override fun transformNamedFunction(
+        namedFunction: FirNamedFunction,
         data: FirResolvedDeclarationStatus?,
-    ): FirStatement = whileAnalysing(session, simpleFunction) {
-        val overriddenFunctions = statusResolver.getOverriddenFunctions(simpleFunction, containingClass)
-        transformSimpleFunction(simpleFunction, overriddenFunctions, data)
-        return simpleFunction
+    ): FirStatement = whileAnalysing(session, namedFunction) {
+        val overriddenFunctions = statusResolver.getOverriddenFunctions(namedFunction, containingClass)
+        transformNamedFunction(namedFunction, overriddenFunctions, data)
+        return namedFunction
     }
 
-    fun transformSimpleFunction(
-        simpleFunction: FirSimpleFunction,
-        overriddenFunctions: List<FirSimpleFunction>,
+    fun transformNamedFunction(
+        namedFunction: FirNamedFunction,
+        overriddenFunctions: List<FirNamedFunction>,
         data: FirResolvedDeclarationStatus? = null,
     ) {
         val resolvedStatus = statusResolver.resolveStatus(
-            simpleFunction,
+            namedFunction,
             containingClass,
             isLocal = false,
             overriddenFunctions.map { it.status as FirResolvedDeclarationStatus },
         )
 
-        simpleFunction.transformStatus(this, resolvedStatus)
-        transformDeclaration(simpleFunction, data) as FirStatement
+        namedFunction.transformStatus(this, resolvedStatus)
+        transformDeclaration(namedFunction, data) as FirStatement
     }
 
     override fun transformProperty(

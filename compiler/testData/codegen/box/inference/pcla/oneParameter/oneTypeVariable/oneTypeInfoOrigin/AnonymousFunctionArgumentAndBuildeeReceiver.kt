@@ -1,6 +1,5 @@
 // CHECK_TYPE_WITH_EXACT
 
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-59551
 
 class Buildee<CT> {

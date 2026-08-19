@@ -5,13 +5,14 @@
 
 package org.jetbrains.kotlin.psi2ir.lazy
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.lazy.IrLazyClassBase
 import org.jetbrains.kotlin.ir.declarations.lazy.lazyVar
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrSimpleType
@@ -19,6 +20,7 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.name.Name
 
+@K1Deprecation
 class IrLazyClass(
     override var startOffset: Int,
     override var endOffset: Int,
@@ -43,13 +45,9 @@ class IrLazyClass(
 ) : IrClass(), IrLazyClassBase, Psi2IrLazyDeclarationBase {
     init {
         symbol.bind(this)
-        this.deserializedIr = lazy {
-            assert(parent is IrPackageFragment)
-            stubGenerator.extensions.deserializeClass(this, stubGenerator, parent)
-        }
     }
 
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+    override var annotations: List<IrAnnotation> by createLazyAnnotations()
 
     override var thisReceiver: IrValueParameter? by lazyVar(stubGenerator.lock) {
         typeTranslator.buildWithScope(this) {

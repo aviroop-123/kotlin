@@ -20,8 +20,10 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaLocalVariableSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
+import org.jetbrains.kotlin.fir.declarations.utils.isDelegatedProperty
 import org.jetbrains.kotlin.fir.declarations.utils.isLateInit
 import org.jetbrains.kotlin.fir.symbols.impl.FirErrorPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -61,10 +63,19 @@ internal sealed class KaFirLocalOrErrorVariableSymbol(
         // See changes in KT-76578
         get() = withValidityAssertion { backingPsi?.hasModifier(KtTokens.LATEINIT_KEYWORD) ?: firSymbol.isLateInit }
 
+    override val isDelegated: Boolean
+        get() = withValidityAssertion {
+            if (backingPsi != null) {
+                (backingPsi as? KtProperty)?.hasDelegate() == true
+            } else {
+                (firSymbol as? FirPropertySymbol)?.isDelegatedProperty == true
+            }
+        }
+
     override fun createPointer(): KaSymbolPointer<KaLocalVariableSymbol> = withValidityAssertion {
         psiBasedSymbolPointerOfTypeIfSource<KaLocalVariableSymbol>()?.let { return it }
 
-        if (firSymbol.fir.source?.kind == KtFakeSourceElementKind.ScriptParameter) {
+        if (firSymbol.fir.source?.kind is KtFakeSourceElementKind.ScriptParameter) {
             return KaFirScriptParameterSymbolPointer(name, analysisSession.createOwnerPointer(this), this)
         }
 
@@ -112,7 +123,7 @@ internal class KaFirLocalVariableSymbol : KaFirLocalOrErrorVariableSymbol {
     }
 
     constructor(symbol: FirPropertySymbol, session: KaFirSession) : super(symbol, session) {
-        assert(symbol.isLocal)
+        assert(symbol is FirLocalPropertySymbol)
     }
 
     override val name: Name

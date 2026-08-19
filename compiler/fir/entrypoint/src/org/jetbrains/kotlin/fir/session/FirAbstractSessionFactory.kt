@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.fir.session
 
+import org.jetbrains.kotlin.cli.diagnosticFactoriesStorage
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.checkers.registerCommonCheckers
@@ -21,6 +22,28 @@ import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.addIfNotNull
+
+/**
+ * Describes the role of a source module for which a session is created, used to choose
+ * the proper layout of dependency symbol providers (see [FirAbstractSessionFactory]).
+ */
+enum class KmpModuleKind {
+    SingleModule, // used for modules without KMP (pure jvm compilation, for example)
+    NonLeafRegularModule, // non-leaf module in KMP compilation when hmpp is disabled
+    LeafRegularModule, // leaf module in KMP compilation when hmpp is disabled
+    NonLeafHmppModule, // non-leaf module in KMP compilation when hmpp is enabled
+    LeafHmppModule; // leaf module in KMP compilation when hmpp is enabled
+
+    companion object {
+        fun leafModule(isHmppEnabled: Boolean): KmpModuleKind {
+            return if (isHmppEnabled) LeafHmppModule else LeafRegularModule
+        }
+
+        fun nonLeafModule(isHmppEnabled: Boolean): KmpModuleKind {
+            return if (isHmppEnabled) NonLeafHmppModule else NonLeafRegularModule
+        }
+    }
+}
 
 /**
  * This is the base class for factories, which create various sessions for compilation.
@@ -73,7 +96,7 @@ import org.jetbrains.kotlin.utils.addIfNotNull
  *  Source session (platform) ───────────────► Libraries session (platform) [regular dependencies + shared providers]
  */
 @OptIn(PrivateSessionConstructor::class, SessionConfiguration::class)
-abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
+abstract class FirAbstractSessionFactory<CONTEXT> {
 
     // ==================================== Shared library session ====================================
 
@@ -84,13 +107,12 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
      */
     protected fun createSharedLibrarySession(
         mainModuleName: Name,
-        context: LIBRARY_CONTEXT,
+        context: CONTEXT,
         languageVersionSettings: LanguageVersionSettings,
         extensionRegistrars: List<FirExtensionRegistrar>
     ): FirSession {
         return FirCliSession(FirSession.Kind.Library).apply session@{
-            registerCliCompilerOnlyComponents(languageVersionSettings)
-            registerCommonComponents(languageVersionSettings)
+            registerCliCompilerAndCommonComponents(languageVersionSettings, isFactoryForMetadataCompilation)
             registerLibrarySessionComponents(context)
 
             val kotlinScopeProvider = createKotlinScopeProviderForLibrarySession()
@@ -120,7 +142,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
         session: FirSession,
         moduleData: FirModuleData,
         scopeProvider: FirKotlinScopeProvider,
-        context: LIBRARY_CONTEXT,
+        context: CONTEXT,
     ): List<FirSymbolProvider> {
         return buildList {
             add(FirBuiltinSyntheticFunctionInterfaceProvider(session, moduleData, scopeProvider))
@@ -133,7 +155,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
         session: FirSession,
         moduleData: FirModuleData,
         scopeProvider: FirKotlinScopeProvider,
-        context: LIBRARY_CONTEXT,
+        context: CONTEXT,
     ): List<FirSymbolProvider>
 
     // ==================================== Library session ====================================
@@ -144,7 +166,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
      * For more information see KDoc to [FirAbstractSessionFactory]
      */
     protected fun createLibrarySession(
-        context: LIBRARY_CONTEXT,
+        context: CONTEXT,
         sharedLibrarySession: FirSession,
         moduleDataProvider: ModuleDataProvider,
         languageVersionSettings: LanguageVersionSettings,
@@ -157,8 +179,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
                 it.bindSession(this)
             }
 
-            registerCliCompilerOnlyComponents(languageVersionSettings)
-            registerCommonComponents(languageVersionSettings)
+            registerCliCompilerAndCommonComponents(languageVersionSettings, isFactoryForMetadataCompilation)
             registerLibrarySessionComponents(context)
             register(FirBuiltinSyntheticFunctionInterfaceProvider::class, sharedLibrarySession.syntheticFunctionInterfacesSymbolProvider)
 
@@ -212,7 +233,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
     }
 
     protected abstract fun createKotlinScopeProviderForLibrarySession(): FirKotlinScopeProvider
-    protected abstract fun FirSession.registerLibrarySessionComponents(c: LIBRARY_CONTEXT)
+    abstract fun FirSession.registerLibrarySessionComponents(c: CONTEXT)
 
     // ==================================== Platform session ====================================
 
@@ -223,10 +244,10 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
      */
     protected fun createSourceSession(
         moduleData: FirModuleData,
-        context: SOURCE_CONTEXT,
+        context: CONTEXT,
         extensionRegistrars: List<FirExtensionRegistrar>,
         configuration: CompilerConfiguration,
-        isForLeafHmppModule: Boolean,
+        kmpModuleKind: KmpModuleKind,
         init: FirSessionConfigurator.() -> Unit,
         createProviders: (
             FirSession, FirKotlinScopeProvider, FirSymbolProvider,
@@ -237,16 +258,17 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
         return FirCliSession(FirSession.Kind.Source).apply session@{
             moduleData.bindSession(this@session)
             registerModuleData(moduleData)
-            registerCliCompilerOnlyComponents(languageVersionSettings)
             if (configuration.dumpInferenceLogs) register(FirInferenceLogger::class, FirInferenceLogger())
-            registerCommonComponents(languageVersionSettings)
+            registerCliCompilerAndCommonComponents(languageVersionSettings, isFactoryForMetadataCompilation)
             registerResolveComponents(
+                configuration.diagnosticFactoriesStorage ?: error("diagnosticFactoriesStorage is not registered in the configuration"),
                 configuration.lookupTracker,
                 configuration.enumWhenTracker,
                 configuration.importTracker,
                 configuration.fileMappingTracker,
             )
             registerCliCompilerOnlyResolveComponents()
+
             registerSourceSessionComponents(context)
 
             val kotlinScopeProvider = createKotlinScopeProviderForSourceSession(moduleData, languageVersionSettings)
@@ -257,9 +279,9 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
 
             FirSessionConfigurator(this).apply {
                 registerCommonCheckers()
-                registerPlatformCheckers(context)
+                registerPlatformCheckers()
                 if (configuration.useFirExtraCheckers) {
-                    registerExtraPlatformCheckers(context)
+                    registerExtraPlatformCheckers()
                 }
 
                 for (extensionRegistrar in extensionRegistrars) {
@@ -273,7 +295,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
                 this,
                 moduleData,
                 languageVersionSettings,
-                isForLeafHmppModule,
+                kmpModuleKind,
             )
             val generatedSymbolsProvider = FirSwitchableExtensionDeclarationsSymbolProvider.createIfNeeded(this)
 
@@ -289,7 +311,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
                 // metadata klibs for specific source sets contain declarations only from exactly this source set
                 // so to see declarations from previous source sets (e.g. common, if we are in jvmAndJs module) we need to
                 // propagate binary dependencies from our source dependsOn modules
-                if (!isForLeafHmppModule) {
+                if (kmpModuleKind != KmpModuleKind.LeafHmppModule) {
                     moduleData.dependsOnDependencies.flatMapTo(this) { it.session.structuredProviders.dependencyProviders }
                 }
                 addIfNotNull(additionalOptionalAnnotationsProvider)
@@ -335,11 +357,12 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
         moduleData: FirModuleData, languageVersionSettings: LanguageVersionSettings
     ): FirKotlinScopeProvider
 
-    protected abstract fun FirSessionConfigurator.registerPlatformCheckers(c: SOURCE_CONTEXT)
-    protected abstract fun FirSessionConfigurator.registerExtraPlatformCheckers(c: SOURCE_CONTEXT)
-    protected abstract fun FirSession.registerSourceSessionComponents(c: SOURCE_CONTEXT)
+    abstract fun FirSessionConfigurator.registerPlatformCheckers()
+    abstract fun FirSessionConfigurator.registerExtraPlatformCheckers()
+    abstract fun FirSession.registerSourceSessionComponents(c: CONTEXT)
 
     protected abstract val requiresSpecialSetupOfSourceProvidersInHmppCompilation: Boolean
+    protected abstract val isFactoryForMetadataCompilation: Boolean
 
     // ==================================== Common parts ====================================
 
@@ -349,7 +372,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
         session: FirSession,
         moduleData: FirModuleData,
         languageVersionSettings: LanguageVersionSettings,
-        isForLeafHmppModule: Boolean,
+        kmpModuleKind: KmpModuleKind,
     ): StructuredProviders {
         // dependsOnDependencies can actualize declarations from their dependencies. Because actual declarations can be more specific
         // (e.g. have additional supertypes), the modules must be ordered from most specific (i.e. actual) to most generic (i.e. expect)
@@ -376,7 +399,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
                 val binaryProvidersFromCommonModules = mutableListOf<FirSymbolProvider>()
                 val binaryProvidersFromPlatformModule = mutableListOf<FirSymbolProvider>()
                 val sourceProvidersFromCommonModules = mutableListOf<FirSymbolProvider>()
-                for ((dependencyModuleData, providers) in providersFromDependencies) {
+                for ([dependencyModuleData, providers] in providersFromDependencies) {
                     when (dependencyModuleData.session.kind) {
                         // dependency session of the current module
                         FirSession.Kind.Library -> {
@@ -404,7 +427,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
                  * module, so for common modules we create fallback provider **only** for the root common module and
                  * for the platform module (as it has its own stdlib in dependencies)
                  */
-                if (binaryProvidersFromCommonModules.any { it is FirFallbackBuiltinSymbolProvider } && !isForLeafHmppModule) {
+                if (binaryProvidersFromCommonModules.any { it is FirFallbackBuiltinSymbolProvider } && kmpModuleKind != KmpModuleKind.LeafHmppModule) {
                     binaryProvidersFromPlatformModule.removeAll { it is FirFallbackBuiltinSymbolProvider }
                 }
 
@@ -421,7 +444,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
             }
 
             else -> {
-                dependencyProviders = providersFromDependencies.flatMap { (dependencyModuleData, providers) ->
+                dependencyProviders = providersFromDependencies.flatMap { [dependencyModuleData, providers] ->
                     when (dependencyModuleData.session.kind) {
                         FirSession.Kind.Library -> providers.dependencyProviders.also { check(providers.sourceProviders.isEmpty()) }
                         // Dependency providers for common and platform modules are basically the same, so there is no need in duplicating them.
@@ -432,7 +455,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
                 // regular modules.
                 // TODO(KT-75896): Such dependencies might occur only in old tests, which are not migrated to CLI facades yet.
                 sharedProvider = providersFromDependencies
-                    .first { (moduleData, _) -> moduleData.session.kind == FirSession.Kind.Library }
+                    .first { [moduleData, _] -> moduleData.session.kind == FirSession.Kind.Library }
                     .second.sharedProvider
             }
         }
@@ -447,7 +470,7 @@ abstract class FirAbstractSessionFactory<LIBRARY_CONTEXT, SOURCE_CONTEXT> {
     /* It eliminates dependency and composite providers since the current dependency provider is composite in fact.
     *  To prevent duplications and resolving errors, library or source providers from other modules should be filtered out during flattening.
     *  It depends on the session's kind of the top-level provider */
-    private fun FirSymbolProvider.flattenAndFilterOwnProviders(): List<FirSymbolProvider> {
+    fun FirSymbolProvider.flattenAndFilterOwnProviders(): List<FirSymbolProvider> {
         val originalSession = session.takeIf { it.kind == FirSession.Kind.Source }
         return flatten { provider ->
             // Make sure only source symbol providers from the same session as the original symbol provider are flattened. A composite

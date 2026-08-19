@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.backend.konan.serialization
 
+import org.jetbrains.kotlin.backend.common.linkage.IrDeserializer
 import org.jetbrains.kotlin.backend.common.serialization.IrModuleDeserializer
 import org.jetbrains.kotlin.backend.common.serialization.IrModuleDeserializerKind
 import org.jetbrains.kotlin.backend.common.serialization.KotlinIrLinker
@@ -31,12 +32,15 @@ internal class KonanForwardDeclarationModuleDeserializer(
     private val linker: KotlinIrLinker,
     private val stubGenerator: DeclarationStubGenerator,
 ) : IrModuleDeserializer(moduleDescriptor, KotlinAbiVersion.Companion.CURRENT) {
+
+    override val klib get() = error("'klib' is not available for ${this::class.java}")
+
     init {
         require(moduleDescriptor.isForwardDeclarationModule)
     }
 
     companion object {
-        private val FORWARD_DECLARATION_ORIGIN by IrDeclarationOriginImpl.Companion
+        private val FORWARD_DECLARATION_ORIGIN by IrDeclarationOriginImpl.Regular
     }
 
     private val declaredDeclaration = mutableMapOf<IdSignature, IrClass>()
@@ -51,11 +55,14 @@ internal class KonanForwardDeclarationModuleDeserializer(
 
     override fun contains(idSig: IdSignature): Boolean = idSig.isForwardDeclarationSignature()
 
+    override fun getDefinedPackageNames(): Set<FqName> =
+        NativeForwardDeclarationKind.entries.map { it.packageFqName }.toSet()
+
     private fun resolveDescriptor(idSig: IdSignature): ClassDescriptor? =
-            with(idSig as IdSignature.CommonSignature) {
-                val classId = ClassId(packageFqName(), FqName(declarationFqName), false)
-                moduleDescriptor.findClassAcrossModuleDependencies(classId)
-            }
+        with(idSig as IdSignature.CommonSignature) {
+            val classId = ClassId(packageFqName(), FqName(declarationFqName), false)
+            moduleDescriptor.findClassAcrossModuleDependencies(classId)
+        }
 
     private fun buildForwardDeclarationStub(descriptor: ClassDescriptor): IrClass {
         return stubGenerator.generateClassStub(descriptor).also {
@@ -69,10 +76,8 @@ internal class KonanForwardDeclarationModuleDeserializer(
         }
         val descriptor = resolveDescriptor(idSig) ?: return null
         val actualModule = descriptor.module
-        if (actualModule !== moduleDescriptor) {
-            val moduleDeserializer = linker.resolveModuleDeserializer(actualModule, idSig)
-            moduleDeserializer.addModuleReachableTopLevel(idSig)
-            return linker.symbolTable.referenceClass(idSig)
+        check(actualModule == moduleDescriptor) {
+            "Expected module ${moduleDescriptor.name}, but got ${actualModule.name} for descriptor $descriptor"
         }
 
         return declaredDeclaration.getOrPut(idSig) { buildForwardDeclarationStub(descriptor) }.symbol
@@ -81,7 +86,6 @@ internal class KonanForwardDeclarationModuleDeserializer(
     override fun deserializedSymbolNotFound(idSig: IdSignature): Nothing = error("No descriptor found for $idSig")
 
     override val moduleFragment: IrModuleFragment = IrModuleFragmentImpl(moduleDescriptor)
-    override val moduleDependencies: Collection<IrModuleDeserializer> = emptyList()
 
     override val kind get() = IrModuleDeserializerKind.SYNTHETIC
 }

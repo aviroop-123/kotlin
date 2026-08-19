@@ -200,7 +200,7 @@ class KotlinMetadataTargetConfigurator :
                     // This logic can be simplified, see KT-64523
                     val shouldBeDisabled = platformCompilations
                         .filterIsInstance<KotlinNativeCompilation>()
-                        .none { it.crossCompilationOnCurrentHostSupported.await() }
+                        .none { it.target.crossCompilationOnCurrentHostSupported.await() }
                     if (shouldBeDisabled) {
                         // Then we don't have any platform module to put this compiled source set to, so disable the compilation task:
                         compileTaskProvider.configure { it.enabled = false }
@@ -222,7 +222,8 @@ class KotlinMetadataTargetConfigurator :
         // Metadata from visible source sets within dependsOn closure
         compilation.compileDependencyFiles += sourceSet.dependsOnClosureCompilePath
 
-        compilation.compileDependencyFiles += sourceSet.retrieveExternalDependencies(transitive = true)
+        val externalDependencies = sourceSet.retrieveExternalDependencies(transitive = true)
+        compilation.compileDependencyFiles += externalDependencies
     }
 }
 
@@ -259,9 +260,7 @@ private val ResolvedArtifactResult.isMpp: Boolean
 internal fun Project.locateOrRegisterGenerateProjectStructureMetadataTask(): TaskProvider<GenerateProjectStructureMetadata> =
     project.locateOrRegisterTask(lowerCamelCaseName("generateProjectStructureMetadata")) { task ->
         task.lazyKotlinProjectStructureMetadata = lazy { project.multiplatformExtension.kotlinProjectStructureMetadata }
-        if (project.kotlinPropertiesProvider.kotlinKmpProjectIsolationEnabled) {
-            task.addMetadataSourceSetsToOutput(project)
-        }
+        task.addMetadataSourceSetsToOutput(project)
         task.description = "Generates serialized project structure metadata of the current project (for tooling)"
     }
 

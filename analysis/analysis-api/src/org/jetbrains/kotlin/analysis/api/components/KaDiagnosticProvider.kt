@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,13 +7,27 @@ package org.jetbrains.kotlin.analysis.api.components
 
 import org.jetbrains.kotlin.analysis.api.KaContextParameterApi
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
+import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaDiagnosticWithPsi
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 
-@SubclassOptInRequired(KaImplementationDetail::class)
+@KaSessionComponentImplementationDetail
+@SubclassOptInRequired(KaSessionComponentImplementationDetail::class)
 public interface KaDiagnosticProvider : KaSessionComponent {
+    /**
+     * Collects diagnostics for the given element.
+     *
+     * **Caution:** The result might not include diagnostics that are reported for child elements, as well as diagnostics provided by the
+     * checkers of containing elements. Therefore, the API might not return all expected diagnostics for an element.
+     * [KtFile.collectDiagnostics] should be preferred at the current time.
+     *
+     * Deprecated: Use [directDiagnostics] instead.
+     */
+    @KaExperimentalApi
+    @Deprecated("Use KtElement.directDiagnostics instead", ReplaceWith("directDiagnostics(filter)"))
+    public fun KtElement.diagnostics(filter: KaDiagnosticCheckerFilter): Collection<KaDiagnosticWithPsi<*>>
+
     /**
      * Collects diagnostics for the given element.
      *
@@ -22,12 +36,26 @@ public interface KaDiagnosticProvider : KaSessionComponent {
      * [KtFile.collectDiagnostics] should be preferred at the current time.
      */
     @KaExperimentalApi
-    public fun KtElement.diagnostics(filter: KaDiagnosticCheckerFilter): Collection<KaDiagnosticWithPsi<*>>
+    public fun KtElement.directDiagnostics(filter: KaDiagnosticCheckerFilter): Collection<KaDiagnosticWithPsi<*>>
 
     /**
      * Collects all diagnostics for the given file.
+     *
+     * Eager version of [KtFile.diagnostics].
+     *
+     * @see KtFile.diagnostics
      */
     public fun KtFile.collectDiagnostics(filter: KaDiagnosticCheckerFilter): Collection<KaDiagnosticWithPsi<*>>
+
+    /**
+     * Returns a [Sequence] of all diagnostics for the given file.
+     *
+     * This is a [Sequence]-based version of [collectDiagnostics].
+     *
+     * @see collectDiagnostics
+     */
+    @KaExperimentalApi
+    public fun KtFile.diagnostics(filter: KaDiagnosticCheckerFilter): Sequence<KaDiagnosticWithPsi<*>>
 }
 
 /**
@@ -60,20 +88,80 @@ public enum class KaDiagnosticCheckerFilter {
 }
 
 /**
- * @see KaDiagnosticProvider.diagnostics
+ * Collects diagnostics for the given element.
+ *
+ * **Caution:** The result might not include diagnostics that are reported for child elements, as well as diagnostics provided by the
+ * checkers of containing elements. Therefore, the API might not return all expected diagnostics for an element.
+ * [KtFile.collectDiagnostics] should be preferred at the current time.
+ *
+ * Deprecated: Use [directDiagnostics] instead.
  */
-@KaContextParameterApi
+// Auto-generated bridge. DO NOT EDIT MANUALLY!
 @KaExperimentalApi
-context(context: KaDiagnosticProvider)
+@Deprecated("Use KtElement.directDiagnostics instead", ReplaceWith("directDiagnostics(filter)"))
+@KaContextParameterApi
+context(session: KaSession)
 public fun KtElement.diagnostics(filter: KaDiagnosticCheckerFilter): Collection<KaDiagnosticWithPsi<*>> {
-    return with(context) { diagnostics(filter) }
+    @Suppress("DEPRECATION")
+    return with(session) {
+        diagnostics(
+            filter = filter,
+        )
+    }
 }
 
 /**
- * @see KaDiagnosticProvider.collectDiagnostics
+ * Collects diagnostics for the given element.
+ *
+ * **Caution:** The result might not include diagnostics that are reported for child elements, as well as diagnostics provided by the
+ * checkers of containing elements. Therefore, the API might not return all expected diagnostics for an element.
+ * [KtFile.collectDiagnostics] should be preferred at the current time.
  */
+// Auto-generated bridge. DO NOT EDIT MANUALLY!
+@KaExperimentalApi
 @KaContextParameterApi
-context(context: KaDiagnosticProvider)
+context(session: KaSession)
+public fun KtElement.directDiagnostics(filter: KaDiagnosticCheckerFilter): Collection<KaDiagnosticWithPsi<*>> {
+    return with(session) {
+        directDiagnostics(
+            filter = filter,
+        )
+    }
+}
+
+/**
+ * Collects all diagnostics for the given file.
+ *
+ * Eager version of [KtFile.diagnostics].
+ *
+ * @see KtFile.diagnostics
+ */
+// Auto-generated bridge. DO NOT EDIT MANUALLY!
+@KaContextParameterApi
+context(session: KaSession)
 public fun KtFile.collectDiagnostics(filter: KaDiagnosticCheckerFilter): Collection<KaDiagnosticWithPsi<*>> {
-    return with(context) { collectDiagnostics(filter) }
+    return with(session) {
+        collectDiagnostics(
+            filter = filter,
+        )
+    }
+}
+
+/**
+ * Returns a [Sequence] of all diagnostics for the given file.
+ *
+ * This is a [Sequence]-based version of [collectDiagnostics].
+ *
+ * @see collectDiagnostics
+ */
+// Auto-generated bridge. DO NOT EDIT MANUALLY!
+@KaExperimentalApi
+@KaContextParameterApi
+context(session: KaSession)
+public fun KtFile.diagnostics(filter: KaDiagnosticCheckerFilter): Sequence<KaDiagnosticWithPsi<*>> {
+    return with(session) {
+        diagnostics(
+            filter = filter,
+        )
+    }
 }

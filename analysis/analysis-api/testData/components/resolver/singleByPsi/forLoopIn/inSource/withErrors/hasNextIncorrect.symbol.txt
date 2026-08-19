@@ -1,0 +1,14 @@
+KtForExpression(23,37): 'for(i in f) {}'
+  KaCompoundSymbolResolutionError:
+    attempts = [
+      KaSymbolResolutionSuccess:
+        symbols = [
+          /Foo.iterator(<dispatch receiver>: Foo): Iterator,
+          /Iterator.next(<dispatch receiver>: Iterator): kotlin.Any
+        ],
+      KaSymbolResolutionError:
+        candidateSymbols = [
+          /hasNext(<extension receiver>: kotlin.Int): kotlin.Boolean
+        ]
+        diagnostic = ERROR<UNRESOLVED_REFERENCE_WRONG_RECEIVER: Candidate 'fun Int.hasNext(): Boolean' is inapplicable because of a receiver type mismatch.>
+    ]

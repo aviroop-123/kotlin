@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseReturnsEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -15,7 +14,7 @@ fun myAssert(condition: Boolean) {
 fun testWithCatch(x: Any?) {
     try {
         myAssert(x is String)
-        <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        x.length
     } catch (e: java.lang.IllegalArgumentException) { }
 
     x.<!UNRESOLVED_REFERENCE!>length<!>

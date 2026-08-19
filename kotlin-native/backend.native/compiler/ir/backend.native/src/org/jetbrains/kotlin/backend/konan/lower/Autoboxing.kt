@@ -23,8 +23,6 @@ import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstantPrimitiveImpl
 import org.jetbrains.kotlin.ir.irAttribute
-import org.jetbrains.kotlin.ir.objcinterop.isObjCForwardDeclaration
-import org.jetbrains.kotlin.ir.objcinterop.isObjCMetaClass
 import org.jetbrains.kotlin.ir.symbols.*
 import org.jetbrains.kotlin.ir.symbols.impl.IrFieldSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrPropertySymbolImpl
@@ -36,6 +34,7 @@ import org.jetbrains.kotlin.ir.util.isSubtypeOfClass
 import org.jetbrains.kotlin.ir.visitors.*
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.addToStdlib.getOrSetIfNull
+import org.jetbrains.kotlin.ir.objcinterop.isObjCClass
 
 /**
  * Boxes and unboxes values of value types when necessary.
@@ -56,22 +55,26 @@ private class AutoboxingTransformer(val context: Context) : AbstractValueUsageTr
         context.irBuiltIns
 ) {
     private val insertSafeCasts = context.config.genericSafeCasts
+    private val anyClass = context.irBuiltIns.anyClass.owner
 
     // TODO: should we handle the cases when expression type
     // is not equal to e.g. called function return type?
 
-    override fun IrExpression.useInTypeOperator(operator: IrTypeOperator, typeOperand: IrType) = when {
+    override fun IrExpression.useInTypeOperator(operator: IrTypeOperator, typeOperand: IrType) =
+            this.useInTypeOperator(operator, typeOperand, forceSkipTypeCheck = false)
+
+    fun IrExpression.useInTypeOperator(operator: IrTypeOperator, typeOperand: IrType, forceSkipTypeCheck: Boolean) = when {
         operator == IrTypeOperator.IMPLICIT_COERCION_TO_UNIT || operator == IrTypeOperator.IMPLICIT_INTEGER_COERCION -> this
         insertSafeCasts && operator == IrTypeOperator.IMPLICIT_CAST -> {
             if (typeOperand.isInlinedNative())
-                this.useAs(context.irBuiltIns.anyNType)
-                        .useAs(typeOperand)
+                this.useAs(context.irBuiltIns.anyNType, forceSkipTypeCheck)
+                        .useAs(typeOperand, forceSkipTypeCheck)
             else
-                this.useAs(typeOperand)
+                this.useAs(typeOperand, forceSkipTypeCheck)
         }
         else -> {
             // Codegen expects the argument of type-checking operator to be an object reference:
-            this.useAs(context.irBuiltIns.anyNType)
+            this.useAs(context.irBuiltIns.anyNType, forceSkipTypeCheck)
         }
     }
 
@@ -86,30 +89,17 @@ private class AutoboxingTransformer(val context: Context) : AbstractValueUsageTr
         check(irTypeOperatorCall.operator == IrTypeOperator.IMPLICIT_CAST) {
             "Expected an implicit cast: ${irTypeOperatorCall.operator}"
         }
-        irTypeOperatorCall.argument = irTypeOperatorCall.argument.transform(this, null)
 
-        val expectedType = irTypeOperatorCall.typeOperand
-        val actualType = irTypeOperatorCall.argument.type
-        val expectedInlineClass = expectedType.getInlinedClassNative()
-        val actualInlineClass = actualType.getInlinedClassNative()
-        return when {
-            expectedInlineClass == actualInlineClass -> {
-                // No cast/box/unbox is needed.
-                if (expectedType == actualType)
-                    irTypeOperatorCall.argument
-                else irBuilders.peek()!!.irCallWithSubstitutedType(symbols.reinterpret.owner, listOf(actualType, expectedType)).apply {
-                    arguments[0] = irTypeOperatorCall.argument
-                }
-            }
-            expectedInlineClass != null && actualInlineClass != null -> {
-                // This will be a ClassCastException at runtime.
-                visitTypeOperator(irTypeOperatorCall)
-            }
-            else -> {
-                // A box/unbox operation is still needed.
-                irTypeOperatorCall.argument.adaptIfNecessary(actualType, expectedType, skipTypeCheck = true)
-            }
-        }
+        irTypeOperatorCall.transformChildrenVoid(this)
+        // Albeit no cast is needed here, it is incorrect to just return the operand because of possible box/unbox operations.
+        irTypeOperatorCall.argument = irTypeOperatorCall.argument.useInTypeOperator(
+                irTypeOperatorCall.operator, irTypeOperatorCall.typeOperand,
+                // Note: IMPLICIT_CAST is considered a noop in codegen, so it can be left here as is with no performance penalty.
+                // But no additional type checks should be added.
+                forceSkipTypeCheck = true
+        )
+
+        return irTypeOperatorCall
     }
 
     private var currentFunction: IrFunction? = null
@@ -187,7 +177,9 @@ private class AutoboxingTransformer(val context: Context) : AbstractValueUsageTr
             }
 
     private fun IrClass.canBeAssignedTo(expectedClass: IrClass) =
-            this.isNothing() || this.symbol.isSubtypeOfClass(expectedClass.symbol)
+            this.isNothing() || expectedClass == anyClass /* A workaround for plugins emitting classes with empty superTypes */
+                    || (expectedClass.isCompanion && expectedClass.parentAsClass.isObjCClass()) // TODO: a workaround for CMP-9000.
+                    || this.symbol.isSubtypeOfClass(expectedClass.symbol)
 
     private fun IrExpression.adaptIfNecessary(actualType: IrType, expectedType: IrType, skipTypeCheck: Boolean = false): IrExpression {
         val conversion = context.getTypeConversion(actualType, expectedType)
@@ -202,14 +194,40 @@ private class AutoboxingTransformer(val context: Context) : AbstractValueUsageTr
                 erasedExpectedClass.partialLinkageStatus is ClassifierPartialLinkageStatus.Unusable -> {
                     this
                 }
-                //expectedType.isNothing() -> this // TODO
+                expectedType.isNullableNothing() -> this // Work around KT-82040. Remove when K1 is deprecated.
                 insertSafeCasts && !skipTypeCheck
                         // For type parameters, actualClass is null, and we
                         // conservatively insert type check for them (due to unsafe casts).
                         && actualClass?.canBeAssignedTo(erasedExpectedType.getClass()!!) != true
                         && actualType.getInlinedClassNative() == null
-                        && !erasedExpectedClass.isObjCForwardDeclaration()
-                        && !erasedExpectedClass.isObjCMetaClass() // See KT-65260 for details.
+                        /*
+                        Objective-C is tricky.
+
+                        First of all, it is common to use "duck typing" in Objective-C:
+                        e.g., if an Obj-C method has an Obj-C class or protocol as the return type, the return value doesn't need to
+                        actually be of that type: it is enough to respond to the same method calls.
+                        Such mismatches happen even in Apple's own frameworks, e.g. in KT-85508.
+
+                        Next, there are forward declarations, and a cast to one shouldn't be generated as we don't have enough information
+                        for that.
+
+                        Another kind of problem is when the target type can't be found by the linker, like in KT-84678.
+
+                        Finally, sometimes cinterop translates Objective-C types wrong, e.g. in KT-56860.
+                        So, even if the Objective-C code returns a real instance of the declared type, Kotlin can get the latter wrong.
+
+                        In other words, in many cases, casts to Obj-C types shouldn't be generated here.
+                        On the other hand, we won't lose much if we don't generate casts to Obj-C types here at all:
+                        most usages of Obj-C objects in Kotlin go through dynamic Objective-C method dispatch. So, having the wrong type
+                        won't lead to heap corruption. Instead, a method call can fail with "unrecognized selector sent to instance", which
+                        is close enough to a `TypeCastException`.
+                        There are also `objc_direct` methods that use direct dispatch (and thus could lead to heap corruption if the type is
+                        wrong), but they are not widely used.
+
+                        All in all, it is safe and easier to not generate casts to Obj-C types here.
+                        Improving this is tracked in KT-85681.
+                         */
+                        && !erasedExpectedClass.isObjCClass()
                 -> {
                     this.checkedCast(actualType, erasedExpectedType)
                 }
@@ -226,7 +244,7 @@ private class AutoboxingTransformer(val context: Context) : AbstractValueUsageTr
                 return it
             }
             val parameter = conversion.owner.parameters.single()
-            val argument = if (insertSafeCasts && !skipTypeCheck && expectedType.isInlinedNative())
+            val argument = if (insertSafeCasts && !skipTypeCheck && expectedType.isInlinedNative() && !actualType.isNothing())
                 this.checkedCast(actualType, conversion.owner.returnType)
             else this
 
@@ -251,6 +269,17 @@ private class AutoboxingTransformer(val context: Context) : AbstractValueUsageTr
                 expression
             }
 
+            symbols.initInstance -> {
+                val instance = expression.arguments[0]!!
+                val constructorCall = expression.arguments[1]!!
+                check(constructorCall is IrConstructorCall) { "Expected a constructor call: ${constructorCall.render()}" }
+                expression.arguments[0] = instance.transform(this, data = null).useAs(irBuiltIns.anyType)
+                // Leave the second argument of [initInstance] as is.
+                super.visitConstructorCall(constructorCall)
+
+                expression
+            }
+
             else -> super.visitCall(expression)
         }
     }
@@ -262,12 +291,12 @@ private class InlineClassTransformer(private val context: Context) : IrBuildingT
     private val symbols = context.symbols
     private val irBuiltIns = context.irBuiltIns
 
-    private val builtBoxUnboxFunctions = mutableListOf<IrFunction>()
+    private val builtSpecialFunctions = mutableListOf<IrFunction>()
 
     override fun visitFile(declaration: IrFile): IrFile {
         declaration.transformChildrenVoid(this)
-        declaration.declarations.addAll(builtBoxUnboxFunctions)
-        builtBoxUnboxFunctions.clear()
+        declaration.declarations.addAll(builtSpecialFunctions)
+        builtSpecialFunctions.clear()
         return declaration
     }
 
@@ -282,6 +311,7 @@ private class InlineClassTransformer(private val context: Context) : IrBuildingT
 
                 buildBoxFunction(declaration, context.getBoxFunction(declaration))
                 buildUnboxFunction(declaration, context.getUnboxFunction(declaration))
+                buildBackingFieldSetter(declaration, context.getInlineClassFieldSetter(declaration))
             }
 
             if (declaration.isNativePrimitiveType()) {
@@ -339,6 +369,26 @@ private class InlineClassTransformer(private val context: Context) : IrBuildingT
             builder.lowerConstructorCallToValue(expression, constructor)
         } else {
             expression
+        }
+    }
+
+    override fun visitCall(expression: IrCall): IrExpression {
+        if (expression.symbol != symbols.initInstance)
+            return super.visitCall(expression)
+
+        val instance = expression.arguments[0]!!
+        val constructorCall = expression.arguments[1]!!
+        check(constructorCall is IrConstructorCall) { "Expected a constructor call: ${constructorCall.render()}" }
+        val constructor = constructorCall.symbol.owner
+        return if (!constructor.constructedClass.isInlined())
+            super.visitCall(expression)
+        else {
+            val backingFieldSetter = context.getInlineClassFieldSetter(constructor.constructedClass)
+            builder.at(expression).irCall(backingFieldSetter).apply {
+                arguments[0] = instance.transform(this@InlineClassTransformer, data = null)
+                constructorCall.transformChildrenVoid()
+                arguments[1] = builder.lowerConstructorCallToValue(constructorCall, constructor)
+            }
         }
     }
 
@@ -408,7 +458,7 @@ private class InlineClassTransformer(private val context: Context) : IrBuildingT
             +irReturn(irGet(box))
         }
 
-        builtBoxUnboxFunctions += function
+        builtSpecialFunctions += function
     }
 
     private fun IrBuilderWithScope.irNullPointerOrReference(type: IrType): IrExpression =
@@ -434,7 +484,18 @@ private class InlineClassTransformer(private val context: Context) : IrBuildingT
             +irReturn(irGetField(irGet(boxParameter), getInlineClassBackingField(irClass)))
         }
 
-        builtBoxUnboxFunctions += function
+        builtSpecialFunctions += function
+    }
+
+    private fun buildBackingFieldSetter(irClass: IrClass, function: IrFunction) {
+        val builder = context.createIrBuilder(function.symbol)
+
+        function.body = builder.irBlockBody(function) {
+            val field = getInlineClassBackingField(irClass)
+            +irSetField(irGet(function.parameters[0]), field, irGet(function.parameters[1]))
+        }
+
+        builtSpecialFunctions += function
     }
 
     private fun buildBoxField(declaration: IrClass) {
@@ -485,7 +546,7 @@ private class InlineClassTransformer(private val context: Context) : IrBuildingT
             }
             +irGet(argument)
         } else this.irCall(loweredConstructor).apply {
-            for ((idx, arg) in expression.arguments.withIndex()) {
+            for ([idx, arg] in expression.arguments.withIndex()) {
                 arguments[idx] = arg
             }
         }
@@ -554,7 +615,9 @@ private class InlineClassTransformer(private val context: Context) : IrBuildingT
                     }
                 })
             }
-            +irReturn(genReturnValue())
+            // return Unit will be added anyway by ReturnsInsertionLowering.
+            if (!irConstructor.isPrimary)
+                +irReturn(genReturnValue())
         }
     }
 

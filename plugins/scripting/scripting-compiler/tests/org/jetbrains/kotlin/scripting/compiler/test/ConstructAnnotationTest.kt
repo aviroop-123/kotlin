@@ -11,6 +11,7 @@ import com.intellij.util.ThrowableRunnable
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.script.loadScriptingPlugin
 import org.jetbrains.kotlin.scripting.compiler.plugin.TestDisposable
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.ScriptDiagnosticsMessageCollector
@@ -115,7 +116,7 @@ class ConstructAnnotationTest {
     }
 
     private fun annotations(filename: String, vararg classes: KClass<out Annotation>): ResultWithDiagnostics<List<Annotation>> {
-        val file = File(testDataPath, filename)
+        val file = ForTestCompileRuntime.transformTestDataPath(testDataPath + File.separator + filename)
         val compilationConfiguration = KotlinTestUtils.newConfiguration(ConfigurationKind.NO_KOTLIN_REFLECT, TestJdkKind.MOCK_JDK).apply {
             updateWithBaseCompilerArguments()
             addKotlinSourceRoot(file.path)
@@ -149,8 +150,8 @@ class ConstructAnnotationTest {
             return makeFailureResult(messageCollector.diagnostics)
         }
 
-        val data = getScriptCollectedData(ktFile, configuration, environment.project, null)
-        val annotations = data[ScriptCollectedData.foundAnnotations] ?: emptyList()
+        val data = getScriptCollectedData(ktFile, configuration, null)
+        val annotations = data[ScriptCollectedData.collectedAnnotations]?.map { it.annotation } ?: emptyList()
 
         annotations
             .filterIsInstance(InvalidScriptResolverAnnotation::class.java)

@@ -1,19 +1,19 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.low.level.api.fir.resolver
 
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.psi.util.parentsOfType
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.resolveToFirSymbol
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.ContextCollector
-import org.jetbrains.kotlin.analysis.utils.printer.parentsOfType
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
-import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.declarations.builder.buildAnonymousFunctionCopy
 import org.jetbrains.kotlin.fir.diagnostics.FirDiagnosticHolder
 import org.jetbrains.kotlin.fir.expressions.*
@@ -30,8 +30,9 @@ import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.FirBodyResolve
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.FirExpressionsResolveTransformer
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.FirAnonymousFunctionSymbol
-import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
+import org.jetbrains.kotlin.fir.types.abbreviatedTypeOrSelf
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.fir.utils.exceptions.withFirEntry
 import org.jetbrains.kotlin.name.Name
@@ -43,6 +44,7 @@ import org.jetbrains.kotlin.util.PrivateForInline
 import org.jetbrains.kotlin.utils.exceptions.logErrorWithAttachment
 import org.jetbrains.kotlin.utils.exceptions.withPsiEntry
 
+@KaImplementationDetail
 class AllCandidatesResolver(private val firSession: FirSession) {
     private val scopeSession = ScopeSession()
 
@@ -97,12 +99,16 @@ class AllCandidatesResolver(private val firSession: FirSession) {
     fun getAllCandidatesForDelegatedConstructor(
         resolutionFacade: LLResolutionFacade,
         delegatedConstructorCall: FirDelegatedConstructorCall,
-        derivedClassLookupTag: ConeClassLikeLookupTag,
+        derivedClass: FirClassSymbol<*>,
         element: KtElement
     ): List<OverloadCandidate> {
         initializeBodyResolveContext(resolutionFacade, element)
 
-        val constructedType = delegatedConstructorCall.constructedTypeRef.coneType as ConeClassLikeType
+        val constructedType = delegatedConstructorCall.constructedTypeRef
+            .coneType
+            .abbreviatedTypeOrSelf as? ConeClassLikeType
+            ?: return emptyList()
+
         return run {
             val callInfo = bodyResolveComponents.callResolver.callInfoForDelegatingConstructorCall(
                 delegatedConstructorCall,
@@ -111,7 +117,7 @@ class AllCandidatesResolver(private val firSession: FirSession) {
 
             with(bodyResolveComponents.towerResolver) {
                 reset()
-                runResolverForDelegatingConstructor(callInfo, constructedType, derivedClassLookupTag, resolutionContext)
+                runResolverForDelegatingConstructor(callInfo, constructedType, derivedClass, resolutionContext)
             }
 
             bodyResolveComponents.collector.allCandidates
@@ -136,6 +142,7 @@ class AllCandidatesResolver(private val firSession: FirSession) {
         bodyResolveComponents.context.file = firFile
     }
 
+    @OptIn(ConstraintSystemCompletionMode.ExclusiveForOverloadResolutionByLambdaReturnType::class)
     private fun <T> List<OverloadCandidate>.postProcessCandidates(call: T) where T : FirExpression, T : FirResolvable {
         val callCompleter = bodyResolveComponents.callCompleter
         val analyzer = callCompleter.createPostponedArgumentsAnalyzer(resolutionContext)
@@ -150,7 +157,10 @@ class AllCandidatesResolver(private val firSession: FirSession) {
             // Runs completion for the candidate. This step is required to solve the constraint system
             callCompleter.runCompletionForCall(
                 candidate = candidate,
-                completionMode = ConstraintSystemCompletionMode.FULL,
+                // The lambda's processing logic modifies the original tree,
+                // so we cannot analyze them in the current state.
+                // See KT-82121 for more details.
+                completionMode = ConstraintSystemCompletionMode.UNTIL_FIRST_LAMBDA,
                 call = call,
                 initialType = components.initialTypeOfCandidate(candidate),
                 analyzer = analyzer,
@@ -198,16 +208,7 @@ private fun copyQualifiedAccess(
         argumentList = when (val argumentListToCopy = qualifiedAccess.argumentList) {
             is FirEmptyArgumentList -> argumentListToCopy
             is FirResolvedArgumentList -> {
-                var hasNullableParameter = false
-                val newArguments = argumentListToCopy.arguments.map(::copyArgument)
-                val newMapping = LinkedHashMap<FirExpression, FirValueParameter?>(newArguments.size)
-                for (newArgument in newArguments) {
-                    val parameter = argumentListToCopy.mapping[newArgument]
-                    newMapping[newArgument] = parameter
-                    if (parameter == null) {
-                        hasNullableParameter = true
-                    }
-                }
+                val newMapping = argumentListToCopy.mapping.mapKeysTo(LinkedHashMap()) { copyArgument(it.key) }
 
                 /**
                  * Arguments from the original argument list are used, so it has to be copied as well.
@@ -223,16 +224,10 @@ private fun copyQualifiedAccess(
                     null
                 }
 
-                if (hasNullableParameter && newOriginalList != null) {
-                    buildArgumentListForErrorCall(original = newOriginalList, mapping = newMapping)
-                } else {
-                    @Suppress("UNCHECKED_CAST") // The mapping is guaranteed to be of the correct type by `hasNullableParameter`
-                    buildResolvedArgumentList(
-                        original = newOriginalList,
-                        mapping = newMapping as LinkedHashMap<FirExpression, FirValueParameter>,
-                    )
-                }
-
+                buildResolvedArgumentList(
+                    original = newOriginalList,
+                    mapping = newMapping,
+                )
             }
 
             else -> {

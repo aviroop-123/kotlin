@@ -39,6 +39,11 @@ internal object KtStubBasedElementTypes {
     val CLASS_BODY: KtStubElementType<out KotlinPlaceHolderStub<KtClassBody>, KtClassBody> =
         provider.classBodyType
 
+    @JvmField
+    @KtExperimentalApi
+    val COMPANION_BLOCK: KtStubElementType<out KotlinPlaceHolderStub<KtCompanionBlock>, KtCompanionBlock> =
+        provider.companionBlockType
+
 
     // Initializers
 
@@ -62,7 +67,7 @@ internal object KtStubBasedElementTypes {
         provider.propertyType
 
     @JvmField
-    val ENUM_ENTRY: KtStubElementType<out KotlinClassStub, KtClass> =
+    val ENUM_ENTRY: KtStubElementType<out KotlinClassStub, KtEnumEntry> =
         provider.enumEntryType
 
     @JvmField
@@ -86,6 +91,10 @@ internal object KtStubBasedElementTypes {
         provider.backingFieldType
 
     @JvmField
+    val DESTRUCTURING_DECLARATION: KtStubElementType<out KotlinDestructuringDeclarationStub, KtDestructuringDeclaration> =
+        provider.destructuringDeclarationType
+
+    @JvmField
     val INITIALIZER_LIST: KtStubElementType<out KotlinPlaceHolderStub<KtInitializerList>, KtInitializerList> =
         provider.initializerListType
 
@@ -101,8 +110,8 @@ internal object KtStubBasedElementTypes {
         provider.valueParameterType
 
     @JvmField
-    val CONTEXT_RECEIVER_LIST: KtStubElementType<out KotlinPlaceHolderStub<KtContextReceiverList>, KtContextReceiverList> =
-        provider.contextReceiverListType
+    val CONTEXT_PARAMETER_LIST: KtStubElementType<out KotlinPlaceHolderStub<KtContextParameterList>, KtContextParameterList> =
+        provider.contextParameterListType
 
     @JvmField
     val CONTEXT_RECEIVER: KtStubElementType<out KotlinContextReceiverStub, KtContextReceiver> =

@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseCallsInPlaceEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -41,7 +40,7 @@ fun innerTryCatchInitializes() {
         <!UNINITIALIZED_VARIABLE!>x<!>.inc()
 
         // Potential reasignment
-        x = 42
+        <!VAL_REASSIGNMENT!>x<!> = 42
     }
     // Here x=I because outer try-catch either exited normally (x=I) or catched exception (x=I, with reassingment, though)
     x.inc()

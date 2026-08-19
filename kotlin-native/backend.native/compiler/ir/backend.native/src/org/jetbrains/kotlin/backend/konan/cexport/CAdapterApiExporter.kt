@@ -62,7 +62,7 @@ internal class CAdapterApiExporter(
             DefinitionKind.C_HEADER_DECLARATION -> {
                 when {
                     element.isTopLevelFunction -> {
-                        val (name, declaration) = element.makeTopLevelFunctionString()
+                        val [name, declaration] = element.makeTopLevelFunctionString()
                         exportedSymbols += name
                         output(declaration, 0)
                     }
@@ -284,7 +284,7 @@ internal class CAdapterApiExporter(
     |void Kotlin_initRuntimeIfNeeded();
     |void Kotlin_mm_switchThreadStateRunnable() RUNTIME_NOTHROW;
     |void Kotlin_mm_switchThreadStateNative() RUNTIME_NOTHROW;
-    |void HandleCurrentExceptionWhenLeavingKotlinCode();
+    |void HandleCurrentExceptionWhenLeavingKotlinCode() RUNTIME_NORETURN;
     |
     |KObjHeader* CreateStringFromCString(const char*, KObjHeader**);
     |char* CreateCStringFromString(const KObjHeader*);
@@ -347,7 +347,7 @@ internal class CAdapterApiExporter(
             assert(!it.isNothing())
             val nullableIt = it.makeNullable()
             val needArgument = !it.isUnit()
-            val (parameter, maybeComma) = if (needArgument)
+            val [parameter, maybeComma] = if (needArgument)
                 ("${typeTranslator.translateType(it)} value" to ",") else ("" to "")
             val argument = if (needArgument) "value, " else ""
             output("extern \"C\" KObjHeader* Kotlin_box${it.shortNameForPredefinedType}($parameter$maybeComma KObjHeader**);")

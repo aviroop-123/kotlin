@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -35,10 +35,12 @@ import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.FirAbstractBod
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.FirDeclarationsResolveTransformer
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.FirExpressionsResolveTransformer
 import org.jetbrains.kotlin.fir.symbols.impl.FirAnonymousFunctionSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirReceiverParameterSymbol
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitTypeRefImplWithoutSource
 import org.jetbrains.kotlin.fir.visitors.transformSingle
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.resolve.ContractsDslNames
 
 abstract class FirAbstractContractResolveTransformerDispatcher(
     session: FirSession,
@@ -63,7 +65,8 @@ abstract class FirAbstractContractResolveTransformerDispatcher(
     private val regularDeclarationsTransformer = FirDeclarationsResolveTransformer(this)
 
     private var contractMode = true
-    private var insideContractDescription = false
+    var insideContractDescription: Boolean = false
+        private set
 
     override fun transformAnnotation(annotation: FirAnnotation, data: ResolutionMode): FirStatement {
         // Annotations within contracts will be resolved explicitly during BODY_RESOLVE.
@@ -77,15 +80,15 @@ abstract class FirAbstractContractResolveTransformerDispatcher(
 
     protected open inner class FirDeclarationsContractResolveTransformer :
         FirDeclarationsResolveTransformer(this@FirAbstractContractResolveTransformerDispatcher) {
-        override fun transformSimpleFunction(
-            simpleFunction: FirSimpleFunction,
+        override fun transformNamedFunction(
+            namedFunction: FirNamedFunction,
             data: ResolutionMode
-        ): FirSimpleFunction {
-            if (!simpleFunction.hasContractToResolve) return simpleFunction
+        ): FirNamedFunction {
+            if (!namedFunction.hasContractToResolve) return namedFunction
 
-            return context.withSimpleFunction(simpleFunction, session) {
-                context.forFunctionBody(simpleFunction, components) {
-                    transformContractDescriptionOwner(simpleFunction)
+            return context.withNamedFunction(namedFunction, session) {
+                context.forFunctionBody(namedFunction, components) {
+                    transformContractDescriptionOwner(namedFunction)
                 }
             }
         }
@@ -102,12 +105,12 @@ abstract class FirAbstractContractResolveTransformerDispatcher(
         override fun transformProperty(property: FirProperty, data: ResolutionMode): FirProperty {
             if (
                 property.getter?.hasContractToResolve != true && property.setter?.hasContractToResolve != true ||
-                property.isLocal || property.delegate != null
+                property.symbol is FirLocalPropertySymbol || property.delegate != null
             ) {
                 return property
             }
             if (property is FirSyntheticProperty) {
-                transformSimpleFunction(property.getter.delegate, data)
+                transformNamedFunction(property.getter.delegate, data)
                 return property
             }
             context.withProperty(property) {
@@ -175,7 +178,7 @@ abstract class FirAbstractContractResolveTransformerDispatcher(
             // We generate a FirContractCallBlock according to a heuristic, which can have false positives,
             // such as user-defined functions called "contract". In this case, we restore the contract call block
             // to a normal call.
-            if (resolvedContractCall.toResolvedCallableSymbol()?.callableId != FirContractsDslNames.CONTRACT) {
+            if (resolvedContractCall.toResolvedCallableSymbol()?.callableId != ContractsDslNames.CONTRACT) {
                 if (hasBodyContract) {
                     owner.body!!.replaceFirstStatement<FirContractCallBlock> { contractDescription.contractCall }
                 }

@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.konan.test.dump
 
 import com.intellij.testFramework.TestDataFile
+import org.jetbrains.kotlin.konan.file.createTempFile
 import org.jetbrains.kotlin.konan.test.blackbox.AbstractNativeSimpleTest
 import org.jetbrains.kotlin.konan.test.blackbox.compileToLibrary
 import org.jetbrains.kotlin.konan.test.blackbox.muteTestIfNecessary
@@ -16,21 +17,21 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilat
 import org.jetbrains.kotlin.konan.test.blackbox.support.group.UsePartialLinkage
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.KotlinNativeClassLoader
-import org.jetbrains.kotlin.konan.test.blackbox.support.settings.PipelineType
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Timeouts
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.dumpMetadata
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.getAbsoluteFile
-import org.jetbrains.kotlin.konan.test.firIdentical
 import org.jetbrains.kotlin.library.KotlinIrSignatureVersion
+import org.jetbrains.kotlin.test.services.JUnit5Assertions
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.assertEqualsToFile
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.fail
+import org.jetbrains.kotlin.test.services.impl.ModuleStructureExtractorImpl
+import org.jetbrains.kotlin.test.util.KtTestUtil
 import org.jetbrains.kotlin.test.utils.withSuffixAndExtension
-import org.jetbrains.kotlin.utils.addToStdlib.runIf
 import org.junit.jupiter.api.Tag
 import java.io.File
 
 @Tag("klib")
-@UsePartialLinkage(UsePartialLinkage.Mode.DISABLED)
+@UsePartialLinkage(UsePartialLinkage.Mode.ERROR)
 abstract class AbstractNativeKlibDumpMetadataTest : AbstractNativeSimpleTest() {
 
     protected fun runTest(@TestDataFile testPath: String) {
@@ -43,43 +44,53 @@ abstract class AbstractNativeKlibDumpMetadataTest : AbstractNativeSimpleTest() {
         val kotlinNativeClassLoader = testRunSettings.get<KotlinNativeClassLoader>()
         val klib: KLIB = testCompilationResult.assertSuccess().resultingArtifact
 
-        val isFir = testRunSettings.get<PipelineType>() == PipelineType.K2
-        val isFirIdentical = firIdentical(testPathFull)
-
         val versions = KotlinIrSignatureVersion.CURRENTLY_SUPPORTED_VERSIONS + null
-        versions.forEach { signatureVersion: KotlinIrSignatureVersion? ->
-            val metadataDump = klib.dumpMetadata(
-                kotlinNativeClassLoader.classLoader,
-                printSignatures = signatureVersion != null,
-                signatureVersion
-            )
+        JUnit5Assertions.assertAll(
+            versions.map { signatureVersion: KotlinIrSignatureVersion? ->
+                {
+                    val metadataDump = klib.dumpMetadata(
+                        kotlinNativeClassLoader.classLoader,
+                        printSignatures = signatureVersion != null,
+                        signatureVersion
+                    )
 
-            val testDataFileK1 = testDataFile(testPathFull, signatureVersion, isFir = false)
-            val testDataFileK2 = testDataFile(testPathFull, signatureVersion, isFir = true)
+                    val testDataFile = testDataFile(testPathFull, signatureVersion)
 
-            val testDataFile = if (isFir && !isFirIdentical) testDataFileK2 else testDataFileK1
-
-            assertEqualsToFile(testDataFile, metadataDump)
-        }
-        if (!isFirIdentical) {
-            checkFirIdentical(testPathFull, versions)
-        }
+                    assertEqualsToFile(testDataFile, metadataDump)
+                }
+            }
+        )
     }
 
-    private fun testDataFile(testPathFull: File, signatureVersion: KotlinIrSignatureVersion?, isFir: Boolean): File {
+    private fun testDataFile(testPathFull: File, signatureVersion: KotlinIrSignatureVersion?): File {
         val versionSpecificSuffix = signatureVersion?.let { ".v${it.number}" }.orEmpty()
-        val firSpecificSuffix = runIf(isFir) { ".fir" }.orEmpty()
 
         return testPathFull.withSuffixAndExtension(
-            suffix = "$versionSpecificSuffix$firSpecificSuffix",
+            suffix = versionSpecificSuffix,
             extension = "txt"
         )
     }
 
     private fun generateTestCaseWithSingleSource(source: File, extraArgs: List<String>): TestCase {
+        val moduleStructure = ModuleStructureExtractorImpl.parseModuleStructureWithoutService(source, JUnit5Assertions)
+        if (moduleStructure.modules.size > 1) {
+            fail { "Test should contain only one module" }
+        }
         val moduleName: String = source.name
-        val module = TestModule.Exclusive(moduleName, emptySet(), emptySet(), emptySet())
-        module.files += TestFile.createCommitted(source, module)
+        val module = TestModule.Exclusive(
+            moduleName,
+            directRegularDependencySymbols = emptySet(),
+            directFriendDependencySymbols = emptySet(),
+            directDependsOnDependencySymbols = emptySet()
+        )
+        val rootDir = KtTestUtil.tmpDirForTest(this::class.java.name, source.nameWithoutExtension)
+        for (testFile in moduleStructure.modules.single().files) {
+            val realFile = rootDir.resolve(testFile.relativePath).also {
+                it.parentFile.mkdirs()
+                it.writeText(testFile.originalContent.trimStart())
+            }
+            module.files += TestFile.createCommitted(realFile, module)
+        }
 
         return TestCase(
             id = TestCaseId.Named(moduleName),
@@ -91,22 +102,6 @@ abstract class AbstractNativeKlibDumpMetadataTest : AbstractNativeSimpleTest() {
             extras = TestCase.WithTestRunnerExtras(TestRunnerType.DEFAULT)
         ).apply {
             initialize(null, null)
-        }
-    }
-
-    private fun checkFirIdentical(kotlinTestDataFile: File, versions: Collection<KotlinIrSignatureVersion?>) {
-        val allDumpsAreIdentical = versions.all { signatureVersion ->
-            val testDataFileK1 = testDataFile(kotlinTestDataFile, signatureVersion, isFir = false)
-            val testDataFileK2 = testDataFile(kotlinTestDataFile, signatureVersion, isFir = true)
-            equalDumps(testDataFileK1, testDataFileK2)
-        }
-        if (allDumpsAreIdentical) {
-            versions.forEach { signatureVersion ->
-                val testDataFileK2 = testDataFile(kotlinTestDataFile, signatureVersion, isFir = true)
-                testDataFileK2.delete()
-            }
-            kotlinTestDataFile.writeText("// FIR_IDENTICAL\n" + kotlinTestDataFile.readText())
-            fail { "Dump files are equal. Please re-run the test.".trimIndent() }
         }
     }
 

@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// SKIP_TXT
 // DIAGNOSTICS: -UNUSED_PARAMETER
 
 package test
@@ -15,7 +14,7 @@ fun <K, V> B<K>.foo(p: KProperty1<K, V>) {}
 class C : A
 
 fun <R : A> B<R>.test(){
-    foo(<!TYPE_MISMATCH, TYPE_MISMATCH!>C::bla<!>)
+    <!CANNOT_INFER_PARAMETER_TYPE!>foo<!>(C::<!INAPPLICABLE_CANDIDATE!>bla<!>)
 }
 
 /* GENERATED_FIR_TAGS: classDeclaration, funWithExtensionReceiver, functionDeclaration, getter, interfaceDeclaration,

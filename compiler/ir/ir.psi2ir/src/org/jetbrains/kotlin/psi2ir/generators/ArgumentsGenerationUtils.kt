@@ -407,13 +407,13 @@ private fun StatementGenerator.applySuspendConversionForValueArgumentIfRequired(
             valueParameterType
 
     val irAdapterRefType = suspendFunType.toIrType()
-    return IrBlockImpl(expression.startOffset, expression.endOffset, irAdapterRefType, IrStatementOrigin.SUSPEND_CONVERSION)
+    return IrBlockImpl(expression.startOffset, expression.endOffset, irAdapterRefType, IrStatementOrigin.FUNCTION_TYPE_EXPRESSION_CONVERSION)
         .apply {
             val irAdapterFunction = createFunctionForSuspendConversion(startOffset, endOffset, suspendConversionType, suspendFunType)
             // TODO add a bound receiver property to IrFunctionExpressionImpl?
             val irAdapterRef = IrFunctionReferenceImpl(
                 startOffset, endOffset, irAdapterRefType, irAdapterFunction.symbol, irAdapterFunction.typeParameters.size,
-                null, IrStatementOrigin.SUSPEND_CONVERSION
+                null, IrStatementOrigin.FUNCTION_TYPE_EXPRESSION_CONVERSION
             )
             statements.add(irAdapterFunction)
             statements.add(irAdapterRef.apply { arguments[0] = expression })
@@ -602,7 +602,7 @@ private fun StatementGenerator.pregenerateExtensionInvokeCall(resolvedCall: Reso
             ExtensionInvokeCallReceiver(call, functionReceiverValue, extensionInvokeReceiverValue)
 
     call.irValueArgumentsByIndex[0] = null
-    for ((valueParameter, valueArgument) in resolvedCall.valueArguments) {
+    for ([valueParameter, valueArgument] in resolvedCall.valueArguments) {
         call.irValueArgumentsByIndex[valueParameter.index + 1] =
             generateValueArgument(valueArgument, valueParameter, resolvedCall)
     }
@@ -647,7 +647,7 @@ internal fun StatementGenerator.generateSamConversionForValueArgumentsIfRequired
                 "${resolvedCallArguments?.size} != ${underlyingValueParameters.size}"
     }
 
-    val substitutionContext = call.original.typeArguments.entries.associate { (typeParameterDescriptor, typeArgument) ->
+    val substitutionContext = call.original.typeArguments.entries.associate { [typeParameterDescriptor, typeArgument] ->
         underlyingDescriptor.typeParameters[typeParameterDescriptor.index].typeConstructor to TypeProjectionImpl(typeArgument)
     }
     val typeSubstitutor = TypeSubstitutor.create(substitutionContext)
@@ -687,7 +687,7 @@ internal fun StatementGenerator.generateSamConversionForValueArgumentsIfRequired
         val irSamType = substitutedSamType.toIrType()
 
         fun IrExpression.isFunctionReferenceAdapter() =
-            this is IrBlock && (origin == IrStatementOrigin.SUSPEND_CONVERSION || origin == IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE)
+            this is IrBlock && (origin == IrStatementOrigin.FUNCTION_TYPE_EXPRESSION_CONVERSION || origin == IrStatementOrigin.ADAPTED_FUNCTION_REFERENCE)
 
         fun IrExpression.applySamConversion() =
             IrTypeOperatorCallImpl(
@@ -887,7 +887,7 @@ internal inline fun IrMemberAccessExpression<*>.putTypeArguments(
     toIrType: (KotlinType) -> IrType
 ) {
     if (typeArguments == null) return
-    for ((typeParameter, typeArgument) in typeArguments) {
+    for ([typeParameter, typeArgument] in typeArguments) {
         this.typeArguments[typeParameter.index] = toIrType(typeArgument)
     }
 }

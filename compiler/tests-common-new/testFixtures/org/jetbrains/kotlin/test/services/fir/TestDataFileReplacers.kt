@@ -6,12 +6,15 @@
 package org.jetbrains.kotlin.test.services.fir
 
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE_FEATURE_TOGGLED_IDENTICAL
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.LANGUAGE_FEATURE_TOGGLED
 import org.jetbrains.kotlin.test.services.MetaTestConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
-import org.jetbrains.kotlin.test.utils.firTestDataFile
+import org.jetbrains.kotlin.test.services.moduleStructure
 import org.jetbrains.kotlin.test.utils.isCustomTestData
 import org.jetbrains.kotlin.test.utils.isLLFirSpecializedTestData
 import org.jetbrains.kotlin.test.utils.latestLVTestDataFile
+import org.jetbrains.kotlin.test.utils.lfDisabledTestDataFile
 import java.io.File
 
 abstract class TestDataFileReplacer(testServices: TestServices) : MetaTestConfigurator(testServices) {
@@ -37,17 +40,6 @@ abstract class TestDataFileReplacer(testServices: TestServices) : MetaTestConfig
     protected abstract val File.newFile: File
 }
 
-class FirOldFrontendMetaConfigurator(testServices: TestServices) : TestDataFileReplacer(testServices) {
-    override fun shouldReplaceFile(originalFile: File): Boolean {
-        return originalFile.useLines { lines ->
-            lines.none { it == "// ${FirDiagnosticsDirectives.FIR_IDENTICAL.name}" }
-        }
-    }
-
-    override val File.newFile: File
-        get() = this.firTestDataFile
-}
-
 class LatestLanguageVersionMetaConfigurator(testServices: TestServices) : TestDataFileReplacer(testServices) {
     override fun shouldReplaceFile(originalFile: File): Boolean {
         return originalFile.useLines { lines ->
@@ -57,4 +49,27 @@ class LatestLanguageVersionMetaConfigurator(testServices: TestServices) : TestDa
 
     override val File.newFile: File
         get() = this.latestLVTestDataFile
+}
+
+class LanguageFeatureDisabledMetaConfigurator(testServices: TestServices) : TestDataFileReplacer(testServices) {
+    override fun shouldReplaceFile(originalFile: File): Boolean {
+        var lfTestedFound = false
+        var lfDisabledIdenticalFound = false
+        originalFile.useLines { lines ->
+            lines.forEach {
+                lfTestedFound = lfTestedFound || it.startsWith("// $LANGUAGE_FEATURE_TOGGLED")
+                lfDisabledIdenticalFound = it.startsWith("// $LANGUAGE_FEATURE_TOGGLED_IDENTICAL")
+                if (lfDisabledIdenticalFound) return@useLines
+            }
+        }
+        return lfTestedFound && !lfDisabledIdenticalFound
+    }
+
+    override val File.newFile: File
+        get() = this.lfDisabledTestDataFile
+
+    override fun shouldSkipTest(): Boolean {
+        return LANGUAGE_FEATURE_TOGGLED !in testServices.moduleStructure.allDirectives
+    }
+
 }

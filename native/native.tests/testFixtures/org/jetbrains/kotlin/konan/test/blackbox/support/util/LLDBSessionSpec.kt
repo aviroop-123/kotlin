@@ -5,66 +5,84 @@
 
 package org.jetbrains.kotlin.konan.test.blackbox.support.util
 
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.KotlinNativeTargets
+import org.jetbrains.kotlin.test.TargetBackend
+import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.assertFalse
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.assertTrue
+import org.jetbrains.kotlin.test.services.JUnit5Assertions.assumeFalse
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.fail
+import org.jetbrains.kotlin.test.utils.SteppingTestLoggedData
+import org.jetbrains.kotlin.test.utils.checkSteppingTestResult
+import org.jetbrains.kotlin.test.utils.formatAsSteppingTestExpectation
 import java.io.File
 
-private class Step(val command: String, val body: List<String>) {
-    companion object {
-        fun parse(block: String, expectedPrefix: String): Step {
-            val lines = block.lines()
-
-            val commandWithPrefix = lines.first()
-            assertTrue(commandWithPrefix.startsWith(expectedPrefix)) {
-                "The command should start with $expectedPrefix. Got: $commandWithPrefix"
-            }
-
-            val command = commandWithPrefix.removePrefix(expectedPrefix).trimStart()
-            val body = lines.drop(1).filterNot(String::isBlank)
-
-            return Step(command, body)
-        }
-    }
-}
-
-internal class LLDBSessionSpec private constructor(private val expectedSteps: List<Step>) {
-    fun generateCLIArguments(prettyPrinters: File): List<String> = buildList {
+abstract class LLDBSessionSpec {
+    open fun generateCLIArguments(prettyPrinters: File): List<String> = buildList {
+        // Don't pickup ~/.lldbinit
+        this += "--no-lldbinit"
         this += "-b"
         this += "-o"
         this += "command script import ${prettyPrinters.absolutePath}"
+        this += "-o"
+        val testHelper = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/scripts/konan_lldb_test_helper.py")
+        this += "command script import ${testHelper.absolutePath}"
+    }
+
+    abstract fun checkLLDBOutput(output: String, nativeTargets: KotlinNativeTargets): Boolean
+
+    protected fun sanityCheckLLDBOutput(output: String) {
+        // Workaround for KT-84923. Mute the test if the problem occurs:
+        val kt84923Message = "attached to process, but could not pause execution; attach failed"
+        assumeFalse(output.contains(kt84923Message)) { "Test skipped because of KT-84923" }
+
+        // Ideally, we should just check that stderr is empty.
+        // Tracked in KT-86532.
+        for (prefix in listOf(PYTHON_EXCEPTION_HEADER, "warning:")) {
+            assertFalse(prefix in output) {
+                "Unexpected output in debugger: ${output.substring(output.indexOf(prefix))}"
+            }
+        }
+    }
+
+    companion object {
+        private const val PYTHON_EXCEPTION_HEADER = "Traceback (most recent call last):"
+    }
+}
+
+/**
+ * Executes a set of debugger commands defined per-test, compares raw LLDB output with the golden data.
+ */
+internal class ReplLLDBSessionSpec private constructor(private val expectedSteps: List<Step>) : LLDBSessionSpec() {
+    override fun generateCLIArguments(prettyPrinters: File): List<String> = buildList {
+        addAll(super.generateCLIArguments(prettyPrinters))
         expectedSteps.forEach { step ->
             this += "-o"
             this += step.command
         }
-        // Don't pickup ~/.lldbinit
-        this += "--no-lldbinit"
     }
 
-    fun checkLLDBOutput(output: String, nativeTargets: KotlinNativeTargets): Boolean {
-        assertFalse(PYTHON_EXCEPTION_HEADER in output) {
-            "Unhandled python exception in debugger: ${output.substring(output.indexOf(PYTHON_EXCEPTION_HEADER))}"
-        }
+    override fun checkLLDBOutput(output: String, nativeTargets: KotlinNativeTargets): Boolean {
+        sanityCheckLLDBOutput(output)
 
         val blocks = output.split(LLDB_OUTPUT_SEPARATOR).filterNot(String::isBlank)
 
         val meaningfulBlocks = if (nativeTargets.testTarget == nativeTargets.hostTarget) {
             // TODO: why are these two leading blocks only checked for the host target?
-
-            val createTargetBlock = blocks.getOrElse(0) { "" }
-            assertTrue(createTargetBlock.startsWith("(lldb) target create")) {
-                "Missing block \"target create\". Got: $createTargetBlock"
+            val expectedPrefix = listOf(
+                "(lldb) target create",
+                "(lldb) command script import",
+                "(lldb) command script import",
+            )
+            expectedPrefix.forEachIndexed { index, expected ->
+                val actual = blocks.getOrElse(index) { "" }
+                assertTrue(actual.startsWith(expected)) { "Missing block $expected. Got: $actual" }
             }
 
-            val commandScriptBlock = blocks.getOrElse(1) { "" }
-            assertTrue(commandScriptBlock.startsWith("(lldb) command script import")) {
-                "Missing block \"command script import\". Got: $commandScriptBlock"
-            }
-
-            blocks.drop(2)
+            blocks.drop(expectedPrefix.size)
         } else {
-            blocks.drop(2).dropLast(1)
+            blocks.drop(3).dropLast(1)
         }
 
         val recordedSteps = meaningfulBlocks.map { block -> Step.parse(block, LLDB_COMMAND_PREFIX) }
@@ -76,7 +94,7 @@ internal class LLDBSessionSpec private constructor(private val expectedSteps: Li
             """.trimIndent()
         }
 
-        for ((expectedStep, recordedStep) in expectedSteps.zip(recordedSteps)) {
+        for ([expectedStep, recordedStep] in expectedSteps.zip(recordedSteps)) {
             assertTrue(expectedStep.command == recordedStep.command) {
                 """
                     Wrong command in response.
@@ -128,21 +146,115 @@ internal class LLDBSessionSpec private constructor(private val expectedSteps: Li
         return true
     }
 
+    private class Step(val command: String, val body: List<String>) {
+        companion object {
+            fun parse(block: String, expectedPrefix: String): Step {
+                val lines = block.lines()
+
+                val commandWithPrefix = lines.first()
+                assertTrue(commandWithPrefix.startsWith(expectedPrefix)) {
+                    "The command should start with $expectedPrefix. Got: $commandWithPrefix"
+                }
+
+                val command = commandWithPrefix.removePrefix(expectedPrefix).trimStart()
+                val body = lines.drop(1).filterNot(String::isBlank)
+
+                return Step(command, body)
+            }
+        }
+    }
+
     companion object {
         private const val LLDB_COMMAND_PREFIX = "(lldb)"
         private const val SPEC_COMMAND_PREFIX = ">"
-
         private val LLDB_OUTPUT_SEPARATOR = """(?=\(lldb\))""".toRegex()
         private val SPEC_BLOCK_SEPARATOR = "(?=^>)".toRegex(RegexOption.MULTILINE)
-
         private val LINE_WILDCARD = """\s*\[\.\.]\s*""".toRegex()
 
-        private const val PYTHON_EXCEPTION_HEADER = "Traceback (most recent call last):"
-
-        fun parse(lldbSpec: String): LLDBSessionSpec = LLDBSessionSpec(
+        fun parse(lldbSpec: String): ReplLLDBSessionSpec = ReplLLDBSessionSpec(
             lldbSpec.split(SPEC_BLOCK_SEPARATOR)
                 .filterNot(String::isBlank)
                 .map { block -> Step.parse(block, SPEC_COMMAND_PREFIX) }
         )
+    }
+}
+
+/**
+ * Executes step-into command through the entire program, compares line number after each step with the golden data.
+ *
+ * Analogous to [org.jetbrains.kotlin.test.backend.handlers.SteppingDebugRunner], [org.jetbrains.kotlin.js.test.handlers.JsDebugRunner].
+ */
+internal class SteppingLLDBSessionSpec(
+    private val registeredDirectives: RegisteredDirectives,
+    private val originalFile: File,
+    testSourceFiles: Collection<File>,
+) : LLDBSessionSpec() {
+    private val testSourceFilePaths = testSourceFiles.map { it.absoluteFile.invariantSeparatorsPath }
+
+    override fun generateCLIArguments(prettyPrinters: File): List<String> = buildList {
+        addAll(super.generateCLIArguments(prettyPrinters))
+        // TODO (KT-84864): Can't use `-r` here, because sometimes LLDB treats them wrong
+        //     Feel free to add you variant if the test data changes.
+        //     Revert to `-r` variant once the issue is resolved.
+        this += "-o"
+        this += "b kfun:#box(){}"
+        this += "-o"
+        this += "b kfun:#box(){}kotlin.Int"
+        this += "-o"
+        this += "b kfun:#box(){}kotlin.String"
+        this += "-o"
+        this += "b kfun:#box#suspend(kotlin.coroutines.Continuation<kotlin.Unit>){}kotlin.Any"
+        this += "-o"
+        this += "r"
+        this += "-o"
+        this += "step_through_current_frame"
+    }
+
+    override fun checkLLDBOutput(output: String, nativeTargets: KotlinNativeTargets): Boolean {
+        sanityCheckLLDBOutput(output)
+
+        val loggedSteps = output.lines().mapNotNull { line ->
+            val stepLine = line.removePrefix("//step ")
+            if (stepLine == line) {
+                return@mapNotNull null
+            }
+
+            val [filePath, lineStr, funRawName] = stepLine.split('\u001f', limit = 3)
+            if (filePath !in testSourceFilePaths) {
+                return@mapNotNull null
+            }
+
+            // Function names in K/N are mangled in a quite convoluted way, so here we try to extract
+            // the original, simple function name from it. There are a few naming patters, those regexes
+            // try to match one from the most to the least specific.
+            val funNameMatch = KFunNameStaticSuspendRe.matchAt(funRawName, 0)
+                ?: KFunNameInternalRe.matchAt(funRawName, 0)
+                ?: KFunNameRegularRe.matchAt(funRawName, 0)
+            val simpleFunName = funNameMatch?.groupValues?.get(1) ?: funRawName
+
+            val sourceName = filePath.substringAfterLast('/')
+            val line = lineStr.toInt()
+            val expectation = formatAsSteppingTestExpectation(
+                sourceName, line.takeUnless { it == 0 }, simpleFunName, false, null
+            )
+            SteppingTestLoggedData(line, false, expectation)
+        }
+
+        if (loggedSteps.isEmpty()) {
+            return false
+        }
+        checkSteppingTestResult(
+            TargetBackend.NATIVE,
+            originalFile,
+            loggedSteps,
+            registeredDirectives,
+        )
+        return true
+    }
+
+    companion object {
+        private val KFunNameStaticSuspendRe = Regex("kfun:.*?#(.+)#(?:static|suspend)\\(")
+        private val KFunNameInternalRe = Regex("kfun:(?:.*\\.)?(.+)#internal")
+        private val KFunNameRegularRe = Regex("kfun:.*#(.+?)(?:__at__.+)?\\(")
     }
 }

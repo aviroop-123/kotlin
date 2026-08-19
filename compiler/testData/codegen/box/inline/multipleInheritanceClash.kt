@@ -1,9 +1,10 @@
 // KT-49722
 // Right now there will be an internal compiler error, since inliner lowering is not ready for such a code
-// IGNORE_BACKEND: JS_IR, JS_IR_ES6, NATIVE, WASM
+// IGNORE_BACKEND: JS_IR, JS_IR_ES6, NATIVE, WASM_JS, WASM_WASI
 // LANGUAGE: -IrIntraModuleInlinerBeforeKlibSerialization -IrCrossModuleInlinerBeforeKlibSerialization
 // ^^^ in deserialization tests, IR Inliner on 1st stage crashes before IR dumps comparison. So let's test dumps without inliner
 
+// FILE: lib.kt
 interface I<T> {
     val prop: T
     fun h(x: T = prop): Any
@@ -19,4 +20,5 @@ class B : A<Int>(), I2<Int> {
     override val prop get() = "OK"
 }
 
+// FILE: main.kt
 fun box() = B().h()

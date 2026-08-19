@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (NEGATIVE)
@@ -12,7 +11,7 @@
 
 // TESTCASE NUMBER: 1
 fun case_1() {
-    var x: Any? = <!VARIABLE_WITH_REDUNDANT_INITIALIZER!>null<!>
+    var x: Any? = null
 
     if (true) {
         x = ClassLevel2()
@@ -20,6 +19,6 @@ fun case_1() {
         x = ClassLevel3()
     }
 
-    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Any & kotlin.Any?")!>x<!>
-    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Any & kotlin.Any?")!>x<!>.<!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>inv<!>()
+    <!DEBUG_INFO_EXPRESSION_TYPE("ClassLevel2")!>x<!>
+    <!DEBUG_INFO_EXPRESSION_TYPE("ClassLevel2")!>x<!>.<!UNRESOLVED_REFERENCE!>inv<!>()
 }

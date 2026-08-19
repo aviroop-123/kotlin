@@ -195,6 +195,8 @@ sealed class AnnotationStub(val classifier: Classifier) {
 
         class ExternalClass(val protocolGetter: String = "", val binaryName: String = "") :
                 ObjC(Classifier.topLevel(cinteropPackage, "ExternalObjCClass"))
+
+        object Unavailable : ObjC(Classifier.topLevel(cinteropPackage, "ObjCUnavailable"))
     }
 
     sealed class CCall(classifier: Classifier) : AnnotationStub(classifier) {
@@ -202,6 +204,11 @@ sealed class AnnotationStub(val classifier: Classifier) {
         object WCString : CCall(cCallClassifier.nested("WCString"))
         class Symbol(val symbolName: String) : CCall(cCallClassifier)
         class Direct(val name: String) : CCall(cCallClassifier.nested("Direct"))
+    }
+
+    sealed class CGlobalAccess(classifier: Classifier) : AnnotationStub(classifier) {
+        object Pointer : CGlobalAccess(cGlobalAccessClassifier.nested("Pointer"))
+        class Symbol(val name: String) : CGlobalAccess(cGlobalAccessClassifier)
     }
 
     class CStruct(val struct: String) : AnnotationStub(cStructClassifier) {
@@ -260,6 +267,8 @@ sealed class AnnotationStub(val classifier: Classifier) {
 
     private companion object {
         val cCallClassifier = Classifier.topLevel(cinteropInternalPackage, "CCall")
+
+        val cGlobalAccessClassifier = Classifier.topLevel(cinteropInternalPackage, "CGlobalAccess")
 
         val cStructClassifier = Classifier.topLevel(cinteropInternalPackage, "CStruct")
     }

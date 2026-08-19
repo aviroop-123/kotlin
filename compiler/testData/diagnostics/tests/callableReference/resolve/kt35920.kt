@@ -1,7 +1,8 @@
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
 // DIAGNOSTICS: -UNUSED_PARAMETER
+// LATEST_LV_DIFFERENCE
 // FILE: JavaClass.java
+
 public class JavaClass<R> {
     public static String baz(int x) { return ""; }
 }
@@ -10,7 +11,7 @@ public class JavaClass<R> {
 fun foo(x: (Int) -> String) {}
 
 fun main() {
-    foo(JavaClass<*>::<!UNRESOLVED_REFERENCE!>baz<!>)
+    foo(JavaClass<*>::baz)
 }
 
 /* GENERATED_FIR_TAGS: flexibleType, functionDeclaration, functionalType, javaCallableReference */

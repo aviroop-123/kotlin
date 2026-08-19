@@ -25,7 +25,7 @@ val JVM_NAME_ANNOTATION_FQ_NAME = FqName("kotlin.jvm.JvmName")
 fun DeclarationDescriptor.isInlineClass(): Boolean = this is ClassDescriptor && this.valueClassRepresentation is InlineClassRepresentation
 
 fun DeclarationDescriptor.isMultiFieldValueClass(): Boolean =
-    this is ClassDescriptor && this.valueClassRepresentation is MultiFieldValueClassRepresentation
+    this is ClassDescriptor && this.valueClassRepresentation is JvmInlineMultiFieldValueClassRepresentation
 
 fun DeclarationDescriptor.isValueClass(): Boolean = isInlineClass() || isMultiFieldValueClass()
 
@@ -44,7 +44,6 @@ fun KotlinType.unsubstitutedUnderlyingTypes(): List<KotlinType> {
 
 
 fun KotlinType.isInlineClassType(): Boolean = constructor.declarationDescriptor?.isInlineClass() ?: false
-fun KotlinType.isValueClassType(): Boolean = constructor.declarationDescriptor?.isValueClass() ?: false
 
 fun KotlinType.needsMfvcFlattening(): Boolean =
     constructor.declarationDescriptor?.run { isMultiFieldValueClass() && !isNullableType() } == true
@@ -74,13 +73,6 @@ fun KotlinType.isNullableUnderlyingType(): Boolean {
     return TypeUtils.isNullableType(underlyingType)
 }
 
-fun CallableDescriptor.isGetterOfUnderlyingPropertyOfValueClass() =
-    this is PropertyGetterDescriptor && correspondingProperty.isUnderlyingPropertyOfValueClass()
-
 fun VariableDescriptor.isUnderlyingPropertyOfInlineClass(): Boolean =
-    extensionReceiverParameter == null &&
+    extensionReceiverParameter == null && contextReceiverParameters.isEmpty() &&
             (containingDeclaration as? ClassDescriptor)?.inlineClassRepresentation?.underlyingPropertyName == this.name
-
-fun VariableDescriptor.isUnderlyingPropertyOfValueClass(): Boolean =
-    extensionReceiverParameter == null &&
-            (containingDeclaration as? ClassDescriptor)?.valueClassRepresentation?.containsPropertyWithName(this.name) == true

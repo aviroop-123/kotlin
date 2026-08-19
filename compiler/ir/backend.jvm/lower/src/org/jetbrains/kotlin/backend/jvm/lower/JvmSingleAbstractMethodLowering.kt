@@ -7,12 +7,12 @@ package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.ScopeWithIr
 import org.jetbrains.kotlin.backend.common.lower.SingleAbstractMethodLowering
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
-import org.jetbrains.kotlin.ir.util.erasedUpperBound
 import org.jetbrains.kotlin.backend.jvm.ir.isInPublicInlineScope
 import org.jetbrains.kotlin.backend.jvm.ir.rawType
 import org.jetbrains.kotlin.backend.jvm.ir.suspendFunctionOriginal
+import org.jetbrains.kotlin.backend.jvm.isPublicAbi
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrElement
@@ -22,13 +22,14 @@ import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.getClass
+import org.jetbrains.kotlin.ir.util.erasedUpperBound
+import org.jetbrains.kotlin.ir.util.isOriginallyLocalDeclaration
 import org.jetbrains.kotlin.load.java.JavaDescriptorVisibilities
 import org.jetbrains.kotlin.utils.filterIsInstanceAnd
 
-@PhaseDescription(
-    name = "SingleAbstractMethod",
+@PhasePrerequisites(
     // FunctionReferenceLowering produces optimized SAM wrappers.
-    prerequisite = [FunctionReferenceLowering::class]
+    FunctionReferenceLowering::class,
 )
 internal class JvmSingleAbstractMethodLowering(context: JvmBackendContext) : SingleAbstractMethodLowering(context) {
     private val isJavaSamConversionWithEqualsHashCode =
@@ -68,6 +69,14 @@ internal class JvmSingleAbstractMethodLowering(context: JvmBackendContext) : Sin
         for (property in fakeOverrideProperties) {
             property.getter?.let(klass.declarations::add)
             property.setter?.let(klass.declarations::add)
+        }
+
+        if (klass.visibility != DescriptorVisibilities.LOCAL) {
+            // Essentially, all SAM wrappers are local classes, but that visibility is lifted historically.
+            klass.isOriginallyLocalDeclaration = true
+        }
+        if (inInlineFunctionScope) {
+            klass.isPublicAbi = true
         }
     }
 }

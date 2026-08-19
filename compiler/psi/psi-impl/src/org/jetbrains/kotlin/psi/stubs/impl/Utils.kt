@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.psi.stubs.impl
 
 import com.intellij.psi.PsiElement
+import com.intellij.psi.stubs.ObjectStubBase
 import com.intellij.psi.stubs.StubElement
 import com.intellij.util.io.StringRef
 import org.jetbrains.kotlin.psi.KtImplementationDetail
@@ -13,9 +14,10 @@ import org.jetbrains.kotlin.psi.stubs.KotlinStubElement
 import org.jetbrains.kotlin.utils.exceptions.checkWithAttachment
 
 object Utils {
-    fun wrapStrings(names: List<String>): Array<StringRef> {
-        return Array(names.size) { i -> StringRef.fromString(names[i])!! }
-    }
+    fun wrapStrings(names: List<String>): Array<StringRef> = if (names.isEmpty())
+        StringRef.EMPTY_ARRAY
+    else
+        Array(names.size) { i -> StringRef.fromString(names[i])!! }
 }
 
 
@@ -39,6 +41,10 @@ private fun <T : PsiElement> copyStubRecursively(
     }
 
     val stubCopy = originalStub.copyInto(newParentStub)
+    if (originalStub is ObjectStubBase<*> && originalStub.isDangling) {
+        (stubCopy as ObjectStubBase<*>).markDangling()
+    }
+
     checkWithAttachment(
         originalStub::class == stubCopy::class,
         { "${originalStub::class.simpleName} is expected, but ${stubCopy::class.simpleName} is found" },

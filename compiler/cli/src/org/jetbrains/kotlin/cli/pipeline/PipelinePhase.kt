@@ -5,14 +5,9 @@
 
 package org.jetbrains.kotlin.cli.pipeline
 
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.config.LoggingContext
-import org.jetbrains.kotlin.config.phaser.Action
-import org.jetbrains.kotlin.config.phaser.ActionState
-import org.jetbrains.kotlin.config.phaser.PhaseConfig
-import org.jetbrains.kotlin.config.phaser.PhaserState
-import org.jetbrains.kotlin.config.phaser.NamedCompilerPhase
-import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector
+import org.jetbrains.kotlin.config.perfManager
+import org.jetbrains.kotlin.config.phaser.*
 import org.jetbrains.kotlin.util.PerformanceManager
 import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
@@ -22,11 +17,8 @@ import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
  * [PipelinePhase] itself could be run without the context
  */
 class PipelineContext(
-    val messageCollector: MessageCollector,
-    val diagnosticCollector: BaseDiagnosticsCollector,
-    val performanceManager: PerformanceManager,
-    val renderDiagnosticInternalName: Boolean,
-    val kaptMode: Boolean
+    val performanceManager: PerformanceManager?,
+    val kaptMode: Boolean,
 ) : LoggingContext {
     override var inVerbosePhase: Boolean = false
 }
@@ -92,4 +84,14 @@ private fun <Input, Output, Context> Action<Output, Context>.toPostAction(): Act
     return { state: ActionState, inputOutput: Pair<Input, Output>, context: Context ->
         this.invoke(state, inputOutput.second, context)
     }
+}
+
+fun <I : PipelineArtifact, O : PipelineArtifact> PipelinePhase<I, O>.executePhaseIsolatedWithActions(input: I): O? {
+    val phaseConfig = PhaseConfig()
+    val phaserState = PhaserState()
+    val context = PipelineContext(input.configuration.perfManager, kaptMode = false)
+    runBefore(phaseConfig, phaserState, context, input)
+    val output = executePhase(input) ?: return null
+    runAfter(phaseConfig, phaserState, context, input, output)
+    return output
 }

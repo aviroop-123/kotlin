@@ -1,5 +1,4 @@
 // LANGUAGE: +DataFlowBasedExhaustiveness
-// IGNORE_BACKEND_K1: ANY
 
 sealed class Variants {
     object A : Variants()

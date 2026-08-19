@@ -35,7 +35,7 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirDeclaration) {
         if (declaration !is FirMemberDeclaration) return
-        if (!LanguageFeature.MultiPlatformProjects.isEnabled()) {
+        if (LanguageFeature.MultiPlatformProjects.isDisabled()) {
             if ((declaration.isExpect || declaration.isActual) && containsExpectOrActualModifier(declaration) &&
                 declaration.source?.kind?.shouldSkipErrorTypeReporting == false
             ) {
@@ -61,7 +61,7 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
         }
         val matchingCompatibilityToMembersMap = declaration.symbol.expectForActual.orEmpty()
         if ((ExpectActualMatchingCompatibility.MatchedSuccessfully in matchingCompatibilityToMembersMap || declaration.hasActualModifier()) &&
-            !declaration.isLocalMember // Reduce verbosity. WRONG_MODIFIER_TARGET will be reported anyway.
+            !declaration.isLocalDeclaredInBlock // Reduce verbosity. WRONG_MODIFIER_TARGET will be reported anyway.
         ) {
             checkActualDeclarationHasExpected(declaration, matchingCompatibilityToMembersMap)
         }
@@ -81,9 +81,7 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
         if (declaration is FirProperty) {
             checkExpectPropertyAccessorsModifiers(declaration)
         }
-        if (LanguageFeature.MultiplatformRestrictions.isEnabled() &&
-            declaration is FirFunction && declaration.isTailRec
-        ) {
+        if (declaration is FirFunction && declaration.isTailRec) {
             reporter.reportOn(declaration.source, FirErrors.EXPECTED_TAILREC_FUNCTION)
         }
     }
@@ -104,7 +102,7 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
         fun FirPropertyAccessor.isDefault(): Boolean {
             val source = source
             check(source != null) { "expect-actual matching is only possible for code with sources" }
-            return source.kind == KtFakeSourceElementKind.DefaultAccessor
+            return source.kind is KtFakeSourceElementKind.DefaultAccessor
         }
 
         if (!accessor.isDefault()) {
@@ -116,9 +114,7 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
     private fun checkExpectDeclarationHasNoExternalModifier(
         declaration: FirMemberDeclaration,
     ) {
-        if (LanguageFeature.MultiplatformRestrictions.isEnabled() &&
-            declaration.isExternal
-        ) {
+        if (declaration.isExternal) {
             reporter.reportOn(declaration.source, FirErrors.EXPECTED_EXTERNAL_DECLARATION)
         }
     }
@@ -178,7 +174,7 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
             return
         }
 
-        val (classScopesIncompatibilities, normalIncompatibilities) =
+        val [classScopesIncompatibilities, normalIncompatibilities] =
             checkingIncompatibilities.partitionIsInstance<_, ExpectActualIncompatibility.ClassScopes<FirBasedSymbol<*>>>()
 
         for (incompatibility in normalIncompatibilities) {
@@ -186,6 +182,8 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
             // A nicer diagnostic for functions with default params
             if (declaration is FirFunction && incompatibility == ExpectActualIncompatibility.ActualFunctionWithOptionalParameters) {
                 reporter.reportOn(declaration.source, FirErrors.ACTUAL_FUNCTION_WITH_DEFAULT_ARGUMENTS)
+            } else if (incompatibility == ExpectActualIncompatibility.IgnorabilityIsDifferent) {
+                reportIgnorabilityIncompatibleMembers(expectedSingleCandidate, symbol, source)
             } else {
                 reporter.reportOn(
                     source,
@@ -227,22 +225,20 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
         val nonTrivialIncompatibleMembers = checkingCompatibility.incompatibleMembers.filterNot(::hasSingleActualSuspect)
 
         if (nonTrivialIncompatibleMembers.isNotEmpty()) {
-            val (defaultArgsIncompatibleMembers, otherIncompatibleMembers) =
-                nonTrivialIncompatibleMembers.partition { it.incompatibility == ExpectActualIncompatibility.ParametersWithDefaultValuesInExpectActualizedByFakeOverride }
+            reportDefaultArgsIncompatibleMembers(
+                nonTrivialIncompatibleMembers.filter { it.incompatibility == ExpectActualIncompatibility.ParametersWithDefaultValuesInExpectActualizedByFakeOverride },
+                source,
+                expectedSingleCandidate
+            )
 
-            if (defaultArgsIncompatibleMembers.isNotEmpty()) { // report a nicer diagnostic for DefaultArgumentsInExpectActualizedByFakeOverride
-                val problematicExpectMembers = defaultArgsIncompatibleMembers
-                    .map {
-                        it.expect as? FirNamedFunctionSymbol
-                            ?: error("${ExpectActualIncompatibility.ParametersWithDefaultValuesInExpectActualizedByFakeOverride} can be reported only for ${FirNamedFunctionSymbol::class}")
-                    }
-                reporter.reportOn(
-                    source,
-                    FirErrors.DEFAULT_ARGUMENTS_IN_EXPECT_ACTUALIZED_BY_FAKE_OVERRIDE,
-                    expectedSingleCandidate,
-                    problematicExpectMembers
-                )
-            }
+            reportIgnorabilityIncompatibleMembers(
+                nonTrivialIncompatibleMembers.filter { it.incompatibility == ExpectActualIncompatibility.IgnorabilityIsDifferent },
+                source,
+            )
+
+            val otherIncompatibleMembers =
+                nonTrivialIncompatibleMembers.filterNot { it.incompatibility == ExpectActualIncompatibility.IgnorabilityIsDifferent || it.incompatibility == ExpectActualIncompatibility.ParametersWithDefaultValuesInExpectActualizedByFakeOverride }
+
             if (otherIncompatibleMembers.isNotEmpty()) {
                 for (member in otherIncompatibleMembers) {
                     reporter.reportOn(
@@ -263,6 +259,57 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
                 symbol,
                 checkingCompatibility.mismatchedMembers
             )
+        }
+    }
+
+    context(reporter: DiagnosticReporter, context: CheckerContext)
+    private fun reportDefaultArgsIncompatibleMembers(
+        defaultArgsIncompatibleMembers: List<MemberIncompatibility<FirBasedSymbol<*>>>,
+        source: KtSourceElement?,
+        expectClass: FirRegularClassSymbol,
+    ) {
+        if (defaultArgsIncompatibleMembers.isNotEmpty()) { // report a nicer diagnostic for DefaultArgumentsInExpectActualizedByFakeOverride
+            val problematicExpectMembers = defaultArgsIncompatibleMembers
+                .map {
+                    it.expect as? FirNamedFunctionSymbol
+                        ?: error("${ExpectActualIncompatibility.ParametersWithDefaultValuesInExpectActualizedByFakeOverride} can be reported only for ${FirNamedFunctionSymbol::class}")
+                }
+            reporter.reportOn(
+                source,
+                FirErrors.DEFAULT_ARGUMENTS_IN_EXPECT_ACTUALIZED_BY_FAKE_OVERRIDE,
+                expectClass,
+                problematicExpectMembers
+            )
+        }
+    }
+
+    context(reporter: DiagnosticReporter, context: CheckerContext)
+    private fun reportIgnorabilityIncompatibleMembers(
+        expect: FirBasedSymbol<*>,
+        actual: FirBasedSymbol<*>,
+        source: KtSourceElement?,
+    ) {
+        val expectMember =
+            expect as? FirCallableSymbol<*> ?: error("Ignorability incompatibility can be reported only for callables")
+        val actualMember =
+            actual as? FirCallableSymbol<*> ?: error("Ignorability incompatibility can be reported only for callables")
+        reporter.reportOn(
+            source,
+            FirErrors.ACTUAL_IGNORABILITY_NOT_MATCH_EXPECT,
+            expectMember,
+            expectMember.resolvedStatus.returnValueStatus,
+            actualMember,
+            actualMember.resolvedStatus.returnValueStatus
+        )
+    }
+
+    context(reporter: DiagnosticReporter, context: CheckerContext)
+    private fun reportIgnorabilityIncompatibleMembers(
+        ignorabilityIncompatibleMembers: List<MemberIncompatibility<FirBasedSymbol<*>>>,
+        source: KtSourceElement?,
+    ) {
+        for (member in ignorabilityIncompatibleMembers) {
+            reportIgnorabilityIncompatibleMembers(member.expect, member.actual, source)
         }
     }
 
@@ -331,6 +378,7 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
     //  - annotation constructors, because annotation classes can only have one constructor
     //  - value class primary constructors, because value class must have primary constructor
     //  - value parameter inside primary constructor of inline class, because inline class must have one value parameter
+    //  - enum entries and generated enum members entries, values and valueOf
     private fun requireActualModifier(
         declaration: FirBasedSymbol<*>,
         actualContainingClass: FirRegularClassSymbol,
@@ -339,35 +387,39 @@ object FirExpectActualDeclarationChecker : FirBasicDeclarationChecker(MppChecker
         val source = declaration.source
         check(source != null) { "expect-actual matching is only possible for code with sources" }
         return source.kind != KtFakeSourceElementKind.ImplicitConstructor &&
+                source.kind !is KtFakeSourceElementKind.EnumGeneratedDeclaration &&
                 declaration.origin != FirDeclarationOrigin.Synthetic.DataClassMember &&
                 !declaration.isAnnotationConstructor(platformSession) &&
-                !declaration.isPrimaryConstructorOfInlineOrValueClass(platformSession) &&
-                !isUnderlyingPropertyOfInlineClass(declaration, actualContainingClass, platformSession)
+                !(declaration.isPrimaryConstructorOfInlineOrValueClass(platformSession) && actualContainingClass.isBasicValueClass) &&
+                !isUnderlyingPropertyOfValueClass(declaration, actualContainingClass, platformSession) &&
+                declaration !is FirEnumEntrySymbol
     }
 
     // Ideally, this function shouldn't exist KT-63751
     private fun FirElement.hasActualModifier(): Boolean {
         return when (source?.kind) {
             null -> false
-            KtFakeSourceElementKind.DataClassGeneratedMembers -> false
-            KtFakeSourceElementKind.EnumGeneratedDeclaration -> false
+            is KtFakeSourceElementKind.DataClassGeneratedMembers -> false
+            is KtFakeSourceElementKind.EnumGeneratedDeclaration -> false
             KtFakeSourceElementKind.ImplicitConstructor -> false
             else -> hasModifier(KtTokens.ACTUAL_KEYWORD)
         }
     }
 
-    private fun isUnderlyingPropertyOfInlineClass(
+    private fun isUnderlyingPropertyOfValueClass(
         symbol: FirBasedSymbol<*>,
         actualContainingClass: FirRegularClassSymbol,
         platformSession: FirSession
     ): Boolean = (actualContainingClass.isInlineOrValue) &&
             symbol is FirPropertySymbol &&
-            actualContainingClass.primaryConstructorIfAny(platformSession)?.valueParameterSymbols?.singleOrNull() == symbol.correspondingValueParameterFromPrimaryConstructor
+            actualContainingClass.primaryConstructorIfAny(platformSession)?.valueParameterSymbols.orEmpty()
+                .contains(symbol.correspondingValueParameterFromPrimaryConstructor)
 }
 
 private fun ExpectActualIncompatibility<*>.toDiagnostic() = when (this) {
     ExpectActualIncompatibility.ActualFunctionWithOptionalParameters -> error("unreachable")
     is ExpectActualIncompatibility.ClassScopes<*> -> error("unreachable")
+    ExpectActualIncompatibility.IgnorabilityIsDifferent -> error("Should be handled before")
 
     ExpectActualIncompatibility.ClassKind -> FirErrors.EXPECT_ACTUAL_INCOMPATIBLE_CLASS_KIND
     ExpectActualIncompatibility.ClassModifiers -> FirErrors.EXPECT_ACTUAL_INCOMPATIBLE_CLASS_MODIFIERS

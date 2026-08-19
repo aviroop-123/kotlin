@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// LANGUAGE: +UnrestrictedBuilderInference
 // DIAGNOSTICS: -UNUSED_PARAMETER -DEPRECATION -OPT_IN_IS_NOT_ENABLED -UNUSED_VARIABLE
 // WITH_STDLIB
 // ISSUE: KT-64802 (K2/PCLA difference)
@@ -37,7 +36,7 @@ fun <E> select4(x: E?, y: In<E>): E = x!!
 fun test() {
     val ret = build {
         emit("1")
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>select1(get(), getIn())<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Comparable<*>? & java.io.Serializable?")!>select1(get(), getIn())<!>
         select1(get(), Test.foo(getIn()))
         select1(Test.foo(get()), Test.foo(getIn()))
         select1(Test.foo(get()), getIn())
@@ -50,24 +49,24 @@ fun test() {
 
         build2 {
             emit(1)
-            select1(this@build.get(), <!TYPE_MISMATCH("In<String>; In<Int!>")!>getIn()<!>)
-            select1(get(), <!TYPE_MISMATCH!>Test.foo(this@build.getIn())<!>)
-            select1(Test.foo(this@build.get()), <!TYPE_MISMATCH!>Test.foo(getIn())<!>)
-            select1(Test.foo(get()), <!TYPE_MISMATCH!>this@build.getIn()<!>)
-            select2(this@build.get(), <!TYPE_MISMATCH!>getIn()<!>)
-            select2(get(), <!TYPE_MISMATCH!>Test.foo(this@build.getIn())<!>)
-            select2(Test.foo(this@build.get()), <!TYPE_MISMATCH!>Test.foo(getIn())<!>)
-            select2(Test.foo(get()), <!TYPE_MISMATCH!>this@build.getIn()<!>)
-            select3(this@build.get(), <!TYPE_MISMATCH!>getIn()<!>)
-            select3(get(), <!TYPE_MISMATCH!>Test.foo(this@build.getIn())<!>)
-            select3(Test.foo(this@build.get()), <!TYPE_MISMATCH!>Test.foo(getIn())<!>)
-            select3(Test.foo(get()), <!TYPE_MISMATCH!>this@build.getIn()<!>)
-            select4(this@build.get(), <!TYPE_MISMATCH!>getIn()<!>)
-            select4(get(), <!TYPE_MISMATCH!>Test.foo(this@build.getIn())<!>)
-            select4(Test.foo(this@build.get()), <!TYPE_MISMATCH!>Test.foo(getIn())<!>)
-            select4(Test.foo(get()), <!TYPE_MISMATCH!>this@build.getIn()<!>)
+            select1(this@build.get(), getIn())
+            select1(get(), Test.foo(this@build.getIn()))
+            select1(Test.foo(this@build.get()), Test.foo(getIn()))
+            select1(Test.foo(get()), this@build.getIn())
+            select2(this@build.get(), getIn())
+            select2(get(), Test.foo(this@build.getIn()))
+            select2(Test.foo(this@build.get()), Test.foo(getIn()))
+            select2(Test.foo(get()), this@build.getIn())
+            select3(this@build.get(), getIn())
+            select3(get(), Test.foo(this@build.getIn()))
+            select3(Test.foo(this@build.get()), Test.foo(getIn()))
+            select3(Test.foo(get()), this@build.getIn())
+            select4(this@build.get(), getIn())
+            select4(get(), Test.foo(this@build.getIn()))
+            select4(Test.foo(this@build.get()), Test.foo(getIn()))
+            select4(Test.foo(get()), this@build.getIn())
 
-            select4(id(Test.foo(this@build.get())), <!TYPE_MISMATCH!>getIn()<!>)
+            select4(id(Test.foo(this@build.get())), getIn())
             ""
         }
         ""
@@ -80,8 +79,8 @@ fun test() {
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>select2(Test.foo(get()), getIn())<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>select3(get(), getIn())<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>select3(get(), Test.foo(getIn()))<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>select3(Test.foo(get()), Test.foo(getIn()))<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String?")!>select3(Test.foo(get()), getIn())<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>select3(Test.foo(get()), Test.foo(getIn()))<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>select3(Test.foo(get()), getIn())<!>
         ""
     }
 }

@@ -1,5 +1,4 @@
 // ISSUE: KT-75061
-// IGNORE_BACKEND_K1: ANY
 // LANGUAGE: +ContextSensitiveResolutionUsingExpectedType
 
 sealed interface Either<out E, out A> {

@@ -34,26 +34,27 @@ object FirSessionFactoryHelper {
         noinline sessionConfigurator: FirSessionConfigurator.() -> Unit = {},
     ): FirSession {
         val dependencyList = DependencyListForCliModule.build(moduleName, init = dependenciesConfigurator)
-        val packagePartProvider = projectEnvironment.getPackagePartProvider(librariesScope)
         val languageVersionSettings = configuration.languageVersionSettings
+
+        val context = FirJvmSessionFactory.Context(
+            configuration,
+            projectEnvironment,
+            librariesScope,
+        )
+
         val sharedLibrarySession = FirJvmSessionFactory.createSharedLibrarySession(
             moduleName,
-            projectEnvironment,
             extensionRegistrars,
-            packagePartProvider,
             languageVersionSettings,
-            predefinedJavaComponents = null,
+            context,
         )
 
         val librarySession = FirJvmSessionFactory.createLibrarySession(
             sharedLibrarySession,
             dependencyList.moduleDataProvider,
-            projectEnvironment,
             extensionRegistrars,
-            librariesScope,
-            packagePartProvider,
             languageVersionSettings,
-            predefinedJavaComponents = null,
+            context,
         )
 
         val mainModuleData = FirSourceModuleData(
@@ -66,13 +67,12 @@ object FirSessionFactoryHelper {
         return FirJvmSessionFactory.createSourceSession(
             mainModuleData,
             javaSourcesScope,
-            projectEnvironment,
             { incrementalCompilationContext?.createSymbolProviders(it, mainModuleData, projectEnvironment) },
             extensionRegistrars,
             configuration,
-            predefinedJavaComponents = null,
+            context,
             needRegisterJavaElementFinder,
-            isForLeafHmppModule = false,
+            kmpModuleKind = KmpModuleKind.SingleModule,
         ) {
             registerComponent(FirBuiltinSyntheticFunctionInterfaceProvider::class, librarySession.syntheticFunctionInterfacesSymbolProvider)
             sessionConfigurator()
@@ -92,30 +92,32 @@ object FirSessionFactoryHelper {
             registerModuleData(moduleData)
             moduleData.bindSession(this)
             // Empty stub for tests
-            register(FirLanguageSettingsComponent::class, FirLanguageSettingsComponent(
-                object : LanguageVersionSettings {
+            val languageVersionSettings = object : LanguageVersionSettings {
 
-                    private fun stub(): Nothing = TODO(
-                        "It does not yet have well-defined semantics for tests." +
-                                "If you're seeing this, implement it in a test-specific way"
-                    )
+                private fun stub(): Nothing = TODO(
+                    "It does not yet have well-defined semantics for tests." +
+                            "If you're seeing this, implement it in a test-specific way"
+                )
 
-                    override fun getFeatureSupport(feature: LanguageFeature): LanguageFeature.State {
-                        return features.getOrDefault(feature, LanguageFeature.State.DISABLED)
-                    }
-
-                    override fun getCustomizedLanguageFeatures(): Map<LanguageFeature, LanguageFeature.State> = stub()
-
-                    override fun isPreRelease(): Boolean = stub()
-
-                    override fun <T> getFlag(flag: AnalysisFlag<T>): T = stub()
-
-                    override val apiVersion: ApiVersion
-                        get() = stub()
-                    override val languageVersion: LanguageVersion
-                        get() = stub()
+                override fun getFeatureSupport(feature: LanguageFeature): LanguageFeature.State {
+                    return features.getOrDefault(feature, LanguageFeature.State.DISABLED)
                 }
-            ))
+
+                override fun getCustomizedLanguageFeatures(): Map<LanguageFeature, LanguageFeature.State> = stub()
+
+                override fun isPreRelease(): Boolean = stub()
+
+                override fun <T> getFlag(flag: AnalysisFlag<T>): T = flag.defaultValue
+
+                override val apiVersion: ApiVersion
+                    get() = stub()
+                override val languageVersion: LanguageVersion
+                    get() = stub()
+            }
+            register(
+                FirLanguageSettingsComponent::class,
+                FirLanguageSettingsComponent(languageVersionSettings, isMetadataCompilation = false)
+            )
 
             register(FirExtensionService::class, FirExtensionService(this))
         }

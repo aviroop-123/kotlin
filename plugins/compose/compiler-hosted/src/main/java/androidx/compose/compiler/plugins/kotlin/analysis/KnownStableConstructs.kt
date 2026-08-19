@@ -16,13 +16,20 @@
 
 package androidx.compose.compiler.plugins.kotlin.analysis
 
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.util.Locale
 import kotlin.coroutines.EmptyCoroutineContext
 
 /**
- * This is a registry of APIs that are defined outside of Compose that we know to be stable but
- * cannot annotate with `Stable` or `Immutable`.
+ * This is a registry of
+ *   1) functions and types that are defined outside of Compose that we know to be stable but cannot
+ *      annotate with `Stable` or `Immutable`
+ *   2) annotations that are defined outside of Compose that we know to be stable markers, but
+ *      cannot annotate with `StableMarker`
  *
  * For all of the functions and types listed in these collections, we associate them with a bitmask.
  * This mask corresponds to the bitmask returned by
@@ -68,6 +75,7 @@ object KnownStableConstructs {
         // Java types
         BigInteger::class.qualifiedName!! to 0,
         BigDecimal::class.qualifiedName!! to 0,
+        Locale::class.qualifiedName!! to 0,
     )
 
     // TODO: buildList, buildMap, buildSet, etc.
@@ -87,5 +95,12 @@ object KnownStableConstructs {
         "kotlinx.collections.immutable.persistentListOf" to 0b1,
         "kotlinx.collections.immutable.persistentSetOf" to 0b1,
         "kotlinx.collections.immutable.persistentMapOf" to 0b11,
+    )
+
+    val stableMarkers = setOf(
+        ClassId(
+            FqName("com.google.errorprone.annotations"),
+            Name.identifier("Immutable")
+        )
     )
 }

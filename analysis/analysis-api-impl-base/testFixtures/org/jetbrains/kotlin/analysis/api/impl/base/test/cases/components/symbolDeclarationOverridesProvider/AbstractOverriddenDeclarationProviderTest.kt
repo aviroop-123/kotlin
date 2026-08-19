@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.analysis.api.impl.base.test.cases.components.symbol
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.components.containingDeclaration
 import org.jetbrains.kotlin.analysis.api.components.render
-import org.jetbrains.kotlin.analysis.api.components.resolveToSymbol
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
 import org.jetbrains.kotlin.analysis.api.symbols.*
@@ -16,12 +15,13 @@ import org.jetbrains.kotlin.analysis.test.framework.base.AbstractAnalysisApiBase
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
 import org.jetbrains.kotlin.analysis.test.framework.services.expressionMarkerProvider
 import org.jetbrains.kotlin.analysis.test.framework.targets.getSingleTestTargetSymbolOfType
-import org.jetbrains.kotlin.analysis.test.framework.test.configurators.FrontendKind
 import org.jetbrains.kotlin.analysis.test.framework.utils.executeOnPooledThreadInReadAction
-import org.jetbrains.kotlin.idea.references.mainReference
+import org.jetbrains.kotlin.analysis.test.framework.utils.resolveSymbolPreferringCall
 import org.jetbrains.kotlin.psi.KtDeclaration
+import org.jetbrains.kotlin.psi.KtExperimentalApi
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.resolution.KtResolvable
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.assertions
 import org.jetbrains.kotlin.types.Variance
@@ -39,12 +39,7 @@ abstract class AbstractOverriddenDeclarationProviderTest : AbstractAnalysisApiBa
                 val allOverriddenSymbols = symbol.allOverriddenSymbols.map { renderSignature(it) }
                 val directlyOverriddenSymbols = symbol.directlyOverriddenSymbols.map { renderSignature(it) }
 
-                // K1 doesn't support this
-                val intersectionOverriddenSymbols = if (configurator.frontendKind == FrontendKind.Fe10) {
-                    emptyList()
-                } else {
-                    symbol.intersectionOverriddenSymbols.map { renderSignature(it) }
-                }
+                val intersectionOverriddenSymbols = symbol.intersectionOverriddenSymbols.map { renderSignature(it) }
 
                 buildString {
                     appendLine("ALL:")
@@ -59,6 +54,7 @@ abstract class AbstractOverriddenDeclarationProviderTest : AbstractAnalysisApiBa
         testServices.assertions.assertEqualsToTestOutputFile(actual)
     }
 
+    @OptIn(KtExperimentalApi::class)
     context(_: KaSession)
     private fun getCallableSymbol(mainFile: KtFile, mainModule: KtTestModule, testServices: TestServices): KaCallableSymbol {
         val declaration = testServices.expressionMarkerProvider.getBottommostElementOfTypeAtCaretOrNull<KtDeclaration>(mainFile)
@@ -69,8 +65,8 @@ abstract class AbstractOverriddenDeclarationProviderTest : AbstractAnalysisApiBa
         val referenceExpression = testServices.expressionMarkerProvider
             .getTopmostSelectedElementOfTypeByDirectiveOrNull(mainFile, mainModule, defaultType = KtExpression::class) as? KtExpression
         if (referenceExpression != null) {
-            val reference = referenceExpression.mainReference ?: error("No reference at caret")
-            val symbol = reference.resolveToSymbol() ?: error("Reference cannot be resolved")
+            val reference = referenceExpression as? KtResolvable ?: error("No resolvable at caret")
+            val symbol = reference.resolveSymbolPreferringCall() ?: error("Reference cannot be resolved")
             require(symbol is KaCallableSymbol) { "Resolved to non-callable symbol $${symbol::class.simpleName}" }
             return symbol
         }
@@ -105,7 +101,7 @@ abstract class AbstractOverriddenDeclarationProviderTest : AbstractAnalysisApiBa
 
         val chunks = mutableListOf<String>()
 
-        for ((index, parent) in parentsWithSelf.withIndex()) {
+        for ([index, parent] in parentsWithSelf.withIndex()) {
             // Render qualified names for top-level declarations
             if (index == 0) {
                 val qualifiedName = when (parent) {

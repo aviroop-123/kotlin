@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.testFederation.SmokeTestConfig
+import org.jetbrains.kotlin.testFederation.TemporaryTestFederationApi
+import org.jetbrains.kotlin.testFederation.smokeTestConfig
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
 
 plugins {
@@ -5,6 +8,65 @@ plugins {
     `jvm-test-suite`
     id("test-symlink-transformation")
     id("project-tests-convention")
+    id("test-inputs-check")
+}
+
+val noArgCompilerPlugin = configurations.dependencyScope("noArgCompilerPlugin")
+val assignmentCompilerPlugin = configurations.dependencyScope("assignmentCompilerPlugin")
+
+val noArgCompilerPluginResolvable = configurations.resolvable("noArgCompilerPluginResolvable") {
+    extendsFrom(noArgCompilerPlugin.get())
+}
+val assignmentCompilerPluginResolvable = configurations.resolvable("assignmentCompilerPluginResolvable") {
+    extendsFrom(assignmentCompilerPlugin.get())
+}
+
+val buildToolsApiImpl = configurations.dependencyScope("buildToolsApiImpl")
+val buildToolsApiImplResolvable = configurations.resolvable("buildToolsApiImplResolvable") {
+    extendsFrom(buildToolsApiImpl.get())
+}
+
+val jsStdlibImpl = configurations.dependencyScope("jsStdlibImpl")
+val jsStdlibImplResolvable = configurations.resolvable("jsStdlibImplResolvable") {
+    extendsFrom(jsStdlibImpl.get())
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "kotlin-runtime"))
+        attribute(Attribute.of("org.jetbrains.kotlin.platform.type", String::class.java), "js")
+    }
+}
+
+val wasmStdlibImpl = configurations.dependencyScope("wasmStdlibImpl")
+val wasmStdlibImplResolvable = configurations.resolvable("wasmStdlibImplResolvable") {
+    extendsFrom(wasmStdlibImpl.get())
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "kotlin-runtime"))
+        attribute(Attribute.of("org.jetbrains.kotlin.platform.type", String::class.java), "wasm")
+        attribute(Attribute.of("org.jetbrains.kotlin.wasm.target", String::class.java), "js")
+    }
+}
+
+val metadataStdlibImpl = configurations.dependencyScope("metadataStdlibImpl")
+val metadataStdlibImplResolvable = configurations.resolvable("metadataStdlibImplResolvable") {
+    extendsFrom(metadataStdlibImpl.get())
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "kotlin-runtime"))
+        attribute(Attribute.of("org.jetbrains.kotlin.platform.type", String::class.java), "common")
+    }
+}
+
+val scriptingCompilerPlugin = configurations.dependencyScope("scriptingCompilerPlugin")
+val scriptingCompilerPluginResolvable = configurations.resolvable("scriptingCompilerPluginResolvable") {
+    extendsFrom(scriptingCompilerPlugin.get())
+}
+
+val unpackedResources by configurations.dependencyScope("unpackedResources")
+val unpackedResourcesResolvable by configurations.resolvable("unpackedResourcesResolvable") {
+    // Wire the dependency declarations
+    extendsFrom(unpackedResources)
+    // These attributes must be compatible with the producer
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.RESOURCES))
+    }
 }
 
 dependencies {
@@ -17,6 +79,19 @@ dependencies {
     api(platform(libs.junit.bom))
     compileOnly(libs.junit.jupiter.engine)
     compileOnly(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    noArgCompilerPlugin(project(":kotlin-noarg-compiler-plugin.embeddable"))
+    assignmentCompilerPlugin(project(":kotlin-assignment-compiler-plugin.embeddable"))
+    scriptingCompilerPlugin(project(":kotlin-scripting-compiler-embeddable"))
+    buildToolsApiImpl(project(":compiler:build-tools:kotlin-build-tools-compat"))
+    buildToolsApiImpl(project(":compiler:build-tools:kotlin-build-tools-impl"))
+    buildToolsApiImpl(project(":compiler:build-tools:kotlin-build-tools-cri-impl"))
+    unpackedResources(project(":compiler:build-tools:kotlin-build-tools-api-tests")) {
+        isTransitive = false
+    }
+    jsStdlibImpl(project(":kotlin-stdlib"))
+    wasmStdlibImpl(project(":kotlin-stdlib"))
+    metadataStdlibImpl(project(":kotlin-stdlib"))
 }
 
 kotlin {
@@ -24,44 +99,75 @@ kotlin {
         optIn.add("org.jetbrains.kotlin.buildtools.api.ExperimentalBuildToolsApi")
         optIn.add("kotlin.ExperimentalStdlibApi")
         optIn.add("kotlin.io.path.ExperimentalPathApi")
+        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 
 val compatibilityTestsVersions = listOf(
     BuildToolsVersion(KotlinToolingVersion(project.version.toString()), isCurrent = true),
     BuildToolsVersion(KotlinToolingVersion(2, 1, 20, null)),
-    BuildToolsVersion(KotlinToolingVersion(2, 0, 21, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 2, 21, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 3, 0, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 3, 10, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 3, 20, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 4, 0, null)),
+)
+
+val compatibilityTestsExcludedVersions = listOf(
+    BuildToolsVersion(KotlinToolingVersion(2, 3, 21, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 2, 20, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 2, 10, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 2, 0, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 1, 21, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 1, 10, null)),
+    BuildToolsVersion(KotlinToolingVersion(2, 1, 0, null)),
 )
 
 class BuildToolsVersion(val version: KotlinToolingVersion, val isCurrent: Boolean = false) {
     override fun toString() = if (isCurrent) "Snapshot" else version.toString()
 }
 
+val COMPILER_CLASSPATH_PROPERTY = "kotlin.build-tools-api.test.compilerClasspath"
+val JS_STDLIB_CLASSSPATH_PROPERTY = "kotlin.build-tools-api.test.jsStdlibClasspath"
+val WASM_STDLIB_CLASSSPATH_PROPERTY = "kotlin.build-tools-api.test.wasmStdlibClasspath"
+val METADATA_STDLIB_CLASSSPATH_PROPERTY = "kotlin.build-tools-api.test.metadataStdlibClasspath"
+
 fun Test.ensureExecutedAgainstExpectedBuildToolsImplVersion(version: BuildToolsVersion) {
     if (version.isCurrent) return
+    val compilerClasspathProperty =
+        COMPILER_CLASSPATH_PROPERTY // to make the task action configuration cache-friendly, we have to copy it to a local var
     // the check is required for the case when Gradle substitutes external dependencies with project ones
     doFirst {
-        check(classpath.any { "kotlin-build-tools-impl-${version}" in it.name }) {
+        // we cannot check systemProperties because the classpath is configured in addClasspathProperty via jvmArgumentProviders
+        val compilerClasspath = jvmArgumentProviders
+            .map { it.asArguments().joinToString("|||") }
+            .find { compilerClasspathProperty in it }
+            ?.substring("-D$compilerClasspathProperty=".length)
+            ?.substringBefore("|||")
+            ?.split(File.pathSeparator)
+            ?: error("Failed to parse compiler classpath system property $compilerClasspathProperty")
+        check(
+            compilerClasspath.any { "kotlin-build-tools-impl-${version}" in it }) {
             "runtime classpath must contain kotlin-build-tools-impl:$version"
         }
     }
 }
 
-fun SourceSet.configureCompatibilitySourceDirectories() {
+fun SourceSet.configureCompatibilitySourceDirectories(testSuiteName: String) {
     java.setSrcDirs(
         listOf(
-            layout.projectDirectory.dir("src/testCompatibility/java"),
+            layout.projectDirectory.dir("src/$testSuiteName/java"),
         )
     )
     kotlin.setSrcDirs(
         listOf(
-            layout.projectDirectory.dir("src/testCompatibility/java"),
-            layout.projectDirectory.dir("src/testCompatibility/kotlin"),
+            layout.projectDirectory.dir("src/$testSuiteName/java"),
+            layout.projectDirectory.dir("src/$testSuiteName/kotlin"),
         )
     )
     resources.setSrcDirs(
         listOf(
-            layout.projectDirectory.dir("src/testCompatibility/resources"),
+            layout.projectDirectory.dir("src/$testSuiteName/resources"),
         )
     )
 }
@@ -73,7 +179,54 @@ val businessLogicTestSuits = setOf(
     "testInputChangesTracking",
     "testCrossModuleIncrementalChanges",
     "testFirRunner",
+    "testCriToolchain",
+    "testCompilerPlugins",
+    "testBuildMetrics",
+    "testKotlinLogger",
+    "testDefaultOptions",
+    "testDaemonOptions",
+    "testInternalInputsTracker",
+    "testAbiValidation",
+    "testRestrictedArguments",
 )
+
+fun JvmTestSuite.addSnapshotBuildToolsImpl() {
+    targets.all {
+        testTask.configure {
+            addClasspathProperty(buildToolsApiImplResolvable.get(), COMPILER_CLASSPATH_PROPERTY)
+            addClasspathProperty(jsStdlibImplResolvable.get(), JS_STDLIB_CLASSSPATH_PROPERTY)
+            addClasspathProperty(wasmStdlibImplResolvable.get(), WASM_STDLIB_CLASSSPATH_PROPERTY)
+            addClasspathProperty(metadataStdlibImplResolvable.get(), METADATA_STDLIB_CLASSSPATH_PROPERTY)
+        }
+    }
+}
+
+fun JvmTestSuite.addSpecificBuildToolsImpl(version: String) {
+    val baseName = "buildToolsApiImpl$version"
+    val resolvableSuffix = "Resolvable"
+    val configurationsExist = baseName in configurations.names
+    val resolvableConfiguration = if (configurationsExist) {
+        configurations.named("$baseName$resolvableSuffix")
+    } else {
+        val buildToolsApiImpl = configurations.dependencyScope(baseName)
+        val buildToolsApiImplResolvable = configurations.resolvable("$baseName$resolvableSuffix") {
+            extendsFrom(buildToolsApiImpl.get())
+        }
+        project.dependencies {
+            buildToolsApiImpl(project(":compiler:build-tools:kotlin-build-tools-api"))
+            buildToolsApiImpl(project(":compiler:build-tools:kotlin-build-tools-compat"))
+            buildToolsApiImpl("org.jetbrains.kotlin:kotlin-build-tools-impl:${version}")
+        }
+        buildToolsApiImplResolvable
+    }
+
+    targets.all {
+        testTask.configure {
+            addClasspathProperty(resolvableConfiguration.get(), COMPILER_CLASSPATH_PROPERTY)
+            addClasspathProperty(jsStdlibImplResolvable.get(), JS_STDLIB_CLASSSPATH_PROPERTY)
+        }
+    }
+}
 
 testing {
     suites {
@@ -84,27 +237,37 @@ testing {
         var configuredIdeaSourceSets = false
         for (implVersion in compatibilityTestsVersions) {
             register<JvmTestSuite>("testCompatibility${implVersion}") {
-                if (!kotlinBuildProperties.isInIdeaSync || !configuredIdeaSourceSets) {
-                    sources.configureCompatibilitySourceDirectories()
-                    configuredIdeaSourceSets = true
+                if (!kotlinBuildProperties.isInIdeaSync.get() || !configuredIdeaSourceSets) {
+                    sources.configureCompatibilitySourceDirectories("testCompatibility")
                 }
-                dependencies {
-                    runtimeOnly(project(":compiler:build-tools:kotlin-build-tools-compat"))
-                    if (implVersion.isCurrent) {
-                        runtimeOnly(project(":compiler:build-tools:kotlin-build-tools-impl"))
-                    } else {
-                        runtimeOnly("org.jetbrains.kotlin:kotlin-build-tools-impl:${implVersion}")
-                    }
+                if (implVersion.isCurrent) {
+                    addSnapshotBuildToolsImpl()
+                } else {
+                    addSpecificBuildToolsImpl(implVersion.toString())
                 }
                 targets.all {
                     projectTests {
-                        testTask(taskName = testTask.name, jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = false) {
+                        testTask(
+                            taskName = testTask.name,
+                            jUnitMode = JUnitMode.JUnit5,
+                            javaLauncher = JdkMajorVersion.JDK_1_8,
+                            skipInLocalBuild = false
+                        ) {
+                            @OptIn(TemporaryTestFederationApi::class)
+                            smokeTestConfig = SmokeTestConfig.RunAllTests
+
                             ensureExecutedAgainstExpectedBuildToolsImplVersion(implVersion)
                             systemProperty("kotlin.build-tools-api.log.level", "DEBUG")
+                            testInputsCheck {
+                                if (implVersion.version < KotlinToolingVersion(2, 2, 0, "snapshot")) {
+                                    extraPermissions.add("permission java.util.PropertyPermission \"*\", \"read,write\";")
+                                }
+                            }
                         }
                     }
                 }
             }
+            configuredIdeaSourceSets = true
         }
 
         withType<JvmTestSuite>().configureEach configureSuit@{
@@ -112,26 +275,57 @@ testing {
             dependencies {
                 useJUnitJupiter(libs.versions.junit5.get())
 
-                compileOnly(project()) // propagate stdlib from the main dependencies for compilation, the runtime dependency provides the actual required version
-                implementation(project()) {
-                    isTransitive = false
-                }
+                implementation(project())
                 implementation(project(":kotlin-tooling-core"))
+                implementation(project(":compiler:test-security-manager"))
                 implementation(project(":compiler:build-tools:kotlin-build-tools-api"))
-                runtimeOnly(project(":compiler:build-tools:kotlin-build-tools-compat"))
+                implementation(project(":compiler:arguments"))
                 if (isRegular) {
-                    runtimeOnly(project(":compiler:build-tools:kotlin-build-tools-impl"))
+                    addSnapshotBuildToolsImpl()
                 }
             }
 
             targets.all {
-                if (!testTask.name.startsWith("testCompatibility")) {
+                if (businessLogicTestSuits.any { testTask.name.startsWith(it) }) {
                     projectTests {
-                        testTask(taskName = testTask.name, jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = false) {
+                        testTask(
+                            taskName = testTask.name,
+                            jUnitMode = JUnitMode.JUnit5,
+                            javaLauncher = JdkMajorVersion.JDK_1_8,
+                            skipInLocalBuild = false
+                        ) {
                             systemProperty("kotlin.build-tools-api.log.level", "DEBUG")
+
                         }
                     }
                 }
+                testTask.configure {
+                    systemProperty(
+                        "kotlin.daemon.custom.run.files.path.for.tests",
+                        "build/daemon"
+                    )
+                    addClasspathProperty(unpackedResourcesResolvable, "kotlin.test.templates.classpath")
+                    testInputsCheck {
+                        with(extraPermissions) {
+                            add("permission java.net.SocketPermission \"localhost\", \"connect,resolve,accept\";")
+                            add("permission java.util.PropertyPermission \"java.rmi.server.hostname\", \"write\";")
+
+                            // paths below are not expected to exist,
+                            // these are here to pass some implicit `exists()` checks in the Kotlin compiler
+                            add("permission java.io.FilePermission \"<no_path>/lib\", \"read\";")
+                            add("permission java.io.FilePermission \"./kotlin-scripting-compiler.jar\", \"read\";")
+                            add("permission java.io.FilePermission \"./kotlin-scripting-compiler-impl.jar\", \"read\";")
+                            add("permission java.io.FilePermission \"./kotlin-scripting-common.jar\", \"read\";")
+                            add("permission java.io.FilePermission \"./kotlin-scripting-jvm.jar\", \"read\";")
+                        }
+                    }
+                }
+            }
+        }
+
+        named<JvmTestSuite>("testDaemonOptions") {
+            dependencies {
+                implementation(project(":daemon-common"))
             }
         }
 
@@ -140,9 +334,91 @@ testing {
                 testSymlinkTransformation.resolveAgainstSymlinkedArtifacts(this)
             }
         }
+
+        named<JvmTestSuite>("testDefaultOptions") testSuite@{
+            dependencies {
+                implementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect"))
+                implementation(project(":daemon-common"))
+                implementation(project(":compiler:build-tools:kotlin-build-tools-impl"))
+            }
+        }
+
+        named<JvmTestSuite>("testInputChangesTracking") {
+            dependencies {
+                implementation(project(":compiler:build-tools:kotlin-build-statistics"))
+            }
+        }
+
+        named<JvmTestSuite>("testInternalInputsTracker") {
+            dependencies {
+                implementation(project(":compiler:build-tools:kotlin-build-tools-impl"))
+            }
+        }
+
+        named<JvmTestSuite>("testRestrictedArguments") {
+            dependencies {
+                implementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect"))
+            }
+        }
+
+        named<JvmTestSuite>("testCompilerPlugins") {
+            dependencies {
+                compileOnly(project(":kotlin-scripting-common"))
+                implementation(project(":compiler:build-tools:kotlin-build-statistics"))
+            }
+            targets.all {
+                testTask.configure {
+                    addClasspathProperty(noArgCompilerPluginResolvable.get(), "NOARG_COMPILER_PLUGIN")
+                    addClasspathProperty(assignmentCompilerPluginResolvable.get(), "ASSIGNMENT_COMPILER_PLUGIN")
+                    addClasspathProperty(scriptingCompilerPluginResolvable.get(), "SCRIPTING_COMPILER_PLUGIN")
+
+                    // those classes use compileOnly dependency on scripting and should not be considered as containing test classes to avoid runtime failures
+                    exclude(
+                        "org/jetbrains/kotlin/buildtools/tests/compilation/GreetScriptTemplate.class",
+                        "org/jetbrains/kotlin/buildtools/tests/compilation/GreetScriptCustomExtensionTemplate.class",
+                        "org/jetbrains/kotlin/buildtools/tests/compilation/GreetScriptMyExtensionTemplate.class",
+                        "org/jetbrains/kotlin/buildtools/tests/compilation/GreetScriptDefinition.class",
+                    )
+                }
+            }
+        }
     }
 }
 
 tasks.named("check") {
     dependsOn(testing.suites.matching { it.name != "testExample" }) // do not run example tests by default
+}
+
+val checkCompatibilityCoverageTask = checkCompatibilityCoverage(
+    btaVersion = project.version.toString(),
+    compatibilityTestsVersions = compatibilityTestsVersions.map { it.version },
+    compatibilityTestsExcludedVersions = compatibilityTestsExcludedVersions.map { it.version },
+)
+
+fun Project.checkCompatibilityCoverage(
+    btaVersion: String,
+    compatibilityTestsVersions: List<KotlinToolingVersion>,
+    compatibilityTestsExcludedVersions: List<KotlinToolingVersion>,
+): TaskProvider<JavaExec> {
+    val checkerClasspath = configurations.register("checkerClasspath") {
+        isCanBeConsumed = false
+        isCanBeResolved = true
+    }
+
+    dependencies {
+        checkerClasspath(project(":compiler:build-tools:kotlin-build-tools-version-coverage-check"))
+    }
+
+    return tasks.register<JavaExec>("checkCompatibilityCoverage") {
+        group = "verification"
+        description = "Verify that tests cover all versions required by backward compatibility guarantees"
+        classpath = checkerClasspath.get()
+        mainClass.set("org.jetbrains.kotlin.buildtools.versioncoverage.MainKt")
+        args(
+            btaVersion,
+            "backward",
+            compatibilityTestsVersions.joinToString(",") { it.toString() },
+            compatibilityTestsExcludedVersions.joinToString(",") { it.toString() },
+        )
+    }
 }

@@ -1,3 +1,0 @@
-KtNameReferenceExpression(27,32): 'field'
-  KtSimpleNameReference:
-    (in <local>: x) field

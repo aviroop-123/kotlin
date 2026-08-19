@@ -7,11 +7,7 @@ package org.jetbrains.kotlin.fir.resolve.calls.overloads
 
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.containingClassLookupTag
-import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirFunction
-import org.jetbrains.kotlin.fir.declarations.FirProperty
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
-import org.jetbrains.kotlin.fir.declarations.FirVariable
+import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isExpect
 import org.jetbrains.kotlin.fir.resolve.calls.candidate.Candidate
 import org.jetbrains.kotlin.fir.scopes.impl.FirStandardOverrideChecker
@@ -26,7 +22,6 @@ import org.jetbrains.kotlin.fir.scopes.impl.FirStandardOverrideChecker
 class ConeEquivalentCallConflictResolver(private val session: FirSession) : ConeCallConflictResolver() {
     override fun chooseMaximallySpecificCandidates(
         candidates: Set<Candidate>,
-        discriminateAbstracts: Boolean
     ): Set<Candidate> {
         return filterOutEquivalentCalls(candidates)
     }
@@ -80,11 +75,13 @@ class ConeEquivalentCallConflictResolver(private val session: FirSession) : Cone
     private val Candidate.mappedArgumentsOrderRepresentation: IntArray?
         get() {
             val function = symbol.fir as? FirFunction ?: return null
-            val parametersToIndices = function.valueParameters.mapIndexed { index, it -> it to index }.toMap()
+            val parametersToIndices = (function.valueParameters + function.contextParameters)
+                .mapIndexed { index, it -> it to index }
+                .toMap()
             if (!argumentMappingInitialized) return null
             val mapping = argumentMapping
             val result = IntArray(mapping.size + 1) { function.valueParameters.size }
-            for ((index, parameter) in mapping.values.withIndex()) {
+            for ([index, parameter] in mapping.values.withIndex()) {
                 result[index + 1] = parametersToIndices[parameter] ?: error("Unmapped argument in arguments mapping")
             }
             return result
@@ -115,7 +112,7 @@ class ConeEquivalentCallConflictResolver(private val session: FirSession) : Cone
             // Furthermore, the call resolver also has to filter out duplicate `emptyArray()` candidates coming from the *same* stdlib, as
             // the function is defined both as a builtin in `kotlin.kotlin_builtins` and a regular top-level function in
             // `ArrayIntrinsicsKt.class`. See KT-78882.
-            if (first.moduleData == second.moduleData && first.moduleData.session.kind == FirSession.Kind.Source) return false
+            if (first.moduleData == second.moduleData && !first.moduleData.areRedeclarationsEquivalent) return false
 
             if (first is FirVariable != second is FirVariable) {
                 return false
@@ -132,7 +129,7 @@ class ConeEquivalentCallConflictResolver(private val session: FirSession) : Cone
                             overrideChecker.isOverriddenProperty(second, first, ignoreVisibility = true)
                 }
 
-                first is FirSimpleFunction && second is FirSimpleFunction -> {
+                first is FirNamedFunction && second is FirNamedFunction -> {
                     overrideChecker.isOverriddenFunction(first, second, ignoreVisibility = true) &&
                             overrideChecker.isOverriddenFunction(second, first, ignoreVisibility = true)
                 }

@@ -10,7 +10,7 @@
     },
     "createdBy": {
         "gradle": {
-            "version": "8.14"
+            "version": "9.5.1"
         }
     },
     "variants": [
@@ -317,10 +317,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -878,10 +878,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -1439,10 +1439,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -2000,10 +2000,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -2561,10 +2561,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -3122,10 +3122,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -3683,10 +3683,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -4244,10 +4244,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {
@@ -4661,10 +4661,10 @@
             },
             "dependencies": [
                 {
-                    "group": "org.jetbrains.kotlin",
-                    "module": "abi-tools-api",
+                    "group": "com.microsoft.playwright",
+                    "module": "playwright",
                     "version": {
-                        "requires": "ArtifactsTest.version"
+                        "requires": "1.60.0"
                     },
                     "excludes": [
                         {

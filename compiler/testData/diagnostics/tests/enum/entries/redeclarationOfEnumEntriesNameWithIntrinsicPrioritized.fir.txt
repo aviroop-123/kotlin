@@ -1,4 +1,4 @@
-FILE: redeclarationOfEnumEntriesNameWithIntrinsicPrioritized.fir.kt
+FILE: redeclarationOfEnumEntriesNameWithIntrinsicPrioritized.kt
     public final enum class E : R|kotlin/Enum<E>| {
         private constructor(): R|E| {
             super<R|kotlin/Enum<E>|>()
@@ -18,6 +18,6 @@ FILE: redeclarationOfEnumEntriesNameWithIntrinsicPrioritized.fir.kt
         }
 
         public final static val entries: R|kotlin/enums/EnumEntries<E>|
-            public get(): R|kotlin/enums/EnumEntries<E>|
+            public static get(): R|kotlin/enums/EnumEntries<E>|
 
     }

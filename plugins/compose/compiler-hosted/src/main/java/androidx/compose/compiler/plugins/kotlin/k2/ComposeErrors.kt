@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtTryExpression
 
@@ -42,14 +43,16 @@ object ComposeErrors : KtDiagnosticsContainer() {
 
     val NONREADONLY_CALL_IN_READONLY_COMPOSABLE by error0<PsiElement>()
 
-    val CAPTURED_COMPOSABLE_INVOCATION by
-    error2<PsiElement, FirVariableSymbol<*>, FirCallableSymbol<*>>()
+    val CAPTURED_COMPOSABLE_INVOCATION by error2<PsiElement, FirVariableSymbol<*>, FirCallableSymbol<*>>()
 
     // composable calls are not allowed in try expressions
     // error goes on the `try` keyword
     val ILLEGAL_TRY_CATCH_AROUND_COMPOSABLE by error0<KtTryExpression>(
         ComposeSourceElementPositioningStrategies.TRY_KEYWORD
     )
+
+    // error goes on the `runCatching` call
+    val ILLEGAL_RUN_CATCHING_AROUND_COMPOSABLE by error0<KtCallExpression>(SourceElementPositioningStrategies.REFERENCED_NAME_BY_QUALIFIED)
 
     val MISSING_DISALLOW_COMPOSABLE_CALLS_ANNOTATION by error3<
             PsiElement,
@@ -103,6 +106,16 @@ object ComposeErrors : KtDiagnosticsContainer() {
     val OPEN_COMPOSABLE_DEFAULT_PARAMETER_VALUE by error1<PsiElement, LanguageVersion>()
 
     val ABSTRACT_COMPOSABLE_DEFAULT_PARAMETER_VALUE by error1<PsiElement, LanguageVersion>()
+
+    val KEY_CALL_WITH_NO_ARGUMENTS by error0<PsiElement>(
+        SourceElementPositioningStrategy(
+            LightTreePositioningStrategies.REFERENCED_NAME_BY_QUALIFIED,
+            PositioningStrategies.CALL_EXPRESSION
+        )
+    )
+
+    val COMPOSE_CONFIGURATION_ERROR by errorWithoutSource()
+    val COMPOSE_CONFIGURATION_WARNING by warningWithoutSource()
 
     override fun getRendererFactory(): BaseDiagnosticRendererFactory = ComposeErrorMessages
 }

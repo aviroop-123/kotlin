@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -9,10 +9,10 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiMember
+import com.intellij.psi.util.parentOfType
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
 import org.jetbrains.kotlin.analysis.test.framework.services.expressionMarkerProvider
 import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfigurator
-import org.jetbrains.kotlin.analysis.utils.printer.parentOfType
 import org.jetbrains.kotlin.asJava.renderClass
 import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.psi.KtDeclaration
@@ -26,7 +26,6 @@ import java.nio.file.Path
 
 abstract class AbstractSymbolLightClassesAnnotationEqualityTest(
     configurator: AnalysisApiTestConfigurator,
-    override val currentExtension: String,
     override val isTestAgainstCompiledCode: Boolean,
 ) : AbstractSymbolLightClassesTestBase(configurator) {
     override fun doLightClassTest(ktFiles: List<KtFile>, module: KtTestModule, testServices: TestServices) {
@@ -40,7 +39,7 @@ abstract class AbstractSymbolLightClassesAnnotationEqualityTest(
 
         val annotationsFromFindAnnotation = mutableSetOf<PsiAnnotation>()
         val modifierList = actualLightDeclaration.modifierList!!
-        for ((qualifier, isExpected) in qualifiersToCheck) {
+        for ((val qualifier = qualifierName, val isExpected) in qualifiersToCheck) {
             val actual = modifierList.hasAnnotation(qualifier)
             testServices.assertions.assertEquals(expected = isExpected, actual = actual) {
                 "$qualifier isExpected: $isExpected, but $actual is found"

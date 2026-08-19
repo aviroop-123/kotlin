@@ -5,26 +5,20 @@
 
 package org.jetbrains.kotlin.psi2ir.descriptors
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.PrimitiveType
-import org.jetbrains.kotlin.builtins.StandardNames.BUILT_INS_PACKAGE_FQ_NAME
 import org.jetbrains.kotlin.builtins.UnsignedType
 import org.jetbrains.kotlin.descriptors.*
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.TypeParameterDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
-import org.jetbrains.kotlin.ir.BuiltInOperatorNames
-import org.jetbrains.kotlin.ir.InternalSymbolFinderAPI
-import org.jetbrains.kotlin.ir.IrBuiltIns
-import org.jetbrains.kotlin.ir.SymbolFinder
-import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
-import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
+import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.descriptors.*
-import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
@@ -32,21 +26,19 @@ import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeBuilder
 import org.jetbrains.kotlin.ir.types.impl.buildSimpleType
-import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.name.CallableId
-import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.name.StandardClassIds
-import org.jetbrains.kotlin.resolve.descriptorUtil.classId
+import org.jetbrains.kotlin.ir.util.SymbolTable
+import org.jetbrains.kotlin.ir.util.TypeTranslator
+import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.primaryConstructor
+import org.jetbrains.kotlin.name.*
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
-import org.jetbrains.kotlin.util.OperatorNameConventions
 
 @ObsoleteDescriptorBasedAPI
 @OptIn(InternalSymbolFinderAPI::class)
+@K1Deprecation
 class IrBuiltInsOverDescriptors(
     val builtIns: KotlinBuiltIns,
     private val typeTranslator: TypeTranslator,
@@ -55,8 +47,9 @@ class IrBuiltInsOverDescriptors(
     override val symbolFinder: SymbolFinderOverDescriptors = SymbolFinderOverDescriptors(builtIns, symbolTable)
     override val languageVersionSettings = typeTranslator.languageVersionSettings
 
-    private var _functionFactory: IrAbstractDescriptorBasedFunctionFactory? = null
-    var functionFactory: IrAbstractDescriptorBasedFunctionFactory
+    private var _functionFactory: IrAbstractFunctionFactory? = null
+    @OptIn(UnstableBuiltInsApi::class)
+    override var functionFactory: IrAbstractFunctionFactory?
         get() =
             synchronized(this) {
                 if (_functionFactory == null) {
@@ -112,7 +105,7 @@ class IrBuiltInsOverDescriptors(
         val operatorDescriptor =
             IrSimpleBuiltinOperatorDescriptorImpl(packageFragmentDescriptor, Name.identifier(name), returnType.originalKotlinType!!)
 
-        for ((i, valueParameterType) in valueParameterTypes.withIndex()) {
+        for ([i, valueParameterType] in valueParameterTypes.withIndex()) {
             operatorDescriptor.addValueParameter(
                 IrBuiltinValueParameterDescriptorImpl(
                     operatorDescriptor, Name.identifier("arg$i"), i, valueParameterType.originalKotlinType!!
@@ -141,7 +134,7 @@ class IrBuiltInsOverDescriptors(
             operator.parent = operatorsPackageFragment
             operatorsPackageFragment.declarations += operator
 
-            operator.parameters += valueParameterTypes.withIndex().map { (i, valueParameterType) ->
+            operator.parameters += valueParameterTypes.withIndex().map { [i, valueParameterType] ->
                 val valueParameterDescriptor = operatorDescriptor.valueParameters[i]
                 val valueParameterSymbol = IrValueParameterSymbolImpl(valueParameterDescriptor)
                 irFactory.createValueParameter(
@@ -163,7 +156,7 @@ class IrBuiltInsOverDescriptors(
             }
 
             if (isIntrinsicConst) {
-                operator.annotations += IrConstructorCallImpl.fromSymbolDescriptor(
+                operator.annotations += IrAnnotationImpl.fromSymbolDescriptor(
                     UNDEFINED_OFFSET, UNDEFINED_OFFSET, intrinsicConstType, intrinsicConstConstructor.symbol
                 )
             }
@@ -326,13 +319,13 @@ class IrBuiltInsOverDescriptors(
     override val longType = long.toIrType()
     override val longClass = builtIns.long.toIrSymbol()
 
-    override val ubyteClass = symbolFinder.findClass(UnsignedType.UBYTE.typeName, BUILT_INS_PACKAGE_FQ_NAME)
+    override val ubyteClass = symbolFinder.findClass(StandardClassIds.UByte)
     override val ubyteType by lazy { ubyteClass!!.typeWith() }
-    override val ushortClass = symbolFinder.findClass(UnsignedType.USHORT.typeName, BUILT_INS_PACKAGE_FQ_NAME)
+    override val ushortClass = symbolFinder.findClass(StandardClassIds.UShort)
     override val ushortType by lazy { ushortClass!!.typeWith() }
-    override val uintClass = symbolFinder.findClass(UnsignedType.UINT.typeName, BUILT_INS_PACKAGE_FQ_NAME)
+    override val uintClass = symbolFinder.findClass(StandardClassIds.UInt)
     override val uintType by lazy { uintClass!!.typeWith() }
-    override val ulongClass = symbolFinder.findClass(UnsignedType.ULONG.typeName, BUILT_INS_PACKAGE_FQ_NAME)
+    override val ulongClass = symbolFinder.findClass(StandardClassIds.ULong)
     override val ulongType by lazy { ulongClass!!.typeWith() }
 
     val float = builtIns.floatType
@@ -357,7 +350,7 @@ class IrBuiltInsOverDescriptors(
     override val stringClass = builtIns.string.toIrSymbol()
 
     // TODO: check if correct
-    override val charSequenceClass = symbolFinder.findClass(Name.identifier("CharSequence"), "kotlin")!!
+    override val charSequenceClass = symbolFinder.findClass(StandardClassIds.CharSequence)!!
 
     override val collectionClass = builtIns.collection.toIrSymbol()
     override val setClass = builtIns.set.toIrSymbol()
@@ -453,13 +446,13 @@ class IrBuiltInsOverDescriptors(
     override val floatArray = builtIns.getPrimitiveArrayClassDescriptor(PrimitiveType.FLOAT).toIrSymbol()
     override val doubleArray = builtIns.getPrimitiveArrayClassDescriptor(PrimitiveType.DOUBLE).toIrSymbol()
     override val booleanArray = builtIns.getPrimitiveArrayClassDescriptor(PrimitiveType.BOOLEAN).toIrSymbol()
-    override val ubyteArray = symbolFinder.findClass(UnsignedType.UBYTE.arrayClassId.shortClassName, BUILT_INS_PACKAGE_FQ_NAME)
-    override val ushortArray = symbolFinder.findClass(UnsignedType.USHORT.arrayClassId.shortClassName, BUILT_INS_PACKAGE_FQ_NAME)
-    override val uintArray = symbolFinder.findClass(UnsignedType.UINT.arrayClassId.shortClassName, BUILT_INS_PACKAGE_FQ_NAME)
-    override val ulongArray = symbolFinder.findClass(UnsignedType.ULONG.arrayClassId.shortClassName, BUILT_INS_PACKAGE_FQ_NAME)
+    override val ubyteArray = symbolFinder.findClass(StandardClassIds.unsignedArrayTypeByElementType[StandardClassIds.UByte]!!)
+    override val ushortArray = symbolFinder.findClass(StandardClassIds.unsignedArrayTypeByElementType[StandardClassIds.UShort]!!)
+    override val uintArray = symbolFinder.findClass(StandardClassIds.unsignedArrayTypeByElementType[StandardClassIds.UInt]!!)
+    override val ulongArray = symbolFinder.findClass(StandardClassIds.unsignedArrayTypeByElementType[StandardClassIds.ULong]!!)
     override val primitiveArraysToPrimitiveTypes =
         PrimitiveType.entries.associate { builtIns.getPrimitiveArrayClassDescriptor(it).toIrSymbol() to it }
-    override val primitiveTypesToPrimitiveArrays = primitiveArraysToPrimitiveTypes.map { (k, v) -> v to k }.toMap()
+    override val primitiveTypesToPrimitiveArrays = primitiveArraysToPrimitiveTypes.map { [k, v] -> v to k }.toMap()
     override val primitiveArrayElementTypes = primitiveArraysToPrimitiveTypes.mapValues { primitiveTypeToIrType[it.value] }
     override val primitiveArrayForType = primitiveArrayElementTypes.asSequence().associate { it.value to it.key }
 
@@ -470,7 +463,7 @@ class IrBuiltInsOverDescriptors(
         }.toMap()
 
     override val unsignedArraysElementTypes: Map<IrClassSymbol, IrType?> by lazy {
-        unsignedTypesToUnsignedArrays.map { (k, v) ->
+        unsignedTypesToUnsignedArrays.map { [k, v] ->
             v to builtIns.builtInsModule.findClassAcrossModuleDependencies(k.classId)?.defaultType?.toIrType()
         }.toMap()
     }
@@ -537,71 +530,44 @@ class IrBuiltInsOverDescriptors(
             KotlinTypeChecker.DEFAULT.equalTypes(it.valueParameters[0].type, int)
         }.toIrSymbol()
 
-    override val arrayOf = symbolFinder.findFunctions(Name.identifier("arrayOf")).first {
-        it.descriptor.extensionReceiverParameter == null && it.descriptor.dispatchReceiverParameter == null &&
-                it.descriptor.valueParameters.size == 1 && it.descriptor.valueParameters[0].varargElementType != null
-    }
+    override val arrayOf = symbolFinder
+        .findFunctions(CallableId(StandardClassIds.BASE_KOTLIN_PACKAGE, Name.identifier("arrayOf")))
+        .first {
+            it.descriptor.extensionReceiverParameter == null && it.descriptor.dispatchReceiverParameter == null &&
+                    it.descriptor.valueParameters.size == 1 && it.descriptor.valueParameters[0].varargElementType != null
+        }
 
-    override val arrayOfNulls = symbolFinder.findFunctions(Name.identifier("arrayOfNulls")).first {
-        it.descriptor.extensionReceiverParameter == null && it.descriptor.dispatchReceiverParameter == null &&
-                it.descriptor.valueParameters.size == 1 && KotlinBuiltIns.isInt(it.descriptor.valueParameters[0].type)
-    }
+    override val arrayOfNulls = symbolFinder
+        .findFunctions(CallableId(StandardClassIds.BASE_KOTLIN_PACKAGE, Name.identifier("arrayOfNulls")))
+        .first {
+            it.descriptor.extensionReceiverParameter == null && it.descriptor.dispatchReceiverParameter == null &&
+                    it.descriptor.valueParameters.size == 1 && KotlinBuiltIns.isInt(it.descriptor.valueParameters[0].type)
+        }
 
     override val linkageErrorSymbol: IrSimpleFunctionSymbol = defineOperator("linkageError", nothingType, listOf(stringType))
 
     override val enumClass = builtIns.enum.toIrSymbol()
 
-    override val extensionToString: IrSimpleFunctionSymbol = symbolFinder.findFunctions(OperatorNameConventions.TO_STRING, "kotlin").first {
-        val descriptor = it.descriptor
-        descriptor is SimpleFunctionDescriptor && descriptor.dispatchReceiverParameter == null &&
-                descriptor.extensionReceiverParameter != null &&
-                KotlinBuiltIns.isNullableAny(descriptor.extensionReceiverParameter!!.type) && descriptor.valueParameters.isEmpty()
-    }
+    override fun functionN(arity: Int): IrClass = functionFactory!!.functionN(arity)
+    override fun kFunctionN(arity: Int): IrClass = functionFactory!!.kFunctionN(arity)
+    override fun suspendFunctionN(arity: Int): IrClass = functionFactory!!.suspendFunctionN(arity)
+    override fun kSuspendFunctionN(arity: Int): IrClass = functionFactory!!.kSuspendFunctionN(arity)
 
-    override val memberToString: IrSimpleFunctionSymbol = symbolFinder
-        .findFunctions(CallableId(builtIns.any.classId!!, OperatorNameConventions.TO_STRING))
-        .single {
-            val descriptor = it.descriptor
-            descriptor is SimpleFunctionDescriptor && descriptor.valueParameters.isEmpty()
-        }
-
-    override val extensionStringPlus: IrSimpleFunctionSymbol = symbolFinder.findFunctions(OperatorNameConventions.PLUS, "kotlin").first {
-        val descriptor = it.descriptor
-        descriptor is SimpleFunctionDescriptor && descriptor.dispatchReceiverParameter == null &&
-                descriptor.extensionReceiverParameter != null &&
-                KotlinBuiltIns.isStringOrNullableString(descriptor.extensionReceiverParameter!!.type) &&
-                descriptor.valueParameters.size == 1 &&
-                KotlinBuiltIns.isNullableAny(descriptor.valueParameters.first().type)
-    }
-
-    override val memberStringPlus: IrSimpleFunctionSymbol = symbolFinder
-        .findFunctions(CallableId(builtIns.string.classId!!, OperatorNameConventions.PLUS))
-        .single {
-            val descriptor = it.descriptor
-            descriptor is SimpleFunctionDescriptor &&
-                    descriptor.valueParameters.size == 1 &&
-                    KotlinBuiltIns.isNullableAny(descriptor.valueParameters.first().type)
-        }
-
-    override fun functionN(arity: Int): IrClass = functionFactory.functionN(arity)
-    override fun kFunctionN(arity: Int): IrClass = functionFactory.kFunctionN(arity)
-    override fun suspendFunctionN(arity: Int): IrClass = functionFactory.suspendFunctionN(arity)
-    override fun kSuspendFunctionN(arity: Int): IrClass = functionFactory.kSuspendFunctionN(arity)
+    override val deprecatedSymbol: IrClassSymbol = symbolFinder.findClass(StandardClassIds.Annotations.Deprecated)!!
+    override val deprecationLevelSymbol: IrClassSymbol = symbolFinder.findClass(StandardClassIds.DeprecationLevel)!!
 }
 
 private inline fun MemberScope.findFirstFunction(name: String, predicate: (CallableMemberDescriptor) -> Boolean) =
     getContributedFunctions(Name.identifier(name), NoLookupLocation.FROM_BACKEND).first(predicate)
 
 @InternalSymbolFinderAPI
+@K1Deprecation
 class SymbolFinderOverDescriptors(private val builtIns: KotlinBuiltIns, private val symbolTable: SymbolTable) : SymbolFinder() {
     internal fun builtInsPackage(vararg packageNameSegments: String) =
         builtIns.builtInsModule.getPackage(FqName.fromSegments(listOf(*packageNameSegments))).memberScope
 
-    override fun findGetter(property: IrPropertySymbol): IrSimpleFunctionSymbol? =
-        symbolTable.descriptorExtension.referenceSimpleFunction(property.descriptor.getter!!)
-
     private fun getClassDescriptor(classId: ClassId) : ClassDescriptor? {
-        val parentClassId = classId.parentClassId
+        val parentClassId = classId.outerClassId
         return if (parentClassId == null) {
             builtIns.builtInsModule
                 .getPackage(classId.packageFqName)

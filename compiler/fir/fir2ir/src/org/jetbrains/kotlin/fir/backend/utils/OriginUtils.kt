@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.fir.backend.utils
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtNodeTypes
+import org.jetbrains.kotlin.KtSourceElementKind
 import org.jetbrains.kotlin.builtins.StandardNames.DATA_CLASS_COMPONENT_PREFIX
 import org.jetbrains.kotlin.fir.backend.Fir2IrComponents
 import org.jetbrains.kotlin.fir.containingClassLookupTag
@@ -31,7 +32,6 @@ import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin.GeneratedByPlugin
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
-import org.jetbrains.kotlin.name.isLocal
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -64,6 +64,10 @@ fun FirDeclaration?.computeIrOrigin(
     val firOrigin = origin
     val computed = when {
         firOrigin is FirDeclarationOrigin.Plugin -> GeneratedByPlugin(firOrigin.key)
+
+        firOrigin is FirDeclarationOrigin.Synthetic.ReplContainerClass -> IrDeclarationOrigin.SCRIPT_CLASS
+        firOrigin is FirDeclarationOrigin.Synthetic.ReplEvalFunction -> IrDeclarationOrigin.REPL_EVAL_FUNCTION
+        firOrigin is FirDeclarationOrigin.ScriptCustomization.ResultProperty -> IrDeclarationOrigin.SCRIPT_RESULT_PROPERTY
 
         this is FirValueParameter -> when (name) {
             SpecialNames.UNDERSCORE_FOR_UNUSED_VAR -> IrDeclarationOrigin.UNDERSCORE_PARAMETER
@@ -120,10 +124,7 @@ internal fun FirReference.statementOrigin(): IrStatementOrigin? = when (this) {
                 IrStatementOrigin.NOT_IN
 
             source?.kind is KtFakeSourceElementKind.DesugaredIncrementOrDecrement ->
-                incOrDecSourceKindToIrStatementOrigin[source?.kind]
-
-            source?.kind is KtFakeSourceElementKind.DesugaredPrefixSecondGetReference ->
-                incOrDecSourceKindToIrStatementOrigin[source?.kind]
+                source?.kind?.incOrDecSourceKindToIrStatementOrigin()
 
             source?.elementType == KtNodeTypes.OPERATION_REFERENCE ->
                 nameToOperationConventionOrigin[symbol.callableId.callableName]
@@ -160,7 +161,7 @@ private val PREFIX_POSTFIX_ORIGIN_MAP: Map<NameWithElementType, IrStatementOrigi
 )
 
 fun FirVariableAssignment.getIrAssignmentOrigin(): IrStatementOrigin {
-    incOrDecSourceKindToIrStatementOrigin[source?.kind]?.let { return it }
+    source?.kind?.incOrDecSourceKindToIrStatementOrigin()?.let { return it }
     augmentedAssignSourceKindToIrStatementOrigin[source?.kind]?.let { return it }
     val callableName = getCallableNameFromIntClassIfAny() ?: return IrStatementOrigin.EQ
     PREFIX_POSTFIX_ORIGIN_MAP[callableName to source?.elementType]?.let { return it }
@@ -169,8 +170,14 @@ fun FirVariableAssignment.getIrAssignmentOrigin(): IrStatementOrigin {
     val kind = rValue.source?.kind
 
     return when (kind) {
-        KtFakeSourceElementKind.DesugaredPrefixInc, KtFakeSourceElementKind.DesugaredPostfixInc -> IrStatementOrigin.PLUSEQ
-        KtFakeSourceElementKind.DesugaredPrefixDec, KtFakeSourceElementKind.DesugaredPostfixDec -> IrStatementOrigin.MINUSEQ
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PrefixInc,
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PostfixInc
+            -> IrStatementOrigin.PLUSEQ
+
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PrefixDec,
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PostfixDec
+            -> IrStatementOrigin.MINUSEQ
+
         else -> IrStatementOrigin.EQ
     }
 }
@@ -183,7 +190,7 @@ fun FirVariableAssignment.getIrPrefixPostfixOriginIfAny(): IrStatementOrigin? {
 private fun FirVariableAssignment.getCallableNameFromIntClassIfAny(): Name? {
     val calleeReferenceSymbol = calleeReference?.toResolvedCallableSymbol() ?: return null
     val rValue = rValue
-    if (rValue is FirFunctionCall && calleeReferenceSymbol.callableId.isLocal) {
+    if (rValue is FirFunctionCall && calleeReferenceSymbol.isLocal) {
         val callableId = rValue.calleeReference.toResolvedCallableSymbol()?.callableId
         if (callableId?.classId == StandardClassIds.Int) {
             return callableId.callableName
@@ -200,11 +207,11 @@ val augmentedAssignSourceKindToIrStatementOrigin: Map<KtFakeSourceElementKind.De
     KtFakeSourceElementKind.DesugaredRemAssign to IrStatementOrigin.PERCEQ
 )
 
-val incOrDecSourceKindToIrStatementOrigin: Map<KtFakeSourceElementKind, IrStatementOrigin> = mapOf(
-    KtFakeSourceElementKind.DesugaredPrefixInc to IrStatementOrigin.PREFIX_INCR,
-    KtFakeSourceElementKind.DesugaredPostfixInc to IrStatementOrigin.POSTFIX_INCR,
-    KtFakeSourceElementKind.DesugaredPrefixDec to IrStatementOrigin.PREFIX_DECR,
-    KtFakeSourceElementKind.DesugaredPostfixDec to IrStatementOrigin.POSTFIX_DECR,
-    KtFakeSourceElementKind.DesugaredPrefixIncSecondGetReference to IrStatementOrigin.PREFIX_INCR,
-    KtFakeSourceElementKind.DesugaredPrefixDecSecondGetReference to IrStatementOrigin.PREFIX_DECR
-)
+fun KtSourceElementKind.incOrDecSourceKindToIrStatementOrigin(): IrStatementOrigin? =
+    when (this) {
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PrefixInc -> IrStatementOrigin.PREFIX_INCR
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PostfixInc -> IrStatementOrigin.POSTFIX_INCR
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PrefixDec -> IrStatementOrigin.PREFIX_DECR
+        is KtFakeSourceElementKind.DesugaredIncrementOrDecrement.PostfixDec -> IrStatementOrigin.POSTFIX_DECR
+        else -> null
+    }

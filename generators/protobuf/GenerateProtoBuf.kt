@@ -22,7 +22,9 @@ import kotlin.system.exitProcess
 //       make
 //       make install
 // * macOS:
-//     curl -L https://raw.githubusercontent.com/udalov/protobuf261/master/protobuf261.rb > protobuf261.rb
+//     FORMULA_TAP="$(brew --repository)/Library/Taps/udalov/homebrew-protobuf/Formula"
+//     mkdir -p "FORMULA_TAP"
+//     curl -L https://raw.githubusercontent.com/udalov/protobuf261/master/protobuf261.rb > "$FORMULA_TAP/protobuf261.rb"
 //     brew install protobuf261.rb
 //
 // You may need to provide custom path to protoc executable, just modify this constant:
@@ -54,7 +56,6 @@ val PROTO_PATHS: List<ProtoPath> = listOf(
     ProtoPath("build-common/src/java_descriptors.proto"),
     ProtoPath("compiler/util-klib/src/KlibMetadataProtoBuf.proto"),
     ProtoPath("compiler/ir/serialization.common/src/KotlinIr.proto", false),
-    ProtoPath("compiler/ir/serialization.jvm/src/JvmIr.proto", false),
 )
 
 private val EXT_OPTIONS_PROTO_PATH = ProtoPath("core/metadata/src/ext_options.proto")

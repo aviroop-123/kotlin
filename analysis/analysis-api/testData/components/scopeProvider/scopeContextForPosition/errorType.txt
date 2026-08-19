@@ -7,6 +7,8 @@ implicit values:
       type: ERROR_TYPE
     ownerSymbol = KaAnonymousFunctionSymbol:
       <anonymous function>(): ERROR CLASS: Unresolved name: e
+    label = with
+
 
 scopes:
   LocalScope, index = 0
@@ -83,6 +85,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -118,4 +121,3 @@ scopes:
     constructors: 0
 
   DefaultStarImportingScope, index = 10
-

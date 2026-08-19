@@ -1,12 +1,12 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +EnumEntries +PrioritizedEnumEntries +ForbidEnumEntryNamedEntries
+// LANGUAGE: +PrioritizedEnumEntries +ForbidEnumEntryNamedEntries
 // WITH_STDLIB
 // FIR_DUMP
 
 enum class Ambiguous {
-    first, <!DEPRECATED_DECLARATION_OF_ENUM_ENTRY!>entries;<!>
+    first, <!DECLARATION_OF_ENUM_ENTRY_ENTRIES_ERROR!>entries<!>;
 }
 
-val e = <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>Ambiguous.entries<!NO_GET_METHOD!>[0]<!><!>.<!DEBUG_INFO_MISSING_UNRESOLVED!>ordinal<!>
+val e = Ambiguous.entries[0].ordinal
 
 /* GENERATED_FIR_TAGS: enumDeclaration, enumEntry, integerLiteral, propertyDeclaration */

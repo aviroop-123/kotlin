@@ -1,4 +1,5 @@
-val x <!EXTERNAL_DELEGATION!>by lazy { "1" }<!>
+// RUN_PIPELINE_TILL: FRONTEND
+val x by lazy { "1" }
     <!WRONG_EXTERNAL_DECLARATION!>external get<!>
 
 class Delegate {
@@ -6,6 +7,6 @@ class Delegate {
     operator fun setValue(thisRef: Any?, property: Any, value: String) {}
 }
 
-var y <!EXTERNAL_DELEGATION!>by Delegate()<!>
+var y by Delegate()
     <!WRONG_EXTERNAL_DECLARATION!>external get<!>
     <!WRONG_EXTERNAL_DECLARATION!>external set<!>

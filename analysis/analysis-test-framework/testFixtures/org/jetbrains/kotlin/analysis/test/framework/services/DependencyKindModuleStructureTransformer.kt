@@ -49,15 +49,14 @@ object DependencyKindModuleStructureTransformer : ModuleStructureTransformer() {
         val newKind = when (dependencyModule.explicitTestModuleKind) {
             TestModuleKind.Source,
             TestModuleKind.LibrarySource,
+            TestModuleKind.SourceLike,
             TestModuleKind.ScriptSource,
-            TestModuleKind.CodeFragment -> {
-                DependencyKind.Source
-            }
+            TestModuleKind.CodeFragment,
+                -> DependencyKind.Source
 
             TestModuleKind.LibraryBinary,
-            TestModuleKind.LibraryBinaryDecompiled -> {
-                DependencyKind.Binary
-            }
+            TestModuleKind.LibraryBinaryDecompiled,
+                -> DependencyKind.Binary
 
             TestModuleKind.NotUnderContentRoot,
             TestModuleKind.NotUnderContentRootWithDependencies,

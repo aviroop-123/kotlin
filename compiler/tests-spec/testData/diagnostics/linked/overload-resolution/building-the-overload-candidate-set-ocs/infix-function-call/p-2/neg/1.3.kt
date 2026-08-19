@@ -1,6 +1,4 @@
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -40,7 +38,7 @@ import libPackage.contains
 
 fun case1() {
     val regex = Regex("")
-   "" <!INFIX_MODIFIER_REQUIRED!>contains<!>  regex
+   "" <!NONE_APPLICABLE!>contains<!>  regex
 }
 
 // FILE: TestCase2.kt
@@ -57,6 +55,6 @@ fun case2() {
     }
 
     val regex = Regex("")
-    "" <!INFIX_MODIFIER_REQUIRED!>contains<!>  regex
+    "" <!NONE_APPLICABLE!>contains<!>  regex
 }
 

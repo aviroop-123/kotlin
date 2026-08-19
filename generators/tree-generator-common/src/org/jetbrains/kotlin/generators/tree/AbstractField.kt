@@ -28,8 +28,8 @@ abstract class AbstractField<Field : AbstractField<Field>> {
 
     open val arbitraryImportables: MutableList<Importable> = mutableListOf()
 
-    open var optInAnnotation: ClassRef<*>? = null
-    open var replaceOptInAnnotation: ClassRef<*>? = null
+    open var optInAnnotation: PrintableAnnotation? = null
+    open var replaceOptInAnnotation: PrintableAnnotation? = null
 
     abstract var isMutable: Boolean
 
@@ -44,6 +44,8 @@ abstract class AbstractField<Field : AbstractField<Field>> {
 
     var isOverride: Boolean = false
 
+    var doPrint = true
+    
     /**
      * If `true`, this field is skipped in `build%Element%Copy` functions.
      *
@@ -123,6 +125,7 @@ abstract class AbstractField<Field : AbstractField<Field>> {
         copy.useInBaseTransformerDetection = useInBaseTransformerDetection
         copy.overriddenFields += overriddenFields
         copy.implementationDefaultStrategy = implementationDefaultStrategy
+        copy.doPrint = doPrint
     }
 
     sealed interface ImplementationDefaultStrategy {

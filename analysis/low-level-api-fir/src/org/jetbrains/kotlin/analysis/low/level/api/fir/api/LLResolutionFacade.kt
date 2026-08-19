@@ -5,14 +5,16 @@
 
 package org.jetbrains.kotlin.analysis.low.level.api.fir.api
 
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiTypeParameter
 import com.intellij.psi.impl.compiled.ClsElementImpl
+import org.jetbrains.kotlin.analysis.api.impl.base.util.requireIsInstance
+import org.jetbrains.kotlin.analysis.api.impl.base.util.withPsiEntry
 import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.api.utils.errors.withPsiEntry
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirModuleResolveComponents
 import org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.getNonLocalContainingOrThisElement
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
@@ -20,9 +22,6 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.state.*
 import org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders.LLModuleSpecificSymbolProviderAccess
 import org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders.getClassLikeSymbolByPsiWithoutDependencies
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.*
-import org.jetbrains.kotlin.analysis.utils.classId
-import org.jetbrains.kotlin.analysis.utils.errors.requireIsInstance
-import org.jetbrains.kotlin.analysis.utils.isLocalClass
 import org.jetbrains.kotlin.asJava.KtLightClassMarker
 import org.jetbrains.kotlin.diagnostics.KtPsiDiagnostic
 import org.jetbrains.kotlin.fir.FirElement
@@ -47,6 +46,7 @@ import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
 /**
  * An entry point for a FIR Low Level API resolution. Represents a project view from a use-site [KaModule].
  */
+@KaImplementationDetail
 class LLResolutionFacade internal constructor(
     val moduleProvider: LLModuleProvider,
     val resolutionStrategyProvider: LLModuleResolutionStrategyProvider,
@@ -120,10 +120,10 @@ class LLResolutionFacade internal constructor(
     }
 
     /**
-     * @see LLDiagnosticProvider.collectDiagnostics
+     * @see LLDiagnosticProvider.diagnostics
      */
-    internal fun collectDiagnosticsForFile(ktFile: KtFile, filter: DiagnosticCheckerFilter): Collection<KtPsiDiagnostic> {
-        return diagnosticProvider.collectDiagnostics(ktFile, filter)
+    internal fun diagnostics(ktFile: KtFile, filter: DiagnosticCheckerFilter): Sequence<KtPsiDiagnostic> {
+        return diagnosticProvider.diagnostics(ktFile, filter)
     }
 
     internal fun resolveToFirSymbol(ktDeclaration: KtDeclaration, phase: FirResolvePhase): FirBasedSymbol<*> {
@@ -141,29 +141,28 @@ class LLResolutionFacade internal constructor(
     }
 
     private fun findSourceFirSymbol(ktDeclaration: KtDeclaration): FirBasedSymbol<*> {
-        val targetDeclaration = ktDeclaration.originalDeclaration ?: ktDeclaration
-        val targetModule = getModule(targetDeclaration)
+        val targetModule = getModule(ktDeclaration)
 
         require(getModuleResolutionStrategy(targetModule) == LLModuleResolutionStrategy.LAZY) {
             "Declaration should be resolvable module, instead it had ${targetModule::class}"
         }
 
         // All elements inside a code fragment are local
-        val nonLocalContainer = targetDeclaration.containingKtFile as? KtCodeFragment
-            ?: targetDeclaration.getNonLocalContainingOrThisElement()
+        val nonLocalContainer = ktDeclaration.containingKtFile as? KtCodeFragment
+            ?: ktDeclaration.getNonLocalContainingOrThisElement()
             ?: errorWithAttachment("Declaration should have non-local container") {
-                withPsiEntry("ktDeclaration", targetDeclaration, ::getModule)
+                withPsiEntry("ktDeclaration", ktDeclaration, ::getModule)
                 withEntry("module", targetModule) { it.moduleDescription }
             }
 
-        val firDeclaration = if ((nonLocalContainer as? KtDeclaration) == targetDeclaration) {
+        val firDeclaration = if ((nonLocalContainer as? KtDeclaration) == ktDeclaration) {
             val session = sessionProvider.getResolvableSession(targetModule)
             nonLocalContainer.findSourceNonLocalFirDeclaration(
                 firFileBuilder = session.moduleComponents.firFileBuilder,
                 provider = session.firProvider,
             )
         } else {
-            findSourceFirDeclarationViaResolve(targetDeclaration)
+            findSourceFirDeclarationViaResolve(ktDeclaration)
         }
 
         return firDeclaration.symbol
@@ -248,6 +247,7 @@ class LLResolutionFacade internal constructor(
     }
 }
 
+@KaImplementationDetail
 fun LLResolutionFacade.getModule(element: PsiElement): KaModule {
     return KotlinProjectStructureProvider.getModule(project, element, useSiteModule)
 }

@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_EXPRESSION -UNUSED_PARAMETER -UNUSED_VARIABLE -UNUSED_VALUE -VARIABLE_WITH_REDUNDANT_INITIALIZER
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (NEGATIVE)
@@ -20,8 +19,8 @@ fun stringArg(number: String) {}
  */
 fun case_1(x: Int?) {
     if (x == null) {
-        <!UNREACHABLE_CODE!>stringArg(<!><!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!><!ALWAYS_NULL!>x<!>!!<!><!UNREACHABLE_CODE!>)<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing"), UNREACHABLE_CODE!>x<!>
+        stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x!!<!>)
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x<!>
     }
 }
 
@@ -31,9 +30,9 @@ fun case_1(x: Int?) {
  * ISSUES: KT-27464, KT-35668
  */
 fun case_2(x: Int?, y: Nothing?) {
-    if (x == <!DEBUG_INFO_CONSTANT!>y<!>) {
-        <!UNREACHABLE_CODE!>stringArg(<!><!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!><!ALWAYS_NULL!>x<!>!!<!><!UNREACHABLE_CODE!>)<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing"), UNREACHABLE_CODE!>x<!>
+    if (x == y) {
+        stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x!!<!>)
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x<!>
     }
 }
 
@@ -44,9 +43,9 @@ fun case_2(x: Int?, y: Nothing?) {
  */
 fun case_3(x: Int?) {
     if (x == null) {
-        <!ALWAYS_NULL!>x<!> as Int
-        stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing"), DEBUG_INFO_SMARTCAST!>x<!>)
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing")!>x<!>
+        x <!CAST_NEVER_SUCCEEDS!>as<!> Int
+        stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x<!>)
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x<!>
     }
 }
 
@@ -57,9 +56,9 @@ fun case_3(x: Int?) {
  */
 fun case_4(x: Int?) {
     if (x == null) {
-        <!ALWAYS_NULL!>x<!>!!
-        <!UNREACHABLE_CODE!>stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing"), DEBUG_INFO_SMARTCAST!>x<!>)<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing"), UNREACHABLE_CODE!>x<!>
+        x!!
+        stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x<!>)
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>x<!>
     }
 }
 
@@ -70,9 +69,9 @@ fun case_4(x: Int?) {
  */
 fun case_5(x: Int?) {
     if (x == null) {
-        var y = <!DEBUG_INFO_CONSTANT!>x<!>
-        <!ALWAYS_NULL!>y<!>!!
-        <!UNREACHABLE_CODE!>stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing"), DEBUG_INFO_SMARTCAST!>y<!>)<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int? & kotlin.Nothing"), UNREACHABLE_CODE!>y<!>
+        var y = x
+        y!!
+        stringArg(<!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>y<!>)
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>y<!>
     }
 }

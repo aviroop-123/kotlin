@@ -1,6 +1,0 @@
-KtNameReferenceExpression(27,31): 'util'
-  KtSimpleNameReference:
-    package java.util
-  
-  SyntheticPropertyAccessorReference:
-    Nothing (Unresolved reference)

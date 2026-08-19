@@ -8,18 +8,16 @@
 
 package kotlin.test
 
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
 import kotlin.internal.*
 import kotlin.reflect.*
 
 /** Asserts that a [blockResult] is a failure with the specific exception type being thrown. */
 @PublishedApi
-internal actual fun <T : Throwable> checkResultIsFailure(exceptionClass: KClass<T>, message: String?, blockResult: Result<Unit>): T {
+internal actual fun <T : Throwable> checkResultIsFailure(exceptionClass: KClass<T>, message: String?, blockResult: Result<Any?>): T {
     blockResult.fold(
-        onSuccess = {
+        onSuccess = { v ->
             val msg = messagePrefix(message)
-            asserter.fail(msg + "Expected an exception of ${exceptionClass.java} to be thrown, but was completed successfully.")
+            asserter.fail(msg + "Expected an exception of ${exceptionClass.java} to be thrown, ${formatResultMessage(v)}")
         },
         onFailure = { e ->
             if (exceptionClass.java.isInstance(e)) {
@@ -30,65 +28,6 @@ internal actual fun <T : Throwable> checkResultIsFailure(exceptionClass: KClass<
             asserter.fail(messagePrefix(message) + "Expected an exception of ${exceptionClass.java} to be thrown, but was $e", e)
         }
     )
-}
-
-/** @suppress */
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("assertFails")
-public fun assertFailsNoInline(block: () -> Unit): Throwable = assertFails(block)
-
-/** @suppress */
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("assertFails")
-public fun assertFailsNoInline(message: String?, block: () -> Unit): Throwable = assertFails(message, block)
-
-/** @suppress */
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("assertFailsWith")
-public fun <T : Throwable> assertFailsWithNoInline(exceptionClass: KClass<T>, block: () -> Unit): T = assertFailsWith(exceptionClass, block)
-
-/** @suppress */
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("assertFailsWith")
-public fun <T : Throwable> assertFailsWithNoInline(exceptionClass: KClass<T>, message: String?, block: () -> Unit): T =
-    assertFailsWith(exceptionClass, message, block)
-
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("assertTrue")
-public fun assertTrueNoInline(message: String? = null, block: () -> Boolean) {
-    contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-    assertTrue(block(), message)
-}
-
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("assertFalse")
-public fun assertFalseNoInline(message: String? = null, block: () -> Boolean) {
-    contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-    assertFalse(block(), message)
-}
-
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("assertNotNull")
-public fun <T : Any, R> assertNotNullNoInline(actual: T?, message: String? = null, block: (T) -> R) {
-    contract { returns() implies (actual != null) }
-    asserter.assertNotNull(message, actual)
-    if (actual != null) {
-        block(actual)
-    }
-}
-
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("expect")
-public fun <T> expectNoInline(expected: T, block: () -> T) {
-    contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-    assertEquals(expected, block())
-}
-
-@Deprecated("Provided for binary compatibility", level = DeprecationLevel.HIDDEN)
-@JvmName("expect")
-public fun <T> expectNoInline(expected: T, message: String?, block: () -> T) {
-    contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-    assertEquals(expected, block(), message)
 }
 
 /**

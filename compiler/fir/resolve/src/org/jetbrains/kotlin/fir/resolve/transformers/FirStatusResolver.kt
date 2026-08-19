@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.resolve.DataClassResolver
 import org.jetbrains.kotlin.resolve.ReturnValueStatus
 import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
+import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
 import java.util.*
 
 class FirStatusResolver(
@@ -60,7 +61,7 @@ class FirStatusResolver(
     ): FirResolvedDeclarationStatus {
         return when (declaration) {
             is FirProperty -> resolveStatus(declaration, containingClass, isLocal)
-            is FirSimpleFunction -> resolveStatus(declaration, containingClass, isLocal)
+            is FirNamedFunction -> resolveStatus(declaration, containingClass, isLocal)
             is FirPropertyAccessor -> resolveStatus(declaration, containingClass, containingProperty, isLocal)
             is FirRegularClass -> resolveStatus(declaration, containingClass, isLocal)
             is FirTypeAlias -> resolveStatus(declaration, containingClass, isLocal)
@@ -81,7 +82,7 @@ class FirStatusResolver(
             return emptyList()
         }
 
-        val scope = containingClass.unsubstitutedScope(session, scopeSession, withForcedTypeCalculator = false, memberRequiredPhase = null)
+        val scope = containingClass.unsubstitutedScope(withForcedTypeCalculator = false, memberRequiredPhase = null)
 
         return buildList {
             scope.processPropertiesByName(property.name) {}
@@ -111,17 +112,15 @@ class FirStatusResolver(
     }
 
     fun getOverriddenFunctions(
-        function: FirSimpleFunction,
+        function: FirNamedFunction,
         containingClass: FirClass?
-    ): List<FirSimpleFunction> {
+    ): List<FirNamedFunction> {
         if (containingClass == null) {
             return emptyList()
         }
 
         return buildList {
             val scope = containingClass.unsubstitutedScope(
-                session,
-                scopeSession,
                 withForcedTypeCalculator = false,
                 memberRequiredPhase = null,
             )
@@ -141,7 +140,7 @@ class FirStatusResolver(
     }
 
     fun resolveStatus(
-        function: FirSimpleFunction,
+        function: FirNamedFunction,
         containingClass: FirClass?,
         isLocal: Boolean,
         overriddenStatuses: List<FirResolvedDeclarationStatus>? = null,
@@ -165,11 +164,8 @@ class FirStatusResolver(
             is FirRegularClass -> firClass.applyExtensionTransformers { transformStatus(it, firClass, containingClass?.symbol, isLocal) }
             else -> firClass.status
         }
-        require(status.visibility == firClass.status.visibility) {
-            "Attempt to change visibility of a class-like: ${firClass.symbol.classId}, " +
-                    "original visibility: ${firClass.status.visibility}, new visibility: ${status.visibility}"
-        }
 
+        classLikeStatusValidation(newStatus = status, declaration = firClass)
         return resolveStatus(firClass, status, containingClass, null, isLocal, emptyList())
     }
 
@@ -181,7 +177,26 @@ class FirStatusResolver(
         val status = typeAlias.applyExtensionTransformers {
             transformStatus(it, typeAlias, containingClass?.symbol, isLocal)
         }
+
+        classLikeStatusValidation(newStatus = status, declaration = typeAlias)
         return resolveStatus(typeAlias, status, containingClass, null, isLocal, emptyList())
+    }
+
+    private fun classLikeStatusValidation(newStatus: FirDeclarationStatus, declaration: FirClassLikeDeclaration) {
+        val originalVisibility = declaration.status.visibility
+        requireWithAttachment(
+            originalVisibility != Visibilities.Unknown,
+            { "Visibility has to be provided for a class-like declaration (${declaration::class.simpleName}) during its initialization" },
+        ) {
+            withFirEntry("declaration", declaration)
+        }
+
+        requireWithAttachment(
+            newStatus.visibility == originalVisibility,
+            { "Attempt to change visibility of a class-like declaration (${declaration::class.simpleName}), original visibility: $originalVisibility, new visibility: ${declaration.visibility}" },
+        ) {
+            withFirEntry("declaration", declaration)
+        }
     }
 
     fun resolveStatus(
@@ -334,7 +349,7 @@ class FirStatusResolver(
         }
 
         if (containingClass?.status?.isData == true &&
-            declaration is FirSimpleFunction &&
+            declaration is FirNamedFunction &&
             declaration.origin == FirDeclarationOrigin.Synthetic.DataClassMember &&
             DataClassResolver.isCopy(declaration.name)
         ) {
@@ -397,7 +412,7 @@ private val FirClass.modality: Modality?
 
 private fun FirDeclaration.hasOwnBodyOrAccessorBody(): Boolean {
     return when (this) {
-        is FirSimpleFunction -> this.body != null
+        is FirNamedFunction -> this.body != null
         is FirProperty -> this.initializer != null || this.getter?.body != null || this.setter?.body != null
         else -> true
     }

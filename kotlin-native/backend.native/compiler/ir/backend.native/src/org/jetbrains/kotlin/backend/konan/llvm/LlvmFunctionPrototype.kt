@@ -75,7 +75,7 @@ private class LlvmFunctionAttributesCopier(private val externalFunction: LLVMVal
     }
 
     override fun addCallSiteAttributes(callSite: LLVMValueRef) {
-        attributesForCallSite.withIndex().forEach { (listIndex, attributeList) ->
+        attributesForCallSite.withIndex().forEach { [listIndex, attributeList] ->
             attributeList.forEach { attributeRef ->
                 LLVMAddCallSiteAttribute(callSite, LLVMAttributeFunctionIndex + listIndex, attributeRef)
             }
@@ -83,7 +83,7 @@ private class LlvmFunctionAttributesCopier(private val externalFunction: LLVMVal
     }
 
     override fun addFunctionAttributes(function: LLVMValueRef) {
-        attributesForFunctionDeclaration.withIndex().forEach { (listIndex, attributeList) ->
+        attributesForFunctionDeclaration.withIndex().forEach { [listIndex, attributeList] ->
             attributeList.forEach { attributeRef ->
                 LLVMAddAttributeAtIndex(function, LLVMAttributeFunctionIndex + listIndex, attributeRef)
             }
@@ -127,7 +127,7 @@ internal fun LlvmFunctionSignature(irFunction: IrSimpleFunction, contextUtils: C
     require(!irFunction.isSuspend) { "Suspend functions should be lowered out at this point" }
 
     if (returnType.isObjectType)
-        parameterTypes.add(LlvmParamType(contextUtils.kObjHeaderPtrPtr))
+        parameterTypes.add(LlvmParamType(contextUtils.llvm.pointerType))
 
     return LlvmFunctionSignature(
             returnType = returnType,
@@ -176,7 +176,7 @@ internal open class LlvmFunctionSignature(
 sealed class FunctionOrigin {
     object FromNativeRuntime : FunctionOrigin()
 
-    class OwnedBy(val declaration: IrDeclaration) : FunctionOrigin()
+    class OwnedBy(val declaration: IrDeclaration, val weak: Boolean = false) : FunctionOrigin()
 }
 
 

@@ -1,0 +1,13 @@
+<caret_2>:
+  KDocName(53,57): 'prop'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val prop: kotlin.String!
+      ]
+
+<caret_1>:
+  KDocName(63,79): 'KotlinChild.prop'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val prop: kotlin.String!
+      ]

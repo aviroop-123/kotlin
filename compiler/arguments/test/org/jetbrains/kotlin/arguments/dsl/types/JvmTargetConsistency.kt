@@ -5,11 +5,10 @@
 
 package org.jetbrains.kotlin.arguments.dsl.types
 
-import org.jetbrains.kotlin.arguments.description.actualJvmCompilerArguments
-import org.jetbrains.kotlin.config.JvmTarget as CompilerJvmTarget
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.jetbrains.kotlin.config.JvmTarget as CompilerJvmTarget
 
 class JvmTargetConsistency {
     @Test
@@ -35,28 +34,6 @@ class JvmTargetConsistency {
     }
 
     @Test
-    fun jvmTargetArgumentDescriptionIsUpdated() {
-        val jvmTargetArg = actualJvmCompilerArguments.arguments.single { it.name == "jvm-target" }
-
-        assertEquals(
-            expected = -1717185985,
-            actual = jvmTargetArg.description.hashCode(),
-            message = "'${jvmTargetArg.name}' description in '${actualJvmCompilerArguments::name}' should be updated. Current value should be moved into new value in 'valueInVersions' map."
-        )
-    }
-
-    @Test
-    fun jdkReleaseArgumentDescriptionIsUpdated() {
-        val jdkReleaseArg = actualJvmCompilerArguments.arguments.single { it.name == "Xjdk-release" }
-
-        assertEquals(
-            expected = 376057521,
-            actual = jdkReleaseArg.description.hashCode(),
-            message = "'${jdkReleaseArg.name}' description in '${actualJvmCompilerArguments::name}' should be updated. Current value should be moved into new value in 'valueInVersions' map."
-        )
-    }
-
-    @Test
     fun allSupportedKotlinVersionsArePresent() {
         CompilerJvmTarget.entries.forEach { jvmTarget ->
             assertTrue(
@@ -77,6 +54,18 @@ class JvmTargetConsistency {
                     )
                 }
             }
+    }
+
+    @Test
+    fun jdkReleaseHasAllJvmTargets() {
+        val jdkReleaseVersions = JdkRelease.entries.map { it.releaseName }
+        val jvmTargetVersions = JvmTarget.entries.map { it.targetName }
+        assertTrue(
+            jdkReleaseVersions.containsAll(jvmTargetVersions),
+            message =
+                "The following JvmTarget versions are not present in JdkRelease versions: ${jvmTargetVersions - jdkReleaseVersions}.\n" +
+                        "Please add them to org.jetbrains.kotlin.arguments.dsl.types.JdkRelease.",
+        )
     }
 
     private fun CompilerJvmTarget.toDslJvmTargetOrNull() = JvmTarget.entries.find { target ->

@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER
 // JSR305_GLOBAL_REPORT: ignore
 // JSR305_MIGRATION_REPORT: strict
@@ -46,7 +45,7 @@ fun main(a: A) {
 
     a.foo2("", null)?.length
     a.foo2("", null).length
-    a.foo2(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>, "").length
+    a.foo2(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>, "").length
 
     a.bar2().length
     a.bar2()<!UNNECESSARY_NOT_NULL_ASSERTION!>!!<!>.length

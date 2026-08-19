@@ -1,0 +1,17 @@
+//
+// Source
+// ------------------------------------------
+
+class Foo
+
+//
+// Transformed IR
+// ------------------------------------------
+
+@StabilityInferred(parameters = 1)
+class Foo {
+  val %stable: Int = 0
+    get() {
+      return field
+    }
+}

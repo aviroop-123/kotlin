@@ -7,7 +7,16 @@ package org.jetbrains.kotlin.fir.resolve.calls.candidate
 
 import org.jetbrains.kotlin.fir.resolve.calls.stages.*
 
-sealed class CallKind(vararg val resolutionSequence: ResolutionStage) {
+sealed class CallKind(
+    vararg val resolutionSequence: ResolutionStage,
+    /**
+     * Stages that will be run after candidate is chosen.
+     * Currently only used for collection literals.
+     */
+    additionalStages: Array<ResolutionStage> = emptyArray(),
+) {
+    val resolutionSequenceWithAdditionalStages: Array<out ResolutionStage> = arrayOf(*resolutionSequence, *additionalStages)
+
     object VariableAccess : CallKind(
         CheckHiddenDeclaration,
         CheckVisibility,
@@ -55,6 +64,7 @@ sealed class CallKind(vararg val resolutionSequence: ResolutionStage) {
         CheckShadowedImplicits,
         CheckCallModifiers,
         EagerResolveOfCallableReferences,
+        EagerResolveOfCollectionLiteral,
         CheckLowPriorityInOverloadResolution,
         ProcessDynamicExtensionAnnotation,
         LowerPriorityIfDynamic,
@@ -62,7 +72,43 @@ sealed class CallKind(vararg val resolutionSequence: ResolutionStage) {
         CheckIncompatibleTypeVariableUpperBounds,
         TypeParameterAsCallable,
         TypeVariablesInExplicitReceivers,
+        InferThrowableTypeParameterToUpperBound,
         CheckLambdaAgainstTypeVariableContradiction,
+    )
+
+    /**
+     * NB! Only used for non-trivial collection literals in `WithExpectedType` or `ContextDependent` call kinds.
+     * The other collection literals fallback earlier.
+     *
+     * For collection literal, we only need stages that either:
+     * 1. are part of candidate constraint system construction, or
+     * 2. in green code, ensure that we choose the correct one among operator `of`s ([MapArguments], [CheckCallModifiers], ...)
+     *
+     * Stages like [EagerResolveOfCallableReferences] do not help to choose the candidate for **collection literal** call,
+     * but they need to be run **after** the candidate is chosen to help with overload resolution of outer
+     * call. This is done in scope of [EagerResolveOfCollectionLiteral] for outer call.
+     */
+    object CollectionLiteral : CallKind(
+        CheckHiddenDeclaration,
+        MapArguments,
+        MapTypeArguments,
+        CreateFreshTypeVariableSubstitutorStage,
+        CollectTypeVariableUsagesInfo,
+        CheckCallModifiers,
+        CheckLowPriorityInOverloadResolution,
+        additionalStages = arrayOf(
+            CheckVisibility,
+            CheckArguments,
+            CheckDispatchReceiver,
+            CheckExtensionReceiver,
+            CheckContextArguments,
+            CheckShadowedImplicits,
+            EagerResolveOfCollectionLiteral,
+            EagerResolveOfCallableReferences,
+            CheckLambdaAgainstTypeVariableContradiction,
+            InferThrowableTypeParameterToUpperBound,
+            CheckIncompatibleTypeVariableUpperBounds,
+        )
     )
 
     object DelegatingConstructorCall : CallKind(
@@ -78,6 +124,7 @@ sealed class CallKind(vararg val resolutionSequence: ResolutionStage) {
         CheckContextArguments,
         CheckShadowedImplicits,
         EagerResolveOfCallableReferences,
+        EagerResolveOfCollectionLiteral,
         ConstraintSystemForks,
         CheckIncompatibleTypeVariableUpperBounds,
         CheckLambdaAgainstTypeVariableContradiction,
@@ -93,6 +140,7 @@ sealed class CallKind(vararg val resolutionSequence: ResolutionStage) {
         CollectTypeVariableUsagesInfo,
         CheckDispatchReceiver,
         CheckExtensionReceiver,
+        CheckContextArguments,
         CheckShadowedImplicits,
         CheckCallableReferenceExpectedType,
         CheckLowPriorityInOverloadResolution,
@@ -131,6 +179,7 @@ class ResolutionSequenceBuilder(
     var resolveCallableReferenceArguments: Boolean = false,
     var checkCallableReferenceExpectedType: Boolean = false,
     val checkContextParameters: Boolean = false,
+    val inferThrowableTypeParameterToUpperBound: Boolean = false,
 ) {
     fun build(): CallKind {
         val stages = mutableListOf<ResolutionStage>().apply {
@@ -142,6 +191,7 @@ class ResolutionSequenceBuilder(
             if (checkDispatchReceiver) add(CheckDispatchReceiver)
             if (checkExtensionReceiver) add(CheckExtensionReceiver)
             if (checkArguments) add(CheckArguments)
+            if (inferThrowableTypeParameterToUpperBound) add(InferThrowableTypeParameterToUpperBound)
             if (checkContextParameters) add(CheckContextArguments)
             if (resolveCallableReferenceArguments) add(EagerResolveOfCallableReferences)
             if (checkLowPriorityInOverloadResolution) add(CheckLowPriorityInOverloadResolution)

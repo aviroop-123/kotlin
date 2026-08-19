@@ -8,10 +8,10 @@ package org.jetbrains.kotlin.incremental.classpathDiff
 import com.intellij.openapi.util.io.FileUtil
 import org.jetbrains.kotlin.build.report.DoNothingICReporter
 import org.jetbrains.kotlin.build.report.debug
-import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporter
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.*
 import org.jetbrains.kotlin.build.report.metrics.measure
+import org.jetbrains.kotlin.buildtools.api.jvm.ClassSnapshotGranularity.CLASS_LEVEL
+import org.jetbrains.kotlin.buildtools.api.jvm.ClassSnapshotGranularity.CLASS_MEMBER_LEVEL
 import org.jetbrains.kotlin.incremental.*
 import org.jetbrains.kotlin.incremental.classpathDiff.BreadthFirstSearch.findReachableNodes
 import org.jetbrains.kotlin.incremental.classpathDiff.ImpactedSymbolsComputer.computeImpactedSymbols
@@ -51,7 +51,7 @@ internal object ClasspathChangesComputer {
             "Loaded shrunk previous classpath snapshot for diffing, found ${shrunkPreviousClasspathSnapshot.size} classes"
         }
 
-        return reporter.measure(GradleBuildTime.COMPUTE_CHANGED_AND_IMPACTED_SET) {
+        return reporter.measure(COMPUTE_CHANGED_AND_IMPACTED_SET) {
             computeChangedAndImpactedSet(shrunkCurrentClasspathAgainstPreviousLookups, shrunkPreviousClasspathSnapshot, reporter)
         }
     }
@@ -64,26 +64,26 @@ internal object ClasspathChangesComputer {
     fun computeChangedAndImpactedSet(
         currentClassSnapshots: List<AccessibleClassSnapshot>,
         previousClassSnapshots: List<AccessibleClassSnapshot>,
-        reporter: ClasspathSnapshotBuildReporter
+        reporter: ClasspathSnapshotBuildReporter,
     ): ProgramSymbolSet {
         val currentClasses: Map<ClassId, AccessibleClassSnapshot> = currentClassSnapshots.associateBy { it.classId }
         val previousClasses: Map<ClassId, AccessibleClassSnapshot> = previousClassSnapshots.associateBy { it.classId }
 
-        val changedCurrentClasses: List<AccessibleClassSnapshot> = currentClasses.mapNotNull { (classId, currentClass) ->
+        val changedCurrentClasses: List<AccessibleClassSnapshot> = currentClasses.mapNotNull { [classId, currentClass] ->
             val previousClass = previousClasses[classId]
             if (previousClass == null || currentClass.classAbiHash != previousClass.classAbiHash) {
                 currentClass
             } else null
         }
 
-        val changedPreviousClasses: List<AccessibleClassSnapshot> = previousClasses.mapNotNull { (classId, previousClass) ->
+        val changedPreviousClasses: List<AccessibleClassSnapshot> = previousClasses.mapNotNull { [classId, previousClass] ->
             val currentClass = currentClasses[classId]
             if (currentClass == null || currentClass.classAbiHash != previousClass.classAbiHash) {
                 previousClass
             } else null
         }
 
-        val changedSet = reporter.measure(GradleBuildTime.COMPUTE_CLASS_CHANGES) {
+        val changedSet = reporter.measure(COMPUTE_CLASS_CHANGES) {
             computeClassChanges(changedCurrentClasses, changedPreviousClasses, reporter)
         }
         reporter.reportVerboseWithLimit { "Changed set = ${changedSet.toDebugString()}" }
@@ -92,7 +92,7 @@ internal object ClasspathChangesComputer {
             return changedSet
         }
 
-        val changedAndImpactedSet = reporter.measure(GradleBuildTime.COMPUTE_IMPACTED_SET) {
+        val changedAndImpactedSet = reporter.measure(COMPUTE_IMPACTED_SET) {
             // Note that changes may contain added symbols (they can also impact recompilation -- see examples in JavaClassChangesComputer).
             // So ideally, the result should be:
             //     computeImpactedSymbols(changes = changesOnPreviousClasspath, allClasses = classesOnPreviousClasspath) +
@@ -127,21 +127,21 @@ internal object ClasspathChangesComputer {
     private fun computeClassChanges(
         currentClassSnapshots: List<AccessibleClassSnapshot>,
         previousClassSnapshots: List<AccessibleClassSnapshot>,
-        metrics: BuildMetricsReporter<GradleBuildTime, GradleBuildPerformanceMetric>
+        metrics: BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>
     ): ProgramSymbolSet {
-        val (currentKotlinClassSnapshots, currentJavaClassSnapshots) = currentClassSnapshots.partition { it is KotlinClassSnapshot }
-        val (previousKotlinClassSnapshots, previousJavaClassSnapshots) = previousClassSnapshots.partition { it is KotlinClassSnapshot }
+        val [currentKotlinClassSnapshots, currentJavaClassSnapshots] = currentClassSnapshots.partition { it is KotlinClassSnapshot }
+        val [previousKotlinClassSnapshots, previousJavaClassSnapshots] = previousClassSnapshots.partition { it is KotlinClassSnapshot }
 
         @Suppress("UNCHECKED_CAST")
-        val kotlinClassChanges = metrics.measure(GradleBuildTime.COMPUTE_KOTLIN_CLASS_CHANGES) {
+        val kotlinClassChanges = metrics.measure(COMPUTE_KOTLIN_CLASS_CHANGES) {
             computeKotlinClassChanges(
                 currentKotlinClassSnapshots as List<KotlinClassSnapshot>,
-                previousKotlinClassSnapshots as List<KotlinClassSnapshot>
+                previousKotlinClassSnapshots as List<KotlinClassSnapshot>,
             )
         }
 
         @Suppress("UNCHECKED_CAST")
-        val javaClassChanges = metrics.measure(GradleBuildTime.COMPUTE_JAVA_CLASS_CHANGES) {
+        val javaClassChanges = metrics.measure(COMPUTE_JAVA_CLASS_CHANGES) {
             JavaClassChangesComputer.compute(
                 currentJavaClassSnapshots as List<JavaClassSnapshot>,
                 previousJavaClassSnapshots as List<JavaClassSnapshot>
@@ -153,15 +153,37 @@ internal object ClasspathChangesComputer {
 
     private fun computeKotlinClassChanges(
         currentClassSnapshots: List<KotlinClassSnapshot>,
-        previousClassSnapshots: List<KotlinClassSnapshot>
+        previousClassSnapshots: List<KotlinClassSnapshot>,
     ): ProgramSymbolSet {
-        val (coarseGrainedCurrentClassSnapshots, fineGrainedCurrentClassSnapshots) =
-            currentClassSnapshots.partition { it.classMemberLevelSnapshot == null }
-        val (coarseGrainedPreviousClassSnapshots, fineGrainedPreviousClassSnapshots) =
-            previousClassSnapshots.partition { it.classMemberLevelSnapshot == null }
+        val granularityChangedClassIds = findClassesWithGranularityChange(currentClassSnapshots, previousClassSnapshots)
+
+        val [coarseGrainedCurrentClassSnapshots, fineGrainedCurrentClassSnapshots] = currentClassSnapshots.partition {
+            it.classMemberLevelSnapshot == null || it.classId in granularityChangedClassIds
+        }
+        val [coarseGrainedPreviousClassSnapshots, fineGrainedPreviousClassSnapshots] = previousClassSnapshots.partition {
+            it.classMemberLevelSnapshot == null || it.classId in granularityChangedClassIds
+        }
 
         return computeCoarseGrainedKotlinClassChanges(coarseGrainedCurrentClassSnapshots, coarseGrainedPreviousClassSnapshots) +
                 computeFineGrainedKotlinClassChanges(fineGrainedCurrentClassSnapshots, fineGrainedPreviousClassSnapshots)
+    }
+
+    /**
+     * Identifies classes where granularity changed between previous and current snapshots (e.g., a dependency
+     * switched from [CLASS_MEMBER_LEVEL] to [CLASS_LEVEL] or vice versa). For such classes, we can only compare at the coarse (class)
+     * level since one side lacks member-level data.
+     */
+    private fun findClassesWithGranularityChange(
+        currentClassSnapshots: List<KotlinClassSnapshot>,
+        previousClassSnapshots: List<KotlinClassSnapshot>,
+    ): MutableSet<ClassId> {
+        val currentByClassId = currentClassSnapshots.associateBy { it.classId }
+        val previousByClassId = previousClassSnapshots.associateBy { it.classId }
+        val granularityChangedClassIds = (currentByClassId.keys intersect previousByClassId.keys).filterTo(mutableSetOf()) { classId ->
+            (currentByClassId.getValue(classId).classMemberLevelSnapshot == null) !=
+                    (previousByClassId.getValue(classId).classMemberLevelSnapshot == null)
+        }
+        return granularityChangedClassIds
     }
 
     private fun computeCoarseGrainedKotlinClassChanges(
@@ -283,7 +305,7 @@ internal object ClasspathChangesComputer {
         val changedProgramSymbols = dirtyLookupSymbols.toProgramSymbolSet(allClasses)
 
         // Check whether there is any info in this DirtyData that has not yet been converted to `changedProgramSymbols`
-        val (changedLookupSymbols, changedFqNames) = changedProgramSymbols.toChangesEither().let {
+        val [changedLookupSymbols, changedFqNames] = changedProgramSymbols.toChangesEither().let {
             it.lookupSymbols.toSet() to it.fqNames.toSet()
         }
         val unmatchedLookupSymbols = this.dirtyLookupSymbols.toMutableSet().also {
@@ -393,7 +415,7 @@ private object ImpactedSymbolsComputer {
             }
 
             // Package members are currently not impacted, so we just copy the original set over
-            changes.packageMembers.forEach { (packageFqName, memberNames) ->
+            changes.packageMembers.forEach { [packageFqName, memberNames] ->
                 addPackageMembers(packageFqName, memberNames)
             }
         }.getResult()

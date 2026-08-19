@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,9 +7,11 @@ package org.jetbrains.kotlin.analysis.api.renderer.declarations
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.KaSpi
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.types.Variance
 
+@KaSpi
 @KaExperimentalApi
 public interface KaRendererTypeApproximator {
     public fun approximateType(analysisSession: KaSession, type: KaType, position: Variance): KaType
@@ -19,7 +21,7 @@ public interface KaRendererTypeApproximator {
         @OptIn(KaExperimentalApi::class)
         override fun approximateType(analysisSession: KaSession, type: KaType, position: Variance): KaType {
             with(analysisSession) {
-                val effectiveType = type.enhancedType ?: type
+                val effectiveType = type.augmentedByWarningLevelAnnotations
 
                 return when (position) {
                     Variance.INVARIANT -> effectiveType

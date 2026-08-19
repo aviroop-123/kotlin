@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,9 +7,16 @@ package org.jetbrains.kotlin.codegen
 
 import org.jetbrains.kotlin.ObsoleteTestInfrastructure
 import org.jetbrains.kotlin.test.ConfigurationKind
+import org.jetbrains.kotlin.test.FirParser
 
 @OptIn(ObsoleteTestInfrastructure::class)
 open class CustomBytecodeTextTest : CodegenTestCase() {
+    override val useFir: Boolean
+        get() = true
+
+    override val firParser: FirParser
+        get() = FirParser.LightTree
+
     fun testEnumMapping() {
         createEnvironmentWithMockJdkAndIdeaAnnotations(ConfigurationKind.ALL)
         myFiles = CodegenTestFiles.create(
@@ -28,7 +35,7 @@ open class CustomBytecodeTextTest : CodegenTestCase() {
                 }
             }
             """,
-            myEnvironment.project
+            myEnvironment!!.project
         )
 
         val text = generateToText()
@@ -37,13 +44,13 @@ open class CustomBytecodeTextTest : CodegenTestCase() {
             "actual bytecode:\n$text",
             getstatics,
             listOf(
-                "GETSTATIC MyEnum.${'$'}VALUES : [LMyEnum;",
-                "GETSTATIC MyEnum.${'$'}ENTRIES : Lkotlin/enums/EnumEntries;",
+                $$"GETSTATIC MyEnum.$VALUES : [LMyEnum;",
+                $$"GETSTATIC MyEnum.$ENTRIES : Lkotlin/enums/EnumEntries;",
                 "GETSTATIC MyEnum.ENTRY1 : LMyEnum;",
                 "GETSTATIC MyEnum.ENTRY2 : LMyEnum;",
                 "GETSTATIC MyEnum.ENTRY3 : LMyEnum;",
                 "GETSTATIC MyEnum.ENTRY4 : LMyEnum;",
-                "GETSTATIC MyEnum.${'$'}VALUES : [LMyEnum;",
+                $$"GETSTATIC MyEnum.$VALUES : [LMyEnum;",
                 "GETSTATIC MyEnum.ENTRY4 : LMyEnum;",
                 "GETSTATIC MyEnum.ENTRY3 : LMyEnum;",
                 "GETSTATIC MyEnum.ENTRY2 : LMyEnum;",

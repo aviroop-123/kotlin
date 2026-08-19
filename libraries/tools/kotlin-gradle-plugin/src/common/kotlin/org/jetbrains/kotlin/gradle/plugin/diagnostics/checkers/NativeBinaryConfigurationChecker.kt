@@ -11,6 +11,8 @@ import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinGradleProjectChecker
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinGradleProjectCheckerContext
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinToolingDiagnostics
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinToolingDiagnosticsCollector
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.ToolingDiagnosticsContext
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.reportOncePerGradleProject
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBinary
 
@@ -23,22 +25,28 @@ internal object NativeBinaryConfigurationChecker : KotlinGradleProjectChecker {
         multiplatformExtension.targets
             .withType(KotlinNativeTarget::class.java)
             .configureEach { target ->
-                target.binaries.configureEach { binary ->
-                    if (hasIncompatibleConfiguration(binary)) {
-                        collector.report(
-                            project,
-                            KotlinToolingDiagnostics.IncompatibleBinaryConfiguration(
-                                binary.name,
-                                binary.debuggable,
-                                binary.optimized
-                            )
-                        )
-                    }
-                }
+                checkTarget(diagnosticsContext, target, collector)
             }
     }
 
-    private fun hasIncompatibleConfiguration(binary: NativeBinary): Boolean {
-        return (binary.debuggable && binary.optimized) || (!binary.debuggable && !binary.optimized)
+    private fun checkTarget(
+        diagnosticsContext: ToolingDiagnosticsContext,
+        target: KotlinNativeTarget,
+        collector: KotlinToolingDiagnosticsCollector,
+    ) {
+        target.binaries.configureEach { binary ->
+            if (!binary.hasIncompatibleConfiguration) return@configureEach
+            collector.reportOncePerGradleProject(
+                diagnosticsContext,
+                KotlinToolingDiagnostics.IncompatibleBinaryConfiguration(
+                    diagnosticsContext.projectPath,
+                    binary.name,
+                    binary.debuggable,
+                    binary.optimized
+                )
+            )
+        }
     }
 }
+
+private val NativeBinary.hasIncompatibleConfiguration: Boolean get() = (debuggable && optimized) || (!debuggable && !optimized)

@@ -7,7 +7,9 @@ package org.jetbrains.kotlin.backend.common.actualizer
 
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.symbols.*
 import org.jetbrains.kotlin.ir.symbols.impl.IrFieldFakeOverrideSymbol
@@ -21,10 +23,11 @@ import org.jetbrains.kotlin.ir.types.isNullableAny
 import org.jetbrains.kotlin.ir.types.makeNotNull
 import org.jetbrains.kotlin.ir.util.DeepCopyIrTreeWithSymbols
 import org.jetbrains.kotlin.ir.util.SymbolRemapper
-import org.jetbrains.kotlin.ir.util.constructedClass
 import org.jetbrains.kotlin.ir.util.isClass
 import org.jetbrains.kotlin.ir.util.isInterface
+import org.jetbrains.kotlin.ir.util.primaryConstructor
 import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 import org.jetbrains.kotlin.utils.memoryOptimizedMap
 import org.jetbrains.kotlin.utils.memoryOptimizedMapNotNull
 import org.jetbrains.kotlin.utils.setSize
@@ -215,6 +218,31 @@ internal open class ActualizerVisitor(
             it.actualizeAnnotations()
         }
 
+    override fun visitAnnotation(expression: IrAnnotation): IrAnnotation {
+        val constructorSymbol = symbolRemapper.getReferencedConstructor(expression.classSymbol.owner.primaryConstructor!!.symbol)
+
+        return IrAnnotationImpl(
+            expression.startOffset,
+            expression.endOffset,
+            expression.type.remapType(),
+            constructorSymbol,
+            expression.typeArguments.size,
+            expression.constructorTypeArgumentsCount,
+            expression.origin,
+        ).apply {
+            arguments.assignFrom(expression.arguments) { it?.transform() }
+            typeArguments.assignFrom(expression.typeArguments) { it?.remapType() }
+            processAttributes(expression)
+
+            // This is a hack to allow actualizing annotation constructors without parameters with constructors with default arguments.
+            // Without it, attempting to call such a constructor in common code will result in either a backend exception or in linkage error.
+            // See KT-67488 for details.
+            if (constructorSymbol.isBound) {
+                arguments.setSize(constructorSymbol.owner.parameters.size)
+            }
+        }
+    }
+
     override fun visitConstructorCall(expression: IrConstructorCall): IrConstructorCall {
         val constructorSymbol = symbolRemapper.getReferencedConstructor(expression.symbol)
 
@@ -227,13 +255,14 @@ internal open class ActualizerVisitor(
             expression.constructorTypeArgumentsCount,
             expression.origin,
         ).apply {
-            copyRemappedTypeArgumentsFrom(expression)
-            transformValueArguments(expression)
+            arguments.assignFrom(expression.arguments) { it?.transform() }
+            typeArguments.assignFrom(expression.typeArguments) { it?.remapType() }
             processAttributes(expression)
 
             // This is a hack to allow actualizing annotation constructors without parameters with constructors with default arguments.
             // Without it, attempting to call such a constructor in common code will result in either a backend exception or in linkage error.
             // See KT-67488 for details.
+            // TODO: Check this condition after KT-74200 fix
             if (constructorSymbol.isBound) {
                 arguments.setSize(constructorSymbol.owner.parameters.size)
             }
@@ -247,7 +276,7 @@ internal open class ActualizerVisitor(
         transformAnnotations(this)
         if (!membersActualization) return
         val newAnnotations = annotations.memoryOptimizedMapNotNull { annotation ->
-            val annotationClass = annotation.symbol.owner.constructedClass
+            val annotationClass = annotation.classSymbol.owner
             when {
                 annotationClass.isExpect && annotationClass.containsOptionalExpectation() -> null
                 else -> annotation

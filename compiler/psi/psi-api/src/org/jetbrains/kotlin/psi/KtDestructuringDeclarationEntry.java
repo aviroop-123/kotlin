@@ -1,23 +1,13 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi;
 
 import com.intellij.lang.ASTNode;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.TokenType;
 import com.intellij.psi.search.LocalSearchScope;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -28,13 +18,24 @@ import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.typeRefHelpers.TypeRefHelpersKt;
 
+import org.jetbrains.kotlin.resolution.KtResolvableCall;
+
 import java.util.Collections;
 import java.util.List;
 
 import static org.jetbrains.kotlin.lexer.KtTokens.EQ;
 
+/**
+ * Represents a single entry in a destructuring declaration.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ * val (x, y) = pair
+ * //   ^
+ * }</pre>
+ */
 @SuppressWarnings("deprecation")
-public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbed implements KtVariableDeclaration {
+public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbed implements KtVariableDeclaration, KtResolvableCall {
 
     public KtDestructuringDeclarationEntry(@NotNull ASTNode node) {
         super(node);
@@ -45,10 +46,15 @@ public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbe
         return TypeRefHelpersKt.getTypeReference(this);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.setDestructuringDeclarationEntryTypeReference(this, typeRef)}
+     * instead.
+     */
     @Override
     @Nullable
+    @Deprecated
     public KtTypeReference setTypeReference(@Nullable KtTypeReference typeRef) {
-        return TypeRefHelpersKt.setTypeReference(this, getNameIdentifier(), typeRef);
+        return KtPsiMutationService.getInstance().setDestructuringDeclarationEntryTypeReference(this, typeRef);
     }
 
     @Nullable
@@ -112,7 +118,15 @@ public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbe
     @Nullable
     @Override
     public KtNameReferenceExpression getInitializer() {
-        return PsiTreeUtil.getNextSiblingOfType(findChildByType(EQ), KtNameReferenceExpression.class);
+        return PsiTreeUtil.getNextSiblingOfType(getEqualsToken(), KtNameReferenceExpression.class);
+    }
+
+    /**
+     * Returns the equals sign before the initializer if it is present.
+     */
+    @Nullable
+    public PsiElement getEqualsToken() {
+        return findChildByType(EQ);
     }
 
     @Override
@@ -123,6 +137,11 @@ public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbe
     @NotNull
     private ASTNode getParentNode() {
         ASTNode parent = getNode().getTreeParent();
+        if (parent.getElementType() == TokenType.ERROR_ELEMENT) {
+            // For top-level destructuring declarations we report an error in the parser.
+            // TODO(KT-58563): After the reporting is moved out of the parser, this workaround can be removed.
+            parent = parent.getTreeParent();
+        }
         assert parent.getElementType() == KtNodeTypes.DESTRUCTURING_DECLARATION :
                 "parent is " + parent.getElementType();
         return parent;

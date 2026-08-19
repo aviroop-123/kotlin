@@ -15,8 +15,6 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.provider.SetProperty
 import org.gradle.api.specs.Spec
 import org.gradle.api.tasks.*
-import org.gradle.api.tasks.compile.AbstractCompile
-import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.util.PatternFilterable
 import org.gradle.work.Incremental
 import org.gradle.work.InputChanges
@@ -71,16 +69,6 @@ abstract class KotlinCompile @Inject constructor(
         compilerOptions
     )
 
-    @Suppress("DEPRECATION_ERROR", "DEPRECATION")
-    @Deprecated(
-        "Configure compilerOptions directly. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compilerOptions"),
-        level = DeprecationLevel.ERROR,
-    )
-    override val parentKotlinOptions: Property<KotlinJvmOptions> = objectFactory
-        .property(kotlinOptions)
-        .chainedDisallowChanges()
-
     @get:Nested
     override val multiplatformStructure: K2MultiplatformStructure = objectFactory.newInstance()
 
@@ -102,15 +90,6 @@ abstract class KotlinCompile @Inject constructor(
     @get:Internal // To support compile avoidance (ClasspathSnapshotProperties.classpathSnapshot will be used as input instead)
     abstract override val libraries: ConfigurableFileCollection
 
-    @get:Deprecated(
-        message = "Please migrate to compilerOptions.moduleName. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compilerOptions.moduleName"),
-        level = DeprecationLevel.ERROR,
-    )
-    @get:Optional
-    @get:Input
-    abstract override val moduleName: Property<String>
-
     @get:Input
     internal val useFirRunner: Property<Boolean> = objectFactory.propertyWithConvention(false)
 
@@ -126,6 +105,7 @@ abstract class KotlinCompile @Inject constructor(
 
         @get:OutputDirectory
         @get:Optional // Set if useClasspathSnapshot == true
+        @Deprecated("The classpathSnapshotDir parameter is no longer required. Scheduled for removal in Kotlin 2.5.")
         abstract val classpathSnapshotDir: DirectoryProperty
     }
 
@@ -134,7 +114,6 @@ abstract class KotlinCompile @Inject constructor(
             sources,
             javaSources,
             scriptSources,
-            androidLayoutResources,
             commonSourceSet,
             classpathSnapshotProperties.classpathSnapshot
         )
@@ -151,8 +130,6 @@ abstract class KotlinCompile @Inject constructor(
     @get:Internal
     internal abstract val associatedJavaCompileTaskName: Property<String>
 
-    @get:Internal
-    internal val nagTaskModuleNameUsage: Property<Boolean> = objectFactory.propertyWithConvention(false)
 
     @get:Internal
     internal val scriptDefinitions: ConfigurableFileCollection = objectFactory.fileCollection()
@@ -243,7 +220,6 @@ abstract class KotlinCompile @Inject constructor(
 
             KotlinJvmCompilerOptionsHelper.fillCompilerArguments(compilerOptions, args)
 
-            overrideArgsUsingTaskModuleNameWithWarning(args)
             requireNotNull(args.moduleName)
 
             val localExecutionTimeFreeCompilerArgs = executionTimeFreeCompilerArgs
@@ -278,7 +254,7 @@ abstract class KotlinCompile @Inject constructor(
                 listOfNotNull(
                     pluginClasspath, kotlinPluginData?.orNull?.classpath
                 ).reduce(FileCollection::plus).toPathsArray()
-            }
+            } ?: emptyArray()
         }
 
         dependencyClasspath { args ->
@@ -296,9 +272,13 @@ abstract class KotlinCompile @Inject constructor(
             if (multiPlatformEnabled.get()) {
                 if (compilerOptions.usesK2.get()) {
                     args.fragmentSources = multiplatformStructure.fragmentSourcesCompilerArgs(sourcesFiles, sourceFileFilter)
-                    args.fragmentDependencies = if (separateKmpCompilation.get()) {
-                        multiplatformStructure.fragmentDependenciesCompilerArgs
-                    } else emptyArray()
+                    if (separateKmpCompilation.get()) {
+                        args.fragmentDependencies = multiplatformStructure.fragmentDependenciesCompilerArgs
+                        args.fragmentFriendDependencies = multiplatformStructure.fragmentFriendsCompilerArgs
+                    } else {
+                        args.fragmentDependencies = emptyArray()
+                        args.fragmentFriendDependencies = emptyArray()
+                    }
                 } else {
                     args.commonSources = commonSourceSet.asFileTree.toPathsArray()
                 }
@@ -312,21 +292,6 @@ abstract class KotlinCompile @Inject constructor(
             }
 
             args.freeArgs += (scriptSourcesFiles + javaSourcesFiles + sourcesFiles).map { it.absolutePath }
-        }
-    }
-
-    @Suppress("DEPRECATION_ERROR")
-    protected fun overrideArgsUsingTaskModuleNameWithWarning(
-        args: K2JVMCompilerArguments,
-    ) {
-        val taskModuleName = moduleName.orNull
-        if (taskModuleName != null) {
-            if (nagTaskModuleNameUsage.get()) {
-                logger.warn(
-                    "w: $path 'KotlinJvmCompile.moduleName' is deprecated, please migrate to 'compilerOptions.moduleName'!"
-                )
-            }
-            args.moduleName = taskModuleName
         }
     }
 
@@ -452,14 +417,13 @@ abstract class KotlinCompile @Inject constructor(
                 workingDir = taskBuildCacheableOutputDirectory.get().asFile,
                 rootProjectDir = projectRootDir,
                 buildDir = projectLayout.buildDirectory.getFile(),
-                disableMultiModuleIC = disableMultiModuleIC,
                 multiModuleICSettings = multiModuleICSettings,
                 icFeatures = makeIncrementalCompilationFeatures(),
                 useJvmFirRunner = useFirRunner.get(),
             )
         } else null
 
-        @Suppress("ConvertArgumentToSet")
+        @Suppress("DEPRECATION")
         val environment = GradleCompilerEnvironment(
             defaultCompilerClasspath, gradleMessageCollector, outputItemCollector,
             // In the incremental compiler, outputFiles will be cleaned on rebuild. However, because classpathSnapshotDir is not included in
@@ -519,34 +483,6 @@ abstract class KotlinCompile @Inject constructor(
         }
     }
 
-    @get:Input
-    val disableMultiModuleIC: Boolean by lazy {
-        if (!isIncrementalCompilationEnabled() || !javaOutputDir.isPresent) {
-            false
-        } else {
-
-            var illegalTaskOrNull: AbstractCompile? = null
-            project.tasks.configureEach {
-                if (it is AbstractCompile &&
-                    it !is JavaCompile &&
-                    it !is AbstractKotlinCompile<*> &&
-                    javaOutputDir.get().asFile.isParentOf(it.destinationDirectory.get().asFile)
-                ) {
-                    illegalTaskOrNull = illegalTaskOrNull ?: it
-                }
-            }
-            if (illegalTaskOrNull != null) {
-                val illegalTask = illegalTaskOrNull!!
-                logger.info(
-                    "Kotlin inter-project IC is disabled: " +
-                            "unknown task '$illegalTask' destination dir ${illegalTask.destinationDirectory.get().asFile} " +
-                            "intersects with java destination dir $javaOutputDir"
-                )
-            }
-            illegalTaskOrNull != null
-        }
-    }
-
     private val javaSourceFiles = objectFactory.fileCollection()
 
     private fun javaFilesPatternFilter(patternFilterable: PatternFilterable) {
@@ -567,22 +503,6 @@ abstract class KotlinCompile @Inject constructor(
                 .matching(::javaFilesPatternFilter)
         )
 
-    @get:Internal
-    internal val androidLayoutResourceFiles = objectFactory.fileCollection()
-
-    /**
-     * This input is used by android-extensions plugin
-     */
-    @get:Incremental
-    @get:InputFiles
-    @get:IgnoreEmptyDirectories
-    @get:NormalizeLineEndings
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    internal open val androidLayoutResources: FileCollection = androidLayoutResourceFiles
-        .asFileTree
-        .matching { patternFilterable ->
-            patternFilterable.include("xml".fileExtensionCasePermutations().map { "**/*.$it" })
-        }
 
     // override setSource to track Java and script sources as well
     override fun source(vararg sources: Any) {
@@ -608,7 +528,7 @@ abstract class KotlinCompile @Inject constructor(
     }
 
     private fun getClasspathChanges(inputChanges: InputChanges): ClasspathChanges {
-
+        @Suppress("DEPRECATION")
         val classpathSnapshotFiles = ClasspathSnapshotFiles(
             classpathSnapshotProperties.classpathSnapshot.files.toList(),
             classpathSnapshotProperties.classpathSnapshotDir.get().asFile

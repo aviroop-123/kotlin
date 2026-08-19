@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.fir.renderer
 
+import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationDataRegistry
@@ -15,7 +16,7 @@ open class FirDeclarationRendererWithAttributes : FirDeclarationRenderer() {
     override fun FirDeclaration.renderDeclarationAttributes() {
         if (attributes.isNotEmpty()) {
             val attributes = getAttributesWithValues()
-                .mapNotNull { (klass, value) ->
+                .mapNotNull { [klass, value] ->
                     val unwrappedValue = when (value) {
                         is Lazy<*> -> value.value
                         else -> value
@@ -23,7 +24,7 @@ open class FirDeclarationRendererWithAttributes : FirDeclarationRenderer() {
                     klass to unwrappedValue.renderAsDeclarationAttributeValue()
                 }
                 .ifEmpty { return }
-                .joinToString { (name, value) -> "$name=$value" }
+                .joinToString { [name, value] -> "$name=$value" }
             printer.print("[$attributes] ")
         }
     }
@@ -31,7 +32,7 @@ open class FirDeclarationRendererWithAttributes : FirDeclarationRenderer() {
     private fun FirDeclaration.getAttributesWithValues(): List<Pair<String, Any?>> {
         return attributeTypesToIds()
             .sortedBy { it.first }
-            .map { (klass, index) -> klass to attributes[index] }
+            .map { [klass, index] -> klass to attributes[index] }
     }
 
     protected open fun attributeTypesToIds(): List<Pair<String, Int>> {
@@ -40,10 +41,15 @@ open class FirDeclarationRendererWithAttributes : FirDeclarationRenderer() {
             .map { it.key.substringAfterLast(".") to it.value }
     }
 
-    private fun Any.renderAsDeclarationAttributeValue() = when (this) {
+    private fun Any.renderAsDeclarationAttributeValue(): String = when (this) {
+        is List<*> -> map { it?.renderAsDeclarationAttributeValue() }.toString()
+        is Map<*, *> -> map { [key, value] ->
+            key?.renderAsDeclarationAttributeValue() to value?.renderAsDeclarationAttributeValue()
+        }.toMap().toString()
         is FirCallableSymbol<*> -> callableIdAsString()
         is FirClassLikeSymbol<*> -> classId.asString()
         is FirCallableDeclaration -> symbol.callableIdAsString()
+        is KtSourceElement -> "KtSourceElement"
         else -> toString()
     }
 }

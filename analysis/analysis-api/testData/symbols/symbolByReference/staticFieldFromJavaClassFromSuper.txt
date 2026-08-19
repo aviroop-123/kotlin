@@ -4,8 +4,11 @@ KaJavaFieldSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: true
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isStatic: true
   isVal: false
   location: CLASS
@@ -22,3 +25,4 @@ KaJavaFieldSymbol:
   getContainingJvmClassName: BaseClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: BaseClass.bar

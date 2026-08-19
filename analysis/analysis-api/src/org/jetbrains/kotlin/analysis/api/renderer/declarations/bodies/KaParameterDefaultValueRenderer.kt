@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,9 +7,11 @@ package org.jetbrains.kotlin.analysis.api.renderer.declarations.bodies
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.KaSpi
 import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 
+@KaSpi
 @KaExperimentalApi
 public interface KaParameterDefaultValueRenderer {
     public fun renderDefaultValue(analysisSession: KaSession, symbol: KaValueParameterSymbol, printer: PrettyPrinter)
@@ -23,7 +25,7 @@ public interface KaParameterDefaultValueRenderer {
     @KaExperimentalApi
     public object THREE_DOTS : KaParameterDefaultValueRenderer {
         override fun renderDefaultValue(analysisSession: KaSession, symbol: KaValueParameterSymbol, printer: PrettyPrinter) {
-            if (symbol.hasDefaultValue) {
+            if (symbol.hasDeclaredDefaultValue) {
                 printer.append("...")
             }
         }

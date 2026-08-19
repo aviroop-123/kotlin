@@ -1,6 +1,4 @@
-// FIR_IDENTICAL
 // SKIP_KT_DUMP
-// LANGUAGE: +SuspendConversion
 
 fun interface SuspendRunnable {
     suspend fun invoke()

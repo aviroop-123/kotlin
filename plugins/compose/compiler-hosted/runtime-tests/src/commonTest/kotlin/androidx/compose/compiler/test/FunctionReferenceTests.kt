@@ -8,6 +8,8 @@ package androidx.compose.compiler.test
 
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mock.*
+import org.jetbrains.kotlin.testFederation.SmokeTest
+import org.junit.experimental.categories.Category
 import kotlin.test.Test
 
 // This class is on top of the file to avoid handling order when loading generated classes
@@ -18,6 +20,7 @@ private interface FunctionRefInterface {
     }
 }
 
+@Category(SmokeTest::class)
 class FunctionReferenceTests {
     @Test
     fun functionReference() = compositionTest {
@@ -213,6 +216,20 @@ class FunctionReferenceTests {
             }
             Linear {
                 Text("GenericText 0")
+            }
+        }
+    }
+
+    @Test
+    fun lambda() = compositionTest {
+        compose {
+            val lambda = @Composable { Text("test") }
+            Linear(lambda::invoke)
+        }
+
+        validate {
+            Linear {
+                Text("test")
             }
         }
     }

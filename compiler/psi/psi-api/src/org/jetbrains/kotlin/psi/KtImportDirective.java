@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -17,6 +17,15 @@ import org.jetbrains.kotlin.psi.stubs.KotlinImportDirectiveStub;
 import org.jetbrains.kotlin.psi.stubs.elements.KtTokenSets;
 import org.jetbrains.kotlin.resolve.ImportPath;
 
+/**
+ * Represents a single {@code import} directive.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ *    import kotlin.collections.List
+ * // ^____________________________^
+ * }</pre>
+ */
 public class KtImportDirective extends KtElementImplStub<KotlinImportDirectiveStub> implements KtImportInfo {
 
     public KtImportDirective(@NotNull ASTNode node) {
@@ -36,6 +45,7 @@ public class KtImportDirective extends KtElementImplStub<KotlinImportDirectiveSt
 
     @Nullable
     @IfNotParsed
+    @SuppressWarnings("deprecation") // KT-78356
     public KtExpression getImportedReference() {
         KtExpression[] references = getStubOrPsiChildren(KtTokenSets.INSIDE_DIRECTIVE_EXPRESSIONS, KtExpression.ARRAY_FACTORY);
         if (references.length > 0) {
@@ -45,6 +55,7 @@ public class KtImportDirective extends KtElementImplStub<KotlinImportDirectiveSt
     }
 
     @Nullable
+    @SuppressWarnings("deprecation") // KT-78356
     public KtImportAlias getAlias() {
         return getStubOrPsiChild(KtStubBasedElementTypes.IMPORT_ALIAS);
     }

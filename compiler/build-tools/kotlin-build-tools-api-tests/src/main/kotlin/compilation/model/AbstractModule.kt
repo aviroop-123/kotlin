@@ -3,29 +3,31 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.buildtools.api.tests.compilation.model
+package org.jetbrains.kotlin.buildtools.tests.compilation.model
 
+import org.jetbrains.kotlin.buildtools.api.BaseCompilationOperation
+import org.jetbrains.kotlin.buildtools.api.BaseIncrementalCompilationConfiguration
 import org.jetbrains.kotlin.buildtools.api.CompilationResult
 import org.jetbrains.kotlin.buildtools.api.ExecutionPolicy
-import org.jetbrains.kotlin.buildtools.api.jvm.operations.JvmCompilationOperation
 import org.junit.jupiter.api.Assertions.assertEquals
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import kotlin.reflect.KClass
 
 private class CompilationOutcomeImpl(
     rawLogLines: Map<LogLevel, Collection<String>>,
-    override val actualResult: CompilationResult
+    override val actualResult: CompilationResult?,
 ) : CompilationOutcome {
     private val _logLines by lazy {
-        rawLogLines.mapValues { (_, lines) -> lines.toList() }
+        rawLogLines.mapValues { [_, lines] -> lines.toList() }
     }
 
     override val logLines: Map<LogLevel, List<String>>
         get() = _logLines
 
     private val _uniqueLogLines by lazy {
-        rawLogLines.mapValues { (_, lines) -> lines.toSet() }
+        rawLogLines.mapValues { [_, lines] -> lines.toSet() }
     }
 
     override val uniqueLogLines: Map<LogLevel, Set<String>>
@@ -33,7 +35,7 @@ private class CompilationOutcomeImpl(
 
     var maxLogLevel: LogLevel = LogLevel.ERROR
         private set
-    var expectedResult = CompilationResult.COMPILATION_SUCCESS
+    var expectedResult: CompilationResult? = CompilationResult.COMPILATION_SUCCESS
         private set
 
     override fun requireLogLevel(logLevel: LogLevel) {
@@ -44,25 +46,28 @@ private class CompilationOutcomeImpl(
         expectedResult = CompilationResult.COMPILATION_ERROR
     }
 
-    override fun expectCompilationResult(compilationResult: CompilationResult) {
+    override fun expectCompilationResult(compilationResult: CompilationResult?) {
         expectedResult = compilationResult
     }
 }
 
-data class AbstractModuleCacheKey(
+data class AbstractModuleCacheKey<T>(
+    val moduleClass: KClass<*>,
     val moduleName: String,
     val dependencies: List<DependencyScenarioDslCacheKey>,
-    val compilationArguments: (JvmCompilationOperation) -> Unit,
+    val compilationArguments: (T) -> Unit,
 ) : DependencyScenarioDslCacheKey
 
-abstract class AbstractModule(
+val EXPLICIT_NULL_MODULE_NAME_MARKER = "###null_module_name###"
+
+abstract class AbstractModule<O : BaseCompilationOperation, B : BaseCompilationOperation.Builder, IC : BaseIncrementalCompilationConfiguration.Builder>(
     override val project: Project,
     final override val moduleName: String,
     val moduleDirectory: Path,
     val dependencies: List<Dependency>,
     override val defaultStrategyConfig: ExecutionPolicy,
-    final override val moduleCompilationConfigAction: (JvmCompilationOperation) -> Unit,
-) : Module {
+    final override val moduleCompilationConfigAction: (B) -> Unit,
+) : Module<O, B, IC> {
     override val sourcesDirectory: Path
         get() = moduleDirectory.resolve("src")
 
@@ -82,26 +87,67 @@ abstract class AbstractModule(
         get() = icWorkingDir.resolve("caches")
 
     override val scenarioDslCacheKey =
-        AbstractModuleCacheKey(moduleName, dependencies.map { it.scenarioDslCacheKey }, moduleCompilationConfigAction)
+        AbstractModuleCacheKey(
+            this::class,
+            moduleName,
+            dependencies.map { it.scenarioDslCacheKey },
+            moduleCompilationConfigAction
+        )
+
+    override fun compileAndThrow(
+        strategyConfig: ExecutionPolicy,
+        forceOutput: LogLevel?,
+        compilationConfigAction: (B) -> Unit,
+        compilationAction: (O) -> Unit,
+        assertions: context(ModuleContext) CompilationOutcome.(Throwable) -> Unit,
+    ): Throwable {
+        val kotlinLogger = TestKotlinLogger()
+        try {
+            compileImpl(strategyConfig, compilationConfigAction, compilationAction, kotlinLogger)
+        } catch (e: Throwable) {
+            processOutcome(kotlinLogger, null, {
+                expectCompilationResult(null)
+                assertions(e)
+            }, forceOutput)
+            return e
+        }
+        throw AssertionError("Compilation was successful, but expected failure")
+    }
 
     override fun compile(
         strategyConfig: ExecutionPolicy,
         forceOutput: LogLevel?,
-        compilationConfigAction: (JvmCompilationOperation) -> Unit,
-        assertions: CompilationOutcome.(Module) -> Unit,
+        compilationConfigAction: (B) -> Unit,
+        compilationAction: (O) -> Unit,
+        assertions: context(ModuleContext) CompilationOutcome.() -> Unit,
     ): CompilationResult {
         val kotlinLogger = TestKotlinLogger()
-        val result = compileImpl(strategyConfig, compilationConfigAction, kotlinLogger)
+        val result = compileImpl(
+            strategyConfig = strategyConfig,
+            compilationConfigAction = compilationConfigAction,
+            compilationAction = compilationAction,
+            kotlinLogger = kotlinLogger
+        )
+        processOutcome(kotlinLogger, result, assertions, forceOutput)
+        return result
+    }
+
+    protected fun processOutcome(
+        kotlinLogger: TestKotlinLogger,
+        result: CompilationResult?,
+        assertions: context(ModuleContext) CompilationOutcome.() -> Unit,
+        forceOutput: LogLevel?,
+    ) {
         val outcome = CompilationOutcomeImpl(kotlinLogger.logMessagesByLevel, result)
         try {
-            assertions(outcome, this)
+            assertions(outcome)
             assertEquals(outcome.expectedResult, result) {
                 "Compilation result is unexpected"
             }
             if (forceOutput != null) {
                 kotlinLogger.printBuildOutput(forceOutput)
             }
-        } catch (e: AssertionError) {
+        } catch (e: Throwable) {
             val maxLogLevel = if (forceOutput != null) {
                 maxOf(forceOutput, outcome.maxLogLevel)
             } else {
@@ -110,12 +156,12 @@ abstract class AbstractModule(
             kotlinLogger.printBuildOutput(maxLogLevel)
             throw e
         }
-        return result
     }
 
     protected abstract fun compileImpl(
         strategyConfig: ExecutionPolicy,
-        compilationConfigAction: (JvmCompilationOperation) -> Unit,
+        compilationConfigAction: (B) -> Unit,
+        compilationAction: (O) -> Unit,
         kotlinLogger: TestKotlinLogger,
     ): CompilationResult
 
@@ -154,7 +200,7 @@ abstract class AbstractModule(
     }
 
     protected abstract fun prepareExecutionProcessBuilder(
-        mainClassFqn: String
+        mainClassFqn: String,
     ): ProcessBuilder
 
     override fun toString() = moduleName

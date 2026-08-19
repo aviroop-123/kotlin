@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.resolve.calls.checkers.isRestrictedSuspendFunction
 internal class NativeSuspendFunctionsLowering(
         generationState: NativeGenerationState
 ) : AbstractSuspendFunctionsLowering<Context>(generationState.context), FileLoweringPass {
+    private val irBuiltIns = context.irBuiltIns
     private val symbols = context.symbols
     private val fileLowerState = generationState.fileLowerState
     private val saveCoroutineState = symbols.saveCoroutineState
@@ -55,7 +56,7 @@ internal class NativeSuspendFunctionsLowering(
         val function = (element as? IrSimpleFunction) ?: return null
         if (!function.isSuspend || function.modality == Modality.ABSTRACT) return null
 
-        val (tailSuspendCalls, hasNotTailSuspendCalls) = collectTailSuspendCalls(context, function)
+        (val tailSuspendCalls = callSites, val hasNotTailSuspendCalls) = collectTailSuspendCalls(context, function)
         return if (hasNotTailSuspendCalls) {
             listOf<IrDeclaration>(buildCoroutine(function, isSuspendLambdaInvokeMethod = false), function)
         } else {
@@ -105,7 +106,7 @@ internal class NativeSuspendFunctionsLowering(
         +irReturn(
                 irCall(invokeSuspendFunction).apply {
                     arguments[0] = receiver
-                    arguments[1] = irSuccess(irGetObject(symbols.unit))
+                    arguments[1] = irSuccess(irGetObject(irBuiltIns.unitClass))
                 }
         )
     }
@@ -117,7 +118,7 @@ internal class NativeSuspendFunctionsLowering(
     ) {
         val originalBody = transformingFunction.body!!
 
-        val (thisReceiver, resultArgument) = stateMachineFunction.parameters.also { check(it.size == 2) }
+        val [thisReceiver, resultArgument] = stateMachineFunction.parameters.also { check(it.size == 2) }
 
         val coroutineClass = stateMachineFunction.parentAsClass
 
@@ -174,7 +175,7 @@ internal class NativeSuspendFunctionsLowering(
                         (originalBody as IrBlockBody).statements.forEach { +it }
                     })
             if (transformingFunction.returnType.isUnit())
-                +irReturn(irGetObject(symbols.unit))                             // Insert explicit return for Unit functions.
+                +irReturn(irGetObject(irBuiltIns.unitClass))                             // Insert explicit return for Unit functions.
         }
     }
 
@@ -223,7 +224,7 @@ internal class NativeSuspendFunctionsLowering(
                 // No constructor argument is first since the call will be lowered to (val inst = alloc(); call(inst, *args); inst)
                 // and therefore an actual first argument will be the just allocated instance.
                 var first = expression !is IrConstructorCall
-                for ((index, child) in children.withIndex()) {
+                for ([index, child] in children.withIndex()) {
                     if (child == null) continue
                     val transformedChild =
                             if (!child.isSpecialBlock())

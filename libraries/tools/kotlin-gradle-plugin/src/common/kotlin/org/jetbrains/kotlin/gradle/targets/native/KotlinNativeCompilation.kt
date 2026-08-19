@@ -8,6 +8,8 @@ package org.jetbrains.kotlin.gradle.plugin.mpp
 
 import org.gradle.api.Action
 import org.gradle.api.NamedDomainObjectContainer
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskProvider
 import org.jetbrains.kotlin.gradle.dsl.KotlinNativeCompilerOptions
 import org.jetbrains.kotlin.gradle.plugin.*
@@ -25,24 +27,6 @@ abstract class AbstractKotlinNativeCompilation internal constructor(
     val konanTarget: KonanTarget,
 ) : DeprecatedAbstractKotlinCompilation<KotlinAnyOptionsDeprecated>(compilation) {
 
-    @Suppress("DEPRECATION_ERROR")
-    @Deprecated(
-        "Accessing task instance directly is deprecated. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compileTaskProvider"),
-        level = DeprecationLevel.ERROR,
-    )
-    override val compileKotlinTask: KotlinNativeCompile
-        get() = compilation.compileKotlinTask as KotlinNativeCompile
-
-    @Suppress("UNCHECKED_CAST", "DEPRECATION_ERROR")
-    @Deprecated(
-        "Replaced with compileTaskProvider. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compileTaskProvider"),
-        level = DeprecationLevel.ERROR,
-    )
-    override val compileKotlinTaskProvider: TaskProvider<out KotlinNativeCompile>
-        get() = compilation.compileKotlinTaskProvider as TaskProvider<out KotlinNativeCompile>
-
     @Suppress("UNCHECKED_CAST")
     override val compileTaskProvider: TaskProvider<KotlinNativeCompile>
         get() = compilation.compileTaskProvider as TaskProvider<KotlinNativeCompile>
@@ -54,6 +38,14 @@ abstract class AbstractKotlinNativeCompilation internal constructor(
     @Suppress("UNCHECKED_CAST", "DEPRECATION")
     override val compilerOptions: DeprecatedHasCompilerOptions<KotlinNativeCompilerOptions>
         get() = compilation.compilerOptions as DeprecatedHasCompilerOptions<KotlinNativeCompilerOptions>
+
+    /**
+     * File collection of all cinterop klib outputs produced by this compilation.
+     * Populated by [org.jetbrains.kotlin.gradle.plugin.mpp.compilationImpl.KotlinCreateNativeCInteropTasksSideEffect]
+     * and used by [org.jetbrains.kotlin.gradle.plugin.mpp.compilationImpl.KotlinNativeCompilationAssociator]
+     * to propagate cinterop klibs to all associated compilations (e.g. test, swiftExportMain).
+     */
+    internal val cinteropOutputs: ConfigurableFileCollection = compilation.project.objects.fileCollection()
 }
 
 open class KotlinNativeCompilation @Inject internal constructor(
@@ -72,7 +64,10 @@ open class KotlinNativeCompilation @Inject internal constructor(
         get() = super.compilerOptions as NativeCompilerOptions
 
     // Interop DSL.
-    val cinterops = compilation.project.container(DefaultCInteropSettings::class.java, DefaultCInteropSettingsFactory(compilation))
+    val cinterops: NamedDomainObjectContainer<DefaultCInteropSettings> = compilation.project.objects.domainObjectContainer(
+        DefaultCInteropSettings::class.java,
+        DefaultCInteropSettingsFactory(compilation)
+    )
 
     fun cinterops(action: Action<NamedDomainObjectContainer<DefaultCInteropSettings>>) = action.execute(cinterops)
 
@@ -82,6 +77,16 @@ open class KotlinNativeCompilation @Inject internal constructor(
 
     val binariesTaskName: String
         get() = lowerCamelCaseName(target.disambiguationClassifier, compilation.compilationName, "binaries")
+
+    /**
+     * Indicates whether cross-compilation is supported for the given binary's target.
+     *
+     * Cross-compilation is supported if the target is enabled by the host manager
+     * or if none of the target's compilations involve C interop dependencies.
+     */
+    val crossCompilationSupported: Provider<Boolean> = project.provider {
+        crossCompilationOnCurrentHostSupported && crossCompilationSharedData.dataForAllDependencies.all { it.crossCompilationSupported }
+    }
 }
 
 @Suppress("DEPRECATION")

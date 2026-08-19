@@ -6,32 +6,34 @@
 package org.jetbrains.kotlin.konan.test.blackbox
 
 import com.intellij.testFramework.TestDataPath
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.forcesPreReleaseBinariesIfEnabled
+import org.jetbrains.kotlin.konan.target.KonanTarget
+import org.jetbrains.kotlin.konan.target.presetName
 import org.jetbrains.kotlin.konan.test.blackbox.support.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.ClassLevelProperty
 import org.jetbrains.kotlin.konan.test.blackbox.support.EnforcedProperty
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.ObjCFrameworkCompilation
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
-import org.jetbrains.kotlin.konan.test.blackbox.support.group.ClassicPipeline
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.CacheMode
-import org.jetbrains.kotlin.konan.test.blackbox.support.settings.PipelineType
-import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Settings
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Timeouts
 import org.jetbrains.kotlin.konan.test.klib.KlibCrossCompilationOutputTest.Companion.DEPRECATED_K1_LANGUAGE_VERSIONS_DIAGNOSTIC_REGEX
-import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.TestDataAssertions
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertContains
 import kotlin.test.assertIs
 
 abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
     @Test
     fun testReleaseCompilerAgainstPreReleaseLibrary() {
-        val rootDir = File("native/native.tests/testData/compilerOutput/releaseCompilerAgainstPreReleaseLibrary")
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/releaseCompilerAgainstPreReleaseLibrary")
 
         doTestPreReleaseKotlinLibrary(rootDir)
     }
@@ -42,7 +44,7 @@ abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
         // To be refactored later, after
         // CompileKotlinAgainstCustomBinariesTest.testReleaseCompilerAgainstPreReleaseLibraryJsSkipPrereleaseCheck is fixed.
         val rootDir =
-            File("compiler/testData/compileKotlinAgainstCustomBinaries/releaseCompilerAgainstPreReleaseLibraryJsSkipPrereleaseCheck")
+            ForTestCompileRuntime.transformTestDataPath("compiler/testData/compileKotlinAgainstCustomBinaries/releaseCompilerAgainstPreReleaseLibraryJsSkipPrereleaseCheck")
 
         doTestPreReleaseKotlinLibrary(
             rootDir = rootDir,
@@ -66,59 +68,53 @@ abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
         sanitizeCompilerOutput: (String) -> String = { it },
     ) {
         val library = compileLibrary(
-            settings = object : Settings(testRunSettings, listOf(PipelineType.DEFAULT)) {},
+            settings = testRunSettings,
             source = rootDir.resolve("library"),
             freeCompilerArgs = libraryOptions,
             dependencies = emptyList()
         ).assertSuccess().resultingArtifact
 
-        val pipelineType: PipelineType = testRunSettings.get()
-
         val compilationResult = compileLibrary(
             testRunSettings,
             source = rootDir.resolve("source.kt"),
-            freeCompilerArgs = additionalOptions + pipelineType.compilerFlags,
+            freeCompilerArgs = additionalOptions,
             dependencies = listOf(library)
         )
 
-        val goldenData = when (pipelineType) {
-            PipelineType.K2 -> rootDir.resolve("output.fir.txt").takeIf { it.exists() } ?: rootDir.resolve("output.txt")
-            PipelineType.K1 -> rootDir.resolve("output.txt")
-            PipelineType.DEFAULT -> rootDir.resolve("output.fir.txt").takeIf { it.exists() && LanguageVersion.LATEST_STABLE.usesK2 } ?: rootDir.resolve("output.txt")
-        }
+        val goldenData = rootDir.resolve("output.txt")
 
-        KotlinTestUtils.assertEqualsToFile(goldenData, sanitizeCompilerOutput(compilationResult.toOutput()))
+        TestDataAssertions.assertEqualsToFile(goldenData, sanitizeCompilerOutput(compilationResult.toOutput()))
     }
 
     @Test
     fun testObjCExportDiagnostics() {
-        val rootDir = File("native/native.tests/testData/compilerOutput/ObjCExportDiagnostics")
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/ObjCExportDiagnostics")
         val compilationResult = doBuildObjCFrameworkWithNameCollisions(rootDir, listOf("-Xbinary=objcExportReportNameCollisions=true"))
         val goldenData = rootDir.resolve("output.txt")
 
-        KotlinTestUtils.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
+        TestDataAssertions.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
     }
 
     @Test
     fun testObjCExportDiagnosticsErrors() {
-        val rootDir = File("native/native.tests/testData/compilerOutput/ObjCExportDiagnostics")
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/ObjCExportDiagnostics")
         val compilationResult = doBuildObjCFrameworkWithNameCollisions(rootDir, listOf("-Xbinary=objcExportErrorOnNameCollisions=true"))
         assertIs<TestCompilationResult.Failure>(compilationResult)
         val goldenData = rootDir.resolve("error.txt")
 
-        KotlinTestUtils.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
+        TestDataAssertions.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
     }
 
     @Test
-    fun testLoggingWarningWithDistCache() {
-        val rootDir = File("native/native.tests/testData/compilerOutput/runtimeLogging")
+    fun testLogging() {
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/runtimeLogging")
         val testCase = generateTestCaseWithSingleFile(
             rootDir.resolve("main.kt"),
             freeCompilerArgs = TestCompilerArgs("-Xruntime-logs=gc=info"),
             extras = TestCase.NoTestRunnerExtras("main"),
             testKind = TestKind.STANDALONE_NO_TR,
         )
-        val expectedArtifact = TestCompilationArtifact.Executable(buildDir.resolve("logging_warning_with_cache"))
+        val expectedArtifact = TestCompilationArtifact.Executable(buildDir.resolve("logging_with_cache"))
         val compilation = ExecutableCompilation(
             testRunSettings,
             freeCompilerArgs = testCase.freeCompilerArgs,
@@ -128,24 +124,14 @@ abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
             expectedArtifact = expectedArtifact,
         )
         val compilationResult = compilation.result
-        val goldenData = rootDir.resolve(
-            if (testRunSettings.get<CacheMode>().useStaticCacheForDistributionLibraries) "logging_cache_warning.txt" else "empty.txt"
-        )
+        val goldenData = rootDir.resolve("empty.txt")
 
-        KotlinTestUtils.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
-    }
-
-    fun String.sanitizeCompilationOutput(): String = lines().joinToString(separator = "\n") { line ->
-        when {
-            DEPRECATED_K1_LANGUAGE_VERSIONS_DIAGNOSTIC_REGEX.matches(line) -> ""
-            else -> line
-        }
+        TestDataAssertions.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
     }
 
     @Test
     fun testLoggingInvalid() {
-        Assumptions.assumeFalse(testRunSettings.get<CacheMode>().useStaticCacheForDistributionLibraries)
-        val rootDir = File("native/native.tests/testData/compilerOutput/runtimeLogging")
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/runtimeLogging")
         val testCase = generateTestCaseWithSingleFile(
             rootDir.resolve("main.kt"),
             freeCompilerArgs = TestCompilerArgs("-Xruntime-logs=invalid=unknown,logging=debug"),
@@ -164,7 +150,148 @@ abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
         val compilationResult = compilation.result
         val goldenData = rootDir.resolve("logging_invalid_error.txt")
 
-        KotlinTestUtils.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
+        TestDataAssertions.assertEqualsToFile(goldenData, compilationResult.toOutput().sanitizeCompilationOutput())
+    }
+
+    @Test
+    fun testCacheLinkageErrorMessage() {
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/cacheLinkageErrorMessage")
+
+        // Trigger the binary linkage to fail by requesting a non-existing library:
+        val secondStageCompilerArgs = listOf("-linker-option", "-ldoes-not-exist")
+
+        val compilationResult = compileToExecutableInTwoStages(rootDir, secondStageCompilerArgs)
+
+        assertIs<TestCompilationResult.Failure>(compilationResult)
+        val output = compilationResult.toOutput().sanitizeCompilationOutput()
+
+        if (testRunSettings.get<CacheMode>() == CacheMode.WithoutCache) {
+            assertFalse(output.contains("compiler caches")) {
+                "The compiler output wrongly mentions compiler caches:\n```\n$output\n```\n"
+            }
+        } else {
+            val presetName = targets.testTarget.presetName
+            assertContains(
+                output,
+                """
+                |Please try to disable compiler caches and rerun the build.
+                |To disable compiler caches, use `disableNativeCache` in the binary declaration in the Gradle build script.
+                |See https://kotl.in/disable-native-cache for specific instructions.
+                |
+                |Also, consider filing an issue with full Gradle log here: https://kotl.in/issue""".trimMargin()
+            )
+        }
+    }
+
+    @Test
+    fun testCacheBuildErrorMessage() {
+        // Disable when not using cache:
+        Assumptions.assumeFalse(testRunSettings.get<CacheMode>() == CacheMode.WithoutCache)
+        // MinGW support for caches is limited to stdlib, so these tests won't work as expected.
+        Assumptions.assumeFalse(targets.testTarget == KonanTarget.MINGW_X64)
+
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/cacheBuildErrorMessage")
+
+        // Make sure the stdlib cache is built. Otherwise, it will fail instead of the main.klib cache.
+        compileToExecutableInTwoStages(rootDir).assertSuccess()
+
+        val autoCacheDir = buildDir.resolve("cache")
+        autoCacheDir.mkdirs()
+
+        val secondStageCompilerArgs = listOf(
+            // Trigger the cache compilation to crash by passing an invalid flag:
+            "-Xoverride-konan-properties=additionalCacheFlags=-Xpartial-linkage-loglevel=invalid-log-level",
+
+            "-Xauto-cache-from=$buildDir",
+            "-Xauto-cache-dir=$autoCacheDir",
+        )
+        val compilationResult = compileToExecutableInTwoStages(rootDir, secondStageCompilerArgs)
+
+        assertIs<TestCompilationResult.Failure>(compilationResult)
+
+        // Check only the first 5 lines because the rest contains a stack trace.
+        val output = compilationResult.toOutput().sanitizeCompilationOutput()
+            .lines().take(5).joinToString("\n")
+
+        val goldenData = rootDir.resolve("output.txt")
+
+        TestDataAssertions.assertEqualsToFile(goldenData, output)
+    }
+
+    @Test
+    fun testIncrementalBuildErrorMessage() {
+        // Disable when not using cache:
+        Assumptions.assumeFalse(testRunSettings.get<CacheMode>() == CacheMode.WithoutCache)
+        // MinGW support for caches is limited to stdlib, so these tests won't work as expected.
+        Assumptions.assumeFalse(targets.testTarget == KonanTarget.MINGW_X64)
+
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/incrementalBuildErrorMessage")
+
+        // Make sure the stdlib cache is built. Otherwise, it will fail instead of the main.klib incremental cache.
+        compileToExecutableInTwoStages(rootDir).assertSuccess()
+
+        val icCacheDir = buildDir.resolve("ic_cache")
+        icCacheDir.mkdirs()
+
+        val secondStageCompilerArgs = listOf(
+            // Trigger the cache compilation to crash by passing an invalid flag:
+            "-Xoverride-konan-properties=additionalCacheFlags=-Xpartial-linkage-loglevel=invalid-log-level",
+            "-Xic-cache-dir=${icCacheDir.absolutePath}",
+            "-Xenable-incremental-compilation"
+        )
+        val compilationResult = compileToExecutableInTwoStages(rootDir, secondStageCompilerArgs)
+
+        assertIs<TestCompilationResult.Failure>(compilationResult)
+
+        // Check only the first 5 lines because the rest contains a stack trace.
+        val output = compilationResult.toOutput().sanitizeCompilationOutput()
+            .lines().take(5).joinToString("\n")
+
+        val goldenData = rootDir.resolve("output.txt")
+
+        TestDataAssertions.assertEqualsToFile(goldenData, output)
+    }
+
+    private fun compileToExecutableInTwoStages(
+        rootDir: File,
+        secondStageCompilerArgs: List<String> = emptyList(),
+    ): TestCompilationResult<out TestCompilationArtifact.Executable> {
+        val testCase = generateTestCaseWithSingleFile(
+            rootDir.resolve("main.kt"),
+            freeCompilerArgs = TestCompilerArgs.EMPTY,
+            extras = TestCase.NoTestRunnerExtras("main"),
+            testKind = TestKind.STANDALONE_NO_TR,
+        )
+
+        val libraryCompilation = LibraryCompilation(
+            testRunSettings,
+            freeCompilerArgs = testCase.freeCompilerArgs,
+            sourceModules = testCase.modules,
+            dependencies = emptyList(),
+            expectedArtifact = TestCompilationArtifact.KLIB(buildDir.resolve("main.klib"))
+        )
+
+        val libraryCompilationAsDependency = CompiledDependency(
+            libraryCompilation,
+            TestCompilationDependencyType.IncludedLibrary
+        )
+        val compilation = ExecutableCompilation(
+            testRunSettings,
+            freeCompilerArgs = TestCompilerArgs(secondStageCompilerArgs),
+            sourceModules = emptyList(),
+            extras = testCase.extras,
+            dependencies = listOf(libraryCompilationAsDependency),
+            expectedArtifact = TestCompilationArtifact.Executable(buildDir.resolve("main")),
+        )
+
+        return compilation.result
+    }
+
+    fun String.sanitizeCompilationOutput(): String = lines().joinToString(separator = "\n") { line ->
+        when {
+            DEPRECATED_K1_LANGUAGE_VERSIONS_DIAGNOSTIC_REGEX.matches(line) -> ""
+            else -> line
+        }
     }
 
     private fun doBuildObjCFrameworkWithNameCollisions(rootDir: File, additionalOptions: List<String>): TestCompilationResult<out TestCompilationArtifact.ObjCFramework> {
@@ -191,7 +318,7 @@ abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
         ).result
     }
 
-    private val testClashingBindClassToObjCNameRootDir = File("native/native.tests/testData/compilerOutput/clashingBindClassToObjCName")
+    private val testClashingBindClassToObjCNameRootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/clashingBindClassToObjCName")
 
     private fun doTestClashingBindClassToObjCName(
         name: String,
@@ -219,7 +346,7 @@ abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
             .replace("MyClassObjC\\d+".toRegex(), "MyClassObjC*")
         val goldenData = testClashingBindClassToObjCNameRootDir.resolve("${name}.output.txt")
 
-        KotlinTestUtils.assertEqualsToFile(goldenData, output.sanitizeCompilationOutput())
+        TestDataAssertions.assertEqualsToFile(goldenData, output.sanitizeCompilationOutput())
     }
 
     @Test
@@ -277,29 +404,23 @@ abstract class CompilerOutputTestBase : AbstractNativeSimpleTest() {
     })
 }
 
-@Suppress("JUnitTestCaseWithNoTests")
-@ClassicPipeline()
 @TestDataPath("\$PROJECT_ROOT")
 @EnforcedProperty(ClassLevelProperty.COMPILER_OUTPUT_INTERCEPTOR, "NONE")
-class ClassicCompilerOutputTest : CompilerOutputTestBase()
-
-@TestDataPath("\$PROJECT_ROOT")
-@EnforcedProperty(ClassLevelProperty.COMPILER_OUTPUT_INTERCEPTOR, "NONE")
-class FirCompilerOutputTest : CompilerOutputTestBase() {
+class CompilerOutputTest : CompilerOutputTestBase() {
     @Test
     fun testReleaseCompilerAgainstPreReleaseFeature() {
-        val rootDir = File("native/native.tests/testData/compilerOutput/releaseCompilerAgainstPreReleaseFeature")
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/releaseCompilerAgainstPreReleaseFeature")
 
-        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled() } ?: return
+        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled(LanguageVersion.LATEST_STABLE) } ?: return
 
         val poisonedLibrary = compileLibrary(
-            settings = object : Settings(testRunSettings, listOf(PipelineType.DEFAULT)) {},
+            settings = testRunSettings,
             source = rootDir.resolve("poisonedLibrary"),
             freeCompilerArgs = listOf("-XXLanguage:+$arbitraryPoisoningFeature",),
         ).assertSuccess().resultingArtifact
 
         val library = compileLibrary(
-            settings = object : Settings(testRunSettings, listOf(PipelineType.DEFAULT)) {},
+            settings = testRunSettings,
             source = rootDir.resolve("library"),
         ).assertSuccess().resultingArtifact
 
@@ -309,26 +430,26 @@ class FirCompilerOutputTest : CompilerOutputTestBase() {
             dependencies = listOf(poisonedLibrary, library)
         ).toOutput()
 
-        KotlinTestUtils.assertEqualsToFile(
-            rootDir.resolve("output.fir.txt"),
+        TestDataAssertions.assertEqualsToFile(
+            rootDir.resolve("output.txt"),
             compilationResult.replace(arbitraryPoisoningFeature.name, "<!POISONING_LANGUAGE_FEATURE!>")
         )
     }
 
     @Test
     fun testReleaseCompilerWithoutUsageOfPreReleaseFeature() {
-        val rootDir = File("native/native.tests/testData/compilerOutput/releaseCompilerWithoutUsageOfPreReleaseFeature")
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/compilerOutput/releaseCompilerWithoutUsageOfPreReleaseFeature")
 
-        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled() } ?: return
+        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled(LanguageVersion.LATEST_STABLE) } ?: return
 
         val poisonedLibrary = compileLibrary(
-            settings = object : Settings(testRunSettings, listOf(PipelineType.DEFAULT)) {},
+            settings = testRunSettings,
             source = rootDir.resolve("poisonedLibrary"),
             freeCompilerArgs = listOf("-XXLanguage:+$arbitraryPoisoningFeature",),
         ).assertSuccess().resultingArtifact
 
         val library = compileLibrary(
-            settings = object : Settings(testRunSettings, listOf(PipelineType.DEFAULT)) {},
+            settings = testRunSettings,
             source = rootDir.resolve("library"),
         ).assertSuccess().resultingArtifact
 
@@ -338,8 +459,8 @@ class FirCompilerOutputTest : CompilerOutputTestBase() {
             dependencies = listOf(poisonedLibrary, library)
         ).toOutput()
 
-        KotlinTestUtils.assertEqualsToFile(
-            rootDir.resolve("output.fir.txt"),
+        TestDataAssertions.assertEqualsToFile(
+            rootDir.resolve("output.txt"),
             compilationResult.replace(arbitraryPoisoningFeature.name, "<!POISONING_LANGUAGE_FEATURE!>")
         )
     }

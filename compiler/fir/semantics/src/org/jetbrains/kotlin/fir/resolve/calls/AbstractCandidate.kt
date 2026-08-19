@@ -18,6 +18,9 @@ abstract class AbstractCandidate {
 }
 
 abstract class AbstractCallCandidate<P : AbstractConeResolutionAtom> : AbstractCandidate() {
+    /**
+     * Contains mapping of arguments to value and context parameters (in case of explicit context arguments).
+     */
     abstract val argumentMapping: LinkedHashMap<P, FirValueParameter>
     abstract val argumentMappingInitialized: Boolean
     abstract val dispatchReceiver: AbstractConeResolutionAtom?
@@ -27,6 +30,7 @@ abstract class AbstractCallCandidate<P : AbstractConeResolutionAtom> : AbstractC
     abstract val callInfo: AbstractCallInfo
     abstract val diagnostics: List<ResolutionDiagnostic>
     abstract val errors: List<ConstraintSystemError>
+    abstract val isSuccessful: Boolean
     abstract val system: NewConstraintSystem
     abstract val usedOuterCs: Boolean
 }

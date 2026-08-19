@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 class Foo {
     fun f1() {}
     infix fun f2(x: Int) {}

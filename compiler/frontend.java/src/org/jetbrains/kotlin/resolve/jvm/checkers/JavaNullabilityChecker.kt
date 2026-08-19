@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.resolve.jvm.checkers
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.cfg.WhenChecker
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
@@ -39,9 +40,11 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.checker.*
 import org.jetbrains.kotlin.types.expressions.SenselessComparisonChecker
+import org.jetbrains.kotlin.types.model.CustomSubtypingCallback
 import org.jetbrains.kotlin.types.model.KotlinTypeMarker
 import org.jetbrains.kotlin.types.typeUtil.makeNotNullable
 
+@K1Deprecation
 class JavaNullabilityChecker(val upperBoundChecker: UpperBoundChecker) : AdditionalTypeChecker {
     override fun checkType(
         expression: KtExpression,
@@ -144,7 +147,7 @@ class JavaNullabilityChecker(val upperBoundChecker: UpperBoundChecker) : Additio
             resolvedCall.typeArguments.entries
         }
 
-        for ((typeParameter, typeArgument) in typeArguments) {
+        for ([typeParameter, typeArgument] in typeArguments) {
             // continue if we don't have explicit type arguments
             val typeReference = call.typeArguments.getOrNull(typeParameter.index)?.typeReference ?: continue
 
@@ -166,25 +169,29 @@ class JavaNullabilityChecker(val upperBoundChecker: UpperBoundChecker) : Additio
 
         var foundSubtypeTypeParameter: TypeParameterDescriptor? = null
 
-        @OptIn(ClassicTypeCheckerStateInternals::class)
-        val typeState: TypeCheckerState = object : ClassicTypeCheckerState(isErrorTypeEqualsToAnything = true) {
-            private var expectsTypeArgument = false
-            override fun customIsSubtypeOf(subType: KotlinTypeMarker, superType: KotlinTypeMarker): Boolean {
-
-                if (isNullableTypeAgainstNotNullTypeParameter(subType as KotlinType, superType as KotlinType)) {
-                    // data flow value is only checked for top-level types
-                    if (expectsTypeArgument || c.dataFlowInfo.getStableNullability(dataFlowValueForWholeExpression()) != Nullability.NOT_NULL) {
-                        foundSubtypeTypeParameter = subType.constructor.declarationDescriptor as? TypeParameterDescriptor
-                        return false
-                    }
+        var expectsTypeArgument = false
+        fun customIsSubtypeOf(subType: KotlinTypeMarker, superType: KotlinTypeMarker): Boolean? {
+            if (isNullableTypeAgainstNotNullTypeParameter(subType as KotlinType, superType as KotlinType)) {
+                // data flow value is only checked for top-level types
+                if (expectsTypeArgument || c.dataFlowInfo.getStableNullability(dataFlowValueForWholeExpression()) != Nullability.NOT_NULL) {
+                    foundSubtypeTypeParameter = subType.constructor.declarationDescriptor as? TypeParameterDescriptor
+                    return false
                 }
-
-                if (!expectsTypeArgument) {
-                    expectsTypeArgument = true
-                }
-                return true
             }
+
+            if (!expectsTypeArgument) {
+                expectsTypeArgument = true
+            }
+            return null // returning null means that we should proceed with the usual subtyping
         }
+
+        @OptIn(ClassicTypeCheckerStateInternals::class)
+        val typeState: TypeCheckerState = ClassicTypeCheckerState(
+            isErrorTypeEqualsToAnything = true,
+            typeSystemContext = object : ClassicTypeSystemContext {
+                override val customSubtypingCallback: CustomSubtypingCallback = ::customIsSubtypeOf
+            },
+        )
 
         AbstractTypeChecker.isSubtypeOf(typeState, expressionType, c.expectedType)
 
@@ -292,6 +299,7 @@ class JavaNullabilityChecker(val upperBoundChecker: UpperBoundChecker) : Additio
     }
 }
 
+@K1Deprecation
 class EnhancedNullabilityInfo(val enhancedType: KotlinType, val isFromJava: Boolean) {
     val isFromKotlin get() = !isFromJava
 }
@@ -299,6 +307,7 @@ class EnhancedNullabilityInfo(val enhancedType: KotlinType, val isFromJava: Bool
 private fun KotlinType.enhancementFromKotlin() = EnhancedNullabilityInfo(this, isFromJava = false)
 private fun TypeWithEnhancement.enhancementFromJava() = EnhancedNullabilityInfo(enhancement, isFromJava = true)
 
+@K1Deprecation
 fun KotlinType.mustNotBeNull(): EnhancedNullabilityInfo? = when {
     !isError && !isFlexible() && !TypeUtils.acceptsNullable(this) -> enhancementFromKotlin()
     isFlexible() && !TypeUtils.acceptsNullable(asFlexibleType().upperBound) -> enhancementFromKotlin()

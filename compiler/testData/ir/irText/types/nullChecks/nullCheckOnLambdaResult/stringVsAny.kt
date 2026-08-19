@@ -1,5 +1,4 @@
 // TARGET_BACKEND: JVM
-// FIR_IDENTICAL
 
 // FILE: stringVsAny.kt
 fun useAny(fn: () -> Any) = fn()

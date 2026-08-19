@@ -3,6 +3,7 @@ KaTypeParameterSymbol:
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   isReified: false
   location: LOCAL
   modality: FINAL
@@ -14,6 +15,7 @@ KaTypeParameterSymbol:
   getContainingFileSymbol: KaFileSymbol(functionWithTypeParams.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -25,6 +27,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -50,6 +53,7 @@ KaNamedFunctionSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: LOCAL
       modality: FINAL
@@ -61,6 +65,7 @@ KaNamedFunctionSymbol:
       getContainingFileSymbol: KaFileSymbol(functionWithTypeParams.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   valueParameters: [
     KaValueParameterSymbol:
@@ -69,11 +74,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -91,6 +100,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: FunctionWithTypeParamsKt
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(functionWithTypeParams.kt)
@@ -98,3 +108,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: foo

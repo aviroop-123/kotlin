@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.fir.scopes.jvm.computeJvmDescriptorRepresentation
 import org.jetbrains.kotlin.fir.scopes.processOverriddenFunctions
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.unwrapFakeOverrides
@@ -119,8 +120,8 @@ class JavaOverrideChecker internal constructor(
     // In most cases checking erasure of value parameters should be enough, but in some cases there might be semi-valid Java hierarchies
     // with same value parameters, but different return type kinds, so it's worth distinguishing them as different non-overridable members
     fun doesReturnTypesHaveSameKind(
-        candidate: FirSimpleFunction,
-        base: FirSimpleFunction,
+        candidate: FirNamedFunction,
+        base: FirNamedFunction,
     ): Boolean {
         val candidateTypeRef = candidate.returnTypeRef
         val baseTypeRef = base.returnTypeRef
@@ -148,7 +149,7 @@ class JavaOverrideChecker internal constructor(
         return isPrimitiveOrNullablePrimitive || isVoid
     }
 
-    private fun FirSimpleFunction.hasPrimitiveReturnTypeInJvm(returnType: ConeKotlinType): Boolean {
+    private fun FirNamedFunction.hasPrimitiveReturnTypeInJvm(returnType: ConeKotlinType): Boolean {
         if (!returnType.isPrimitiveInJava(isReturnType = true)) return false
 
         var foundNonPrimitiveOverridden = false
@@ -182,19 +183,30 @@ class JavaOverrideChecker internal constructor(
 
     private fun Collection<FirTypeParameterRef>.buildErasure() = associate {
         val symbol = it.symbol
-        val firstBound = symbol.fir.bounds.firstOrNull() // Note that in Java type parameter typed arguments always erased to first bound
+        symbol to symbol.findFirstBoundForErasure(hashSetOf())
+    }
+
+    private fun FirTypeParameterSymbol.findFirstBoundForErasure(visited: MutableSet<FirTypeParameterSymbol>): ConeKotlinType {
+        val alreadyVisited = this in visited
+        visited += this
+        val firstBound = fir.bounds.firstOrNull()
         if (firstBound == null) {
             errorWithAttachment("Bound element is not found") {
-                withFirEntry("typeParameterRef", it)
-                val firTypeParameter = it.symbol.fir
+                withFirEntry("typeParameterRef", fir)
+                val firTypeParameter = fir
                 withFirEntry("typeParameter", firTypeParameter)
                 withFirEntry("containingDeclaration", firTypeParameter.containingDeclarationSymbol.fir)
             }
         }
-
-        symbol to firstBound.toConeKotlinTypeProbablyFlexible(
-            session, javaTypeParameterStack, it.source?.fakeElement(KtFakeSourceElementKind.Enhancement)
+        val firstBoundType = firstBound.toConeKotlinTypeProbablyFlexible(
+            session, javaTypeParameterStack, source?.fakeElement(KtFakeSourceElementKind.Enhancement)
         )
+        val unwrapped = firstBoundType.unwrapLowerBound()
+        return if (!alreadyVisited && unwrapped is ConeTypeParameterType) {
+            unwrapped.lookupTag.symbol.findFirstBoundForErasure(visited)
+        } else {
+            firstBoundType
+        }
     }
 
     private fun FirTypeRef?.isTypeParameterDependent(): Boolean =
@@ -212,7 +224,7 @@ class JavaOverrideChecker internal constructor(
     private fun FirCallableDeclaration.isTypeParameterDependent(): Boolean =
         typeParameters.isNotEmpty() || returnTypeRef.isTypeParameterDependent() ||
                 receiverParameter?.typeRef.isTypeParameterDependent() ||
-                this is FirSimpleFunction && valueParameters.any { it.returnTypeRef.isTypeParameterDependent() }
+                this is FirNamedFunction && valueParameters.any { it.returnTypeRef.isTypeParameterDependent() }
 
     private fun FirTypeRef.extractTypeParametersTo(result: MutableCollection<FirTypeParameterRef>) {
         if (this is FirResolvedTypeRef) {
@@ -241,14 +253,15 @@ class JavaOverrideChecker internal constructor(
         result += typeParameters
         returnTypeRef.extractTypeParametersTo(result)
         receiverParameter?.typeRef?.extractTypeParametersTo(result)
-        if (this is FirSimpleFunction) {
+        if (this is FirNamedFunction) {
             this.valueParameters.forEach { it.returnTypeRef.extractTypeParametersTo(result) }
         }
     }
 
     override fun buildTypeParametersSubstitutorIfCompatible(
         overrideCandidate: FirCallableDeclaration,
-        baseDeclaration: FirCallableDeclaration
+        baseDeclaration: FirCallableDeclaration,
+        checkReifiednessIsSame: Boolean,
     ): ConeSubstitutor {
         overrideCandidate.lazyResolveToPhase(FirResolvePhase.TYPES)
         baseDeclaration.lazyResolveToPhase(FirResolvePhase.TYPES)
@@ -262,7 +275,7 @@ class JavaOverrideChecker internal constructor(
         return substitutorByMap(typeParameters.buildErasure(), session)
     }
 
-    override fun isOverriddenFunction(overrideCandidate: FirSimpleFunction, baseDeclaration: FirSimpleFunction): Boolean {
+    override fun isOverriddenFunction(overrideCandidate: FirNamedFunction, baseDeclaration: FirNamedFunction): Boolean {
         if (overrideCandidate.isStatic != baseDeclaration.isStatic) return false
         if (Visibilities.isPrivate(baseDeclaration.visibility)) return false
 
@@ -289,7 +302,7 @@ class JavaOverrideChecker internal constructor(
         return true
     }
 
-    private fun FirSimpleFunction.hasSameValueParameterTypes(other: FirSimpleFunction): Boolean {
+    private fun FirNamedFunction.hasSameValueParameterTypes(other: FirNamedFunction): Boolean {
         // NB: 'this' is counted as a Java method that cannot have a receiver
         val otherValueParameterTypes = other.collectValueParameterTypes()
         val valueParameterTypes = valueParameters.map { it.returnTypeRef }
@@ -321,7 +334,7 @@ class JavaOverrideChecker internal constructor(
         return true
     }
 
-    private fun FirSimpleFunction.collectValueParameterTypes(): List<FirTypeRef> {
+    private fun FirNamedFunction.collectValueParameterTypes(): List<FirTypeRef> {
         return buildList {
             contextParameters.mapTo(this) { it.returnTypeRef }
             receiverParameter?.typeRef?.let { add(it) }
@@ -338,13 +351,13 @@ class JavaOverrideChecker internal constructor(
 
         val receiverTypeRef = baseDeclaration.receiverParameter?.typeRef
         return when (overrideCandidate) {
-            is FirSimpleFunction -> {
+            is FirNamedFunction -> {
                 if (receiverTypeRef == null) {
                     // TODO: setters
-                    return overrideCandidate.valueParameters.isEmpty()
+                    overrideCandidate.valueParameters.isEmpty()
                 } else {
                     if (overrideCandidate.valueParameters.size != 1) return false
-                    return isEqualTypes(
+                    isEqualTypes(
                         receiverTypeRef, overrideCandidate.valueParameters.single().returnTypeRef, ConeSubstitutor.Empty,
                         forceBoxCandidateType = false, forceBoxBaseType = false,
                         dontComparePrimitivity = false,
@@ -353,7 +366,7 @@ class JavaOverrideChecker internal constructor(
             }
             is FirProperty -> {
                 val overrideReceiverTypeRef = overrideCandidate.receiverParameter?.typeRef
-                return when {
+                when {
                     receiverTypeRef == null -> overrideReceiverTypeRef == null
                     overrideReceiverTypeRef == null -> false
                     else -> isEqualTypes(
@@ -371,7 +384,7 @@ class JavaOverrideChecker internal constructor(
     // Otherwise this method might clash with 'remove(I): E' defined in the java.util.List JDK interface (mapped to kotlin 'removeAt').
     // As in the K1 implementation in `methodSignatureMapping.kt`, we're checking if the method has `MutableCollection.remove`
     // in its overridden symbols.
-    private fun forceSingleValueParameterBoxing(function: FirSimpleFunction): Boolean {
+    private fun forceSingleValueParameterBoxing(function: FirNamedFunction): Boolean {
         if (function.name.asString() != "remove" || function.receiverParameter != null || function.contextParameters.isNotEmpty())
             return false
 

@@ -1,11 +1,12 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // WITH_STDLIB
 // FULL_JDK
+// LANGUAGE: -ProperSupportOfInnerClassesInCallableReferenceLHS
 
 fun <ItemType> setupListSpeedSearch() {
     class MatchedItem(val item: ItemType)
     class MatchedItem1<T>(val item: ItemType)
-    <!CLASS_LITERAL_LHS_NOT_A_CLASS!>MatchedItem::class<!>
+    MatchedItem::class
     MatchedItem::item
     MatchedItem1::class
     <!WRONG_NUMBER_OF_TYPE_ARGUMENTS!>MatchedItem1<!>::item

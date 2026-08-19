@@ -416,6 +416,7 @@ public fun CharSequence.subSequence(range: IntRange): CharSequence = subSequence
 @kotlin.internal.InlineOnly
 @Suppress("EXTENSION_SHADOWED_BY_MEMBER") // false warning
 @Deprecated("Use parameters named startIndex and endIndex.", ReplaceWith("subSequence(startIndex = start, endIndex = end)"))
+@DeprecatedSinceKotlin(warningSince = "1.0", errorSince = "2.3")
 public inline fun String.subSequence(start: Int, end: Int): CharSequence = subSequence(start, end)
 
 /**
@@ -664,6 +665,8 @@ public fun String.removeSuffix(suffix: CharSequence): String {
  * When this char sequence starts with the given [prefix] and ends with the given [suffix],
  * returns a new char sequence having both the given [prefix] and [suffix] removed.
  * Otherwise, returns a new char sequence with the same characters.
+ *
+ * @sample samples.text.Strings.removeSurroundingPrefixSuffixCharSequence
  */
 public fun CharSequence.removeSurrounding(prefix: CharSequence, suffix: CharSequence): CharSequence {
     if ((length >= prefix.length + suffix.length) && startsWith(prefix) && endsWith(suffix)) {
@@ -676,6 +679,8 @@ public fun CharSequence.removeSurrounding(prefix: CharSequence, suffix: CharSequ
  * Removes from a string both the given [prefix] and [suffix] if and only if
  * it starts with the [prefix] and ends with the [suffix].
  * Otherwise, returns this string unchanged.
+ *
+ * @sample samples.text.Strings.removeSurroundingPrefixSuffixString
  */
 public fun String.removeSurrounding(prefix: CharSequence, suffix: CharSequence): String {
     if ((length >= prefix.length + suffix.length) && startsWith(prefix) && endsWith(suffix)) {
@@ -688,6 +693,8 @@ public fun String.removeSurrounding(prefix: CharSequence, suffix: CharSequence):
  * When this char sequence starts with and ends with the given [delimiter],
  * returns a new char sequence having this [delimiter] removed both from the start and end.
  * Otherwise, returns a new char sequence with the same characters.
+ *
+ * @sample samples.text.Strings.removeSurroundingDelimiterCharSequence
  */
 public fun CharSequence.removeSurrounding(delimiter: CharSequence): CharSequence = removeSurrounding(delimiter, delimiter)
 
@@ -695,6 +702,8 @@ public fun CharSequence.removeSurrounding(delimiter: CharSequence): CharSequence
  * Removes the given [delimiter] string from both the start and the end of this string
  * if and only if it starts with and ends with the [delimiter].
  * Otherwise, returns this string unchanged.
+ *
+ * @sample samples.text.Strings.removeSurroundingDelimiterString
  */
 public fun String.removeSurrounding(delimiter: CharSequence): String = removeSurrounding(delimiter, delimiter)
 
@@ -1190,6 +1199,7 @@ public operator fun CharSequence.contains(other: CharSequence, ignoreCase: Boole
  * Returns `true` if this char sequence contains the specified character [char].
  *
  * @param ignoreCase `true` to ignore character case when comparing characters. By default `false`.
+ * @sample samples.text.Strings.containsChar
  */
 @Suppress("INAPPLICABLE_OPERATOR_MODIFIER")
 public operator fun CharSequence.contains(char: Char, ignoreCase: Boolean = false): Boolean =
@@ -1233,7 +1243,7 @@ private class DelimitedRangesSequence(
                         nextItem = currentStartIndex..input.lastIndex
                         nextSearchIndex = -1
                     } else {
-                        val (index, length) = match
+                        val [index, length] = match
                         nextItem = currentStartIndex until index
                         currentStartIndex = index + length
                         nextSearchIndex = currentStartIndex + if (length == 0) 1 else 0
@@ -1416,7 +1426,7 @@ public fun CharSequence.splitToSequence(vararg delimiters: String, ignoreCase: B
 public fun CharSequence.split(vararg delimiters: String, ignoreCase: Boolean = false, limit: Int = 0): List<String> {
     if (delimiters.size == 1) {
         val delimiter = delimiters[0]
-        if (!delimiter.isEmpty()) {
+        if (delimiter.isNotEmpty()) {
             return split(delimiter, ignoreCase, limit)
         }
     }
@@ -1638,4 +1648,21 @@ public fun String.toBooleanStrictOrNull(): Boolean? = when (this) {
     "true" -> true
     "false" -> false
     else -> null
+}
+
+/**
+ * Scans the string (skips its characters) starting from [startIndex] until [predicate] return `false`,
+ * and returns the index of the first character rejected by the predicate, or the length of [this] string,
+ * whichever is reached first.
+ *
+ * This function is intended for internal use only and does not validate [startIndex] index value.
+ *
+ * @param startIndex the index to start scanning from
+ * @param predicate a test applied to each character of the scanned string prefix
+ * @return the index of a first character not conforming to the [predicate], or the length of this string, if all characters conform it.
+ */
+internal inline fun String.skipWhile(startIndex: Int, predicate: (Char) -> Boolean): Int {
+    var i = startIndex
+    while (i < length && predicate(this[i])) i++
+    return i
 }

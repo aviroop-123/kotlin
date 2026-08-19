@@ -76,6 +76,14 @@ private class ConeContractDescriptionElementToAnalysisApi(
             callsEffect.kind,
         )
 
+    override fun visitReturnsResultOfEffectDeclaration(
+        returnsResultOfEffect: KtReturnsResultOfDeclaration<ConeKotlinType, ConeDiagnostic>,
+        data: Unit,
+    ): KaContractReturnsResultOfEffectDeclaration =
+        KaBaseContractReturnsResultOfEffectDeclaration(
+            returnsResultOfEffect.valueParameterReference.accept(),
+        )
+
     override fun visitLogicalBinaryOperationContractExpression(
         binaryLogicExpression: ConeBinaryLogicExpression,
         data: Unit
@@ -111,6 +119,22 @@ private class ConeContractDescriptionElementToAnalysisApi(
             else -> error("Can't convert $booleanConstantDescriptor to Analysis API")
         }
 
+    override fun visitHoldsInEffectDeclaration(
+        holdsInEffect: KtHoldsInEffectDeclaration<ConeKotlinType, ConeDiagnostic>,
+        data: Unit,
+    ): KaContractHoldsInEffectDeclaration = KaBaseContractHoldsInEffectDeclaration(
+        backingCondition = holdsInEffect.argumentsCondition.accept(),
+        backingValueParameterReference = holdsInEffect.valueParameterReference.accept(),
+    )
+
+    override fun visitConditionalReturnsDeclaration(
+        conditionalEffect: KtConditionalReturnsDeclaration<ConeKotlinType, ConeDiagnostic>,
+        data: Unit
+    ): KaContractConditionalContractEffectDeclaration = KaBaseContractConditionalContractEffectDeclaration(
+        backingEffect = conditionalEffect.returnsEffect.accept(),
+        backingCondition = conditionalEffect.argumentsCondition.accept(),
+    )
+
     override fun visitValueParameterReference(
         valueParameterReference: ConeValueParameterReference,
         data: Unit
@@ -142,7 +166,7 @@ private class ConeContractDescriptionElementToAnalysisApi(
 
             in firFunctionSymbol.valueParameters.indices -> firFunctionSymbol.valueParameters[index]
 
-            // Property accessors are not supported in the Analysis API
+            // TODO: KT-82177 Property accessors are not supported in the Analysis API Surface
             else -> firFunctionSymbol.contextParameters.elementAtOrNull(index - firFunctionSymbol.valueParameters.size)
                 ?: errorWithAttachment("${firFunctionSymbol::class.simpleName} doesn't contain parameter or context parameter with index $index") {
                     withFirEntry("fir", firFunctionSymbol.firSymbol.fir)

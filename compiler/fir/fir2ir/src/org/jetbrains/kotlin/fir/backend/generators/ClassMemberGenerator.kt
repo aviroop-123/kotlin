@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter
 import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.expressions.FirExpression
+import org.jetbrains.kotlin.fir.expressions.FirReplExpressionReference
 import org.jetbrains.kotlin.fir.extensions.declarationGenerators
 import org.jetbrains.kotlin.fir.extensions.extensionService
 import org.jetbrains.kotlin.fir.extensions.generatedMembers
@@ -30,13 +31,16 @@ import org.jetbrains.kotlin.fir.references.toResolvedConstructorSymbol
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.fir.resultOrNull
+import org.jetbrains.kotlin.fir.utils.exceptions.withSourceEntry
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrFieldAccessExpression
+import org.jetbrains.kotlin.ir.expressions.IrGetValue
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.*
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
@@ -45,6 +49,7 @@ import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.resolve.DataClassResolver
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
+import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
 
 internal class ClassMemberGenerator(
     private val c: Fir2IrComponents,
@@ -93,6 +98,13 @@ internal class ClassMemberGenerator(
                 }
             }
 
+            // For full value class primary constructors with a non-Any superclass,
+            // move field-from-parameter initializations before the delegating super call.
+            @OptIn(UnsafeDuringIrConstructionAPI::class)
+            if (!configuration.skipBodies && irPrimaryConstructor != null && irClass.isFullValueClass && irClass.superClass != null && irClass.isFinalClass) {
+                moveFieldFromParameterInitsBeforeSuperCall(irPrimaryConstructor, irClass)
+            }
+
             annotationGenerator.generate(irClass, klass)
             if (irPrimaryConstructor != null) {
                 declarationStorage.leaveScope(irPrimaryConstructor.symbol)
@@ -113,7 +125,7 @@ internal class ClassMemberGenerator(
                 }
                 val irParameters = parameters.filter { it.kind == IrParameterKind.Regular }
                 val annotationMode = containingClass?.classKind == ClassKind.ANNOTATION_CLASS && irFunction is IrConstructor
-                for ((valueParameter, firValueParameter) in irParameters.zip(firFunction.valueParameters)) {
+                for ([valueParameter, firValueParameter] in irParameters.zip(firFunction.valueParameters)) {
                     visitor.withAnnotationMode(enableAnnotationMode = annotationMode) {
                         valueParameter.setDefaultValue(firValueParameter)
                     }
@@ -134,34 +146,6 @@ internal class ClassMemberGenerator(
                             }
                         }
                         body.statements += irDelegatingConstructorCall
-                    }
-
-                    // TODO(KT-72994) remove when context receivers are removed
-                    if (containingClass is FirRegularClass && containingClass.contextParameters.isNotEmpty()) {
-                        val contextReceiverFields =
-                            c.classifierStorage.getFieldsWithContextReceiversForClass(irClass, containingClass)
-
-                        val thisParameter =
-                            conversionScope.dispatchReceiverParameter(irClass) ?: error("No found this parameter for $irClass")
-
-                        val irContextParameters = parameters.filter { it.kind == IrParameterKind.Context }
-
-                        for (index in containingClass.contextParameters.indices) {
-                            require(contextReceiverFields.size > index) {
-                                "Not defined context receiver #${index} for $irClass. " +
-                                        "Context receivers found: $contextReceiverFields"
-                            }
-                            val irValueParameter = irContextParameters[index]
-                            body.statements.add(
-                                IrSetFieldImpl(
-                                    UNDEFINED_OFFSET, UNDEFINED_OFFSET,
-                                    contextReceiverFields[index].symbol,
-                                    IrGetValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, thisParameter.type, thisParameter.symbol),
-                                    IrGetValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, irValueParameter.type, irValueParameter.symbol),
-                                    c.builtins.unitType,
-                                )
-                            )
-                        }
                     }
 
                     if (delegatedConstructor?.isThis == false) {
@@ -236,12 +220,16 @@ internal class ClassMemberGenerator(
         val initializer = property.backingField?.initializer ?: property.initializer
         val delegate = property.delegate
         val propertyType = property.returnTypeRef.toIrType()
-        irProperty.initializeBackingField(property, initializerExpression = initializer ?: delegate)
+        // REPL snippet properties are initialized within the `$$eval` function.
+        val initializerExpression = (initializer ?: delegate)?.takeIf { it !is FirReplExpressionReference }
+        irProperty.initializeBackingField(property, initializerExpression = initializerExpression)
         val needGenerateDefaultGetter = property.getter is FirDefaultPropertyGetter ||
                 (property.getter == null && irProperty.parent is IrScript && property.destructuringDeclarationContainerVariable != null)
 
         irProperty.getter?.setPropertyAccessorContent(
-            property.getter, irProperty, propertyType, isDefault = needGenerateDefaultGetter
+            property.getter, irProperty,
+            fieldType = irProperty.backingField?.type?.takeIf { property.hasExplicitBackingField } ?: propertyType,
+            isDefault = needGenerateDefaultGetter
         )
         // Create fake body for Enum.entries
         if (irProperty.origin == IrDeclarationOrigin.ENUM_CLASS_SPECIAL_MEMBER) {
@@ -251,7 +239,9 @@ internal class ClassMemberGenerator(
 
         if (property.isVar) {
             irProperty.setter?.setPropertyAccessorContent(
-                property.setter, irProperty, propertyType, property.setter is FirDefaultPropertySetter
+                property.setter, irProperty,
+                fieldType = irProperty.backingField?.type?.takeIf { property.hasExplicitBackingField } ?: propertyType,
+                isDefault = property.setter is FirDefaultPropertySetter
             )
         }
         annotationGenerator.generate(irProperty, property)
@@ -301,7 +291,7 @@ internal class ClassMemberGenerator(
     private fun IrSimpleFunction.setPropertyAccessorContent(
         propertyAccessor: FirPropertyAccessor?,
         correspondingProperty: IrProperty,
-        propertyType: IrType,
+        fieldType: IrType,
         isDefault: Boolean
     ) {
         conversionScope.withFunction(this) {
@@ -323,14 +313,14 @@ internal class ClassMemberGenerator(
                                         value = IrGetValueImpl(
                                             startOffset,
                                             endOffset,
-                                            propertyType,
+                                            fieldType,
                                             parameters.first { it.kind == IrParameterKind.Regular }.symbol
                                         )
                                     }
                                 } else {
                                     IrReturnImpl(
                                         startOffset, endOffset, builtins.nothingType, symbol,
-                                        IrGetFieldImpl(startOffset, endOffset, fieldSymbol, propertyType).setReceiver(declaration)
+                                        IrGetFieldImpl(startOffset, endOffset, fieldSymbol, fieldType).setReceiver(declaration)
                                     )
                                 }
                             )
@@ -340,6 +330,32 @@ internal class ClassMemberGenerator(
                 }
             }
         }
+    }
+
+    @OptIn(UnsafeDuringIrConstructionAPI::class)
+    private fun moveFieldFromParameterInitsBeforeSuperCall(irConstructor: IrConstructor, irClass: IrClass) {
+        val body = irConstructor.body ?: return
+        requireWithAttachment(condition = body is IrBlockBody, message = { "Expected IrBlockBody" }) {
+            withEntry("body", body.dump())
+        }
+        val fieldInits = buildList {
+            for (declaration in irClass.declarations) {
+                val field = (declaration as? IrProperty)?.backingField ?: continue
+                val initializer = field.initializer ?: continue
+                if ((initializer.expression as? IrGetValue)?.origin != IrStatementOrigin.INITIALIZE_PROPERTY_FROM_PARAMETER) continue
+                val fieldInitialization = IrSetFieldImpl(
+                    initializer.startOffset, initializer.endOffset,
+                    field.symbol,
+                    IrGetValueImpl(initializer.startOffset, initializer.endOffset, irClass.thisReceiver!!.symbol),
+                    initializer.expression,
+                    builtins.unitType,
+                    IrStatementOrigin.INITIALIZE_FIELD,
+                )
+                add(fieldInitialization)
+                field.initializer = null
+            }
+        }
+        body.statements.addAll(0, fieldInits)
     }
 
     private fun IrFieldAccessExpression.setReceiver(declaration: IrDeclaration): IrFieldAccessExpression {
@@ -404,7 +420,7 @@ internal class ClassMemberGenerator(
         }
 
         if (constructor.typeParameters.isNotEmpty() && typeArguments.isNotEmpty()) {
-            for ((index, typeArgument) in typeArguments.withIndex()) {
+            for ([index, typeArgument] in typeArguments.withIndex()) {
                 if (index >= constructor.typeParameters.size) break
                 call.typeArguments[index] = (typeArgument as ConeKotlinTypeProjection).type.toIrType()
             }
@@ -426,7 +442,7 @@ internal class ClassMemberGenerator(
             return // TODO: Remove when KT-67381 is implemented
         }
 
-        val firDefaultValue = firValueParameter.defaultValue
+        val firDefaultValue = firValueParameter.evaluatedInitializer?.resultOrNull<FirExpression>() ?: firValueParameter.defaultValue
         if (firDefaultValue != null) {
             this.defaultValue = when {
                 configuration.skipBodies && parent.isDataClassCopy ->

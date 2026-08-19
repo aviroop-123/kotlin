@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,7 +7,8 @@ package org.jetbrains.kotlin.analysis.api.impl.base.test.cases.components.typeCr
 
 import org.jetbrains.kotlin.analysis.api.components.KaClassTypeBuilder
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForDebug
-import org.jetbrains.kotlin.analysis.api.types.KaType
+import org.jetbrains.kotlin.analysis.api.symbols.KaDebugRenderer
+import org.jetbrains.kotlin.analysis.api.types.abbreviationOrSelf
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.analysis.test.framework.base.AbstractAnalysisApiBasedTest
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
@@ -54,12 +55,13 @@ abstract class AbstractBuildClassTypeTest : AbstractAnalysisApiBasedTest() {
         val actual = copyAwareAnalyzeForTest(mainFile) { contextFile ->
             val targetExpression = testServices.expressionMarkerProvider
                 .getBottommostSelectedElementOfType(contextFile, KtExpression::class)
-            val expressionType = targetExpression.expressionType ?: error("Expression type is null")
+            val expressionType = targetExpression.expressionType?.abbreviationOrSelf ?: error("Expression type is null")
             val allTypesById = testServices.expressionMarkerProvider.getAllCarets(contextFile).associate { caret ->
                 val qualifier = caret.qualifier
                 val caretExpression =
                     testServices.expressionMarkerProvider.getBottommostElementOfTypeAtCaret<KtExpression>(contextFile, qualifier)
-                val expressionType = caretExpression.expressionType ?: error("Expression under $qualifier doesn't have a type")
+                val expressionType =
+                    caretExpression.expressionType?.abbreviationOrSelf ?: error("Expression under $qualifier doesn't have a type")
                 val id = caret.qualifier.toIntOrNull() ?: error("Caret qualifier $qualifier is not a number")
 
                 id to expressionType
@@ -92,27 +94,33 @@ abstract class AbstractBuildClassTypeTest : AbstractAnalysisApiBasedTest() {
                     appendLine("   ClassId is null")
                 } else {
                     val classTypeByClassId = buildClassType(classId, builderConfiguration)
-
+                    appendLine("TYPE:")
                     appendLine(
-                        "   ${KaType::class.simpleName}: ${
-                            classTypeByClassId.render(
-                                renderer = KaTypeRendererForDebug.WITH_QUALIFIED_NAMES,
-                                position = Variance.INVARIANT,
-                            )
-                        }"
+                        KaDebugRenderer(renderTypeByProperties = true).renderType(useSiteSession, classTypeByClassId)
+                    )
+                    appendLine("RENDERED TYPE:")
+                    appendLine(
+                        classTypeByClassId.render(
+                            renderer = KaTypeRendererForDebug.WITH_QUALIFIED_NAMES,
+                            position = Variance.INVARIANT,
+                        )
                     )
                 }
 
                 val classTypeBySymbol = buildClassType(symbol, builderConfiguration)
 
+                appendLine()
                 appendLine("CLASS_TYPE_BY_SYMBOL")
+                appendLine("TYPE:")
                 appendLine(
-                    "   ${KaType::class.simpleName}: ${
-                        classTypeBySymbol.render(
-                            renderer = KaTypeRendererForDebug.WITH_QUALIFIED_NAMES,
-                            position = Variance.INVARIANT,
-                        )
-                    }"
+                    KaDebugRenderer(renderTypeByProperties = true).renderType(useSiteSession, classTypeBySymbol)
+                )
+                appendLine("RENDERED TYPE:")
+                appendLine(
+                    classTypeBySymbol.render(
+                        renderer = KaTypeRendererForDebug.WITH_QUALIFIED_NAMES,
+                        position = Variance.INVARIANT,
+                    )
                 )
             }
         }
@@ -126,7 +134,7 @@ abstract class AbstractBuildClassTypeTest : AbstractAnalysisApiBasedTest() {
     }
 
     private object Directives : SimpleDirectivesContainer() {
-        val NULLABLE by directive("Make resulting type nullable")
+        val NULLABLE by directive("Make the resulting type nullable")
         val ARGUMENT by valueDirective("Type argument to use for class creation") { string ->
             val splits = string.split("_")
             val variance = splits.first()

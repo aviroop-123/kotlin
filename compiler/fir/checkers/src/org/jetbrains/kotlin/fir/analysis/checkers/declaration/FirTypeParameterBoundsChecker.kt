@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.analysis.checkers.*
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
-import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
 import org.jetbrains.kotlin.fir.declarations.utils.isOverride
 import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
@@ -21,14 +21,11 @@ import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.types.model.KotlinTypeMarker
 import org.jetbrains.kotlin.types.model.TypeCheckerProviderContext
-import org.jetbrains.kotlin.types.model.makeDefinitelyNotNullOrNotNull
 
 sealed class FirTypeParameterBoundsChecker(mppKind: MppCheckerKind) : FirTypeParameterChecker(mppKind) {
     object Regular : FirTypeParameterBoundsChecker(MppCheckerKind.Platform) {
@@ -123,7 +120,7 @@ sealed class FirTypeParameterBoundsChecker(mppKind: MppCheckerKind) : FirTypePar
         declaration: FirTypeParameter,
     ) {
         val bounds = declaration.symbol.resolvedBounds.distinctBy { it.coneType }
-        val (boundWithParam, otherBounds) = bounds.partition { it.coneType is ConeTypeParameterType }
+        val [boundWithParam, otherBounds] = bounds.partition { it.coneType is ConeTypeParameterType }
         if (boundWithParam.size > 1 || (boundWithParam.size == 1 && otherBounds.isNotEmpty())) {
             // If there's only one problematic bound (either 2 type parameter bounds, or 1 type parameter bound + 1 other bound),
             // report the diagnostic on that bound

@@ -6,14 +6,15 @@ plugins {
     kotlin("jvm")
     id("d8-configuration")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 repositories {
-    if (!kotlinBuildProperties.isTeamcityBuild) {
+    if (!kotlinBuildProperties.isTeamcityBuild.get()) {
         androidXMavenLocal(androidXMavenLocalPath)
     }
-    androidxSnapshotRepo(composeRuntimeSnapshot.versions.snapshot.id.get())
     composeGoogleMaven(libs.versions.compose.stable.get())
+    androidxSnapshotRepo(composeRuntimeSnapshot.versions.snapshot.id.get())
 }
 
 fun DependencyHandler.testImplementationArtifactOnly(dependency: String) {
@@ -35,12 +36,23 @@ val testJsRuntime: Configuration by configurations.creating {
 
 dependencies {
     implementation(project(":kotlin-stdlib"))
+    compileOnly(project(":compiler:backend.common.jvm"))
+    compileOnly(project(":compiler:container"))
+    compileOnly(project(":compiler:resolution"))
+    compileOnly(project(":compiler:serialization"))
+    compileOnly(project(":core:descriptors"))
+    compileOnly(project(":core:descriptors.jvm"))
+    compileOnly(project(":core:language.targets.jvm"))
+    compileOnly(project(":js:js.frontend"))
+    compileOnly(project(":kotlin-util-klib-metadata"))
     compileOnly(project(":compiler:frontend"))
     compileOnly(project(":compiler:backend.jvm"))
     compileOnly(project(":compiler:cli-base"))
     compileOnly(project(":compiler:ir.serialization.js"))
     compileOnly(project(":compiler:backend.jvm.codegen"))
+    compileOnly(project(":compiler:fir:diagnostic-renderers"))
     compileOnly(project(":compiler:fir:entrypoint"))
+    compileOnly(project(":native:native.config"))
 
     compileOnly(intellijCore())
 
@@ -48,17 +60,21 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit4)
     testRuntimeOnly(libs.junit.vintage.engine)
-    testImplementation(testFixtures(project(":analysis:analysis-api-fe10")))
     testImplementation(testFixtures(project(":analysis:analysis-api-fir")))
     testImplementation(testFixtures(project(":analysis:analysis-api-standalone")))
     testImplementation(testFixtures(project(":analysis:analysis-api-impl-base")))
     testImplementation(testFixtures(project(":analysis:analysis-test-framework")))
     testImplementation(testFixtures(project(":analysis:low-level-api-fir")))
     testImplementation(testFixtures(project(":compiler:test-infrastructure")))
-    testImplementation(testFixtures(project(":generators:analysis-api-generator")))
-    testApi(project(":compiler:plugin-api"))
+    testImplementation(testFixtures(project(":analysis:analysis-api-impl-base")))
+    testImplementation(project(":compiler:plugin-api"))
     testImplementation(testFixtures(project(":compiler:tests-common-new")))
     testImplementation(testFixtures(project(":js:js.tests")))
+
+
+    testImplementation(testFixtures(project(":kotlinx-serialization-compiler-plugin")))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
 
     // compose runtime for tests
     testImplementation(composeRuntime()) { isTransitive = false }
@@ -87,7 +103,7 @@ dependencies {
     testCompileOnly(toolsJarApi())
     testRuntimeOnly(toolsJar())
 
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -104,6 +120,8 @@ sourceSets {
         generatedTestDir()
     }
 }
+
+optInToK1Deprecation()
 
 base {
     archivesName = "kotlin-compose-compiler-plugin"
@@ -126,19 +144,34 @@ sourcesJar()
 javadocJar()
 
 projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5) {
-        dependsOn(":dist")
-        dependsOn(runtimeJar)
-        systemProperty("compose.compiler.hosted.jar.path", runtimeJar.get().outputs.files.singleFile.relativeTo(rootDir))
-        systemProperty("compose.compiler.test.js.classpath", testJsRuntime.asPath)
-        workingDir = rootDir
-        useJsIrBoxTests(version = version, buildDir = layout.buildDirectory)
+    testTask(
+        jUnitMode = JUnitMode.JUnit5,
+        javaLauncher = JdkMajorVersion.JDK_1_8,
+        defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_11_0)
+    ) {
+        addClasspathProperty(runtimeJar.get().outputs.files, "compose.compiler.hosted.jar.path")
+        addClasspathProperty(testJsRuntime, "compose.compiler.test.js.classpath")
+        useJsIrBoxTests(buildDir = layout.buildDirectory)
+
+        testInputsCheck {
+            allowFlightRecorder.set(true)
+        }
     }
 
     testGenerator("androidx.compose.compiler.plugins.kotlin.TestGeneratorKt", doNotSetFixturesSourceSetDependency = true)
 
+    testData(isolated, "testData")
+    testData(project(":js:js.translator").isolated, "testData/_commonFiles")
+
     withJvmStdlibAndReflect()
-    withStdlibJsRuntime()
+    withJsRuntime()
+    withScriptRuntime()
+    withTestJar()
+    withMockJdkAnnotationsJar()
+    withMockJdkRuntime()
+
+    @OptIn(KotlinCompilerDistUsage::class)
+    withDist()
 }
 
 testsJar()

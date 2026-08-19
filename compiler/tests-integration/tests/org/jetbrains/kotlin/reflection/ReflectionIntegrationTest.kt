@@ -5,11 +5,19 @@
 
 package org.jetbrains.kotlin.reflection
 
+import org.jetbrains.kotlin.builtins.PrimitiveType
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
+import org.jetbrains.kotlin.load.kotlin.internalName
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
 import org.jetbrains.kotlin.test.CompilerTestUtil
 import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.backend.handlers.JvmNewKotlinReflectCompatibilityCheck
 import org.jetbrains.kotlin.test.compileJavaFiles
+import org.jetbrains.kotlin.test.services.StandardLibrariesPathProviderForKotlinProject
 import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase
+import org.jetbrains.kotlin.test.util.JUnit4Assertions
 import org.jetbrains.kotlin.test.util.KtTestUtil
 import java.io.File
 import java.net.URLClassLoader
@@ -17,6 +25,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
+import kotlin.metadata.internal.common.KotlinCommonMetadata
 import kotlin.reflect.KClass
 
 class ReflectionIntegrationTest : KtUsefulTestCase() {
@@ -27,7 +36,7 @@ class ReflectionIntegrationTest : KtUsefulTestCase() {
     fun testClassLoaderForBuiltIns() {
         val tmpdir = KotlinTestUtils.tmpDirForTest(this)
 
-        val root = KtTestUtil.getTestDataPathBase() + "/reflection/classLoaderForBuiltIns"
+        val root = KtTestUtil.getTestDataFileLocatedInCompilerTestData("reflection/classLoaderForBuiltIns").path
         compileJavaFiles(
             listOf(File("$root/Main.java")),
             listOf("-d", tmpdir.absolutePath)
@@ -88,39 +97,123 @@ class ReflectionIntegrationTest : KtUsefulTestCase() {
     }
 
     fun testConcurrentAccessToPropertyDelegate() {
-        compileAndRunProgram(KtTestUtil.getTestDataPathBase() + "/reflection/concurrentAccessToPropertyDelegate")
+        compileAndRunProgram(KtTestUtil.getTestDataFileLocatedInCompilerTestData("reflection/concurrentAccessToPropertyDelegate").path)
     }
 
     fun testConcurrentAccessToPrivateFunction() {
-        compileAndRunProgram(KtTestUtil.getTestDataPathBase() + "/reflection/concurrentAccessToPrivateFunction")
+        compileAndRunProgram(KtTestUtil.getTestDataFileLocatedInCompilerTestData("reflection/concurrentAccessToPrivateFunction").path)
     }
 
-    private fun compileAndRunProgram(root: String) {
-        val lib = CompilerTestUtil.compileJvmLibrary(File("$root/test.kt"))
+    // This test checks that we don't initialize full reflection (and specifically never read any metadata or parse protobuf) in case if
+    // delegated properties are used, whose `getValue`/`setValue` operators don't try to access anything from the `KProperty` parameter.
+    // Before Kotlin 2.3.20, where KT-81974 was fixed, bytecode of delegated properties contained unnecessary calls to
+    // `Reflection.property0/1/2` methods. If these methods start to read metadata or perform anything that can hurt performance, it will
+    // introduce performance regression in the old code (compiled by Kotlin < 2.3.20) if it has the new kotlin-reflect in classpath.
+    // So, effectively this test checks that `Reflection.property0/1/2` are still fast enough to be called from the old code.
+    fun testLazyInitializationForDelegatedProperty() {
+        checkFullReflectionIsNotLoaded(KtTestUtil.getTestDataFileLocatedInCompilerTestData("reflection/lazyInitializationForDelegatedProperty").path)
+    }
 
-        runJava(
+    // This test checks that we don't initialize full reflection (and specifically never read any metadata or parse protobuf) for
+    // calls of `typeOf<T>()`.
+    // Before the fix, such calls caused unexpected application slowdown when full kotlin-reflect added to the classpath.
+    fun testLightweightTypeOf() {
+        checkFullReflectionIsNotLoaded(KtTestUtil.getTestDataFileLocatedInCompilerTestData("reflection/lightweightTypeOf").path)
+    }
+
+    private fun checkFullReflectionIsNotLoaded(root: String) {
+        // Run the program and print all classes loaded by the JVM.
+        val (stdout, stderr) = compileAndRunProgram(root, listOf("-verbose:class"))
+
+        // Protobuf is loaded via an entrypoint in the `JvmProtoBuf` class. If that class is not loaded by the JVM, metadata has not been
+        // loaded, and full reflection is not initialized.
+        if ("JvmProtoBuf" in stdout || "JvmProtoBuf" in stderr) {
+            fail("Full reflection should not be loaded:\n\n$stdout\n\n$stderr\n\n")
+        }
+    }
+
+    fun testBuiltinClasses() {
+        val fqNames = mutableListOf<String>()
+        val classLoader = ForTestCompileRuntime.runtimeJarClassLoader()
+        for (packageFqName in StandardNames.BUILT_INS_PACKAGE_FQ_NAMES) {
+            val bytes = classLoader.getResourceAsStream(BuiltInSerializerProtocol.getBuiltInsFilePath(packageFqName))?.readBytes()
+                ?: error(".kotlin_builtins file for built-in package $packageFqName not found in stdlib")
+            val fragment = KotlinCommonMetadata.read(bytes)?.kmModuleFragment
+                ?: error(".kotlin_builtins file for $packageFqName cannot be read by kotlin-metadata-jvm")
+            for (klass in fragment.classes) {
+                val classId = ClassId.fromString(klass.name)
+                val fqName = classId.asSingleFqName()
+                val primitiveArrayType = StandardNames.FqNames.arrayClassFqNameToPrimitiveType[fqName.toUnsafe()]
+                // For arrays and primitive types, there are exceptions both in K1 reflect and new reflect.
+                if (fqName.toUnsafe() != StandardNames.FqNames.array && primitiveArrayType == null &&
+                    PrimitiveType.entries.none { fqName == it.typeFqName }
+                ) {
+                    fqNames.add(classId.internalName.replace("/", "."))
+                }
+            }
+        }
+
+        val (k1ReflectDumpResult, newReflectDumpResult) = JvmNewKotlinReflectCompatibilityCheck.dumpK1AndNewReflect(
+            fqNames,
+            emptyArray(),
+            StandardLibrariesPathProviderForKotlinProject,
+        )
+        val k1ReflectDump = k1ReflectDumpResult.getOrThrow()
+        val newReflectDump = newReflectDumpResult.getOrThrow()
+        JUnit4Assertions.assertEquals(k1ReflectDump, newReflectDump)
+        JUnit4Assertions.assertEqualsToFile(
+            KtTestUtil.getTestDataFileLocatedInCompilerTestData("reflection/builtin-classes.txt"), k1ReflectDump,
+        )
+    }
+
+    private fun compileAndRunProgram(
+        root: String,
+        jvmArgs: List<String> = emptyList(),
+    ): TestOutput {
+        val javaSources = File(root).walkTopDown().filter { it.extension == "java" }.toList()
+        val extraClasspath = if (javaSources.isNotEmpty()) {
+            KotlinTestUtils.tmpDirForTest(this).also { output ->
+                compileJavaFiles(javaSources, listOf("-d", output.absolutePath)).assertSuccessful()
+            }
+        } else null
+
+        val lib = CompilerTestUtil.compileJvmLibrary(File("$root/test.kt"), extraClasspath = listOfNotNull(extraClasspath))
+
+        return runJava(
+            *jvmArgs.toTypedArray(),
             "-ea",
             "-classpath",
-            listOf(
-                ForTestCompileRuntime.runtimeJarForTests().absolutePath,
-                ForTestCompileRuntime.reflectJarForTests().absolutePath,
-                lib.absolutePath,
-            ).joinToString(File.pathSeparator),
+            listOfNotNull(
+                ForTestCompileRuntime.runtimeJarForTests(),
+                ForTestCompileRuntime.reflectJarForTests(),
+                extraClasspath,
+                lib,
+            ).joinToString(File.pathSeparator) { it.absolutePath },
             "TestKt",
         )
     }
 
-    private fun runJava(vararg args: String) {
+    private fun runJava(vararg args: String): TestOutput {
         val javaHome = System.getProperty("java.home")
         val javaExe = File(javaHome, "bin/java.exe").takeIf(File::exists)
             ?: File(javaHome, "bin/java").takeIf(File::exists)
             ?: error("Can't find 'java' executable in $javaHome")
 
-        val process = ProcessBuilder(javaExe.absolutePath, *args).start()
-        process.waitFor(1, TimeUnit.MINUTES)
-        val stderr = process.errorStream.reader().readText()
-        val stdout = process.inputStream.reader().readText()
+        val tmpdir = KotlinTestUtils.tmpDirForTest(this)
+        val stdoutFile = tmpdir.resolve("stdout.txt")
+        val stderrFile = tmpdir.resolve("stderr.txt")
+        val process = ProcessBuilder(javaExe.absolutePath, *args)
+            .redirectOutput(stdoutFile)
+            .redirectError(stderrFile)
+            .start()
+        val finished = process.waitFor(1, TimeUnit.MINUTES)
+        if (!finished) process.destroyForcibly()
+        val stdout = stdoutFile.readText()
+        val stderr = stderrFile.readText()
         val exitCode = process.exitValue()
         assertEquals("Program exited with exit code $exitCode.\nStdout:\n$stdout\nStderr:\n$stderr", 0, exitCode)
+        return TestOutput(stdout, stderr)
     }
+
+    private data class TestOutput(val stdout: String, val stderr: String)
 }

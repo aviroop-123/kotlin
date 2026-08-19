@@ -1,5 +1,3 @@
-// TARGET_BACKEND: JVM_IR
-// IGNORE_BACKEND_K1: JVM_IR
 // ISSUE: KT-54931
 
 class Container {

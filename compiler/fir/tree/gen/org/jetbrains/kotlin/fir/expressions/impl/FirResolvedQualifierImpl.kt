@@ -11,11 +11,13 @@
 package org.jetbrains.kotlin.fir.expressions.impl
 
 import org.jetbrains.kotlin.KtSourceElement
+import org.jetbrains.kotlin.fir.FirIdeOnly
 import org.jetbrains.kotlin.fir.MutableOrEmptyList
 import org.jetbrains.kotlin.fir.builder.toMutableOrEmpty
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
+import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.UnresolvedExpressionTypeAccess
 import org.jetbrains.kotlin.fir.resolve.FirResolvedSymbolOrigin
@@ -28,9 +30,11 @@ import org.jetbrains.kotlin.fir.visitors.transformInplace
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 
-@OptIn(UnresolvedExpressionTypeAccess::class)
+@OptIn(FirIdeOnly::class, UnresolvedExpressionTypeAccess::class)
 internal class FirResolvedQualifierImpl(
     override val source: KtSourceElement?,
+    @property:FirIdeOnly
+    override var contextSensitiveAlternative: FirPropertyAccessExpression?,
     @property:UnresolvedExpressionTypeAccess
     override var coneTypeOrNull: ConeKotlinType?,
     override var annotations: MutableOrEmptyList<FirAnnotation>,
@@ -38,7 +42,8 @@ internal class FirResolvedQualifierImpl(
     override var relativeClassFqName: FqName?,
     override val symbol: FirClassLikeSymbol<*>?,
     override var explicitParent: FirResolvedQualifier?,
-    override var isNullableLHSForCallableReference: Boolean,
+    override var isNullableLhsForCallableReference: Boolean,
+    override var resolvedLhsTypeForCallableReferenceOrNull: ConeKotlinType?,
     override var resolvedToCompanionObject: Boolean,
     override var canBeValue: Boolean,
     override val isFullyQualified: Boolean,
@@ -74,6 +79,10 @@ internal class FirResolvedQualifierImpl(
         return this
     }
 
+    override fun replaceContextSensitiveAlternative(newContextSensitiveAlternative: FirPropertyAccessExpression?) {
+        contextSensitiveAlternative = newContextSensitiveAlternative
+    }
+
     override fun replaceConeTypeOrNull(newConeTypeOrNull: ConeKotlinType?) {
         coneTypeOrNull = newConeTypeOrNull
     }
@@ -82,8 +91,12 @@ internal class FirResolvedQualifierImpl(
         annotations = newAnnotations.toMutableOrEmpty()
     }
 
-    override fun replaceIsNullableLHSForCallableReference(newIsNullableLHSForCallableReference: Boolean) {
-        isNullableLHSForCallableReference = newIsNullableLHSForCallableReference
+    override fun replaceIsNullableLhsForCallableReference(newIsNullableLhsForCallableReference: Boolean) {
+        isNullableLhsForCallableReference = newIsNullableLhsForCallableReference
+    }
+
+    override fun replaceResolvedLhsTypeForCallableReferenceOrNull(newResolvedLhsTypeForCallableReferenceOrNull: ConeKotlinType?) {
+        resolvedLhsTypeForCallableReferenceOrNull = newResolvedLhsTypeForCallableReferenceOrNull
     }
 
     override fun replaceResolvedToCompanionObject(newResolvedToCompanionObject: Boolean) {
@@ -92,6 +105,10 @@ internal class FirResolvedQualifierImpl(
 
     override fun replaceCanBeValue(newCanBeValue: Boolean) {
         canBeValue = newCanBeValue
+    }
+
+    override fun replaceNonFatalDiagnostics(newNonFatalDiagnostics: List<ConeDiagnostic>) {
+        nonFatalDiagnostics = newNonFatalDiagnostics.toMutableOrEmpty()
     }
 
     override fun replaceResolvedSymbolOrigin(newResolvedSymbolOrigin: FirResolvedSymbolOrigin?) {

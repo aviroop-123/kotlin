@@ -7,13 +7,13 @@ package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.ClassLoweringPass
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
+import org.jetbrains.kotlin.backend.jvm.ir.addJavaLangDeprecatedAnnotation
 import org.jetbrains.kotlin.backend.jvm.ir.createJvmIrBuilder
 import org.jetbrains.kotlin.backend.jvm.ir.replaceThisByStaticReference
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.builders.declarations.addField
-import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.IrExpression
@@ -24,15 +24,13 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrSetFieldImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrAnonymousInitializerSymbolImpl
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
-import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
 
 /**
  * Moves and/or copies companion object fields to static fields of companion's owner.
  */
-@PhaseDescription(name = "MoveOrCopyCompanionObjectFields")
 internal class MoveOrCopyCompanionObjectFieldsLowering(val context: JvmBackendContext) : ClassLoweringPass {
     override fun lower(irClass: IrClass) {
-        if (irClass.isNonCompanionObject && !irClass.isReplSnippet) {
+        if (irClass.isNonCompanionObject) {
             irClass.handle()
         } else {
             (irClass.declarations.singleOrNull { it is IrClass && it.isCompanion } as IrClass?)?.handle()
@@ -72,7 +70,7 @@ internal class MoveOrCopyCompanionObjectFieldsLowering(val context: JvmBackendCo
         } else {
             // Anonymous initializers must also be moved and their ordering relative to the fields
             // must be preserved, as the fields can have expression initializers themselves.
-            for ((i, newField) in newDeclarations.withIndex()) {
+            for ([i, newField] in newDeclarations.withIndex()) {
                 if (newField != null)
                     newParent.declarations += newField
                 if (declarations[i] is IrAnonymousInitializer)
@@ -110,9 +108,8 @@ internal class MoveOrCopyCompanionObjectFieldsLowering(val context: JvmBackendCo
             }
             annotations += oldField.annotations
             if (oldProperty.parentAsClass.visibility == DescriptorVisibilities.PRIVATE) {
-                context.createJvmIrBuilder(this.symbol).run {
-                    annotations = filterOutAnnotations(DeprecationResolver.JAVA_DEPRECATED, annotations) +
-                            irCall(irSymbols.javaLangDeprecatedConstructorWithDeprecatedFlag)
+                with(context.createJvmIrBuilder(this.symbol)) {
+                    addJavaLangDeprecatedAnnotation()
                 }
             }
         }
@@ -122,10 +119,7 @@ internal class MoveOrCopyCompanionObjectFieldsLowering(val context: JvmBackendCo
 /**
  * Makes [IrGetField]/[IrSetField] to objects' fields point to the static versions.
  */
-@PhaseDescription(
-    name = "RemapObjectFieldAccesses",
-    prerequisite = [JvmPropertiesLowering::class],
-)
+@PhasePrerequisites(JvmPropertiesLowering::class)
 internal class RemapObjectFieldAccesses(val context: JvmBackendContext) : FileLoweringPass, IrElementTransformerVoid() {
     override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
 

@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.resolve
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.builtins.isFunctionOrKFunctionTypeWithAnySuspendability
 import org.jetbrains.kotlin.config.LanguageFeature.*
@@ -36,6 +37,7 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.expressions.ExpressionTypingUtils
 import org.jetbrains.kotlin.types.isError
 
+@K1Deprecation
 class AnnotationChecker(
     private val additionalCheckers: Iterable<AdditionalAnnotationChecker>,
     private val languageVersionSettings: LanguageVersionSettings,
@@ -382,8 +384,11 @@ class AnnotationChecker(
                 is KtProperty -> {
                     when {
                         annotated.isLocal -> TargetLists.T_LOCAL_VARIABLE
-                        annotated.isMember -> TargetLists.T_MEMBER_PROPERTY(descriptor.hasBackingField(context), annotated.hasDelegate())
-                        else -> TargetLists.T_TOP_LEVEL_PROPERTY(descriptor.hasBackingField(context), annotated.hasDelegate())
+                        annotated.isMember -> TargetLists.T_MEMBER_PROPERTY(
+                            descriptor.hasBackingField(context), annotated.hasDelegate(),
+                            isCompanionMember = false
+                        )
+                        else -> TargetLists.T_TOP_LEVEL_PROPERTY(descriptor.hasBackingField(context), annotated.hasDelegate(), isCompanionExtension = false)
                     }
                 }
                 is KtParameter -> {
@@ -426,6 +431,7 @@ private typealias TargetLists = AnnotationTargetLists
 
 private typealias TargetList = AnnotationTargetList
 
+@K1Deprecation
 interface AdditionalAnnotationChecker {
     fun checkEntries(
         entries: List<KtAnnotationEntry>,

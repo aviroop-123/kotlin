@@ -5,14 +5,17 @@
 
 package org.jetbrains.kotlin.ir.util
 
+import org.jetbrains.kotlin.DeprecatedCompilerApi
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.annotations.KotlinTarget
 import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
+import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrGetEnumValue
+import org.jetbrains.kotlin.ir.expressions.IrLazilyBoundAnnotationImpl
 import org.jetbrains.kotlin.ir.expressions.IrVararg
 import org.jetbrains.kotlin.ir.symbols.*
 import org.jetbrains.kotlin.ir.types.defaultType
@@ -127,15 +130,14 @@ fun <S : IrSymbol> IrOverridableDeclaration<S>.overrides(other: IrOverridableDec
     return false
 }
 
-private val IrConstructorCall.annotationClass
-    get() = this.symbol.owner.constructedClass
+@OptIn(DeprecatedCompilerApi::class)
+fun IrAnnotation.isAnnotationWithEqualFqName(fqName: FqName): Boolean = when {
+    this is IrLazilyBoundAnnotationImpl -> classSymbol.hasEqualFqName(fqName)
+    symbol.isBound -> classSymbol.owner.hasEqualFqName(fqName)
+    else -> symbol.hasEqualFqName(fqName.child(SpecialNames.INIT))
+}
 
-fun IrConstructorCall.isAnnotationWithEqualFqName(fqName: FqName): Boolean =
-    if (symbol.isBound) {
-        annotationClass.hasEqualFqName(fqName)
-    } else {
-        symbol.hasEqualFqName(fqName.child(SpecialNames.INIT))
-    }
+val IrAnnotation.classId: ClassId get() = classSymbol.classIdWhenAvailable!!
 
 val IrClass.packageFqName: FqName?
     get() = symbol.signature?.packageFqName() ?: parent.getPackageFragment()?.packageFqName
@@ -171,12 +173,12 @@ fun IrSymbol.hasTopLevelEqualFqName(packageName: String, declarationName: String
     }
 }
 
-fun List<IrConstructorCall>.hasAnnotation(classId: ClassId): Boolean = hasAnnotation(classId.asSingleFqName())
+fun List<IrAnnotation>.hasAnnotation(classId: ClassId): Boolean = any { it.classId == classId }
 
-fun List<IrConstructorCall>.hasAnnotation(fqName: FqName): Boolean =
+fun List<IrAnnotation>.hasAnnotation(fqName: FqName): Boolean =
     any { it.isAnnotationWithEqualFqName(fqName) }
 
-fun List<IrConstructorCall>.findAnnotation(fqName: FqName): IrConstructorCall? =
+fun List<IrAnnotation>.findAnnotation(fqName: FqName): IrAnnotation? =
     firstOrNull { it.isAnnotationWithEqualFqName(fqName) }
 
 val IrDeclaration.fileEntry: IrFileEntry
@@ -311,7 +313,7 @@ fun IrClassSymbol.getPropertyGetter(name: String): IrSimpleFunctionSymbol? = own
 @UnsafeDuringIrConstructionAPI
 fun IrClassSymbol.getPropertySetter(name: String): IrSimpleFunctionSymbol? = owner.getPropertySetter(name)
 
-fun filterOutAnnotations(fqName: FqName, annotations: List<IrConstructorCall>): List<IrConstructorCall> {
+fun filterOutAnnotations(fqName: FqName, annotations: List<IrAnnotation>): List<IrAnnotation> {
     return annotations.filterNot { it.isAnnotationWithEqualFqName(fqName) }
 }
 
@@ -323,6 +325,18 @@ fun IrFunction.isBuiltInSuspendCoroutineUninterceptedOrReturn(): Boolean =
         "suspendCoroutineUninterceptedOrReturn",
         StandardNames.COROUTINES_INTRINSICS_PACKAGE_FQ_NAME
     )
+
+fun IrElement.isTypeOfIntrinsicCall() = this is IrCall && symbol.isTypeOfIntrinsic()
+
+fun IrFunctionSymbol.isTypeOfIntrinsic(): Boolean {
+    val packageFqName = StandardNames.KOTLIN_REFLECT_FQ_NAME
+
+    return if (isBound) {
+        this is IrSimpleFunctionSymbol && owner.isTopLevelInPackage("typeOf", packageFqName) && owner.hasShape()
+    } else {
+        hasTopLevelEqualFqName(packageFqName.asString(), "typeOf")
+    }
+}
 
 /**
  * @return null - if [this] class is not an annotation class ([isAnnotationClass])
@@ -345,11 +359,14 @@ fun IrClass.getAnnotationTargets(): Set<KotlinTarget>? {
     }.toSet()
 }
 
+val IrFunctionSymbol.isFunctionalTypeInvoke: Boolean
+    get() = owner.name == OperatorNameConventions.INVOKE && owner.parentClassOrNull?.symbol?.isFunctional() == true
+
 fun IrClass.selectSAMOverriddenFunctionOrNull(): IrSimpleFunction? {
     return when {
         // Function classes on jvm have some extra methods, which would be in fact implemented by super type,
         // e.g., callBy and other reflection related callables. So we need to filter them out.
-        symbol.isKFunction() || symbol.isKSuspendFunction() || symbol.isFunction() || symbol.isSuspendFunction() ->
+        symbol.isFunctional() ->
             functions.singleOrNull { it.name == OperatorNameConventions.INVOKE }
         symbol.defaultType.isKProperty() ->
             functions.singleOrNull { it.name == OperatorNameConventions.GET }
@@ -360,3 +377,20 @@ fun IrClass.selectSAMOverriddenFunctionOrNull(): IrSimpleFunction? {
 
 fun IrClass.selectSAMOverriddenFunction(): IrSimpleFunction = selectSAMOverriddenFunctionOrNull()
     ?: error("${render()} should have a single abstract method to be a type of function reference")
+
+/**
+ * Creates an `IdSignature` representation for the current `ClassId`.
+ *
+ * Be aware that this is a straightforward transformation. It does not account for special cases, like C-interop classes.
+ */
+fun ClassId.toIdSignature(): IdSignature {
+    return IdSignature.CommonSignature(
+        packageFqName.asString(),
+        relativeClassName.asString(),
+        id = null,
+        mask = 0L,
+        description = null
+    )
+}
+
+fun IdSignature.CommonSignature.isClassSignature(): Boolean = id == null

@@ -32,9 +32,15 @@ internal class ModuleDeserializerProvider(
         val packageFragment = declaration.getPackageFragment()
         val moduleDescriptor = packageFragment.moduleDescriptor
         val klib = packageFragment.konanLibrary
-        val declarationBeingCached = packageFragment is IrFile && klib != null && libraryBeingCached?.klib == klib
+        val isFromLibraryBeingCached = klib != null && libraryBeingCached?.klib == klib
+        val declarationBeingCached = packageFragment is IrFile && isFromLibraryBeingCached
                 && libraryBeingCached.strategy.contains(packageFragment.path)
-        return if (klib != null && !moduleDescriptor.isFromCInteropLibrary() && cachedLibraries.isLibraryCached(klib) && !declarationBeingCached) {
+        return if (klib != null
+                && !moduleDescriptor.isFromCInteropLibrary()
+                // Caches for dependencies must be fully compiled; an incomplete cache may only be used for the current library.
+                && cachedLibraries.isLibraryCached(klib, allowIncomplete = isFromLibraryBeingCached)
+                && !declarationBeingCached
+        ) {
             linker.moduleDeserializers[moduleDescriptor] ?: error("No module deserializer for ${declaration.render()}")
         } else {
             null

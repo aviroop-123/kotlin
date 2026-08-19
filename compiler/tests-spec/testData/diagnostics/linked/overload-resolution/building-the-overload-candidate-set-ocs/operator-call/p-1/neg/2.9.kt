@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -23,7 +22,7 @@ import LibPackCase1.a.plusAssign
 
 fun case1 (){
     var b: B = B()
-    b +={ <!TYPE_MISMATCH, TYPE_MISMATCH!>C()<!> }
+    b +={ <!RETURN_TYPE_MISMATCH!>C()<!> }
     b +={ 1 }
 }
 

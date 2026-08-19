@@ -21,6 +21,12 @@ fun box() {
 // test.kt:12 box
 // test.kt:13 box
 
+// EXPECTATIONS NATIVE
+// test.kt:11 box
+// test.kt:7 box$bar
+// test.kt:9 box$bar
+// test.kt:13 box
+
 // EXPECTATIONS JS_IR
 // test.kt:11 box
 // test.kt:9 box$bar
@@ -30,7 +36,7 @@ fun box() {
 // test.kt:6 $box (4)
 // test.kt:10 $box (4)
 // test.kt:11 $box (4)
-// test.kt:8 $box$bar (8)
-// test.kt:9 $box$bar (5)
+// test.kt:8 $bar (8)
+// test.kt:9 $bar (5)
 // test.kt:12 $box (4)
 // test.kt:13 $box (1)

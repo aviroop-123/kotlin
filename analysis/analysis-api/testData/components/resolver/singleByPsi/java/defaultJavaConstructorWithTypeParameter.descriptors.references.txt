@@ -1,6 +1,0 @@
-KtNameReferenceExpression(60,69): 'JavaClass'
-  KtSimpleNameReference:
-    (in JavaClass) {psi: PsiClassImpl} constructor()
-
-  SyntheticPropertyAccessorReference:
-    Nothing (Unresolved reference)

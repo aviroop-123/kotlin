@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.stubs.KotlinConstructorStub
+import org.jetbrains.kotlin.psi.stubs.KotlinStubElement
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
 @OptIn(KtImplementationDetail::class)
@@ -21,6 +22,7 @@ class KotlinSecondaryConstructorStubImpl(
     override val isDelegatedCallToThis: Boolean,
     override val isExplicitDelegationCall: Boolean,
     override val mayHaveContract: Boolean,
+    override val kdocText: String?,
 ) : KotlinStubBaseImpl<KtSecondaryConstructor>(parent, KtStubElementTypes.SECONDARY_CONSTRUCTOR),
     KotlinConstructorStub<KtSecondaryConstructor> {
     override val fqName: FqName? get() = null
@@ -40,5 +42,16 @@ class KotlinSecondaryConstructorStubImpl(
         isDelegatedCallToThis = isDelegatedCallToThis,
         isExplicitDelegationCall = isExplicitDelegationCall,
         mayHaveContract = mayHaveContract,
+        kdocText = kdocText,
     )
+
+    @KtImplementationDetail
+    override fun isEquivalentTo(other: KotlinStubElement<*>): Boolean =
+        other is KotlinSecondaryConstructorStubImpl &&
+                other.containingClassName == containingClassName &&
+                other.hasBody == hasBody &&
+                other.isDelegatedCallToThis == isDelegatedCallToThis &&
+                other.isExplicitDelegationCall == isExplicitDelegationCall &&
+                other.mayHaveContract == mayHaveContract &&
+                other.kdocText == kdocText
 }

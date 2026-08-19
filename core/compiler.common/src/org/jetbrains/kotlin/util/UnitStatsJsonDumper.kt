@@ -31,6 +31,7 @@ object UnitStatsJsonDumper {
                     irPreLoweringStats?.let { appendTime(::irPreLoweringStats, it, indent = 1, trailingComma = true) }
                     irSerializationStats?.let { appendTime(::irSerializationStats, it, indent = 1, trailingComma = true) }
                     klibWritingStats?.let { appendTime(::klibWritingStats, it, indent = 1, trailingComma = true) }
+                    irLinkingStats?.let { appendTime(::irLinkingStats, it, indent = 1, trailingComma = true) }
                     irLoweringStats?.let { appendTime(::irLoweringStats, it, indent = 1, trailingComma = true) }
                     backendStats?.let { appendTime(::backendStats, it, indent = 1, trailingComma = true) }
 
@@ -39,6 +40,13 @@ object UnitStatsJsonDumper {
                             appendKeyValue(it::parentPhaseType, it.parentPhaseType, indent = 3)
                             appendKeyValue(it::name, it.name, indent = 3)
                             appendTime(it::time, it.time, indent = 3, trailingComma = false)
+                        }
+                    }
+
+                    klibElementStats?.let {
+                        appendArray(::klibElementStats, klibElementStats, indent = 1, trailingComma = true) {
+                            appendKeyValue(it::path, it.path, indent = 3)
+                            appendKeyValue(it::size, it.size, indent = 3, trailingComma = false)
                         }
                     }
 
@@ -92,7 +100,7 @@ object UnitStatsJsonDumper {
         appendObjectContent: (T) -> Unit
     ) {
         appendInternal("\"${key.name}\": [", indent, trailingComma = false)
-        for ((index, item) in array.withIndex()) {
+        for ([index, item] in array.withIndex()) {
             appendArrayElement(item, indent + 1, trailingComma = index < array.size - 1, appendObjectContent)
         }
         appendInternal("]", indent, trailingComma)

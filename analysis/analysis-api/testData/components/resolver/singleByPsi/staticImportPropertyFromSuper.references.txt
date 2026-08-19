@@ -1,3 +1,0 @@
-KtNameReferenceExpression(96,99): 'bar'
-  KtSimpleNameReference:
-    (in one.two.BaseClass) val bar: kotlin.Int

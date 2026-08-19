@@ -12,8 +12,7 @@ import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
-import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirOptInUsageBaseChecker.getSourceForIsMarkerDiagnostic
-import org.jetbrains.kotlin.fir.analysis.checkers.extractClassesFromArgument
+import org.jetbrains.kotlin.fir.analysis.checkers.extractClassesAndSourcesFromArgument
 import org.jetbrains.kotlin.fir.analysis.checkers.modality
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.findArgumentByName
@@ -45,9 +44,8 @@ object FirOptInAnnotationCallChecker : FirAnnotationCallChecker(MppCheckerKind.C
                 if (arguments.isEmpty()) {
                     reporter.reportOn(expression.source, FirErrors.OPT_IN_WITHOUT_ARGUMENTS)
                 } else {
-                    for ((index, classSymbol) in expression.findArgumentByName(OPT_IN_ANNOTATION_CLASS)
-                        ?.extractClassesFromArgument(context.session).orEmpty().withIndex()) {
-                        val source = expression.getSourceForIsMarkerDiagnostic(index)
+                    for ([classSymbol, source] in expression.findArgumentByName(OPT_IN_ANNOTATION_CLASS)
+                        ?.extractClassesAndSourcesFromArgument(context.session).orEmpty()) {
                         checkOptInArgumentIsMarker(classSymbol, classId, source)
                     }
                 }
@@ -55,17 +53,16 @@ object FirOptInAnnotationCallChecker : FirAnnotationCallChecker(MppCheckerKind.C
         } else if (isSubclassOptIn) {
             val declaration = context.containingDeclarations.lastOrNull() as? FirClassSymbol
             if (declaration != null) {
-                val (isSubclassOptInApplicable, message) = getSubclassOptInApplicabilityAndMessage(declaration)
+                val [isSubclassOptInApplicable, message] = getSubclassOptInApplicabilityAndMessage(declaration)
                 if (!isSubclassOptInApplicable && message != null) {
                     reporter.reportOn(expression.source, FirErrors.SUBCLASS_OPT_IN_INAPPLICABLE, message)
                     return
                 }
             }
 
-            val classSymbols = expression.findArgumentByName(OPT_IN_ANNOTATION_CLASS)?.extractClassesFromArgument(context.session).orEmpty()
+            val classSymbols = expression.findArgumentByName(OPT_IN_ANNOTATION_CLASS)?.extractClassesAndSourcesFromArgument(context.session).orEmpty()
 
-            classSymbols.forEachIndexed { index, classSymbol ->
-                val source = expression.getSourceForIsMarkerDiagnostic(index)
+            classSymbols.forEach { [classSymbol, source] ->
                 checkOptInArgumentIsMarker(classSymbol, classId, source)
             }
         }

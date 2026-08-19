@@ -1,3 +1,0 @@
-KDocName(48,65): 'foo.Foo.Inner.foo'
-  KDocReference:
-    (in foo.Foo.Inner) fun foo()

@@ -1,7 +1,7 @@
 // RUN_PIPELINE_TILL: BACKEND
 // WITH_STDLIB
 
-@file:MustUseReturnValue
+@file:MustUseReturnValues
 
 fun stringF(): String = ""
 fun nsf(): String? = "null"
@@ -18,8 +18,8 @@ fun returnsString(): String {
 }
 
 fun main() {
-    stringF().myLet { it }
-    stringF().myLet { 2 }
+    stringF().<!RETURN_VALUE_NOT_USED!>myLet<!> { it }
+    stringF().<!RETURN_VALUE_NOT_USED!>myLet<!> { 2 }
     stringF().let { 2 }
 }
 

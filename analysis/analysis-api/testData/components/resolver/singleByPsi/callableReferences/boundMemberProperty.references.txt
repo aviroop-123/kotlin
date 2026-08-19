@@ -1,7 +1,0 @@
-KtNameReferenceExpression(87,90): 'obj'
-  KtSimpleNameReference:
-    obj: Foo
-
-KtCallExpression(79,96): 'consume(obj::foo)'
-  KtInvokeFunctionReference:
-    Nothing (Unresolved reference)

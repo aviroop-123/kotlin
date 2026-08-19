@@ -1,3 +1,8 @@
+// For `ObjCMethod`
+@file:OptIn(@Suppress("INVISIBLE_REFERENCE") kotlin.native.internal.InternalForKotlinNative::class)
+// For `overloadedFunctionByParameterNames`, doesn't work when placed on the functions themselves!
+@file:Suppress("CONFLICTING_OVERLOADS")
+
 fun functionNoParameters() {}
 fun functionSingleParameter(i: Int) {}
 fun functionTwoParameters(i: Int, s: String) {}
@@ -91,10 +96,12 @@ fun functionMismatchedParameterNames42(arg0: Int, arg1: String) {
 fun functionMismatchedParameterNames43(arg0: Int, arg1: String) {
 }
 
+@kotlinx.cinterop.ObjCSignatureOverride
 @kotlinx.cinterop.ObjCMethod("ofpn:s:", "", false)
 fun overloadedFunctionByParameterNames(i: Int, s: String) {
 }
 
+@kotlinx.cinterop.ObjCSignatureOverride
 @kotlinx.cinterop.ObjCMethod("ofpn:xs:", "", false)
 fun overloadedFunctionByParameterNames(xi: Int, xs: String) {
 }

@@ -6,8 +6,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -28,6 +32,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: one.Anno
     getContainingModule: KaLibraryModule "Library library"
     deprecationStatus: null
+    importableFqName: null
   callableId: one/Anno.value
   compilerVisibility: Public
   contextParameters: []
@@ -39,8 +44,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -62,13 +69,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: one.Anno
     getContainingModule: KaLibraryModule "Library library"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: false
   hasGetter: true
   hasSetter: false
   initializer: KaConstantValueForAnnotation([0])
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -97,8 +106,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: one.Anno
   getContainingModule: KaLibraryModule "Library library"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getValue
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: null

@@ -159,9 +159,9 @@ abstract class AbstractFirSpecificAnnotationResolveTransformer(
             return indexedAccessAugmentedAssignment
         }
 
-        override fun transformArrayLiteral(arrayLiteral: FirArrayLiteral, data: ResolutionMode): FirStatement {
-            arrayLiteral.transformChildren(transformer, data)
-            return arrayLiteral
+        override fun transformCollectionLiteral(collectionLiteral: FirCollectionLiteral, data: ResolutionMode): FirStatement {
+            collectionLiteral.transformChildren(transformer, data)
+            return collectionLiteral
         }
 
         override fun transformAnonymousObjectExpression(
@@ -449,6 +449,27 @@ abstract class AbstractFirSpecificAnnotationResolveTransformer(
         return script
     }
 
+    inline fun resolveReplSnippet(
+        replSnippet: FirReplSnippet,
+        block: () -> Unit,
+    ) {
+        if (!shouldTransformDeclaration(replSnippet)) return
+
+        computationSession.recordThatAnnotationsAreResolved(replSnippet)
+        transformDeclaration(replSnippet, data = null)
+        transformChildren(replSnippet) {
+            block()
+        }
+    }
+
+    override fun transformReplSnippet(replSnippet: FirReplSnippet, data: Nothing?): FirReplSnippet {
+        resolveReplSnippet(replSnippet) {
+            replSnippet.transformChildren(this, data)
+        }
+
+        return replSnippet
+    }
+
     inline fun withClass(
         klass: FirClass,
         action: () -> Unit
@@ -616,10 +637,10 @@ abstract class AbstractFirSpecificAnnotationResolveTransformer(
         backingField?.replaceAnnotations(newPosition.backingFieldAnnotations)
     }
 
-    override fun transformSimpleFunction(
-        simpleFunction: FirSimpleFunction,
+    override fun transformNamedFunction(
+        namedFunction: FirNamedFunction,
         data: Nothing?
-    ): FirSimpleFunction = transformFunctionDeclarationForDeprecations(simpleFunction, data)
+    ): FirNamedFunction = transformFunctionDeclarationForDeprecations(namedFunction, data)
 
     override fun transformConstructor(
         constructor: FirConstructor,

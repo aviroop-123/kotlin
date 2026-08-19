@@ -6,8 +6,10 @@ KaConstructorSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isPrimary: true
   location: CLASS
   modality: FINAL
@@ -32,8 +34,12 @@ KaConstructorSymbol:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -54,6 +60,7 @@ KaConstructorSymbol:
           getContainingJvmClassName: MyColor
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         callableId: /MyColor.x
         compilerVisibility: Public
         contextParameters: []
@@ -65,8 +72,10 @@ KaConstructorSymbol:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -88,13 +97,15 @@ KaConstructorSymbol:
           getContainingJvmClassName: MyColor
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         hasBackingField: true
         hasGetter: true
         hasSetter: false
         initializer: KaNonConstantInitializerValue(val x: Int)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -123,16 +134,19 @@ KaConstructorSymbol:
         getContainingJvmClassName: MyColor
         getContainingModule: KaSourceModule "Sources of main"
         deprecationStatus: null
-        getterDeprecationStatus: null
         javaGetterName: getX
         javaSetterName: null
-        setterDeprecationStatus: null
         isInline: false
+        importableFqName: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -151,6 +165,7 @@ KaConstructorSymbol:
       getContainingJvmClassName: MyColor
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     KaValueParameterSymbol:
       annotations: []
       callableId: null
@@ -164,8 +179,12 @@ KaConstructorSymbol:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -186,6 +205,7 @@ KaConstructorSymbol:
           getContainingJvmClassName: MyColor
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         callableId: /MyColor.y
         compilerVisibility: Public
         contextParameters: []
@@ -197,8 +217,10 @@ KaConstructorSymbol:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -220,13 +242,15 @@ KaConstructorSymbol:
           getContainingJvmClassName: MyColor
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         hasBackingField: true
         hasGetter: true
         hasSetter: false
         initializer: KaNonConstantInitializerValue(val y: Int)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -255,16 +279,19 @@ KaConstructorSymbol:
         getContainingJvmClassName: MyColor
         getContainingModule: KaSourceModule "Sources of main"
         deprecationStatus: null
-        getterDeprecationStatus: null
         javaGetterName: getY
         javaSetterName: null
-        setterDeprecationStatus: null
         isInline: false
+        importableFqName: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -283,6 +310,7 @@ KaConstructorSymbol:
       getContainingJvmClassName: MyColor
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     KaValueParameterSymbol:
       annotations: []
       callableId: null
@@ -296,8 +324,12 @@ KaConstructorSymbol:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -318,6 +350,7 @@ KaConstructorSymbol:
           getContainingJvmClassName: MyColor
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         callableId: /MyColor.z
         compilerVisibility: Public
         contextParameters: []
@@ -329,8 +362,10 @@ KaConstructorSymbol:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -352,13 +387,15 @@ KaConstructorSymbol:
           getContainingJvmClassName: MyColor
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         hasBackingField: true
         hasGetter: true
         hasSetter: false
         initializer: KaNonConstantInitializerValue(val z: Int)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -387,16 +424,19 @@ KaConstructorSymbol:
         getContainingJvmClassName: MyColor
         getContainingModule: KaSourceModule "Sources of main"
         deprecationStatus: null
-        getterDeprecationStatus: null
         javaGetterName: getZ
         javaSetterName: null
-        setterDeprecationStatus: null
         isInline: false
+        importableFqName: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -415,12 +455,14 @@ KaConstructorSymbol:
       getContainingJvmClassName: MyColor
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(delegateField.kt)
   getContainingJvmClassName: MyColor
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: MyColor
 
 KaNamedClassSymbol:
   annotations: []
@@ -452,6 +494,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: MyColor
 
 KaAnonymousFunctionSymbol:
   annotations: []
@@ -461,8 +504,10 @@ KaAnonymousFunctionSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   location: LOCAL
   modality: FINAL
   origin: SOURCE
@@ -477,6 +522,7 @@ KaAnonymousFunctionSymbol:
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -486,8 +532,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -508,6 +558,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: Some
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: /Some.delegate
   compilerVisibility: Public
   contextParameters: []
@@ -519,8 +570,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: true
     isOverride: false
@@ -538,13 +591,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: Some
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: false
   hasGetter: true
   hasSetter: false
   initializer: null
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: true
+  isDelegated: true
   isExpect: false
   isExtension: false
   isExternal: false
@@ -573,11 +628,10 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: Some
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getDelegate
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: null
 
 KaAnonymousFunctionSymbol:
   annotations: []
@@ -587,8 +641,10 @@ KaAnonymousFunctionSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   location: LOCAL
   modality: FINAL
   origin: SOURCE
@@ -603,6 +659,7 @@ KaAnonymousFunctionSymbol:
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -612,8 +669,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -639,6 +700,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: Some
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: /Some.lambda
   compilerVisibility: Public
   contextParameters: []
@@ -650,8 +712,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -678,13 +742,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: Some
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaNonConstantInitializerValue(lazy { MyColor(1, 2, 3) })
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -718,11 +784,10 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: Some
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getLambda
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: null
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -732,8 +797,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -754,6 +823,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: Some
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: /Some.nonLazy
   compilerVisibility: Public
   contextParameters: []
@@ -765,8 +835,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -788,13 +860,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: Some
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaNonConstantInitializerValue(MyColor(1, 2, 3))
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -823,11 +897,10 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: Some
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getNonLazy
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -859,3 +932,4 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: Some

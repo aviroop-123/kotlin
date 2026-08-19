@@ -7,16 +7,21 @@ package org.jetbrains.kotlin.fir.analysis.checkers.expression
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtSourceElement
+import org.jetbrains.kotlin.KtSourceElementKind
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.isLhsOfAssignment
+import org.jetbrains.kotlin.fir.analysis.checkers.requireFeatureSupport
+import org.jetbrains.kotlin.fir.analysis.checkers.secondToLastContainer
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.isDisabled
 import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.diagnostics.ConeCallToDeprecatedOverrideOfHidden
@@ -25,22 +30,21 @@ import org.jetbrains.kotlin.fir.scopes.impl.typeAliasConstructorInfo
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
+import org.jetbrains.kotlin.fir.types.abbreviatedType
+import org.jetbrains.kotlin.fir.types.classId
 import org.jetbrains.kotlin.fir.types.coneType
+import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.fir.types.isTypealiasExpansion
 import org.jetbrains.kotlin.fir.types.toRegularClassSymbol
 import org.jetbrains.kotlin.metadata.ProtoBuf
+import org.jetbrains.kotlin.metadata.deserialization.VersionRequirement
 import org.jetbrains.kotlin.resolve.deprecation.DeprecationLevelValue
 
 object FirDeprecationChecker : FirBasicExpressionChecker(MppCheckerKind.Common) {
-
-    private val filteredSourceKinds: Set<KtFakeSourceElementKind> = setOf(
-        KtFakeSourceElementKind.PropertyFromParameter,
-        KtFakeSourceElementKind.DataClassGeneratedMembers
-    )
-
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(expression: FirStatement) {
-        if (expression.source?.kind in filteredSourceKinds) return
+        val sourceKind = expression.source?.kind
+        if (isExcludedSourceKind(sourceKind)) return
         if (expression is FirAnnotation) return // checked by FirDeprecatedTypeChecker
         if (expression.isLhsOfAssignment()) return
 
@@ -104,7 +108,7 @@ object FirDeprecationChecker : FirBasicExpressionChecker(MppCheckerKind.Common) 
     @OptIn(SymbolInternals::class)
     context(context: CheckerContext)
     private fun FirStatement.isDelegatedPropertySelfAccess(referencedSymbol: FirBasedSymbol<*>): Boolean {
-        if (source?.kind != KtFakeSourceElementKind.DelegatedPropertyAccessor) return false
+        if (source?.kind !is KtFakeSourceElementKind.DelegatedPropertyAccessor) return false
         val containers = context.containingDeclarations
         val size = containers.size
 
@@ -119,10 +123,42 @@ object FirDeprecationChecker : FirBasicExpressionChecker(MppCheckerKind.Common) 
         source: KtSourceElement?,
         referencedSymbol: FirBasedSymbol<*>,
         callSite: FirElement? = null,
+        migrationLF: LanguageFeature? = null,
     ) {
         val deprecation = getWorstDeprecation(callSite, referencedSymbol) ?: return
+        if (referencedSymbol.isNestedTypeAliasReferenceAndRelevantDeprecation(deprecation)) {
+            source.requireFeatureSupport(LanguageFeature.NestedTypeAliases)
+            return
+        }
         val isTypealiasExpansion = deprecation.isTypealiasExpansionOf(referencedSymbol, callSite)
-        reportApiStatus(source, referencedSymbol, isTypealiasExpansion, deprecation)
+        reportApiStatus(source, referencedSymbol, isTypealiasExpansion, deprecation, migrationLF)
+    }
+
+    private val NestedTypeAliasesSinceVersion = LanguageFeature.NestedTypeAliases.sinceVersion!!.let {
+        VersionRequirement.Version(it.major, it.minor)
+    }
+
+    private fun FirBasedSymbol<*>.isNestedTypeAliasReferenceAndRelevantDeprecation(deprecation: FirDeprecationInfo): Boolean {
+        when (this) {
+            is FirTypeAliasSymbol -> {
+                if (!classId.isNestedClass) return false
+            }
+            is FirConstructorSymbol -> {
+                if (origin != FirDeclarationOrigin.Synthetic.TypeAliasConstructor ||
+                    (resolvedReturnType.abbreviatedType as? ConeClassLikeTypeImpl)?.classId?.isNestedClass != true
+                ) {
+                    return false
+                }
+            }
+            else -> return false
+        }
+
+        // Make sure it's a relevant deprecation
+        return (deprecation as? RequireKotlinDeprecationInfo)?.versionRequirement?.let {
+            it.kind == ProtoBuf.VersionRequirement.VersionKind.LANGUAGE_VERSION &&
+                    it.level == DeprecationLevel.ERROR &&
+                    it.version == NestedTypeAliasesSinceVersion
+        } == true
     }
 
     context(context: CheckerContext)
@@ -150,11 +186,12 @@ object FirDeprecationChecker : FirBasicExpressionChecker(MppCheckerKind.Common) 
         referencedSymbol: FirBasedSymbol<*>,
         isTypealiasExpansion: Boolean,
         deprecationInfo: FirDeprecationInfo,
+        migrationLF: LanguageFeature? = null,
     ) {
         when (deprecationInfo) {
             is FutureApiDeprecationInfo -> reportApiNotAvailable(source, deprecationInfo)
             is RequireKotlinDeprecationInfo -> reportVersionRequirementDeprecation(source, referencedSymbol, deprecationInfo)
-            else -> reportDeprecation(source, referencedSymbol, isTypealiasExpansion, deprecationInfo)
+            else -> reportDeprecation(source, referencedSymbol, isTypealiasExpansion, deprecationInfo, migrationLF)
         }
     }
 
@@ -191,7 +228,18 @@ object FirDeprecationChecker : FirBasicExpressionChecker(MppCheckerKind.Common) 
         referencedSymbol: FirBasedSymbol<*>,
         isTypealiasExpansion: Boolean,
         deprecationInfo: FirDeprecationInfo,
+        migrationLF: LanguageFeature?,
     ) {
+        if (deprecationInfo.deprecationLevel != DeprecationLevelValue.WARNING && migrationLF?.isDisabled() == true) {
+            reporter.reportOn(
+                source,
+                FirErrors.DEPRECATION_ERROR_MIGRATION_PERIOD_WARNING,
+                referencedSymbol,
+                deprecationInfo.getMessage(context.session) ?: "",
+                migrationLF,
+            )
+            return
+        }
         if (!isTypealiasExpansion) {
             val diagnostic = when (deprecationInfo.deprecationLevel) {
                 DeprecationLevelValue.ERROR, DeprecationLevelValue.HIDDEN -> FirErrors.DEPRECATION_ERROR
@@ -239,3 +287,55 @@ object FirDeprecationChecker : FirBasicExpressionChecker(MppCheckerKind.Common) 
         return typeAliasConstructorInfo?.typeAliasSymbol ?: (resolvedReturnTypeRef.toRegularClassSymbol(context.session))
     }
 }
+
+object FirDeprecatedQualifierChecker : FirResolvedQualifierChecker(MppCheckerKind.Common) {
+    context(context: CheckerContext, reporter: DiagnosticReporter)
+    override fun check(expression: FirResolvedQualifier) {
+        val symbol = expression.symbol ?: return
+        if (isExcludedSourceKind(expression.source?.kind)) return
+        FirDeprecationChecker.reportApiStatusIfNeeded(
+            expression.source, symbol,
+            migrationLF = LanguageFeature.ReportDeprecationsOfClassifiersInImplicitInvokes.takeIf {
+                context.secondToLastContainer.let {
+                    it is FirImplicitInvokeCall && it.explicitReceiver == expression
+                }
+            }
+        )
+        if (expression.resolvedToCompanionObject) {
+            // Accessing the companion is like following a chain:
+            // TA1 -> TA2 -> ... -> MyClass ~> Companion.
+            // The first part - `TA1 -> TA2 -> ... -> MyClass` -
+            // is handled automatically when getting deprecationInfo
+            // for the typealias symbol (in FirDeprecationChecker).
+            // Below we check "the last transition".
+            val companionSymbol = symbol.fullyExpandedClass()?.resolvedCompanionObjectSymbol ?: return
+            FirDeprecationChecker.reportApiStatusIfNeeded(expression.source, companionSymbol)
+        }
+    }
+}
+
+/**
+ * [KtFakeSourceElementKind.ImplicitReceiver] must be included because otherwise
+ * ```kotlin
+ * import p.DeprecatedObj.prop
+ *
+ * fun bar() {
+ *     prop // reported twice: in import and here
+ * }
+ *
+ * @Deprecated("Nested")
+ * class Nested {
+ *     companion {
+ *          fun foo() { }
+ *     }
+ *     fun baz() { foo() } // reported
+ * }
+ * ```
+ * Note that [KtFakeSourceElementKind.DesugaredReceiverForOperatorOfCall] and
+ * [KtFakeSourceElementKind.QualifierForContextSensitiveResolution] are both not present here:
+ * there is no other place we could report deprecation for them.
+ */
+private fun isExcludedSourceKind(kind: KtSourceElementKind?): Boolean =
+    kind is KtFakeSourceElementKind.DataClassGeneratedMembers
+            || kind == KtFakeSourceElementKind.PropertyFromParameter
+            || kind == KtFakeSourceElementKind.ImplicitReceiver

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.Duplicate
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.isErrorElement
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.builder.toFirOperationOrNull
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.builder.buildLiteralExpression
@@ -23,6 +24,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.findDescendantOfType
+import org.jetbrains.kotlin.psi.psiUtil.unwrapParenthesesLabelsAndAnnotations
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
@@ -64,6 +66,40 @@ internal open class FirElementsRecorder : FirVisitor<Unit, MutableMap<KtElement,
         }
     }
 
+    override fun visitReplExpressionReference(
+        replExpressionReference: FirReplExpressionReference,
+        data: MutableMap<KtElement, FirElement>
+    ) {
+        // Treat moved initializers/delegates as a part of the original property
+        cacheElement(replExpressionReference, data)
+        replExpressionReference.expressionRef.value.accept(this, data)
+    }
+
+    /** @see visitReplExpressionReference */
+    override fun visitReplPropertyDelegate(replPropertyDelegate: FirReplPropertyDelegate, data: MutableMap<KtElement, FirElement>) {
+        // Ignore moved delegates since they should be treated as part of the original property
+    }
+
+    /** @see visitReplExpressionReference */
+    override fun visitReplPropertyInitializer(
+        replPropertyInitializer: FirReplPropertyInitializer,
+        data: MutableMap<KtElement, FirElement>
+    ) {
+        // Ignore moved initializers since they should be treated as part of the original property
+        // The only exception is result property initializer since it belongs to the snippet and cannot be obtained directly
+        if (replPropertyInitializer.propertySymbol.fir.origin == FirDeclarationOrigin.ScriptCustomization.ResultProperty) {
+            replPropertyInitializer.acceptChildren(this, data)
+        }
+    }
+
+    /** @see visitReplExpressionReference */
+    override fun visitReplDeclarationReference(
+        replDeclarationReference: FirReplDeclarationReference,
+        data: MutableMap<KtElement, FirElement>
+    ) {
+        // Ignore moved references since they are useless
+    }
+
     override fun visitElement(element: FirElement, data: MutableMap<KtElement, FirElement>) {
         cacheElement(element, data)
         element.acceptChildren(this, data)
@@ -84,15 +120,37 @@ internal open class FirElementsRecorder : FirVisitor<Unit, MutableMap<KtElement,
     }
 
     override fun visitLiteralExpression(literalExpression: FirLiteralExpression, data: MutableMap<KtElement, FirElement>) {
-        cacheElement(literalExpression, data)
         literalExpression.annotations.forEach {
             it.accept(this, data)
         }
-        // KtPrefixExpression(-, KtConstExpression(n)) is represented as FirLiteralExpression(-n) with converted constant value.
-        // If one queries FIR for KtConstExpression, we still return FirLiteralExpression(-n) even though its source is KtPrefixExpression.
-        // Here, we cache FirLiteralExpression(n) for KtConstExpression(n) to make everything natural and intuitive!
-        if (literalExpression.isConverted) {
-            literalExpression.kind.reverseConverted(literalExpression)?.let { cacheElement(it, data) }
+
+        when (val psi = literalExpression.anchorPsi as? KtElement) {
+            null -> {}
+            is KtPrefixExpression -> {
+                val constantLiteralExpression = psi.constantExpression ?: return
+                val sourceElement = constantLiteralExpression.toKtPsiSourceElement()
+                val adjustedFirLiteral = when (psi.operationToken) {
+                    KtTokens.MINUS -> {
+                        // KtPrefixExpression(-, KtConstExpression(n)) is represented as FirLiteralExpression(-n) with converted constant value.
+                        // If one queries FIR for KtConstExpression, we still return FirLiteralExpression(-n) even though its source is KtPrefixExpression.
+                        // Here, we cache FirLiteralExpression(n) for KtConstExpression(n) to make everything natural and intuitive!
+                        literalExpression.kind.reverseConverted(
+                            original = literalExpression,
+                            sourceElement = sourceElement,
+                        )
+                    }
+
+                    // Even `+` has to be converted to drop redundant noise from the constant expression.
+                    // E.g., +(@Anno() (1))
+                    KtTokens.PLUS -> literalExpression.copy(newValue = literalExpression.value, newSource = sourceElement)
+                    else -> literalExpression
+                } ?: return
+
+                // Cache only on the constant expression, not on `KtPrefixExpression`
+                cache(constantLiteralExpression, adjustedFirLiteral, data)
+            }
+
+            else -> cache(psi, literalExpression, data)
         }
     }
 
@@ -126,19 +184,29 @@ internal open class FirElementsRecorder : FirVisitor<Unit, MutableMap<KtElement,
         cache(psi, element, cache)
     }
 
-    private val FirLiteralExpression.isConverted: Boolean
+    /**
+     * Just [findDescendantOfType] cannot be used since [KtConstantExpression] could be somewhere inside an annotation argument
+     */
+    private val KtPrefixExpression.constantExpression: KtConstantExpression?
         get() {
-            val firSourcePsi = this.source?.psi ?: return false
-            return firSourcePsi is KtPrefixExpression && firSourcePsi.operationToken == KtTokens.MINUS
+            var current: PsiElement? = this
+            do {
+                val new = when (current) {
+                    is KtPrefixExpression -> current.baseExpression
+                    else -> current.unwrapParenthesesLabelsAndAnnotations()
+                }
+
+                if (current == new) {
+                    break
+                }
+
+                current = new
+            } while (true)
+
+            return current as? KtConstantExpression
         }
 
-    private val FirLiteralExpression.ktConstantExpression: KtConstantExpression?
-        get() {
-            val firSourcePsi = this.source?.psi
-            return firSourcePsi?.findDescendantOfType()
-        }
-
-    private fun ConstantValueKind.reverseConverted(original: FirLiteralExpression): FirLiteralExpression? {
+    private fun ConstantValueKind.reverseConverted(original: FirLiteralExpression, sourceElement: KtSourceElement?): FirLiteralExpression? {
         val value = original.value as? Number ?: return null
         val convertedValue: Any = when (this) {
             ConstantValueKind.Byte -> value.toByte().unaryMinus()
@@ -149,14 +217,20 @@ internal open class FirElementsRecorder : FirVisitor<Unit, MutableMap<KtElement,
             ConstantValueKind.Short -> value.toShort().unaryMinus()
             else -> null
         } ?: return null
-        return buildLiteralExpression(
-            original.ktConstantExpression?.toKtPsiSourceElement(),
-            this,
-            convertedValue,
-            setType = false
-        ).also {
-            it.replaceConeTypeOrNull(original.resolvedType)
-        }
+
+        return original.copy(newValue = convertedValue, newSource = sourceElement)
+    }
+
+    private fun FirLiteralExpression.copy(
+        newValue: Any?,
+        newSource: KtSourceElement?,
+    ): FirLiteralExpression = buildLiteralExpression(
+        newSource,
+        kind,
+        newValue,
+        setType = false
+    ).also {
+        it.replaceConeTypeOrNull(resolvedType)
     }
 
     private fun recordTypeQualifiers(resolvedTypeRef: FirResolvedTypeRef, data: MutableMap<KtElement, FirElement>) {
@@ -195,6 +269,23 @@ internal open class FirElementsRecorder : FirVisitor<Unit, MutableMap<KtElement,
                         // KtConstructorDelegationCall. In this case, the source in FIR has this fake source kind.
                     KtFakeSourceElementKind.ImplicitConstructor,
                     KtFakeSourceElementKind.DanglingModifierList,
+
+                        // Repl snippets move property initializers/delegates, so a reference in the original place is marked as a fake one.
+                        // To "move" them back in the recorder, we have to allow such fake sources and hide the moved ones.
+                    KtFakeSourceElementKind.ReplEvalFunction,
+
+                        /**
+                         * The [FirCodeFragment][org.jetbrains.kotlin.fir.declarations.FirCodeFragment]'s real source is the
+                         * [KtCodeFragment], which also happens to be the [KtFile]. So the FIR code fragment shares a real source with its
+                         * containing FIR file. We still need to record code fragments here so that the [KtCodeFragment] can be mapped to
+                         * `FirCodeFragment`.
+                         *
+                         * Despite sharing a real source with the [FirFile][org.jetbrains.kotlin.fir.declarations.FirFile], this doesn't
+                         * introduce ambiguities. The FIR file is accessed via [getOrBuildFirForKtFile][org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.FirElementBuilder.getOrBuildFirForKtFile]
+                         * or [getOrBuildFirFile][org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLResolutionFacade.getOrBuildFirFile],
+                         * while the FIR code fragment is accessed via [getFirForNonKtFileElement][org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.FirElementBuilder.getFirForNonKtFileElement].
+                         */
+                    KtFakeSourceElementKind.CodeFragment.CodeFragmentDeclaration,
                         -> Unit
 
                     else if (
@@ -210,7 +301,6 @@ internal open class FirElementsRecorder : FirVisitor<Unit, MutableMap<KtElement,
 
                 return source.psi
             }
-
 
         private fun KtSourceElement.isSourceForInvertedInOperator(fir: FirElement) =
             kind == KtFakeSourceElementKind.DesugaredInvertedContains
@@ -238,10 +328,26 @@ internal open class FirElementsRecorder : FirVisitor<Unit, MutableMap<KtElement,
             }
         }
 
-        // After desugaring, we also have FirBlock with the same source element.
-        // We need to filter it out to map this source element to set/plusAssign call, so we check `is FirFunctionCall`
+        /**
+         * After desugaring, we also have FirBlock with the same source element.
+         * We need to filter it out to map this source element to set/plusAssign call, so we check `is FirFunctionCall`.
+         *
+         * **Note:** even real source elements might be marked as fake ones.
+
+         * ```kotlin
+         * object ClientTransaction {
+         *     operator fun plusAssign(a: Int) {}
+         * }
+         *
+         * fun main() {
+         *     ClientTransaction += 10
+         * }
+         * ```
+         *
+         * Here `ClientTransaction` is marked as `DesugaredAugmentedAssign` even though it is a real source element ([FirResolvedQualifier]).
+         */
         private fun KtSourceElement.isSourceForArrayAugmentedAssign(fir: FirElement): Boolean {
-            return kind is KtFakeSourceElementKind.DesugaredAugmentedAssign && (fir is FirFunctionCall || fir is FirThisReceiverExpression)
+            return kind is KtFakeSourceElementKind.DesugaredAugmentedAssign && (fir is FirFunctionCall || fir is FirThisReceiverExpression || fir is FirResolvedQualifier)
         }
 
         // `FirSmartCastExpression` forward the source from the original expression,

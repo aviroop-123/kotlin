@@ -17,7 +17,7 @@ private val ANY_LINE_ENDING_REGEX = """(\r\n|\r|\n)""".toRegex()
 
 class MarkdownInferenceLogsDumper(private val ignoreDuplicates: Boolean = true) : FirInferenceLogsDumper() {
     override fun renderDump(sessionsToLoggers: Map<FirSession, FirInferenceLogger>): String =
-        sessionsToLoggers.entries.joinToString("\n\n") { (session, logger) ->
+        sessionsToLoggers.entries.joinToString("\n\n") { [session, logger] ->
             val structure = buildAdditionalPrintingStructure(logger.topLevelElements)
             val renderedElements = structure.renderNotNullWithIndex { render(it) }
             listOf("## `${session}`", *renderedElements.orEmpty().toTypedArray()).joinToString("\n\n")
@@ -53,23 +53,23 @@ class MarkdownInferenceLogsDumper(private val ignoreDuplicates: Boolean = true) 
     private fun List<LoggingElement>.renderList(): List<String>? =
         renderNotNullWithIndex { index -> render(index) }
 
-    private fun FixationLogRecordElement.render(indexWithinParent: Int): String? = record.render(indexWithinParent)
+    private fun FixationLogRecordElement.render(indexWithinParent: Int): String = record.render(indexWithinParent)
 
-    private fun FixationLogRecord.render(indexWithinParent: Int): String? {
+    private fun FixationLogRecord.render(indexWithinParent: Int): String {
         val lines = mutableListOf(
             chosen?.let {
-                val chosenReadiness = map[chosen]?.readiness ?: error("No readiness for chosen variable")
                 val number = "$indent${indexWithinParent + 1}. "
+                val chosenReadiness = map[chosen]?.renderReadiness(number.length) ?: error("No readiness for chosen variable")
                 number + "Choose " + formatCode(it) + " with " + formatCode(chosenReadiness)
             },
         )
 
         withIndent {
             var index = 0
-            map.mapNotNullTo(lines) { (variable, info) ->
+            map.mapNotNullTo(lines) { [variable, info] ->
                 if (variable == chosen) return@mapNotNullTo null
                 val number = "$indent${index++ + 1}. "
-                number + formatCode(variable) + " is " + formatCode(info.readiness)
+                number + formatCode(variable) + " is " + formatCode(info.renderReadiness(number.length))
             }
         }
 
@@ -87,14 +87,14 @@ class MarkdownInferenceLogsDumper(private val ignoreDuplicates: Boolean = true) 
         val code = "$indent```\n${call.render}\n```"
         val title = "$callTitle\n\n$code"
 
-        val contents = candidates.renderNotNullWithIndex { index -> render() }?.joinToString("\n\n") ?: return null
+        val contents = candidates.renderNotNullWithIndex { _ -> render() }?.joinToString("\n\n") ?: return null
         return listOf(title, contents).joinToString("\n\n")
     }
 
     private fun CandidateNode.render(): String? {
         @OptIn(SymbolInternals::class)
-        val signature = FirRenderer.forReadability().renderElementAsString(owner.candidate.symbol.fir)
-        val title = "$indent#### Candidate ${index + 1}: `${owner.candidate.symbol}` --- `${makeSingleLine(signature)}`"
+        val signature = FirRenderer.forReadability().renderElementAsString(owner.candidate.symbol.fir, trim = true)
+        val title = "$indent#### Candidate ${index + 1}: `${owner.candidate.symbol}` --- `$signature`"
 
         val contents = blocks.renderList()?.joinToString("\n\n") ?: return null
         return listOf(title, contents).joinToString("\n")
@@ -177,12 +177,12 @@ class MarkdownInferenceLogsDumper(private val ignoreDuplicates: Boolean = true) 
         is VariableConstraintElement -> constraint
     }
 
-    private fun InitialConstraintElement.render(indexWithinParent: Int): String? {
+    private fun InitialConstraintElement.render(indexWithinParent: Int): String {
         val position = sanitizeFqNames(position)
         return "$indent${indexWithinParent + 1}. `$constraint` _from ${makeSingleLine(position)}_"
     }
 
-    private fun VariableConstraintElement.render(indexWithinParent: Int): String? {
+    private fun VariableConstraintElement.render(indexWithinParent: Int): String {
         val formattedSelf = "`$constraint`"
         return "$indent${indexWithinParent + 1}. $formattedSelf"
     }

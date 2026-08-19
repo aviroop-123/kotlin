@@ -5,33 +5,50 @@
 
 package org.jetbrains.kotlin.arguments.dsl.types
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.kotlin.arguments.dsl.base.KotlinReleaseVersion
 import org.jetbrains.kotlin.arguments.dsl.base.KotlinReleaseVersionLifecycle
 import org.jetbrains.kotlin.arguments.dsl.base.WithKotlinReleaseVersionsMetadata
-import org.jetbrains.kotlin.arguments.serialization.json.KotlinKlibIrInlinerModeAsNameSerializer
 
-@Serializable(KotlinKlibIrInlinerModeAsNameSerializer::class)
+@Serializable
 enum class KlibIrInlinerMode(
     val modeState: String,
     override val releaseVersionsMetadata: KotlinReleaseVersionLifecycle,
-) : WithKotlinReleaseVersionsMetadata {
+) : WithKotlinReleaseVersionsMetadata, WithStringRepresentation {
+    @SerialName("intra-module")
     intraModule(
         modeState = "intra-module",
         releaseVersionsMetadata = KotlinReleaseVersionLifecycle(
             introducedVersion = KotlinReleaseVersion.v2_3_0,
         ),
     ),
+
+    @SerialName("full")
     full(
         modeState = "full",
         releaseVersionsMetadata = KotlinReleaseVersionLifecycle(
             introducedVersion = KotlinReleaseVersion.v2_3_0,
         ),
     ),
+
+    @SerialName("disabled")
     disabled(
         modeState = "disabled",
         releaseVersionsMetadata = KotlinReleaseVersionLifecycle(
             introducedVersion = KotlinReleaseVersion.v2_3_0,
         ),
     ),
+
+    @SerialName("default")
+    default(
+        modeState = "default",
+        releaseVersionsMetadata = KotlinReleaseVersionLifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0,
+        ),
+    ),
+    ;
+
+    override val stringRepresentation: String
+        get() = modeState
 }

@@ -2,6 +2,8 @@ FILE fqName:<root> fileName:/selfReferentialAnnotation.kt
   CLASS ANNOTATION_CLASS name:Ann modality:OPEN visibility:public superTypes:[kotlin.Annotation]
     thisReceiver: VALUE_PARAMETER INSTANCE_RECEIVER kind:DispatchReceiver name:<this> type:<root>.Ann
     PROPERTY name:e visibility:public modality:FINAL [val]
+      annotations:
+        Ann(e = 1)
       FIELD PROPERTY_BACKING_FIELD name:e type:kotlin.Int visibility:private [final]
         EXPRESSION_BODY
           GET_VAR 'e: kotlin.Int declared in <root>.Ann.<init>' type=kotlin.Int origin=INITIALIZE_PROPERTY_FROM_PARAMETER
@@ -34,7 +36,7 @@ FILE fqName:<root> fileName:/selfReferentialAnnotation.kt
         public open fun toString (): kotlin.String declared in kotlin.Annotation
   CLASS ANNOTATION_CLASS name:MyRequiresOptIn modality:OPEN visibility:public superTypes:[kotlin.Annotation]
     annotations:
-      MyRequiresOptIn(a = "", b = GET_ENUM 'ENUM_ENTRY name:ERROR' type=<root>.MyRequiresOptIn.MyLevel)
+      MyRequiresOptIn(a = "", b = MyLevel.ERROR)
     thisReceiver: VALUE_PARAMETER INSTANCE_RECEIVER kind:DispatchReceiver name:<this> type:<root>.MyRequiresOptIn
     PROPERTY name:a visibility:public modality:FINAL [val]
       FIELD PROPERTY_BACKING_FIELD name:a type:kotlin.String visibility:private [final]
@@ -48,6 +50,8 @@ FILE fqName:<root> fileName:/selfReferentialAnnotation.kt
             GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:a type:kotlin.String visibility:private [final]' type=kotlin.String origin=null
               receiver: GET_VAR '<this>: <root>.MyRequiresOptIn declared in <root>.MyRequiresOptIn.<get-a>' type=<root>.MyRequiresOptIn origin=null
     PROPERTY name:b visibility:public modality:FINAL [val]
+      annotations:
+        MyRequiresOptIn(a = "", b = MyLevel.WARNING)
       FIELD PROPERTY_BACKING_FIELD name:b type:<root>.MyRequiresOptIn.MyLevel visibility:private [final]
         EXPRESSION_BODY
           GET_VAR 'b: <root>.MyRequiresOptIn.MyLevel declared in <root>.MyRequiresOptIn.<init>' type=<root>.MyRequiresOptIn.MyLevel origin=INITIALIZE_PROPERTY_FROM_PARAMETER
@@ -122,7 +126,7 @@ FILE fqName:<root> fileName:/selfReferentialAnnotation.kt
           CONST String type=kotlin.String value=""
       VALUE_PARAMETER kind:Regular name:b index:1 type:<root>.MyRequiresOptIn.MyLevel
         annotations:
-          MyRequiresOptIn(a = "", b = GET_ENUM 'ENUM_ENTRY name:WARNING' type=<root>.MyRequiresOptIn.MyLevel)
+          MyRequiresOptIn(a = "", b = MyLevel.WARNING)
         EXPRESSION_BODY
           GET_ENUM 'ENUM_ENTRY name:ERROR' type=<root>.MyRequiresOptIn.MyLevel
       BLOCK_BODY

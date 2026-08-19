@@ -1,30 +1,45 @@
-plugins {
-    kotlin("jvm")
+tasks.register("analysisApiArtifactTests") {
+    group = "verification"
+
+    @Suppress("UNCHECKED_CAST")
+    val analysisApiProjects = rootProject.extra["analysisApiArtifacts"] as List<String>
+
+    val analysisApiProjectChecks = analysisApiProjects
+        .map { "$it:check" }
+
+    dependsOn(*analysisApiProjectChecks.toTypedArray())
 }
 
 tasks.register("analysisAllTests") {
+    group = "verification"
+
     dependsOn(
-        ":analysis:decompiled:decompiler-to-file-stubs:test",
-        ":analysis:decompiled:decompiler-to-psi:test",
-        ":analysis:decompiled:decompiler-js:test",
-        ":analysis:decompiled:decompiler-native:test",
-        ":analysis:analysis-api:test",
-        ":analysis:analysis-api:apiCheck",
-        ":analysis:analysis-api-fir:test",
-        ":analysis:analysis-api-fe10:test",
-        ":analysis:analysis-api-standalone:test",
-        ":analysis:low-level-api-fir:test",
-        ":analysis:low-level-api-fir:tests-jdk11:test",
-        ":analysis:stubs:test",
-        ":analysis:symbol-light-classes:test",
-        ":compiler:psi:psi-api:apiCheck",
-        ":compiler:psi:psi-api:test",
+        ":analysis:analysisApiArtifactTests",
+        ":analysis:analysis-api:check",
+        ":analysis:analysis-api-fir:check",
+        ":analysis:analysis-api-impl-base:check",
+        ":analysis:analysis-api-platform-interface:check",
+        ":analysis:analysis-api-standalone:check",
+        ":analysis:decompiled:decompiler-js:check",
+        ":analysis:decompiled:decompiler-native:check",
+        ":analysis:decompiled:decompiler-to-file-stubs:check",
+        ":analysis:decompiled:decompiler-to-psi:check",
+        ":analysis:low-level-api-fir:check",
+        ":analysis:low-level-api-fir:tests-jdk11:check",
+        ":analysis:low-level-api-fir:low-level-api-fir-compiler-tests:check",
+        ":analysis:stubs:check",
+        ":analysis:symbol-light-classes:check",
+        ":analysis:test-data-manager:check",
+        ":compiler:psi:psi-api:check",
+        ":compiler:psi:psi-impl:check",
+        ":compiler:psi:psi-utils:check",
+        ":compiler:psi:psi-frontend-utils:check",
     )
 
-    if (kotlinBuildProperties.isKotlinNativeEnabled) {
+    if (kotlinBuildProperties.isKotlinNativeEnabled.get()) {
         dependsOn(
-            ":analysis:analysis-api-standalone:analysis-api-standalone-native:test",
-            ":analysis:low-level-api-fir:low-level-api-fir-native:llFirNativeTests",
+            ":analysis:analysis-api-standalone:analysis-api-standalone-native:check",
+            ":analysis:low-level-api-fir:low-level-api-fir-native-compiler-tests:check",
         )
     }
 }

@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.objcexport
 
+import org.jetbrains.kotlin.analysis.api.getModule
 import org.jetbrains.kotlin.analysis.api.export.utilities.getDeclaredSuperInterfaceSymbols
 import org.jetbrains.kotlin.analysis.api.export.utilities.getSuperClassSymbolNotAny
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
@@ -112,8 +113,10 @@ private class KtObjCExportHeaderGenerator(
 
     private fun ObjCExportContext.translateFileClassifiers(file: KtObjCExportFile) {
         val resolvedFile = with(file) { analysisSession.resolve() }
-        resolvedFile.classifierSymbols.sortedWith(StableClassifierOrder).forEach { classOrObjectSymbol ->
-            translateClassOrObjectSymbol(classOrObjectSymbol)
+        withModuleContext(getFileContainingModule(file)) {
+            resolvedFile.classifierSymbols.sortedWith(StableClassifierOrder).forEach { classOrObjectSymbol ->
+                translateClassOrObjectSymbol(classOrObjectSymbol)
+            }
         }
     }
 
@@ -130,9 +133,12 @@ private class KtObjCExportHeaderGenerator(
 
     private fun ObjCExportContext.translateTopLevelFacade(file: KtObjCExportFile) {
         val resolvedFile = with(file) { analysisSession.resolve() }
-        translateToObjCTopLevelFacade(resolvedFile)?.let { topLevelFacade ->
-            addObjCStubIfNotTranslated(topLevelFacade)
-            enqueueDependencyClasses(topLevelFacade)
+
+        withModuleContext(getFileContainingModule(resolvedFile)) {
+            translateToObjCTopLevelFacade(resolvedFile)?.let { topLevelFacade ->
+                addObjCStubIfNotTranslated(topLevelFacade)
+                enqueueDependencyClasses(topLevelFacade)
+            }
         }
     }
 
@@ -147,7 +153,8 @@ private class KtObjCExportHeaderGenerator(
          * Translate: Note: Even if the result was 'null', the classId will still be marked as 'handled' by adding it
          * to the [objCStubsByClassId] index.
          */
-        val objCClass = translateToObjCExportStub(symbol)
+        val translated = translateToObjCExportStub(symbol)
+        val objCClass = translated?.objCClass
         objCStubsByClassId[classId] = objCClass
         objCClass ?: return null
 
@@ -170,9 +177,8 @@ private class KtObjCExportHeaderGenerator(
             }
         }
 
-
         /* Note: It is important to add *this* stub to the result list only after translating/processing the superclass symbols */
-        addObjCStubIfNotTranslated(objCClass, symbol.classId?.packageFqName?.asString())
+        addObjCStubIfNotTranslated(objCClass, symbol.classId?.packageFqName?.asString(), translated.auxiliaryDeclarations)
         enqueueDependencyClasses(objCClass)
         return objCClass
     }
@@ -284,11 +290,16 @@ private class KtObjCExportHeaderGenerator(
      * K1 also uses a dedicated hash map, but filtering out is spread across the translation traversal.
      * See the usage of [org.jetbrains.kotlin.backend.konan.objcexport.ObjCExportHeaderGenerator.generatedClasses].
      */
-    private fun addObjCStubIfNotTranslated(objCClass: ObjCClass, packageFqn: String? = "") {
+    private fun addObjCStubIfNotTranslated(
+        objCClass: ObjCClass,
+        packageFqn: String? = "",
+        auxiliaryDeclarations: List<ObjCTopLevel> = emptyList()
+    ) {
         val key = ObjCClassKey(objCClass.name, packageFqn, (objCClass as? ObjCInterface)?.categoryName)
         val translatedClass = objCStubsByClassKey[key]
         if (translatedClass != null) return
         objCStubsByClassKey[key] = objCClass
+        objCStubs += auxiliaryDeclarations
         objCStubs += objCClass
     }
 }

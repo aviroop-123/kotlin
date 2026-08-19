@@ -23,7 +23,9 @@ import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.mpp.*
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.resolve.calls.mpp.ExpectActualCollectionArgumentsCompatibilityCheckStrategy
 import org.jetbrains.kotlin.resolve.calls.mpp.ExpectActualMatchingContext
 import org.jetbrains.kotlin.resolve.calls.mpp.ExpectActualMatchingContext.AnnotationCallInfo
@@ -48,6 +50,13 @@ internal abstract class IrExpectActualMatchingContext(
     // Default params can't be accurately checked without information about overriddenSymbols of expect classes members
     override val shouldCheckDefaultParams: Boolean
         get() = false
+
+    /**
+     * `expect` optional annotations are getting stripped from the IR,
+     *   so it doesn't make sense to check for them.
+     */
+    override val skipOptionalAnnotationMismatch: Boolean
+        get() = true
 
     private inline fun <R> CallableSymbolMarker.processIr(
         onFunction: (IrFunction) -> R,
@@ -245,7 +254,7 @@ internal abstract class IrExpectActualMatchingContext(
         expectActualTypeParameters: List<Pair<TypeParameterSymbolMarker, TypeParameterSymbolMarker>>,
         parentSubstitutor: TypeSubstitutorMarker?,
     ): TypeSubstitutorMarker {
-        val typeParametersToArguments = expectActualTypeParameters.associate { (expect, actual) ->
+        val typeParametersToArguments = expectActualTypeParameters.associate { [expect, actual] ->
             (expect as IrTypeParameterSymbol) to (actual as IrTypeParameterSymbol).owner.defaultType
         }
         val substitutor = IrTypeSubstitutor(typeParametersToArguments, allowEmptySubstitution = true)
@@ -494,18 +503,33 @@ internal abstract class IrExpectActualMatchingContext(
 
     override val CallableSymbolMarker.hasStableParameterNames: Boolean
         get() {
-            var ir = asIr()
-
-            if (ir.isFakeOverride && ir is IrOverridableDeclaration<*>) {
-                ir.resolveFakeOverrideMaybeAbstract()?.let { ir = it }
-            }
-
+            val ir = asIrResolvingFakeOverrides()
             return when (ir.origin) {
                 IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB,
                 IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB,
-                -> false
+                    -> false
                 else -> true
             }
+        }
+
+    private fun CallableSymbolMarker.asIrResolvingFakeOverrides(): IrDeclaration {
+        var ir = asIr()
+        if (ir.isFakeOverride && ir is IrOverridableDeclaration<*>) {
+            ir.resolveFakeOverrideMaybeAbstract()?.let { ir = it }
+        }
+        return ir
+    }
+
+    private val objCAnnotations: List<ClassId> = run {
+        val packageFqName = FqName("kotlinx.cinterop")
+        listOf("ObjCMethod", "ObjCConstructor", "ObjCFactory")
+            .map { ClassId(packageFqName, Name.identifier(it)) }
+    }
+
+    override val CallableSymbolMarker.shouldMatchByParameterNames: Boolean
+        get() {
+            val ir = asIrResolvingFakeOverrides()
+            return ir.origin == IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB && objCAnnotations.any { ir.hasAnnotation(it) }
         }
 
     override val CallableSymbolMarker.isJavaField: Boolean
@@ -572,6 +596,9 @@ internal abstract class IrExpectActualMatchingContext(
 
         override val isOptIn: Boolean
             get() = getAnnotationClass()?.hasAnnotation(OptInNames.REQUIRES_OPT_IN_FQ_NAME) ?: false
+
+        override val isOptionalExpectation: Boolean
+            get() = getAnnotationClass()?.hasAnnotation(StandardClassIds.Annotations.OptionalExpectation) ?: false
 
         private fun getAnnotationClass(): IrClass? {
             val annotationClass = irElement.type.getClass() ?: return null
@@ -660,7 +687,7 @@ internal abstract class IrExpectActualMatchingContext(
         if (expectTypeRef !is IrSimpleType || actualTypeRef !is IrSimpleType) return
         if (expectTypeRef.arguments.size != actualTypeRef.arguments.size) return
 
-        for ((expectArg, actualArg) in expectTypeRef.arguments.zip(actualTypeRef.arguments)) {
+        for ([expectArg, actualArg] in expectTypeRef.arguments.zip(actualTypeRef.arguments)) {
             val expectArgType = expectArg.typeOrNull ?: continue
             val actualArgType = actualArg.typeOrNull ?: continue
             checkAnnotationsOnTypeRefAndArguments(expectContainingSymbol, actualContainingSymbol, expectArgType, actualArgType, checker)

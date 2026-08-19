@@ -6,27 +6,27 @@
 package org.jetbrains.kotlin.scripting.compiler.plugin.impl
 
 import com.intellij.util.SmartList
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.tryLoadModuleMapping
+import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartProviderBase
 import org.jetbrains.kotlin.metadata.jvm.deserialization.ModuleMapping
-import org.jetbrains.kotlin.resolve.JvmCompilerDeserializationConfiguration
+import org.jetbrains.kotlin.resolve.CommonCompilerDeserializationConfiguration
 import kotlin.script.experimental.jvm.util.forAllMatchingFiles
 
 class PackagePartFromClassLoaderProvider(
     classLoader: ClassLoader,
     languageVersionSettings: LanguageVersionSettings,
-    messageCollector: MessageCollector
+    configuration: CompilerConfiguration,
 ) : JvmPackagePartProviderBase<String>() {
-    override val deserializationConfiguration = JvmCompilerDeserializationConfiguration(languageVersionSettings)
+    override val deserializationConfiguration = CommonCompilerDeserializationConfiguration(languageVersionSettings)
 
     override val loadedModules: MutableList<ModuleMappingInfo<String>> = SmartList()
 
     init {
         classLoader.forAllMatchingFiles("META-INF/*.${ModuleMapping.MAPPING_FILE_EXT}") { name, stream ->
             tryLoadModuleMapping(
-                { stream.readBytes() }, name, name, deserializationConfiguration, messageCollector
+                { stream.readBytes() }, name, name, deserializationConfiguration, configuration
             )?.let {
                 val moduleName = name.removePrefix("META-INF/").removeSuffix(".${ModuleMapping.MAPPING_FILE_EXT}")
                 loadedModules.add(ModuleMappingInfo(name, it, moduleName))

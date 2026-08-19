@@ -5,6 +5,7 @@ KaAnonymousObjectSymbol:
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   location: LOCAL
   modality: FINAL
   name: null
@@ -25,3 +26,4 @@ KaAnonymousObjectSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: null

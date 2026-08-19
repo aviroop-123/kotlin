@@ -36,14 +36,49 @@ import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.utils.SmartSet
 import org.jetbrains.kotlin.utils.mapToSetOrEmpty
-import org.junit.Assume
-import org.junit.Test
+import org.junit.jupiter.api.Assumptions
+import kotlin.test.Test
 import kotlin.test.*
 
 class SwiftExportUnitTests {
     @BeforeTest
     fun runOnMacOSOnly() {
-        Assume.assumeTrue("macOS host required for this test", HostManager.hostIsMac)
+        Assumptions.assumeTrue(HostManager.hostIsMac, "macOS host required for this test")
+    }
+
+    @Test
+    fun `test swift export resolvable configuration is present with apple targets`() {
+        with(buildProjectWithMPP()) {
+            kotlin {
+                iosArm64()
+            }
+            configureRepositoriesForTests()
+            evaluate()
+
+            val swiftExportClasspath = configurations.findByName("swiftExportClasspath")
+            val swiftExportClasspathResolvable = configurations.findByName("swiftExportClasspathResolvable")
+
+            assertNotNull(swiftExportClasspath)
+            assertNotNull(swiftExportClasspathResolvable)
+            assertTrue(swiftExportClasspathResolvable.isCanBeResolved, "configuration should be resolvable")
+        }
+    }
+
+    @Test
+    fun `test swift export resolvable configuration is not present without apple targets`() {
+        with(buildProjectWithMPP()) {
+            kotlin {
+                linuxX64()
+            }
+            configureRepositoriesForTests()
+            evaluate()
+
+            val swiftExportClasspath = configurations.findByName("swiftExportClasspath")
+            val swiftExportClasspathResolvable = configurations.findByName("swiftExportClasspathResolvable")
+
+            assertNull(swiftExportClasspath)
+            assertNull(swiftExportClasspathResolvable)
+        }
     }
 
     @Test
@@ -121,6 +156,7 @@ class SwiftExportUnitTests {
     @Test
     fun `test swift export missing arch`() {
         val project = swiftExportProject(archs = "arm64", multiplatform = {
+            @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
             listOf(iosSimulatorArm64(), iosX64(), iosArm64())
         })
 
@@ -132,6 +168,7 @@ class SwiftExportUnitTests {
 
         val arm64SimLib = project.multiplatformExtension.iosSimulatorArm64().binaries.findStaticLib("SwiftExportBinary", buildType)
         val arm64Lib = project.multiplatformExtension.iosArm64().binaries.findStaticLib("SwiftExportBinary", buildType)
+        @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
         val x64Lib = project.multiplatformExtension.iosX64().binaries.findStaticLib("SwiftExportBinary", buildType)
 
         assertNotNull(arm64SimLib)
@@ -148,6 +185,7 @@ class SwiftExportUnitTests {
     @Test
     fun `test swift export embed and sign inputs`() {
         val project = swiftExportProject(archs = "arm64 x86_64", multiplatform = {
+            @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
             listOf(iosSimulatorArm64(), iosX64())
         })
 
@@ -224,6 +262,7 @@ class SwiftExportUnitTests {
         val linkTask = project.tasks.getByName("linkSwiftExportBinaryDebugStaticIosSimulatorArm64") as KotlinNativeLink
         val projectLibraries = linkTask.libraries
             .filter { it.name.contains("stdlib").not() }
+            .filter { it.name.contains("nativeDependencies").not() }
 
         val mainProjectLibrary = project.layout.buildDirectory
             .file("classes/kotlin/iosSimulatorArm64/main/klib/shared").get().asFile

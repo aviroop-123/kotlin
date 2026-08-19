@@ -3,3 +3,9 @@ open class Base {
     @java.lang.Deprecated
     open fun f() {}
 }
+
+interface I {
+    @Deprecated("", level = DeprecationLevel.HIDDEN)
+    @java.lang.Deprecated
+    fun f() = 1
+}

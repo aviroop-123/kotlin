@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
 import org.jetbrains.kotlin.psi.stubs.KotlinObjectStub
+import org.jetbrains.kotlin.psi.stubs.KotlinStubElement
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
 @OptIn(KtImplementationDetail::class)
@@ -24,6 +25,7 @@ class KotlinObjectStubImpl(
     override val isTopLevel: Boolean,
     override val isLocal: Boolean,
     override val isObjectLiteral: Boolean,
+    override val kdocText: String?
 ) : KotlinStubBaseImpl<KtObjectDeclaration>(parent, KtStubElementTypes.OBJECT_DECLARATION), KotlinObjectStub {
     override fun getName(): String? = name?.string
     override val superNames: List<String>
@@ -39,5 +41,18 @@ class KotlinObjectStubImpl(
         isTopLevel = isTopLevel,
         isLocal = isLocal,
         isObjectLiteral = isObjectLiteral,
+        kdocText = kdocText,
     )
+
+    @KtImplementationDetail
+    override fun isEquivalentTo(other: KotlinStubElement<*>): Boolean =
+        other is KotlinObjectStubImpl &&
+                other.name == name &&
+                other.fqName == fqName &&
+                other.classId == classId &&
+                other.isTopLevel == isTopLevel &&
+                other.isLocal == isLocal &&
+                other.isObjectLiteral == isObjectLiteral &&
+                other.kdocText == kdocText &&
+                other.superNameRefs.contentEquals(superNameRefs)
 }

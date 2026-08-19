@@ -1,3 +1,0 @@
-KtNameReferenceExpression(156,163): 'handler'
-  KtSimpleNameReference:
-    handler: test.pkg.MyHandler

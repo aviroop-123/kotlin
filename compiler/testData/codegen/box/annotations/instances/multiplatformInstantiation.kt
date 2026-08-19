@@ -1,4 +1,4 @@
-// IGNORE_BACKEND_K2: JVM_IR, JS_IR, JS_IR_ES6, NATIVE, WASM
+// IGNORE_BACKEND: JVM_IR, JS_IR, JS_IR_ES6, NATIVE, WASM_JS, WASM_WASI
 // IGNORE_IR_DESERIALIZATION_TEST: NATIVE
 // FIR status: expect/actual in the same module (ACTUAL_WITHOUT_EXPECT)
 
@@ -6,7 +6,7 @@
 // ^^^ IR serialization/deserialization is not tested with K1.
 
 // WITH_STDLIB
-// LANGUAGE: +InstantiationOfAnnotationClasses +MultiPlatformProjects
+// LANGUAGE: +MultiPlatformProjects
 
 // MODULE: lib
 // FILE: common.kt

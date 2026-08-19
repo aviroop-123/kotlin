@@ -3,17 +3,17 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
-package org.jetbrains.kotlin.buildtools.api.tests.compilation
+package org.jetbrains.kotlin.buildtools.tests.compilation
 
-import org.jetbrains.kotlin.buildtools.api.jvm.JvmSnapshotBasedIncrementalCompilationOptions.Companion.KEEP_IC_CACHES_IN_MEMORY
-import org.jetbrains.kotlin.buildtools.api.tests.CompilerExecutionStrategyConfiguration
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.assertions.assertCompiledSources
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.assertions.assertNoCompiledSources
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.model.DefaultStrategyAgnosticCompilationTest
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.scenario.assertAddedOutputs
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.scenario.assertNoOutputSetChanges
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.scenario.assertRemovedOutputs
-import org.jetbrains.kotlin.buildtools.api.tests.compilation.scenario.scenario
+import org.jetbrains.kotlin.buildtools.api.BaseIncrementalCompilationConfiguration
+import org.jetbrains.kotlin.buildtools.tests.CompilerExecutionStrategyConfiguration
+import org.jetbrains.kotlin.buildtools.tests.compilation.assertions.assertCompiledSources
+import org.jetbrains.kotlin.buildtools.tests.compilation.assertions.assertNoCompiledSources
+import org.jetbrains.kotlin.buildtools.tests.compilation.model.DefaultStrategyAgnosticCompilationTest
+import org.jetbrains.kotlin.buildtools.tests.compilation.scenario.assertAddedOutputs
+import org.jetbrains.kotlin.buildtools.tests.compilation.scenario.assertNoOutputSetChanges
+import org.jetbrains.kotlin.buildtools.tests.compilation.scenario.assertRemovedOutputs
+import org.jetbrains.kotlin.buildtools.tests.compilation.scenario.jvmScenario
 import org.jetbrains.kotlin.test.TestMetadata
 import org.junit.jupiter.api.DisplayName
 import java.util.*
@@ -27,7 +27,7 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
     @DisplayName("Sample scenario DSL IC test with a single module")
     @TestMetadata("jvm-module-1")
     fun testScenario1(strategyConfig: CompilerExecutionStrategyConfiguration) {
-        scenario(strategyConfig) {
+        jvmScenario(strategyConfig) {
             val module1 = module("jvm-module-1")
             // at this moment, the module is already initially built and ready for further incremental compilations
 
@@ -43,18 +43,18 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
                 """.trimIndent()
             )
 
-            module1.compile { module, scenarioModule ->
-                assertCompiledSources(module, "foobar.kt")
-                assertAddedOutputs(module, scenarioModule, "FoobarKt.class") // specify only the difference
+            module1.compile {
+                assertCompiledSources("foobar.kt")
+                assertAddedOutputs("FoobarKt.class") // specify only the difference
             }
 
             module1.deleteFile(
                 "foobar.kt",
             )
 
-            module1.compile { module, scenarioModule ->
-                assertNoCompiledSources(module)
-                assertRemovedOutputs(module, scenarioModule, "FoobarKt.class") // specify only the difference
+            module1.compile {
+                assertNoCompiledSources()
+                assertRemovedOutputs("FoobarKt.class") // specify only the difference
             }
         }
     }
@@ -63,12 +63,12 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
     @DefaultStrategyAgnosticCompilationTest
     @TestMetadata("jvm-module-1")
     fun testScenario2(strategyConfig: CompilerExecutionStrategyConfiguration) {
-        scenario(strategyConfig) {
+        jvmScenario(strategyConfig) {
             // compilation options may be modified
             val module1 = module(
                 "jvm-module-1",
                 icOptionsConfigAction = {
-                    it[KEEP_IC_CACHES_IN_MEMORY] = false
+                    it[BaseIncrementalCompilationConfiguration.KEEP_IC_CACHES_IN_MEMORY] = false
                 },
             )
 
@@ -80,18 +80,18 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
                 """.trimIndent()
             )
 
-            module1.compile { module, scenarioModule ->
-                assertCompiledSources(module, "foobar.kt")
-                assertAddedOutputs(module, scenarioModule, "FoobarKt.class")
+            module1.compile {
+                assertCompiledSources("foobar.kt")
+                assertAddedOutputs("FoobarKt.class")
             }
 
             module1.deleteFile(
                 "foobar.kt",
             )
 
-            module1.compile { module, scenarioModule ->
-                assertNoCompiledSources(module)
-                assertRemovedOutputs(module, scenarioModule, "FoobarKt.class")
+            module1.compile {
+                assertNoCompiledSources()
+                assertRemovedOutputs("FoobarKt.class")
             }
         }
     }
@@ -100,7 +100,7 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
     @DefaultStrategyAgnosticCompilationTest
     @TestMetadata("jvm-module-1")
     fun testScenario3(strategyConfig: CompilerExecutionStrategyConfiguration) {
-        scenario(strategyConfig) {
+        jvmScenario(strategyConfig) {
             val module1 = module("jvm-module-1")
             val module2 = module("jvm-module-2", listOf(module1))
 
@@ -115,14 +115,14 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
             )
 
             // you should handle the right order of compilation between modules yourself
-            module1.compile { module, scenarioModule ->
-                assertCompiledSources(module, "bar.kt")
-                assertNoOutputSetChanges(module, scenarioModule)
+            module1.compile {
+                assertCompiledSources("bar.kt")
+                assertNoOutputSetChanges()
             }
 
-            module2.compile { module, scenarioModule ->
-                assertCompiledSources(module, "b.kt")
-                assertNoOutputSetChanges(module, scenarioModule)
+            module2.compile {
+                assertCompiledSources("b.kt")
+                assertNoOutputSetChanges()
             }
         }
     }
@@ -131,15 +131,15 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
     @DisplayName("Sample scenario DSL IC test with versioned source file modification")
     @TestMetadata("jvm-module-1")
     fun testScenario4(strategyConfig: CompilerExecutionStrategyConfiguration) {
-        scenario(strategyConfig) {
+        jvmScenario(strategyConfig) {
             val module1 = module("jvm-module-1")
 
             // replaces bar.kt with bar.kt.1
             module1.replaceFileWithVersion("bar.kt", "add-default-argument")
 
-            module1.compile { module, scenarioModule ->
-                assertCompiledSources(module, "bar.kt")
-                assertNoOutputSetChanges(module, scenarioModule)
+            module1.compile {
+                assertCompiledSources("bar.kt")
+                assertNoOutputSetChanges()
             }
         }
     }
@@ -148,15 +148,15 @@ class ExampleIncrementalScenarioTest : BaseCompilationTest() {
     @DisplayName("Sample scenario DSL IC test with versioned source file creation")
     @TestMetadata("jvm-module-1")
     fun testScenario5(strategyConfig: CompilerExecutionStrategyConfiguration) {
-        scenario(strategyConfig) {
+        jvmScenario(strategyConfig) {
             val module1 = module("jvm-module-1")
 
             // creates secret.kt from secret.kt.1
             module1.createPredefinedFile("secret.kt", "new-file")
 
-            module1.compile { module, scenarioModule ->
-                assertCompiledSources(module, "secret.kt")
-                assertAddedOutputs(module, scenarioModule, "SecretKt.class")
+            module1.compile {
+                assertCompiledSources("secret.kt")
+                assertAddedOutputs("SecretKt.class")
             }
         }
     }

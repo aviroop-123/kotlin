@@ -26,9 +26,12 @@ object AbstractExpectActualAnnotationMatchChecker {
         StandardClassIds.Annotations.ExpectRefinement,
         StandardClassIds.Annotations.Suppress,
         StandardClassIds.Annotations.WasExperimental,
-        StandardClassIds.Annotations.ActualizeByJvmBuiltinProvider,
         StandardClassIds.Annotations.jsExport,
         StandardClassIds.Annotations.jsExportIgnore,
+        StandardClassIds.Annotations.MustUseReturnValues,
+        StandardClassIds.Annotations.IgnorableReturnValue,
+        StandardClassIds.Annotations.jsExportDefault,
+        StandardClassIds.Annotations.jsNoRuntime,
         OptInNames.OPT_IN_CLASS_ID,
         OptInNames.SUBCLASS_OPT_IN_REQUIRED_CLASS_ID,
     )
@@ -113,7 +116,7 @@ object AbstractExpectActualAnnotationMatchChecker {
         listOf(
             expectSymbol.getter to actualSymbol.getter,
             expectSymbol.setter to actualSymbol.setter,
-        ).forEach { (expectAccessor, actualAccessor) ->
+        ).forEach { [expectAccessor, actualAccessor] ->
             if (expectAccessor != null && actualAccessor != null) {
                 areAnnotationsSetOnDeclarationsCompatible(expectAccessor, actualAccessor)?.let {
                     // Write containing declarations into diagnostic
@@ -173,11 +176,11 @@ object AbstractExpectActualAnnotationMatchChecker {
         actualSymbol: CallableSymbolMarker,
     ): Incompatibility? {
         return expectSymbol.valueParameters.zipIfSizesAreEqual(actualSymbol.valueParameters)
-            ?.firstNotNullOfOrNull { (expectParam, actualParam) ->
+            ?.firstNotNullOfOrNull { [expectParam, actualParam] ->
                 areAnnotationsOfParameterCompatible(expectSymbol, actualSymbol, expectParam, actualParam)
             }
             ?: expectSymbol.contextParameters.zipIfSizesAreEqual(actualSymbol.contextParameters)
-                ?.firstNotNullOfOrNull { (expectParam, actualParam) ->
+                ?.firstNotNullOfOrNull { [expectParam, actualParam] ->
                     areAnnotationsOfParameterCompatible(expectSymbol, actualSymbol, expectParam, actualParam)
                 }
     }
@@ -210,7 +213,7 @@ object AbstractExpectActualAnnotationMatchChecker {
         val expectParams = expectSymbol.getTypeParameters() ?: return null
         val actualParams = actualSymbol.getTypeParameters() ?: return null
 
-        return expectParams.zipIfSizesAreEqual(actualParams)?.firstNotNullOfOrNull { (expectParam, actualParam) ->
+        return expectParams.zipIfSizesAreEqual(actualParams)?.firstNotNullOfOrNull { [expectParam, actualParam] ->
             areAnnotationsSetOnDeclarationsCompatible(expectParam, actualParam)?.let {
                 // Write containing declarations into diagnostic
                 Incompatibility(expectSymbol, actualSymbol, actualParam.getSourceElement(), it.type)
@@ -228,7 +231,7 @@ object AbstractExpectActualAnnotationMatchChecker {
         val expectBounds = expectParam.boundsTypeRefs
         val actualBounds = actualParam.boundsTypeRefs
 
-        return expectBounds.zipIfSizesAreEqual(actualBounds)?.firstNotNullOfOrNull { (expectType, actualType) ->
+        return expectBounds.zipIfSizesAreEqual(actualBounds)?.firstNotNullOfOrNull { [expectType, actualType] ->
             // Identifying bounds by ClassId (without type parameters) is enough because type can't have two bounds of same type.
             if (expectType.getClassId() != actualType.getClassId()) {
                 // Expect and actual type bounds must be same and have same order, otherwise expect-actual compatibility checker
@@ -287,6 +290,9 @@ object AbstractExpectActualAnnotationMatchChecker {
             }
             val actualAnnotationsWithSameClassId = actualAnnotationsByName[expectClassId] ?: emptyList()
             if (actualAnnotationsWithSameClassId.isEmpty()) {
+                if (skipOptionalAnnotationMismatch && expectAnnotation.isOptionalExpectation) {
+                    continue
+                }
                 return IncompatibilityType.MissingOnActual(expectAnnotation)
             }
             val collectionCompatibilityChecker = getAnnotationCollectionArgumentsCompatibilityChecker(expectClassId)

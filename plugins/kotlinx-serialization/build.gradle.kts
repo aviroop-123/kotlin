@@ -11,10 +11,10 @@ description = "Kotlin Serialization Compiler Plugin"
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("d8-configuration")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 val jsonJsIrRuntimeForTests: Configuration by configurations.creating {
@@ -56,7 +56,7 @@ val jsonNativeRuntimeForTests by configurations.creating {
 
 val serializationPluginForTests by configurations.creating
 
-fun DependencyHandlerScope.implicitKotlinApiDependency(notation: Any) {
+fun DependencyHandlerScope.implicitKotlinApiDependency(notation: String) {
     implicitDependencies(notation) {
         attributes {
             attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_API))
@@ -71,20 +71,13 @@ dependencies {
     embedded(project(":kotlinx-serialization-compiler-plugin.backend")) { isTransitive = false }
     embedded(project(":kotlinx-serialization-compiler-plugin.cli")) { isTransitive = false }
 
-    testFixturesApi(project(":compiler:backend"))
-    testFixturesApi(project(":compiler:cli"))
     testFixturesApi(project(":kotlinx-serialization-compiler-plugin.cli"))
 
-    testFixturesApi(testFixtures(project(":compiler:test-infrastructure")))
-    testFixturesApi(testFixtures(project(":compiler:test-infrastructure-utils")))
-    testFixturesApi(testFixtures(project(":compiler:tests-compiler-utils")))
     testFixturesApi(testFixtures(project(":compiler:tests-common-new")))
-    testFixturesApi(project(":compiler:fir:plugin-utils"))
     testFixturesImplementation(testFixtures(project(":generators:test-generator")))
-    testFixturesApi(testFixtures(project(":js:js.tests")))
     testFixturesApi(testFixtures(project(":analysis:analysis-api-fir")))
     testFixturesApi(testFixtures(project(":analysis:analysis-api-impl-base")))
-    testFixturesApi(testFixtures(project(":analysis:low-level-api-fir")))
+    testFixturesApi(testFixtures(project(":analysis:low-level-api-fir:low-level-api-fir-compiler-tests")))
 
     testFixturesApi(platform(libs.junit.bom))
     testFixturesApi(libs.junit.jupiter.api)
@@ -99,16 +92,13 @@ dependencies {
     testFixturesApi("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.0")
     testFixturesApi("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0")
 
-    coreJsIrRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.0") { isTransitive = false }
-    jsonJsIrRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0") { isTransitive = false }
-    coreNativeRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.0") { isTransitive = false }
-    jsonNativeRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0") { isTransitive = false }
+    coreJsIrRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3") { isTransitive = false }
+    jsonJsIrRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") { isTransitive = false }
+    coreNativeRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3") { isTransitive = false }
+    jsonNativeRuntimeForTests("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") { isTransitive = false }
     serializationPluginForTests(project(":kotlinx-serialization-compiler-plugin"))
 
     testRuntimeOnly(intellijCore())
-    testRuntimeOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
-    testRuntimeOnly(project(":core:descriptors.runtime"))
-    testRuntimeOnly(project(":compiler:fir:fir-serialization"))
 
     // Dependencies for Kotlin/Native test infra:
     testFixturesApi(testFixtures(project(":native:native.tests")))
@@ -122,8 +112,8 @@ dependencies {
         "iossimulatorarm64",
         "mingwx64"
     ).forEach {
-        implicitKotlinApiDependency("org.jetbrains.kotlinx:kotlinx-serialization-core-$it:1.7.0")
-        implicitKotlinApiDependency("org.jetbrains.kotlinx:kotlinx-serialization-json-$it:1.7.0")
+        implicitKotlinApiDependency("org.jetbrains.kotlinx:kotlinx-serialization-core-$it:1.7.3")
+        implicitKotlinApiDependency("org.jetbrains.kotlinx:kotlinx-serialization-json-$it:1.7.3")
     }
 }
 
@@ -177,15 +167,20 @@ artifacts {
 }
 
 projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5, defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_11_0)) {
+    testTask(
+        jUnitMode = JUnitMode.JUnit5,
+        javaLauncher = JdkMajorVersion.JDK_1_8,
+        defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_11_0)
+    ) {
         useJUnitPlatform {
             // Exclude all tests with the "serialization-native" tag. They should be launched by another test task.
             excludeTags("serialization-native")
         }
 
-        dependsOn(":dist")
-        workingDir = rootDir
         setUpJsIrBoxTests()
+        testInputsCheck {
+            allowFlightRecorder.set(true)
+        }
     }
 
     nativeTestTask(
@@ -198,19 +193,26 @@ projectTests {
 
     testGenerator("org.jetbrains.kotlinx.serialization.GenerateSerializationTestsKt")
 
+    testData(isolated, "testData")
     withJvmStdlibAndReflect()
+    withScriptRuntime()
+    withTestJar()
+    withMockJdkAnnotationsJar()
+    withJsRuntime()
+
+    // For test task only
+    testData(project(":js:js.translator").isolated, "testData/_commonFiles")
+    withMockJdkRuntime()
+    withStdlibCommon()
+    // Only for CompilerFacilityTestForSerializationGenerated.testSerializationPlugin
+    @OptIn(KotlinCompilerDistUsage::class)
+    withDist()
 }
 
 fun Test.setUpJsIrBoxTests() {
-    useJsIrBoxTests(version = version, buildDir = layout.buildDirectory)
-
-    val localJsCoreRuntimeForTests: FileCollection = coreJsIrRuntimeForTests
-    val localJsJsonRuntimeForTests: FileCollection = jsonJsIrRuntimeForTests
-
-    doFirst {
-        systemProperty("serialization.core.path", localJsCoreRuntimeForTests.asPath)
-        systemProperty("serialization.json.path", localJsJsonRuntimeForTests.asPath)
-    }
+    useJsIrBoxTests(buildDir = layout.buildDirectory)
+    addClasspathProperty(coreJsIrRuntimeForTests, "serialization.core.path")
+    addClasspathProperty(jsonJsIrRuntimeForTests, "serialization.json.path")
 }
 
 //region Workaround for KT-76495 and KTIJ-33877

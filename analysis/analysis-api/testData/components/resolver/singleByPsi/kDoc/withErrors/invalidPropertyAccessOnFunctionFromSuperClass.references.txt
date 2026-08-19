@@ -1,3 +1,0 @@
-KDocName(89,97): 'A.toName'
-  KDocReference:
-    (in SuperClass) fun toName(): kotlin.String

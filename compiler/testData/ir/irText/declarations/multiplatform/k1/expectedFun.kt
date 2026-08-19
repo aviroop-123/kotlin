@@ -1,4 +1,5 @@
-// IGNORE_BACKEND_K2: ANY
+// IGNORE_BACKEND: JKLIB
+// IGNORE_BACKEND: ANY
 // LANGUAGE: +MultiPlatformProjects
 
 expect fun f(): String

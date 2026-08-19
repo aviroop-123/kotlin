@@ -5,12 +5,13 @@
 
 package org.jetbrains.kotlin.fir.pipeline
 
-import org.jetbrains.kotlin.KtSourceFile
+import org.jetbrains.kotlin.backend.common.serialization.metadata.FileVisitor
 import org.jetbrains.kotlin.backend.common.serialization.metadata.KlibSingleFileMetadataSerializer
+import org.jetbrains.kotlin.backend.common.serialization.toIoFileOrNull
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.backend.ConstValueProviderImpl
 import org.jetbrains.kotlin.fir.backend.utils.extractFirDeclarations
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.packageFqName
@@ -20,19 +21,31 @@ import org.jetbrains.kotlin.fir.resolve.providers.firProvider
 import org.jetbrains.kotlin.fir.serialization.FirKLibSerializerExtension
 import org.jetbrains.kotlin.fir.serialization.serializeSingleFirFile
 import org.jetbrains.kotlin.metadata.ProtoBuf
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.util.klibMetadataVersionOrDefault
+import org.jetbrains.kotlin.util.metadataVersion
+import java.io.File
 
 /**
  * Responsible for serializing a FIR file metadata into a protobuf to be later written to a KLIB.
  */
 class Fir2KlibMetadataSerializer(
     compilerConfiguration: CompilerConfiguration,
-    private val firOutputs: List<ModuleCompilerAnalyzedOutput>,
+    private val firOutputs: List<SingleModuleFrontendOutput>,
     private val fir2IrActualizedResult: Fir2IrActualizedResult?,
     private val exportKDoc: Boolean,
     private val produceHeaderKlib: Boolean,
 ) : KlibSingleFileMetadataSerializer<FirFile> {
+    constructor(
+        compilerConfiguration: CompilerConfiguration,
+        firOutputs: List<SingleModuleFrontendOutput>,
+        fir2IrActualizedResult: Fir2IrActualizedResult?,
+        produceHeaderKlib: Boolean,
+    ) : this(
+        compilerConfiguration,
+        firOutputs,
+        fir2IrActualizedResult,
+        exportKDoc = compilerConfiguration.languageVersionSettings.supportsFeature(LanguageFeature.ExportKDocDocumentationToKlib),
+        produceHeaderKlib,
+    )
 
     private val firFilesAndSessions: Map<FirFile, Pair<FirSession, ScopeSession>> =
         buildMap {
@@ -51,15 +64,11 @@ class Fir2KlibMetadataSerializer(
 
     private val languageVersionSettings = compilerConfiguration.languageVersionSettings
 
-    private val metadataVersion = compilerConfiguration.klibMetadataVersionOrDefault()
+    private val metadataVersion = compilerConfiguration.metadataVersion()
 
-    /**
-     * The list of source files whose metadata is to be serialized.
-     */
-    val sourceFiles: List<KtSourceFile> = firFilesAndSessions.keys.map { it.sourceFile!! }
-
-    override val numberOfSourceFiles: Int
-        get() = firFilesAndSessions.size
+    override val sourceFiles: Set<File> by lazy(LazyThreadSafetyMode.NONE) {
+        firFilesAndSessions.keys.mapTo(mutableSetOf()) { it.ioFile }
+    }
 
     override fun serializeSingleFileMetadata(file: FirFile): ProtoBuf.PackageFragment {
         val session: FirSession
@@ -86,7 +95,6 @@ class Fir2KlibMetadataSerializer(
                 scopeSession,
                 firProvider,
                 metadataVersion,
-                components?.let(::ConstValueProviderImpl),
                 exportKDoc,
                 components?.annotationsFromPluginRegistrar?.createAdditionalMetadataProvider(),
             ),
@@ -95,9 +103,12 @@ class Fir2KlibMetadataSerializer(
         )
     }
 
-    override fun forEachFile(block: (Int, FirFile, KtSourceFile, FqName) -> Unit) {
+    override fun forEachFile(block: FileVisitor<FirFile>) {
         firFilesAndSessions.keys.forEachIndexed { i, firFile ->
-            block(i, firFile, firFile.sourceFile!!, firFile.packageFqName)
+            block.visit(i, firFile.ioFile, firFile, firFile.sourceFile, firFile.packageFqName)
         }
     }
+
+    private val FirFile.ioFile: File
+        get() = sourceFile?.toIoFileOrNull() ?: File(name)
 }

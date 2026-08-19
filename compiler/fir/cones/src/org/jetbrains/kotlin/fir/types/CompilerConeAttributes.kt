@@ -54,6 +54,9 @@ object CompilerConeAttributes {
         override val key: KClass<out EnhancedNullability> = EnhancedNullability::class
         override val keepInInferredDeclarationType: Boolean get() = true
 
+        override val implementsEquality: Boolean
+            get() = true
+
         override fun toString(): String = "@EnhancedNullability"
     }
 
@@ -123,7 +126,8 @@ object CompilerConeAttributes {
         NoInfer.ANNOTATION_CLASS_ID to NoInfer.key,
         EnhancedNullability.ANNOTATION_CLASS_ID to EnhancedNullability.key,
         ExtensionFunctionType.ANNOTATION_CLASS_ID to ExtensionFunctionType.key,
-        UnsafeVariance.ANNOTATION_CLASS_ID to UnsafeVariance.key
+        UnsafeVariance.ANNOTATION_CLASS_ID to UnsafeVariance.key,
+        ContextFunctionTypeParams.ANNOTATION_CLASS_ID to ContextFunctionTypeParams::class,
     )
 
     val classIdByCompilerAttributeKey: Map<ConeAttributeKey, ClassId> = compilerAttributeByClassId.entries.associateBy(

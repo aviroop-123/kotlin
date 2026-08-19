@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +DefinitelyNonNullableTypes
 
 fun <T> toDefNotNull(s: T): T & Any = s!!
 
@@ -17,8 +16,8 @@ fun <F> main(x: F, y: F, z: F, w: F, m: F) {
 
     val z1 = x!!
     val z2: F & Any = y!!
-    val w1 = if (z != null) <!DEBUG_INFO_SMARTCAST!>z<!> else return
-    val w2: F & Any = if (w != null) <!DEBUG_INFO_SMARTCAST!>w<!> else return
+    val w1 = if (z != null) z else return
+    val w2: F & Any = if (w != null) w else return
 
     y1.foo()
     y2.foo()
@@ -29,7 +28,7 @@ fun <F> main(x: F, y: F, z: F, w: F, m: F) {
     w1.foo()
     w2.foo()
 
-    expectNN(<!TYPE_MISMATCH!>m<!>)
+    <!CANNOT_INFER_PARAMETER_TYPE!>expectNN<!>(<!ARGUMENT_TYPE_MISMATCH!>m<!>)
     expectNN(m!!)
 }
 

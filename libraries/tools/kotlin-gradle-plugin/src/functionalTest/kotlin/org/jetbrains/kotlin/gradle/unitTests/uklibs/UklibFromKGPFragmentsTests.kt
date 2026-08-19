@@ -22,7 +22,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.uklibs.publication.validateKgpMode
 import org.jetbrains.kotlin.gradle.testing.prettyPrinted
 import org.jetbrains.kotlin.gradle.util.*
 import org.jetbrains.kotlin.konan.target.HostManager
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class UklibFromKGPFragmentsTests {
@@ -62,6 +62,7 @@ class UklibFromKGPFragmentsTests {
         ) {
             kotlin {
                 iosArm64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 jvm()
 
@@ -128,6 +129,7 @@ class UklibFromKGPFragmentsTests {
         ) {
             kotlin {
                 iosArm64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 jvm()
 
@@ -151,11 +153,13 @@ class UklibFromKGPFragmentsTests {
             androidLibrary { compileSdk = 31 }
             kotlin {
                 iosArm64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 jvm()
                 js()
                 wasmJs()
                 wasmWasi()
+                @Suppress("DEPRECATION")
                 androidTarget()
             }
         }.runLifecycleAwareTest {
@@ -216,21 +220,6 @@ class UklibFromKGPFragmentsTests {
     }
 
     @Test
-    fun `project configuration with enabled uklib publication - with cinterops - emits diagnostic`() {
-        buildProjectWithMPP(
-            preApplyCode = {
-                setUklibPublicationStrategy()
-            }
-        ) {
-            kotlin {
-                iosArm64().compilations.getByName("main").cinterops.create("foo")
-            }
-        }.evaluate().assertContainsDiagnostic(
-            KotlinToolingDiagnostics.UklibPublicationWithCinterops
-        )
-    }
-
-    @Test
     fun `project configuration with enabled uklib publication - multiple same targets - emits diagnostic`() {
         buildProjectWithMPP(
             preApplyCode = {
@@ -255,6 +244,7 @@ class UklibFromKGPFragmentsTests {
         ) {
             kotlin {
                 iosArm64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 iosSimulatorArm64()
 
@@ -318,7 +308,28 @@ class UklibFromKGPFragmentsTests {
                 linuxX64()
                 linuxArm64()
                 iosArm64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
+            }
+        }.evaluate().assertNoDiagnostics(
+            filterDiagnosticIds = defaultFilteredDiagnostics + listOf(
+                KotlinToolingDiagnostics.InternalKotlinGradlePluginPropertiesUsed,
+                KotlinToolingDiagnostics.UnusedSourceSetsWarning,
+            )
+        )
+    }
+
+    @Test
+    fun `project configuration with enabled uklib publication - single target with cinterops`() {
+        buildProjectWithMPP(
+            preApplyCode = {
+                setUklibPublicationStrategy()
+            }
+        ) {
+            kotlin {
+                val main = linuxArm64().compilations.getByName("main")
+                main.cinterops.create("foo")
+                main.cinterops.create("bar")
             }
         }.evaluate().assertNoDiagnostics(
             filterDiagnosticIds = defaultFilteredDiagnostics + listOf(

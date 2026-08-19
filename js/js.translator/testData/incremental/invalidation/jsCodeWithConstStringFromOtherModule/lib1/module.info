@@ -15,13 +15,11 @@ STEP 3:
         U : l1.3.kt -> l1.kt
     modified ir: l1.kt
 STEP 4:
-    updated exports: l1.kt
 STEP 5:
     modifications:
         U : l1.5.kt -> l1.kt
     modified ir: l1.kt
 STEP 6:
-    updated exports: l1.kt
 STEP 7:
     modifications:
         U : l1.7.kt -> l1.kt

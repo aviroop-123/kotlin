@@ -22,21 +22,18 @@ import org.gradle.api.specs.Spec
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.*
 import org.gradle.language.base.plugins.LifecycleBasePlugin
-import org.jetbrains.kotlin.ExecClang
 import org.jetbrains.kotlin.PlatformManagerPlugin
+import org.jetbrains.kotlin.clangArgs
 import org.jetbrains.kotlin.cpp.*
 import org.jetbrains.kotlin.cpp.ClangFrontend
 import org.jetbrains.kotlin.dependencies.NativeDependenciesExtension
 import org.jetbrains.kotlin.dependencies.NativeDependenciesPlugin
-import org.jetbrains.kotlin.konan.target.KonanTarget
-import org.jetbrains.kotlin.konan.target.PlatformManager
-import org.jetbrains.kotlin.konan.target.SanitizerKind
-import org.jetbrains.kotlin.konan.target.TargetDomainObjectContainer
-import org.jetbrains.kotlin.konan.target.TargetWithSanitizer
-import org.jetbrains.kotlin.konan.target.enabledTargets
+import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.nativeDistribution.nativeProtoDistribution
-import org.jetbrains.kotlin.testing.native.GoogleTestExtension
+import org.jetbrains.kotlin.resolveLlvmUtility
 import org.jetbrains.kotlin.utils.capitalized
+import org.jetbrains.kotlin.utils.reproducibilityRootsMap
+import java.io.File
 import java.time.Duration
 import javax.inject.Inject
 
@@ -64,7 +61,7 @@ private val SanitizerKind?.description
  * Similar to [NamedDomainObjectContainer.maybeCreate] but with [action] argument that will be applied only if
  * an object is being created.
  */
-private fun <T> NamedDomainObjectContainer<T>.getOrCreate(name: String, action: Action<in T>): T = try {
+private fun <T : Any> NamedDomainObjectContainer<T>.getOrCreate(name: String, action: Action<in T>): T = try {
     this.create(name, action)
 } catch (e: InvalidUserDataException) {
     this.getByName(name)
@@ -148,17 +145,15 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
         project.executorsClasspathConfiguration()
     }
 
-    // TODO: These should be set by the plugin users.
-    private val DEFAULT_CPP_FLAGS = listOfNotNull(
-            "-gdwarf-2".takeIf { project.kotlinBuildProperties.getBoolean("kotlin.native.isNativeRuntimeDebugInfoEnabled", false) },
-            "-std=c++17",
-            "-Werror",
-            "-O2",
-            "-fno-aligned-allocation", // TODO: Remove when all targets support aligned allocation in C++ runtime.
-            "-Wall",
-            "-Wextra",
-            "-Wno-unused-parameter",  // False positives with polymorphic functions.
-    )
+    /**
+     * GTest headers to be used in testFixtures and test source sets.
+     */
+    val googleTestHeadersNoDependency: ConfigurableFileCollection = project.objects.fileCollection()
+
+    /**
+     * Task to download GTest.
+     */
+    val googleTestHeadersDependency: Property<String> = project.objects.property(String::class)
 
     private val allTestsTasks by lazy {
         val name = project.name.capitalized
@@ -225,8 +220,10 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
 
         private val compilationDatabase = project.extensions.getByType<CompilationDatabaseExtension>()
         private val platformManager = project.extensions.getByType<PlatformManager>()
-        private val execClang = ExecClang.create(project.objects, platformManager)
         private val nativeDependencies = project.extensions.getByType<NativeDependenciesExtension>()
+
+        private val reproducibilityRootsMap: Map<File, String>
+            get() = reproducibilityRootsMap(project, nativeDependencies)
 
         private val allCompilerArgs = module.compilerArgs.map {
             it + when (sanitizer) {
@@ -250,9 +247,13 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
             this.headersDirs.from(this@SourceSet.headersDirs)
             this.inputFiles.from(this@SourceSet.inputFiles)
             this.workingDirectory.set(module.compilerWorkingDirectory)
+            this.reproducibilityRootsMap.set(this@SourceSet.reproducibilityRootsMap)
             dependsOn(nativeDependencies.llvmDependency)
             dependsOn(nativeDependencies.targetDependency(_target))
-            dependsOn(this@SourceSet.dependencies)
+            this@SourceSet.dependencies.apply {
+                finalizeValue()
+                dependsOn(*get().toTypedArray())
+            }
             val specs = this@SourceSet.onlyIf
             val target = target
             onlyIf {
@@ -266,15 +267,15 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
                 entry {
                     directory.set(module.compilerWorkingDirectory)
                     files.setFrom(this@SourceSet.inputFiles)
-                    arguments.set(listOf(execClang.resolveExecutable(module.compiler.get())))
+                    arguments.set(listOf(platformManager.resolveLlvmUtility(module.compiler.get())))
                     val headers = project.objects.cppHeadersSet().apply {
                         workingDir.set(module.compilerWorkingDirectory)
                         from(this@SourceSet.inputFiles.dir)
                         from(this@SourceSet.headersDirs)
                     }
-                    arguments.addAll(ClangFrontend.defaultCompilerFlags(headers))
+                    arguments.addAll(ClangFrontend.defaultCompilerFlags(headers, reproducibilityRootsMap))
                     arguments.addAll(allCompilerArgs)
-                    arguments.addAll(execClang.clangArgsForCppRuntime(target.name, module.compiler.get()))
+                    arguments.addAll(platformManager.clangArgs(target, module.compiler.get()))
                     output.set(this@SourceSet.outputDirectory.map { it.asFile.absolutePath })
                 }
                 task.configure {
@@ -283,7 +284,10 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
                     // code that actually exists.
                     dependsOn(nativeDependencies.llvmDependency)
                     dependsOn(nativeDependencies.targetDependency(_target))
-                    dependsOn(this@SourceSet.dependencies)
+                    this@SourceSet.dependencies.apply {
+                        finalizeValue()
+                        dependsOn(*get().toTypedArray())
+                    }
                 }
             }
         }
@@ -293,9 +297,10 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
          */
         val task = project.tasks.register<LlvmLink>("llvmLink${module.name.capitalized}${name.capitalized}${_target.toString().capitalized}") {
             this.description = "Link '${module.name}' bitcode files (${this@SourceSet.name} sources) into a single bitcode file for $_target"
-            this.inputFiles.from(compileTask)
+            this.inputDirectory.set(compileTask.map { it.outputDirectory.get() })
             this.outputFile.set(this@SourceSet.outputFile)
             this.arguments.set(module.linkerArgs)
+            this.reproducibilityRootsMap.set(this@SourceSet.reproducibilityRootsMap)
             val specs = this@SourceSet.onlyIf
             val target = target
             onlyIf {
@@ -321,9 +326,6 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
          */
         abstract class SourceSets @Inject constructor(private val module: Module, private val container: ExtensiblePolymorphicDomainObjectContainer<SourceSet>) : NamedDomainObjectContainer<SourceSet> by container {
             private val project by module::project
-
-            // googleTestExtension is only used if testFixtures or tests are used.
-            private val googleTestExtension by lazy { project.extensions.getByType<GoogleTestExtension>() }
 
             /**
              * Get `main` source set if it was configured.
@@ -357,14 +359,11 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
              */
             fun testFixtures(action: Action<in SourceSet>): SourceSet = create(TEST_FIXTURES_SOURCE_SET_NAME) {
                 this.inputFiles.include("**/*TestSupport.cpp", "**/*TestSupport.mm")
-                this.headersDirs.from(googleTestExtension.headersDirs)
+                this.headersDirs.from(module.owner.googleTestHeadersNoDependency)
                 // TODO: Must generally depend on googletest module headers which must itself depend on sources being present.
-                dependencies.add(project.tasks.named("downloadGoogleTest"))
+                dependencies.add(project.tasks.named(module.owner.googleTestHeadersDependency.get()))
                 compileTask.configure {
                     this.group = VERIFICATION_BUILD_TASK_GROUP
-
-                    // Without this explicit statement task dependency is not created even if it is requested in RuntimeTestingPlugin
-                    dependsOn(project.tasks.named("downloadGoogleTest"))
                 }
                 task.configure {
                     this.group = VERIFICATION_BUILD_TASK_GROUP
@@ -383,14 +382,11 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
              */
             fun test(action: Action<in SourceSet>): SourceSet = create(TEST_SOURCE_SET_NAME) {
                 this.inputFiles.include("**/*Test.cpp", "**/*Test.mm")
-                this.headersDirs.from(googleTestExtension.headersDirs)
+                this.headersDirs.from(module.owner.googleTestHeadersNoDependency)
                 // TODO: Must generally depend on googletest module headers which must itself depend on sources being present.
-                dependencies.add(project.tasks.named("downloadGoogleTest"))
+                dependencies.add(project.tasks.named(module.owner.googleTestHeadersDependency.get()))
                 compileTask.configure {
                     this.group = VERIFICATION_BUILD_TASK_GROUP
-
-                    // Without this explicit statement task dependency is not created even if it is requested in RuntimeTestingPlugin
-                    dependsOn(project.tasks.named("downloadGoogleTest"))
                 }
                 task.configure {
                     this.group = VERIFICATION_BUILD_TASK_GROUP
@@ -408,7 +404,7 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
              */
             project.moduleCompileBitcodeElements(name, MAIN_SOURCE_SET_NAME) {
                 outgoing {
-                    capability(CppConsumerPlugin.moduleCapability(project, this@Module.name))
+                    capability("${project.group}:${project.name}-${this@Module.name}:${project.version}")
                 }
             }
 
@@ -417,7 +413,7 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
              */
             project.moduleCompileBitcodeElements(name, TEST_FIXTURES_SOURCE_SET_NAME) {
                 outgoing {
-                    capability(CppConsumerPlugin.moduleTestFixturesCapability(project, this@Module.name))
+                    capability("${project.group}:${project.name}-${this@Module.name}-test-fixtures:${project.version}")
                 }
             }
 
@@ -426,7 +422,7 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
              */
             project.moduleCompileBitcodeElements(name, TEST_SOURCE_SET_NAME) {
                 outgoing {
-                    capability(CppConsumerPlugin.moduleTestCapability(project, this@Module.name))
+                    capability("${project.group}:${project.name}-${this@Module.name}-test:${project.version}")
                 }
             }
         }
@@ -537,12 +533,17 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
 
         private val compileTestsSemaphore = project.gradle.sharedServices.registerIfAbsent("compileTestsSemaphore", CompileTestsSemaphore::class.java) {
             // TODO: Make the default always null when tests compilation stops consuming so much memory.
-            val defaultParallelism = if (project.kotlinBuildProperties.isTeamcityBuild) 2 else null
-            val parallelism = project.kotlinBuildProperties.getOrNull("kotlin.native.runtimeTestsCompilationParallelism")?.toString()?.toInt() ?: defaultParallelism
+            val defaultParallelism = if (project.kotlinBuildProperties.isTeamcityBuild.get()) 2 else null
+            val parallelism = project.kotlinBuildProperties.intProperty("kotlin.native.runtimeTestsCompilationParallelism").orNull ?: defaultParallelism
             parallelism?.let {
                 maxParallelUsages.set(it)
             }
         }
+
+        /**
+         * Set the default value for each [Module.compilerArgs].
+         */
+        abstract val defaultCompilerArgs: ListProperty<String>
 
         private val modules: NamedDomainObjectContainer<Module> = project.objects.polymorphicDomainObjectContainer(Module::class.java).apply {
             registerFactory(Module::class.java) {
@@ -550,7 +551,7 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
                     this.srcRoot.convention(project.layout.projectDirectory.dir("src/$name"))
                     this.headersDirs.from(this.srcRoot.dir("cpp"))
                     this.compiler.convention("clang++")
-                    this.compilerArgs.set(owner.DEFAULT_CPP_FLAGS)
+                    this.compilerArgs.set(defaultCompilerArgs)
                     this.compilerWorkingDirectory.set(project.layout.projectDirectory.dir("src"))
                 }
             }
@@ -595,17 +596,17 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
             }
             project.dependencies {
                 testsGroup.testLauncherModule.get().let { moduleName ->
-                    testLauncherConfiguration(module(project(project.path), moduleName))
-                    testLauncherConfiguration(moduleTestFixtures(project(project.path), moduleName))
+                    testLauncherConfiguration(module(project(project.path), project.group.toString(), project.name, moduleName))
+                    testLauncherConfiguration(moduleTestFixtures(project(project.path), project.group.toString(), project.name, moduleName))
                 }
                 testsGroup.testedModules.get().forEach { moduleName ->
-                    testsGroupConfiguration(module(project(project.path), moduleName))
-                    testsGroupConfiguration(moduleTestFixtures(project(project.path), moduleName))
-                    testsGroupConfiguration(moduleTest(project(project.path), moduleName))
+                    testsGroupConfiguration(module(project(project.path), project.group.toString(), project.name, moduleName))
+                    testsGroupConfiguration(moduleTestFixtures(project(project.path), project.group.toString(), project.name, moduleName))
+                    testsGroupConfiguration(moduleTest(project(project.path), project.group.toString(), project.name, moduleName))
                 }
                 testsGroup.testSupportModules.get().forEach { moduleName ->
-                    testsGroupConfiguration(module(project(project.path), moduleName))
-                    testsGroupConfiguration(moduleTestFixtures(project(project.path), moduleName))
+                    testsGroupConfiguration(module(project(project.path), project.group.toString(), project.name, moduleName))
+                    testsGroupConfiguration(moduleTestFixtures(project(project.path), project.group.toString(), project.name, moduleName))
                 }
             }
 
@@ -656,7 +657,7 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) :
                         } ?: Duration.ofMinutes(5))
                 this.executorsClasspath.from(project.executorsClasspathConfiguration())
                 this.distPath.set(project.nativeProtoDistribution.root.asFile.absolutePath)
-                this.dataDirPath.set(project.kotlinBuildProperties.getOrNull("konan.data.dir") as String?)
+                this.dataDirPath.set(project.kotlinBuildProperties.stringProperty("konan.data.dir").orNull)
 
                 usesService(runGTestSemaphore)
             }

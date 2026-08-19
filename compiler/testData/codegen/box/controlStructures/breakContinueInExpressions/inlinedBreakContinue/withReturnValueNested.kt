@@ -1,6 +1,4 @@
 // LANGUAGE: +BreakContinueInInlineLambdas
-// IGNORE_BACKEND_K1: ANY
-// Reason: break/continue in inline lambdas unsupported
 // WITH_STDLIB
 
 // FILE: lib.kt

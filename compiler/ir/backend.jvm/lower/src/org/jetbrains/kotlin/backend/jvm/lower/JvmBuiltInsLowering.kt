@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.createJvmIrBuilder
 import org.jetbrains.kotlin.backend.jvm.ir.irArrayOf
@@ -23,7 +22,6 @@ import org.jetbrains.kotlin.ir.util.fqNameForIrSerialization
 import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 
-@PhaseDescription(name = "JvmBuiltInsLowering")
 internal class JvmBuiltInsLowering(val context: JvmBackendContext) : FileLoweringPass {
     override fun lower(irFile: IrFile) {
         val transformer = object : IrElementTransformerVoidWithContext() {
@@ -86,7 +84,7 @@ internal class JvmBuiltInsLowering(val context: JvmBackendContext) : FileLowerin
             intrinsicCallType,
             replacement
         ).also { newCall ->
-            newCall.arguments.assignFrom(replacement.owner.parameters zip arguments) { (parameter, argument) ->
+            newCall.arguments.assignFrom(replacement.owner.parameters zip arguments) { [parameter, argument] ->
                 argument!!.coerceIfPossible(parameter.type) ?: return this@replaceWithCallTo
             }
         }

@@ -267,9 +267,9 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.jetbrains.kotlin</groupId>
-      <artifactId>abi-tools-api</artifactId>
-      <version>ArtifactsTest.version</version>
+      <groupId>com.microsoft.playwright</groupId>
+      <artifactId>playwright</artifactId>
+      <version>1.60.0</version>
       <scope>runtime</scope>
       <exclusions>
         <exclusion>

@@ -8,10 +8,12 @@ package kotlin.js
 import kotlin.internal.UsedFromCompilerGeneratedCode
 
 @PublishedApi
+@UsedFromCompilerGeneratedCode
 internal fun <T : Enum<T>> enumValuesIntrinsic(): Array<T> =
     throw IllegalStateException("Should be replaced by compiler")
 
 @PublishedApi
+@UsedFromCompilerGeneratedCode
 internal fun <T : Enum<T>> enumValueOfIntrinsic(@Suppress("UNUSED_PARAMETER") name: String): T =
     throw IllegalStateException("Should be replaced by compiler")
 
@@ -41,25 +43,9 @@ internal fun safePropertySet(self: dynamic, setterName: String, propName: String
  * For that reason, [kotlin.js.JsOutlinedFunction] will forever remain internal.
  */
 @Target(AnnotationTarget.FUNCTION)
-@UsedFromCompilerGeneratedCode
 @PublishedApi
+@UsedFromCompilerGeneratedCode
 internal annotation class JsOutlinedFunction(val jsFunctionExpression: String, val sourceMap: String)
-
-/**
- * The annotation is needed for annotating function declarations that should be compiled as ES6 generators
- */
-@Target(AnnotationTarget.FUNCTION)
-@UsedFromCompilerGeneratedCode
-internal annotation class JsGenerator
-
-/**
- * The annotation is needed for annotating class declarations and type alias which are used inside exported declarations, but
- * doesn't contain @JsExport annotation
- * This information is used for generating special tagged types inside d.ts files, for more strict usage of implicitly exported entities
- */
-@Target(AnnotationTarget.CLASS)
-@UsedFromCompilerGeneratedCode
-internal annotation class JsImplicitExport(val couldBeConvertedToExplicitExport: Boolean)
 
 /**
  * The annotation is needed for annotating function declarations that should not accept any dispatch receiver

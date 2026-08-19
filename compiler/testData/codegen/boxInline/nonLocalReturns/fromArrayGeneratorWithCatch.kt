@@ -1,3 +1,5 @@
+// WASM_IGNORE_FOR: vm=WasmEdge
+
 // FILE: 1.kt
 inline fun runReturning(f: () -> Nothing): Nothing = f()
 

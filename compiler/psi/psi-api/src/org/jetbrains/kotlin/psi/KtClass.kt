@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -13,6 +13,19 @@ import org.jetbrains.kotlin.KtStubBasedElementTypes
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.stubs.KotlinClassStub
 
+/**
+ * Represents a class or interface declaration.
+ *
+ * ### Example:
+ *
+ * ```kotlin
+ *    class Foo(val x: Int) {
+ *        fun bar() {}
+ *    }
+ * // ^________________^
+ * // The entire class
+ * ```
+ */
 open class KtClass : KtClassOrObject {
     private val classInterfaceTokenSet = TokenSet.create(KtTokens.CLASS_KEYWORD, KtTokens.INTERFACE_KEYWORD)
 
@@ -47,18 +60,24 @@ open class KtClass : KtClassOrObject {
     fun getFunKeyword(): PsiElement? = modifierList?.getModifier(KtTokens.FUN_KEYWORD)
 }
 
-fun KtClass.createPrimaryConstructorIfAbsent(): KtPrimaryConstructor {
-    val constructor = primaryConstructor
-    if (constructor != null) return constructor
-    var anchor: PsiElement? = typeParameterList
-    if (anchor == null) anchor = nameIdentifier
-    if (anchor == null) anchor = lastChild
-    return addAfter(KtPsiFactory(project).createPrimaryConstructor(), anchor) as KtPrimaryConstructor
-}
+@Deprecated(
+    "Use getOrCreatePrimaryConstructor() instead",
+    ReplaceWith(
+        "this.getOrCreatePrimaryConstructor()",
+        "org.jetbrains.kotlin.idea.base.psi.getOrCreatePrimaryConstructor",
+    ),
+)
+@OptIn(KtNonPublicApi::class)
+fun KtClass.createPrimaryConstructorIfAbsent(): KtPrimaryConstructor =
+    KtPsiMutationService.getInstance().getOrCreatePrimaryConstructor(this)
 
-fun KtClass.createPrimaryConstructorParameterListIfAbsent(): KtParameterList {
-    val constructor = createPrimaryConstructorIfAbsent()
-    val parameterList = constructor.valueParameterList
-    if (parameterList != null) return parameterList
-    return constructor.add(KtPsiFactory(project).createParameterList("()")) as KtParameterList
-}
+@Deprecated(
+    "Use getOrCreatePrimaryConstructorParameterList() instead",
+    ReplaceWith(
+        "this.getOrCreatePrimaryConstructorParameterList()",
+        "org.jetbrains.kotlin.idea.base.psi.getOrCreatePrimaryConstructorParameterList",
+    ),
+)
+@OptIn(KtNonPublicApi::class)
+fun KtClass.createPrimaryConstructorParameterListIfAbsent(): KtParameterList =
+    KtPsiMutationService.getInstance().getOrCreatePrimaryConstructorParameterList(this)

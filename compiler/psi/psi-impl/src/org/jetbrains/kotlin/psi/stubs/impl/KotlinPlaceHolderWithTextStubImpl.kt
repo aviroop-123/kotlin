@@ -10,6 +10,7 @@ import com.intellij.psi.stubs.StubElement
 import org.jetbrains.kotlin.psi.KtElementImplStub
 import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.stubs.KotlinPlaceHolderWithTextStub
+import org.jetbrains.kotlin.psi.stubs.KotlinStubElement
 
 @OptIn(KtImplementationDetail::class)
 class KotlinPlaceHolderWithTextStubImpl<T : KtElementImplStub<*>>(
@@ -20,7 +21,15 @@ class KotlinPlaceHolderWithTextStubImpl<T : KtElementImplStub<*>>(
     @KtImplementationDetail
     override fun copyInto(newParent: StubElement<*>?): KotlinPlaceHolderWithTextStubImpl<T> = KotlinPlaceHolderWithTextStubImpl(
         parent = newParent,
-        elementType = stubType,
+        elementType =
+            @Suppress("DEPRECATION") // KT-78356
+            stubType,
         text = text,
     )
+
+    @KtImplementationDetail
+    override fun isEquivalentTo(other: KotlinStubElement<*>): Boolean =
+        other is KotlinPlaceHolderWithTextStubImpl<*> &&
+                other.elementType == elementType &&
+                other.text == text
 }

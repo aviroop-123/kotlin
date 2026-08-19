@@ -1,9 +1,41 @@
-// -- Module: <m1> --
+/m3.kt:22:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
 
-// -- Module: <m2> --
+/m3.kt:22:11: warning: Class 'Some' of the parameter '_' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
 
-// -- Module: <m3> --
-/m3.kt:25:17: error: unresolved reference: Some
-    foo { some: Some, _ -> }
-                ^^^^
+/m3.kt:23:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
 
+/m3.kt:23:11: warning: Class 'Some' of the parameter 'some' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
+
+/m3.kt:24:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:24:11: warning: Class 'Some' of the parameter 'some' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
+
+/m3.kt:24:22: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:25:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:25:17: error: Unresolved reference 'Some'.
+
+/m3.kt:27:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:27:9: warning: Class 'Some' of the parameter 'it' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
+
+/m3.kt:28:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:28:11: warning: Class 'Some' of the parameter '_' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
+
+/m3.kt:29:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:29:11: warning: Class 'Some' of the parameter 'it' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
+
+/m3.kt:30:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:30:9: warning: Class 'Some' of the parameter 'it' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
+
+/m3.kt:30:11: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:31:5: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.
+
+/m3.kt:31:11: warning: Class 'Some' of the parameter 'some' is inaccessible. This may be forbidden soon. Check the module classpath for missing or conflicting dependencies.
+
+/m3.kt:31:19: error: Cannot access class 'Some'. Check your module classpath for missing or conflicting dependencies.

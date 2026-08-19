@@ -1,65 +1,65 @@
 <caret_1>:
-  KtNameReferenceExpression(309,312): 'foo'
-    KaSuccessCallInfo:
+  KtNameReferenceExpression(306,309): 'foo'
+    KaCallResolutionSuccess:
       call = KaSimpleVariableAccessCall:
-        partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
-          contextArguments = []
-          dispatchReceiver = KaExplicitReceiverValue:
-            expression = kotlinClass
-            isSafeNavigation = false
-            type = KotlinClass
-          extensionReceiver = null
-          signature = KaVariableSignature:
-            name = foo
-            receiverType = null
-            returnType = Foo<kotlin.Any>
-            symbol = var foo: Foo<kotlin.Any>
-            contextParameters = []
-            callableId = /KotlinClass.foo
-        simpleAccess = Read
+        contextArguments = []
+        dispatchReceiver = KaExplicitReceiverValue:
+          expression = kotlinClass
+          isSafeNavigation = false
+          type = KotlinClass
+        extensionReceiver = null
+        isContextSensitive = false
+        kind = Read
+        signature = KaVariableSignature:
+          name = foo
+          receiverType = null
+          returnType = Foo<kotlin.Any>
+          symbol = var foo: Foo<kotlin.Any>
+          contextParameters = []
+          callableId = /KotlinClass.foo
         typeArgumentsMapping = {}
 
 <caret_2>:
-  KtNameReferenceExpression(330,333): 'foo'
-    KaSuccessCallInfo:
+  KtNameReferenceExpression(327,330): 'foo'
+    KaCallResolutionSuccess:
       call = KaSimpleVariableAccessCall:
-        partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
-          contextArguments = []
-          dispatchReceiver = KaExplicitReceiverValue:
-            expression = kotlinClass
-            isSafeNavigation = false
-            type = KotlinClass
-          extensionReceiver = null
-          signature = KaVariableSignature:
-            name = foo
-            receiverType = null
-            returnType = Foo<kotlin.Any>
-            symbol = var foo: Foo<kotlin.Any>
-            contextParameters = []
-            callableId = /KotlinClass.foo
-        simpleAccess = Write:
+        contextArguments = []
+        dispatchReceiver = KaExplicitReceiverValue:
+          expression = kotlinClass
+          isSafeNavigation = false
+          type = KotlinClass
+        extensionReceiver = null
+        isContextSensitive = false
+        kind = Write:
           value = foo
+        signature = KaVariableSignature:
+          name = foo
+          receiverType = null
+          returnType = Foo<kotlin.Any>
+          symbol = var foo: Foo<kotlin.Any>
+          contextParameters = []
+          callableId = /KotlinClass.foo
         typeArgumentsMapping = {}
 
 <caret_3>:
-  KtNameReferenceExpression(442,445): 'foo'
-    KaSuccessCallInfo:
+  KtNameReferenceExpression(439,442): 'foo'
+    KaCallResolutionSuccess:
       call = KaSimpleVariableAccessCall:
-        partiallyAppliedSymbol = KaPartiallyAppliedSymbol:
-          contextArguments = []
-          dispatchReceiver = KaSmartCastedReceiverValue:
-            original = KaExplicitReceiverValue:
-              expression = javaClass
-              isSafeNavigation = false
-              type = JavaClass<T>
-            type = it(KotlinClass & JavaClass<T>)
-          extensionReceiver = null
-          signature = KaVariableSignature:
-            name = foo
-            receiverType = null
-            returnType = it(Foo<kotlin.Any> & Foo<T!>)
-            symbol = var foo: it(Foo<kotlin.Any> & Foo<T!>)
-            contextParameters = []
-            callableId = /KotlinClass.foo
-        simpleAccess = Read
+        contextArguments = []
+        dispatchReceiver = KaSmartCastedReceiverValue:
+          original = KaExplicitReceiverValue:
+            expression = javaClass
+            isSafeNavigation = false
+            type = JavaClass<T>
+          type = it(KotlinClass & JavaClass<T>)
+        extensionReceiver = null
+        isContextSensitive = false
+        kind = Read
+        signature = KaVariableSignature:
+          name = foo
+          receiverType = null
+          returnType = it(Foo<kotlin.Any> & Foo<T!>)
+          symbol = var foo: it(Foo<kotlin.Any> & Foo<T!>)
+          contextParameters = []
+          callableId = /KotlinClass.foo
         typeArgumentsMapping = {}

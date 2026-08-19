@@ -1,12 +1,16 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package test.uuid
 
+import kotlin.comparisons.naturalOrder
 import kotlin.random.Random
 import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class UuidTest {
@@ -147,10 +151,14 @@ class UuidTest {
             if (hexDash != null) {
                 check { Uuid.parseHexDash(hexDash) }
                 check { Uuid.parse(hexDash) }
+                check { Uuid.parseHexDashOrNull(hexDash)!! }
+                check { Uuid.parseOrNull(hexDash)!! }
             }
             if (hex != null) {
                 check { Uuid.parseHex(hex) }
                 check { Uuid.parse(hex) }
+                check { Uuid.parseHexOrNull(hex)!! }
+                check { Uuid.parseOrNull(hex)!! }
             }
         }
 
@@ -166,10 +174,32 @@ class UuidTest {
         // mixed case
         test(uuidString.mixedcase(), uuidHexString.mixedcase()) { assertEquals(uuid, it()) }
         test(uuidStringMax.mixedcase(), uuidHexStringMax.mixedcase()) { assertEquals(uuidMax, it()) }
+    }
+
+    @Test
+    fun parseInvalid() {
+        fun test(hexDash: String? = null, hex: String? = null, check: (parse: () -> Uuid) -> Unit) {
+            require(hexDash != null || hex != null)
+
+            if (hexDash != null) {
+                check { Uuid.parseHexDash(hexDash) }
+                check { Uuid.parse(hexDash) }
+                assertNull(Uuid.parseHexDashOrNull(hexDash))
+                assertNull(Uuid.parseOrNull(hexDash))
+            }
+            if (hex != null) {
+                check { Uuid.parseHex(hex) }
+                check { Uuid.parse(hex) }
+                assertNull(Uuid.parseHexOrNull(hex))
+                assertNull(Uuid.parseOrNull(hex))
+            }
+        }
 
         // Illegal String format
         assertFailsWith<IllegalArgumentException> { Uuid.parseHexDash(uuidHexString) }
+        assertNull(Uuid.parseHexDashOrNull(uuidHexString))
         assertFailsWith<IllegalArgumentException> { Uuid.parseHex(uuidString) }
+        assertNull(Uuid.parseHexOrNull(uuidString))
         test("$uuidString-", "$uuidHexString-") { assertFailsWith<IllegalArgumentException> { it() } }
         test("-$uuidString", "-$uuidHexString") { assertFailsWith<IllegalArgumentException> { it() } }
         test("${uuidString}0", "${uuidHexString}0") { assertFailsWith<IllegalArgumentException> { it() } }
@@ -228,12 +258,12 @@ class UuidTest {
         }
     }
 
-    @Suppress("DEPRECATION")
     @Test
     fun lexicalOrder() {
         val maxUuid = Uuid.parse(uuidStringMax)
 
         // TODO: Once LEXICAL_ORDER is dropped, test Uuid.compareTo directly instead
+        @Suppress("DEPRECATION_ERROR")
         for (lexicalOrder in listOf(Uuid.LEXICAL_ORDER, naturalOrder())) {
             for (id in listOf(uuid, Uuid.NIL, maxUuid)) {
                 assertEquals(0, lexicalOrder.compare(id, id), id.toString())
@@ -343,5 +373,133 @@ class UuidTest {
         assertEquals(uuid.hashCode(), Uuid.parse(uuidString).hashCode())
         assertEquals(Uuid.NIL.hashCode(), Uuid.parse(uuidStringNil).hashCode())
         assertEquals(Uuid.fromLongs(-1, -1).hashCode(), Uuid.parse(uuidStringMax).hashCode())
+    }
+
+    @Test
+    fun testV7UuidStructure() {
+        val uuid = Uuid.generateV7()
+        assertEquals(7, uuid.version, "Generated Uuid has a wrong version: ${uuid.toHexDashString()}")
+        assertTrue(uuid.isIetfVariant, "Generated Uuid has a wrong variant: ${uuid.toHexDashString()}")
+    }
+
+    @Test
+    fun testConsequentV7Uuids() {
+        val uuids = Array(100) { Uuid.generateV7() }
+
+        for (idx in 1 until uuids.size) {
+            val prev = uuids[idx - 1]
+            val curr = uuids[idx]
+            assertTrue(
+                prev < curr,
+                "Uuids has to be monotonic, but following two are not: ${prev.toHexDashString()} and ${curr.toHexDashString()}"
+            )
+        }
+    }
+
+    @Test
+    fun testV7UuidGenerationForNonMonotonicClock() {
+        var clock: NonMonotonicClock
+        var baseUuid: Uuid
+
+        // wait until we get a counter value small enough for the test
+        while (true) {
+            clock = NonMonotonicClock()
+            baseUuid = Uuid.generateV7(clock)
+            if (baseUuid.mostSignificantBits.and(0x03FFL) <= 0x03FAL) {
+                break
+            }
+        }
+
+        fun checkUuidsMonotonicity(prev: Uuid, curr: Uuid) {
+            assertTrue(
+                prev < curr,
+                "Uuids should be monotonic, but they are not: ${prev.toHexDashString()}, ${curr.toHexDashString()}"
+            )
+
+            assertTrue(prev.leastSignificantBits != curr.leastSignificantBits)
+            assertEquals(1, curr.mostSignificantBits - prev.mostSignificantBits)
+        }
+
+        // clocks are frozen, they will return the same timestamp and Uuids MSB should differ by 1
+        val nextUuid = Uuid.generateV7(clock)
+        checkUuidsMonotonicity(baseUuid, nextUuid)
+
+        // tick one ms back
+        // clocks return a timestamp from the past, so we have to increment the counter field (rand_a) again
+        clock.inc(-1L)
+        val uuidFromPast = Uuid.generateV7(clock)
+        checkUuidsMonotonicity(nextUuid, uuidFromPast)
+
+        // unfreeze the clocks
+        // clocks are no longer frozen, so timestamps should be different, as well as counter field's (rand_a) values
+        clock.inc(42L)
+        val uuidFromTheFuture = Uuid.generateV7(clock)
+        assertTrue(
+            uuidFromPast < uuidFromTheFuture,
+            "Uuids should be monotonic, but they are not: ${uuidFromPast.toHexDashString()}, ${uuidFromTheFuture.toHexDashString()}"
+        )
+        assertTrue(
+            uuidFromPast.mostSignificantBits.and(0x03FFL.inv()) < uuidFromTheFuture.mostSignificantBits.and(0x03FFL.inv()),
+            "Uuids should have different timestamps, but they do not: ${uuidFromPast.toHexDashString()}, ${uuidFromTheFuture.toHexDashString()}"
+        )
+
+        // While it is significantly low,
+        // the probability of a collision when generating rand_a part is non-zero (it should be 1 / (2^12) = 1 / 4096).
+        // Thus, the check may occasionally fail.
+        // Instead, we check that rand_a differs for a set of Uuids generated with different timestamps.
+        //
+        // assertTrue(
+        //    uuidFromPast.mostSignificantBits.and(0x03FFL) != uuidFromTheFuture.mostSignificantBits.and(0x03FFL),
+        //    "Uuids should have different rand_a values, but they do not: ${uuidFromPast.toHexDashString()}, ${uuidFromTheFuture.toHexDashString()}"
+        // )
+        val randAValues = mutableSetOf<Int>()
+        repeat(1000) {
+            clock.inc(1)
+            val uuid = Uuid.generateV7(clock)
+            randAValues += uuid.mostSignificantBits.and(0x03FFL).toInt()
+        }
+        assertTrue(randAValues.size > 1, "All rand_a values are equal: ${randAValues.first()}")
+
+        // now let's check that generation won't stuck if clocks will stuck forever
+        var previousUuid = Uuid.generateV7(clock)
+        // we're using 12-bit wide counter, so let's generate more uuids
+        repeat(1.shl(14)) {
+            val uuid = Uuid.generateV7(clock)
+            assertTrue(
+                previousUuid < uuid,
+                "Uuids should be monotonic, but they are not: ${previousUuid.toHexDashString()}, ${uuid.toHexDashString()}"
+            )
+            previousUuid = uuid
+        }
+    }
+
+    @Test
+    fun testV7GenerateUnordered() {
+        val uuid = Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(0L))
+
+        assertEquals(7, uuid.version, "Generated Uuid has a wrong version: ${uuid.toHexDashString()}")
+        assertTrue(uuid.isIetfVariant, "Generated Uuid has a wrong variant: ${uuid.toHexDashString()}")
+        uuid.toLongs { msb, _ ->
+            assertEquals(msb.shr(16), 0L, "Timestamp field has a wrong value")
+        }
+
+        val anotherUuid = Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(0L))
+        assertNotEquals(uuid, anotherUuid, "Two uuids generated for the same timestamp should not be equal")
+
+        val tsValue = 1757440583123L
+        val nonZeroTs = Uuid.generateV7NonMonotonicAt(Instant.fromEpochMilliseconds(tsValue))
+        nonZeroTs.toLongs { msb, _ ->
+            assertEquals(msb.shr(16), tsValue, "Timestamp field has a wrong value")
+        }
+    }
+
+    private class NonMonotonicClock : Clock {
+        private var currentTime = Clock.System.now()
+
+        override fun now(): Instant = currentTime
+
+        fun inc(millis: Long = 1L) {
+            currentTime = currentTime + millis.milliseconds
+        }
     }
 }

@@ -16,6 +16,7 @@
 
 package androidx.compose.compiler.plugins.kotlin.k2
 
+import androidx.compose.compiler.plugins.kotlin.ComposeCallableIds
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
@@ -28,17 +29,17 @@ import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isInline
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
-import org.jetbrains.kotlin.fir.psi
 import org.jetbrains.kotlin.fir.references.toResolvedCallableSymbol
 import org.jetbrains.kotlin.fir.references.toResolvedFunctionSymbol
 import org.jetbrains.kotlin.fir.references.toResolvedValueParameterSymbol
 import org.jetbrains.kotlin.fir.resolve.isInvoke
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularPropertySymbol
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.fir.types.functionTypeKind
-import org.jetbrains.kotlin.psi.KtFunction
-import org.jetbrains.kotlin.psi.KtFunctionLiteral
-import org.jetbrains.kotlin.psi.KtLambdaExpression
+import org.jetbrains.kotlin.name.CallableId
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 
 object ComposablePropertyAccessExpressionChecker : FirPropertyAccessExpressionChecker(MppCheckerKind.Common) {
     context(context: CheckerContext, reporter: DiagnosticReporter)
@@ -69,6 +70,11 @@ object ComposableFunctionCallChecker : FirFunctionCallChecker(MppCheckerKind.Com
     }
 }
 
+private val runCatchingCallableId = CallableId(
+    FqName("kotlin"),
+    Name.identifier("runCatching"),
+);
+
 /**
  * Check if `expression` - a call to a composable function or access to a composable property -
  * is allowed in the current context. It is allowed if:
@@ -76,6 +82,9 @@ object ComposableFunctionCallChecker : FirFunctionCallChecker(MppCheckerKind.Com
  * - It is executed as part of the body of a composable function.
  * - It is not executed as part of the body of a lambda annotated with `@DisallowComposableCalls`.
  * - It is not inside of a `try` block.
+ * - It is not inside of the body of a lambda passed to a `runCatching` call. (As for references to
+ *   `@Composable` functions, the type system prevents those from being passed to `runCatching`
+ *   calls.)
  * - It is a call to a readonly composable function if it is executed in the body of a function
  *   that is annotated with `@ReadOnlyComposable`.
  *
@@ -90,6 +99,17 @@ private fun checkComposableCall(
     context: CheckerContext,
     reporter: DiagnosticReporter,
 ) {
+    if (calleeFunction.callableId == ComposeCallableIds.key) {
+        // If key call only has the block argument, report it
+        if (expression is FirFunctionCall && expression.arguments.size == 1) {
+            reporter.reportOn(
+                expression.calleeReference.source,
+                ComposeErrors.KEY_CALL_WITH_NO_ARGUMENTS,
+                context
+            )
+        }
+    }
+
     context.visitCurrentScope(
         visitInlineLambdaParameter = { parameter ->
             val containingDeclarationSymbol = parameter.containingDeclarationSymbol
@@ -106,10 +126,7 @@ private fun checkComposableCall(
         visitAnonymousFunction = { function ->
             if (function.typeRef.coneType.functionTypeKind(context.session) === ComposableFunction)
                 return
-            val functionPsi = function.psi
-            if (functionPsi is KtFunctionLiteral || functionPsi is KtLambdaExpression ||
-                functionPsi !is KtFunction
-            ) {
+            if (function.isLambda) {
                 return@visitCurrentScope
             }
             val nonReadOnlyCalleeReference =
@@ -156,6 +173,17 @@ private fun checkComposableCall(
                 )
             }
         },
+        visitFunctionCall = { functionCall ->
+            if (functionCall.calleeReference.toResolvedCallableSymbol()?.callableId == runCatchingCallableId) {
+                // If we have reached this point, it means that the composable call under scrutiny
+                // happens inside of the body of a lambda passed to a `runCatching` call.
+                reporter.reportOn(
+                    functionCall.source,
+                    ComposeErrors.ILLEGAL_RUN_CATCHING_AROUND_COMPOSABLE,
+                    context
+                )
+            }
+        }
     )
     reporter.reportOn(
         expression.calleeReference.source,
@@ -208,7 +236,7 @@ private fun checkComposableFunction(
         }
         // Only local variables can be implicitly composable, for top-level or class-level
         // declarations we require an explicit annotation.
-        if (!function.propertySymbol.isLocal) {
+        if (function.propertySymbol is FirRegularPropertySymbol) {
             reporter.reportOn(
                 function.propertySymbol.source,
                 ComposeErrors.COMPOSABLE_EXPECTED,
@@ -273,8 +301,9 @@ private inline fun CheckerContext.visitCurrentScope(
     visitAnonymousFunction: (FirAnonymousFunction) -> Unit = {},
     visitFunction: (FirFunction) -> Unit = {},
     visitTryExpression: (FirTryExpression, FirElement) -> Unit = { _, _ -> },
+    visitFunctionCall: (FirFunctionCall) -> Unit = {},
 ) {
-    for ((elementIndex, element) in containingElements.withIndex().reversed()) {
+    for ([elementIndex, element] in containingElements.withIndex().reversed()) {
         when (element) {
             is FirAnonymousFunction -> {
                 if (element.inlineStatus == InlineStatus.Inline) {
@@ -295,6 +324,9 @@ private inline fun CheckerContext.visitCurrentScope(
                 val container = containingElements.getOrNull(elementIndex + 1)
                     ?: continue
                 visitTryExpression(element, container)
+            }
+            is FirFunctionCall -> {
+                visitFunctionCall(element)
             }
             is FirProperty -> {
                 // Coming from an initializer or delegate expression, otherwise we'd

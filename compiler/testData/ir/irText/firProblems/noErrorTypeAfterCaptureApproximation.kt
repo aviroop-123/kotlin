@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 class Inv1<X>
 class Inv2<Y>
 

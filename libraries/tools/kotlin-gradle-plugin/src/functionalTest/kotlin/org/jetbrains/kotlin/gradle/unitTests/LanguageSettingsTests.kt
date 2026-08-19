@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.gradle.tasks.withType
 import org.jetbrains.kotlin.gradle.testing.prettyPrinted
 import org.jetbrains.kotlin.gradle.util.*
 import org.jetbrains.kotlin.util.assertThrows
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class LanguageSettingsTests {
@@ -40,6 +40,7 @@ class LanguageSettingsTests {
                 linuxX64()
                 linuxArm64()
 
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 iosArm64()
 
@@ -88,6 +89,7 @@ class LanguageSettingsTests {
                 linuxX64()
                 linuxArm64()
 
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 iosX64()
                 iosArm64()
 
@@ -168,6 +170,7 @@ class LanguageSettingsTests {
         val project = kmpProject {
             with(multiplatformExtension) {
                 sourceSets.commonMain {
+                    @Suppress("DEPRECATION_ERROR")
                     languageSettings.enableLanguageFeature("InlineClasses")
                 }
             }
@@ -211,6 +214,7 @@ class LanguageSettingsTests {
                     languageSettings {
                         apiVersion = "1.4"
                         languageVersion = "1.3"
+                        @Suppress("DEPRECATION_ERROR")
                         enableLanguageFeature("SoundSmartcastForEnumEntries")
                         progressiveMode = true
                     }
@@ -234,6 +238,7 @@ class LanguageSettingsTests {
         val project = kmpProject {
             androidLibrary { compileSdk = 31 }
             with(multiplatformExtension) {
+                @Suppress("DEPRECATION")
                 androidTarget()
                 jvm().compilations.create("custom")
             }
@@ -312,6 +317,7 @@ class LanguageSettingsTests {
                     linuxX64()
                     linuxArm64()
                     mingwX64()
+                    @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                     macosX64()
                     macosArm64()
 

@@ -1,0 +1,11 @@
+// RUN_PIPELINE_TILL: FRONTEND
+// ISSUE: KT-79330
+// LANGUAGE: -CollectionLiterals -CollectionLiteralsBasedAnnotationResolution
+
+fun test() {
+    <!UNSUPPORTED_ARRAY_LITERAL_OUTSIDE_OF_ANNOTATION_ERROR, UNSUPPORTED_FEATURE!>[]<!>
+    <!UNSUPPORTED_ARRAY_LITERAL_OUTSIDE_OF_ANNOTATION_ERROR, UNSUPPORTED_FEATURE!>[1, 2, 3]<!>
+    <!UNSUPPORTED_ARRAY_LITERAL_OUTSIDE_OF_ANNOTATION_ERROR, UNSUPPORTED_FEATURE!>["1", "2", "3"]<!>
+}
+
+/* GENERATED_FIR_TAGS: collectionLiteral, functionDeclaration, integerLiteral, stringLiteral */

@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.fir.analysis.checkers.expression
 
 import org.jetbrains.kotlin.KtRealSourceElementKind
 import org.jetbrains.kotlin.KtSourceElement
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
@@ -17,6 +18,7 @@ import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.allReceiverExpressions
 import org.jetbrains.kotlin.fir.expressions.arguments
+import org.jetbrains.kotlin.fir.isDisabled
 import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirResolvedErrorReference
 import org.jetbrains.kotlin.fir.references.toResolvedCallableSymbol
@@ -97,6 +99,7 @@ object FirReifiedChecker : FirQualifiedAccessExpressionChecker(MppCheckerKind.Co
                 containingDeclaration is FirRegularClassSymbol && containingDeclaration.classId == StandardClassIds.Array
     }
 
+    @Suppress("SuspiciousWhenOverConeKotlinType") // other kinds of types are handled higher up in the call stack
     private fun ConeKotlinType.cannotBeReified(languageVersionSettings: LanguageVersionSettings): Boolean = when (this) {
         is ConeCapturedType -> true
         is ConeDynamicType -> true
@@ -112,7 +115,11 @@ object FirReifiedChecker : FirQualifiedAccessExpressionChecker(MppCheckerKind.Co
         isArray: Boolean,
         isPlaceHolder: Boolean,
         fullyExpandedType: ConeKotlinType = typeArgument.fullyExpandedType(),
+        inDnnOrFlexible: Boolean = false,
     ) {
+        fun reportDeprecationWarningInDnnOrFlexible(): Boolean =
+            inDnnOrFlexible && LanguageFeature.ReportReificationProblemsInDnnAndFlexible.isDisabled()
+
         if (fullyExpandedType.classId == StandardClassIds.Array) {
             // Type aliases can transform type arguments arbitrarily (drop, nest, etc...).
             // Therefore, we check the arguments of the expanded type, not the ones that went into the type alias.
@@ -129,26 +136,77 @@ object FirReifiedChecker : FirQualifiedAccessExpressionChecker(MppCheckerKind.Co
             return
         }
         if (fullyExpandedType.isTypeVisibilityBroken(checkTypeArguments = false) && (!isExplicit || isPlaceHolder)) {
-            reporter.reportOn(source, FirErrors.INFERRED_INVISIBLE_REIFIED_TYPE_ARGUMENT, typeParameter, fullyExpandedType)
+            reporter.reportOn(
+                source,
+                FirErrors.INFERRED_INVISIBLE_REIFIED_TYPE_ARGUMENT,
+                typeParameter,
+                fullyExpandedType,
+            )
         }
 
-        if (typeArgument is ConeTypeParameterType) {
-            val symbol = typeArgument.lookupTag.typeParameterSymbol
-            if (!symbol.isReified) {
-                reporter.reportOn(
+        when {
+            typeArgument is ConeTypeParameterType -> {
+                val symbol = typeArgument.lookupTag.typeParameterSymbol
+                if (!symbol.isReified) {
+                    val factory =
+                        if (reportDeprecationWarningInDnnOrFlexible()) {
+                            FirErrors.TYPE_PARAMETER_AS_REIFIED_DEPRECATION_WARNING
+                        } else {
+                            if (isArray) FirErrors.TYPE_PARAMETER_AS_REIFIED_ARRAY_ERROR else FirErrors.TYPE_PARAMETER_AS_REIFIED
+                        }
+                    reporter.reportOn(
+                        source,
+                        factory,
+                        symbol,
+                    )
+                }
+            }
+            typeArgument is ConeDefinitelyNotNullType -> {
+                checkArgumentAndReport(
+                    typeArgument.original,
+                    typeParameter,
                     source,
-                    if (isArray) FirErrors.TYPE_PARAMETER_AS_REIFIED_ARRAY_ERROR else FirErrors.TYPE_PARAMETER_AS_REIFIED,
-                    symbol,
+                    isExplicit,
+                    isArray,
+                    isPlaceHolder,
+                    inDnnOrFlexible = true
+                )
+                if (isExplicit) {
+                    // We sometimes infer type arguments to DNN types, which seems to be ok. Only report explicit DNN types written by user.
+                    reporter.reportOn(source, FirErrors.DEFINITELY_NON_NULLABLE_AS_REIFIED)
+                }
+            }
+            typeArgument.cannotBeReified(context.languageVersionSettings) -> {
+                reporter.reportOn(source, FirErrors.REIFIED_TYPE_FORBIDDEN_SUBSTITUTION, typeArgument)
+            }
+            typeArgument is ConeIntersectionType -> {
+                if (reportDeprecationWarningInDnnOrFlexible()) {
+                    reporter.reportOn(
+                        source,
+                        FirErrors.TYPE_INTERSECTION_AS_REIFIED_DEPRECATION_WARNING,
+                        typeParameter,
+                        typeArgument.intersectedTypes,
+                    )
+                } else {
+                    reporter.reportOn(
+                        source,
+                        FirErrors.TYPE_INTERSECTION_AS_REIFIED,
+                        typeParameter,
+                        typeArgument.intersectedTypes,
+                    )
+                }
+            }
+            typeArgument is ConeFlexibleType -> {
+                checkArgumentAndReport(
+                    typeArgument.lowerBound,
+                    typeParameter,
+                    source,
+                    isExplicit,
+                    isArray,
+                    isPlaceHolder,
+                    inDnnOrFlexible = true
                 )
             }
-        } else if (typeArgument is ConeDefinitelyNotNullType && isExplicit) {
-            // We sometimes infer type arguments to DNN types, which seems to be ok. Only report explicit DNN types written by user.
-            reporter.reportOn(source, FirErrors.DEFINITELY_NON_NULLABLE_AS_REIFIED)
-        } else if (typeArgument.cannotBeReified(context.languageVersionSettings)) {
-            reporter.reportOn(source, FirErrors.REIFIED_TYPE_FORBIDDEN_SUBSTITUTION, typeArgument)
-        } else if (typeArgument is ConeIntersectionType) {
-            reporter.reportOn(source, FirErrors.TYPE_INTERSECTION_AS_REIFIED, typeParameter, typeArgument.intersectedTypes)
         }
     }
-
 }

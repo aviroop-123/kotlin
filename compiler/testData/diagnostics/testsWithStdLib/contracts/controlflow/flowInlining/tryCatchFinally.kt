@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseCallsInPlaceEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER -UNUSED_PARAMETER
 
@@ -27,7 +26,7 @@ fun innerTryCatchFinally() {
             <!VAL_REASSIGNMENT!>x<!> = 42
             report(x)
         } finally {
-            x = 0
+            <!VAL_REASSIGNMENT!>x<!> = 0
         }
     }
 

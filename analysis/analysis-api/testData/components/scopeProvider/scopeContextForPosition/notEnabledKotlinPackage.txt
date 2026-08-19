@@ -7,6 +7,8 @@ implicit values:
       type: ERROR_TYPE
     ownerSymbol = KaNamedClassSymbol:
       kotlin/myPackage/SomeClass
+    label = SomeClass
+
 
 scopes:
   LocalScope, index = 0
@@ -25,11 +27,15 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -52,27 +58,26 @@ scopes:
     callables: 0
     constructors: 0
 
-  ExplicitSimpleImportingScope, index = 3
+  ExplicitSimpleImportingScope, index = 4
     packages: 0
     classifiers: 0
     callables: 0
     constructors: 0
 
-  PackageMemberScope, index = 4
+  PackageMemberScope, index = 5
     packages: 0
     classifiers: 0
     callables: 0
     constructors: 0
-
-  DefaultSimpleImportingScope, index = 5
 
   DefaultSimpleImportingScope, index = 6
 
-  ExplicitStarImportingScope, index = 7
+  DefaultSimpleImportingScope, index = 7
+
+  ExplicitStarImportingScope, index = 8
     packages: 0
     classifiers: 0
     callables: 0
     constructors: 0
 
-  DefaultStarImportingScope, index = 8
-
+  DefaultStarImportingScope, index = 9

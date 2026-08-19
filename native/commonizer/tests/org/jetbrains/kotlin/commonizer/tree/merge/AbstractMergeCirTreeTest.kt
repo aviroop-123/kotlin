@@ -7,7 +7,6 @@
 
 package org.jetbrains.kotlin.commonizer.tree.merge
 
-import org.jetbrains.kotlin.builtins.DefaultBuiltIns
 import org.jetbrains.kotlin.commonizer.DefaultCommonizerSettings
 import org.jetbrains.kotlin.commonizer.LeafCommonizerTarget
 import org.jetbrains.kotlin.commonizer.TargetDependent
@@ -17,6 +16,7 @@ import org.jetbrains.kotlin.commonizer.tree.CirTreeModule
 import org.jetbrains.kotlin.commonizer.tree.CirTreeRoot
 import org.jetbrains.kotlin.commonizer.utils.KtInlineSourceCommonizerTestCase
 import org.jetbrains.kotlin.commonizer.utils.MockModulesProvider
+import org.jetbrains.kotlin.commonizer.utils.loadStdlibMetadata
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 
 abstract class AbstractMergeCirTreeTest : KtInlineSourceCommonizerTestCase() {
@@ -87,8 +87,8 @@ abstract class AbstractMergeCirTreeTest : KtInlineSourceCommonizerTestCase() {
     }
 
     private fun TargetDependent(modules: Iterable<Pair<String, CirTreeModule>>): TargetDependent<CirTreeRoot> {
-        return modules.toMap().mapKeys { (targetName, _) -> LeafCommonizerTarget(targetName) }
-            .mapValues { (_, module) -> CirTreeRoot(listOf(module)) }
+        return modules.toMap().mapKeys { [targetName, _] -> LeafCommonizerTarget(targetName) }
+            .mapValues { [_, module] -> CirTreeRoot(listOf(module)) }
             .toTargetDependent()
     }
 
@@ -99,7 +99,9 @@ abstract class AbstractMergeCirTreeTest : KtInlineSourceCommonizerTestCase() {
             CirCommonizedClassifierNodes.default(),
             CirProvidedClassifiers.of(
                 CirFictitiousFunctionClassifiers,
-                CirProvidedClassifiers.by(MockModulesProvider.create(DefaultBuiltIns.Instance.builtInsModule))
+                CirProvidedClassifiers.by(
+                    MockModulesProvider.create(loadStdlibMetadata())
+                )
             )
         )
     }

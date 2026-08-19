@@ -5,30 +5,39 @@
 
 package org.jetbrains.kotlin.library.metadata.impl
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.functions.functionInterfacePackageFragmentProvider
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.contracts.ContractDeserializerImpl
 import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.deserialization.AdditionalClassPartsProvider
+import org.jetbrains.kotlin.descriptors.deserialization.ClassDescriptorFactory
 import org.jetbrains.kotlin.descriptors.impl.CompositePackageFragmentProvider
 import org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.library.KotlinLibrary
+import org.jetbrains.kotlin.library.components.metadata
 import org.jetbrains.kotlin.library.isAnyPlatformStdlib
 import org.jetbrains.kotlin.library.metadata.*
-import org.jetbrains.kotlin.name.*
+import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.NativeForwardDeclarationKind
+import org.jetbrains.kotlin.name.parentOrNull
 import org.jetbrains.kotlin.platform.jvm.isJvm
-import org.jetbrains.kotlin.resolve.KlibCompilerDeserializationConfiguration
+import org.jetbrains.kotlin.resolve.CommonCompilerDeserializationConfiguration
 import org.jetbrains.kotlin.resolve.sam.SamConversionResolverImpl
 import org.jetbrains.kotlin.serialization.deserialization.*
 import org.jetbrains.kotlin.storage.StorageManager
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
 
+@K1Deprecation
 class KlibMetadataModuleDescriptorFactoryImpl(
     override val descriptorFactory: KlibModuleDescriptorFactory,
     override val packageFragmentsFactory: KlibMetadataDeserializedPackageFragmentsFactory,
-    override val flexibleTypeDeserializer: FlexibleTypeDeserializer
+    override val flexibleTypeDeserializer: FlexibleTypeDeserializer,
+    val additionalClassPartsProvider: AdditionalClassPartsProvider = AdditionalClassPartsProvider.None,
+    val fictitiousClassDescriptorFactories: List<ClassDescriptorFactory> = emptyList(),
 ) : KlibMetadataModuleDescriptorFactory {
 
     override fun createDescriptorOptionalBuiltIns(
@@ -36,11 +45,10 @@ class KlibMetadataModuleDescriptorFactoryImpl(
         languageVersionSettings: LanguageVersionSettings,
         storageManager: StorageManager,
         builtIns: KotlinBuiltIns?,
-        packageAccessHandler: PackageAccessHandler?,
         lookupTracker: LookupTracker
     ): ModuleDescriptorImpl {
 
-        val libraryProto = parseModuleHeader(library.moduleHeaderData)
+        val libraryProto = parseModuleHeader(library.metadata.moduleHeaderData)
 
         val moduleName = Name.special(libraryProto.moduleName)
         val moduleOrigin = DeserializedKlibModuleOrigin(library)
@@ -51,12 +59,11 @@ class KlibMetadataModuleDescriptorFactoryImpl(
             descriptorFactory.createDescriptorAndNewBuiltIns(moduleName, storageManager, moduleOrigin)
 
         val provider = createPackageFragmentProvider(
-            library,
-            packageAccessHandler,
-            packageFragmentNames = libraryProto.packageFragmentNameList,
-            storageManager,
-            moduleDescriptor,
-            configuration = KlibCompilerDeserializationConfiguration(languageVersionSettings),
+            library = library,
+            customMetadataProtoLoader = null,
+            storageManager = storageManager,
+            moduleDescriptor = moduleDescriptor,
+            configuration = CommonCompilerDeserializationConfiguration(languageVersionSettings),
             compositePackageFragmentAddend = runIf(library.isAnyPlatformStdlib) {
                 functionInterfacePackageFragmentProvider(storageManager, moduleDescriptor)
             },
@@ -86,8 +93,7 @@ class KlibMetadataModuleDescriptorFactoryImpl(
 
     override fun createPackageFragmentProvider(
         library: KotlinLibrary,
-        packageAccessHandler: PackageAccessHandler?,
-        packageFragmentNames: List<String>,
+        customMetadataProtoLoader: CustomMetadataProtoLoader?,
         storageManager: StorageManager,
         moduleDescriptor: ModuleDescriptor,
         configuration: DeserializationConfiguration,
@@ -96,7 +102,11 @@ class KlibMetadataModuleDescriptorFactoryImpl(
     ): PackageFragmentProvider {
 
         val deserializedPackageFragments = packageFragmentsFactory.createDeserializedPackageFragments(
-            library, packageFragmentNames, moduleDescriptor, packageAccessHandler, storageManager, configuration
+            library = library,
+            moduleDescriptor = moduleDescriptor,
+            customMetadataProtoLoader = customMetadataProtoLoader,
+            storageManager = storageManager,
+            configuration = configuration
         )
 
         // Generate empty PackageFragmentDescriptor instances for packages that aren't mentioned in compilation units directly.
@@ -152,9 +162,10 @@ class KlibMetadataModuleDescriptorFactoryImpl(
             ErrorReporter.DO_NOTHING,
             lookupTracker,
             flexibleTypeDeserializer,
-            emptyList(),
+            fictitiousClassDescriptorFactories,
             notFoundClasses,
             ContractDeserializerImpl(configuration, storageManager),
+            additionalClassPartsProvider = additionalClassPartsProvider,
             extensionRegistryLite = KlibMetadataSerializerProtocol.extensionRegistry,
             samConversionResolver = SamConversionResolverImpl(storageManager, samWithReceiverResolvers = emptyList()),
             enumEntriesDeserializationSupport = enumEntriesDeserializationSupport,

@@ -27,7 +27,9 @@ abstract class KtConstructor<T : KtConstructor<T>> : KtDeclarationStub<KotlinCon
 
     override fun isLocal() = false
 
-    override fun getValueParameterList() = getStubOrPsiChild(KtStubBasedElementTypes.VALUE_PARAMETER_LIST)
+    override fun getValueParameterList() =
+        @Suppress("DEPRECATION") // KT-78356
+        getStubOrPsiChild(KtStubBasedElementTypes.VALUE_PARAMETER_LIST)
 
     override fun getValueParameters() = valueParameterList?.parameters ?: emptyList()
 
@@ -35,6 +37,7 @@ abstract class KtConstructor<T : KtConstructor<T>> : KtDeclarationStub<KotlinCon
 
     override fun getTypeReference() = null
 
+    @Suppress("OVERRIDE_DEPRECATION")
     @Throws(IncorrectOperationException::class)
     override fun setTypeReference(typeRef: KtTypeReference?) = throw IncorrectOperationException("setTypeReference to constructor")
 

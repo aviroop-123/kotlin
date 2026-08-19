@@ -20,12 +20,14 @@ import org.jetbrains.kotlin.descriptors.impl.PackageViewDescriptorFactory
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.resolve.BindingContext.COMPILER_CONFIGURATION
 import org.jetbrains.kotlin.resolve.BindingTraceContext
 import org.jetbrains.kotlin.resolve.LazyTopDownAnalyzer
 import org.jetbrains.kotlin.resolve.TopDownAnalysisContext
 import org.jetbrains.kotlin.resolve.TopDownAnalysisMode
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfoFactory
 import org.jetbrains.kotlin.resolve.calls.tower.ImplicitsExtensionsResolutionFilter
+import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.resolve.diagnostics.Diagnostics
 import org.jetbrains.kotlin.resolve.extensions.ExtraImportsProviderExtension
 import org.jetbrains.kotlin.resolve.lazy.*
@@ -52,7 +54,7 @@ open class ReplCodeAnalyzerBase(
     protected val topDownAnalysisContext: TopDownAnalysisContext
     private val topDownAnalyzer: LazyTopDownAnalyzer
     protected val resolveSession: ResolveSession
-    protected val replState = ResettableAnalyzerState()
+    protected val replState = ResettableAnalyzerState(trace)
 
     val module: ModuleDescriptorImpl
 
@@ -60,7 +62,7 @@ open class ReplCodeAnalyzerBase(
         // Module source scope is empty because all binary classes are in the dependency module, and all source classes are guaranteed
         // to be found via ResolveSession. The latter is true as long as light classes are not needed in REPL (which is currently true
         // because no symbol declared in the REPL session can be used from Java)
-        @Suppress("DEPRECATION")
+        @Suppress("DEPRECATION_ERROR")
         container = TopDownAnalyzerFacadeForJVM.createContainer(
             environment.project,
             emptyList(),
@@ -129,7 +131,7 @@ open class ReplCodeAnalyzerBase(
     }
 
     protected fun runAnalyzer(linePsi: KtFile, importedScripts: List<KtFile>): TopDownAnalysisContext {
-        @Suppress("DEPRECATION")
+        @Suppress("DEPRECATION_ERROR")
         return topDownAnalyzer.analyzeDeclarations(topDownAnalysisContext.topDownAnalysisMode, listOf(linePsi) + importedScripts)
     }
 
@@ -211,7 +213,7 @@ open class ReplCodeAnalyzerBase(
 
     // TODO: merge with org.jetbrains.kotlin.resolve.repl.ReplState when switching to new REPL infrastructure everywhere
     // TODO: review its place in the extracted state infrastructure (now the analyzer itself is a part of the state)
-    class ResettableAnalyzerState {
+    class ResettableAnalyzerState(val trace: BindingTraceContext) {
         @Suppress("DEPRECATION")
         private val successfulLines = ResettableSnippetsHistory<LineInfo.SuccessfulLine>()
 
@@ -286,7 +288,9 @@ open class ReplCodeAnalyzerBase(
         private fun computeFileScopes(lineInfo: LineInfo, fileScopeFactory: FileScopeFactory): FileScopes? {
             val linePsi = lineInfo.linePsi
             val hasImports = linePsi.importDirectives.isNotEmpty() ||
-                    ExtraImportsProviderExtension.getInstance(linePsi.project).getExtraImports(linePsi).isNotEmpty()
+                    ExtraImportsProviderExtension.getInstance(linePsi.project).getExtraImports(
+                        linePsi, trace.get(COMPILER_CONFIGURATION, lineInfo.parentLine?.lineDescriptor?.module)
+                    ).isNotEmpty()
 
             // create scope that wraps previous line lexical scope and adds imports from this line
             val lexicalScopeAfterLastLine = lineInfo.parentLine?.lineDescriptor?.scopeForInitializerResolution ?: return null
@@ -308,8 +312,8 @@ internal fun SourceCode.addNo(no: Int) = SourceCodeByReplLine(text, no, name, lo
 data class SourceCodeByReplLine(
     override val text: String,
     val no: Int,
-    override val name: String? = null,
-    override val locationId: String? = null
+    override val name: String? = "Line_$no",
+    override val locationId: String? = "$name.kts"
 ) : SourceCode
 
 private typealias ReplSourceHistoryList<ResultT> = List<CompiledHistoryItem<SourceCodeByReplLine, ResultT>>

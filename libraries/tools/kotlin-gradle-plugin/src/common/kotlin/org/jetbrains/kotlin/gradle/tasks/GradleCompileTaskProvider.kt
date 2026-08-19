@@ -12,11 +12,15 @@ import org.gradle.api.file.ProjectLayout
 import org.gradle.api.logging.Logger
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
+import org.gradle.api.logging.configuration.WarningMode
 import org.gradle.api.provider.SetProperty
+import org.gradle.util.GradleVersion
 import org.gradle.api.tasks.Internal
 import org.jetbrains.kotlin.compilerRunner.GradleCompilerRunner.Companion.normalizeForFlagFile
 import org.jetbrains.kotlin.gradle.incremental.IncrementalModuleInfoProvider
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.CompilerDiagnosticsProblemsReporter
+import org.jetbrains.kotlin.gradle.plugin.variantImplementationFactoryProvider
 import org.jetbrains.kotlin.gradle.utils.*
 import org.jetbrains.kotlin.gradle.utils.kotlinErrorsDir
 import org.jetbrains.kotlin.gradle.utils.kotlinSessionsDir
@@ -51,11 +55,32 @@ abstract class GradleCompileTaskProvider @Inject constructor(
 
     @get:Internal
     val projectName: Provider<String> = objectFactory
+        .property(project.name)
+
+    @get:Internal
+    val projectPath: Provider<String> = objectFactory
+        .property(project.path)
+
+    @get:Internal
+    val rootProjectName: Provider<String> = objectFactory
         .property(project.rootProject.name.normalizeForFlagFile())
 
     @get:Internal
     val buildModulesInfo: Provider<out IncrementalModuleInfoProvider> = objectFactory
         .property(incrementalModuleInfoProvider)
+
+    @get:Internal
+    internal val compilerDiagnosticsProblemsReporterFactory: Provider<CompilerDiagnosticsProblemsReporter.Factory> = objectFactory
+        .property(project.variantImplementationFactoryProvider<CompilerDiagnosticsProblemsReporter.Factory>().get())
+
+    // Gradle 9.3+ renders Problems API entries as "Problem found:" blocks in console
+    // when --warning-mode=all is active (via ConsoleProblemEmitter). Suppress duplicate w: log in that case.
+    @get:Internal
+    internal val warningModeIsAll: Provider<Boolean> = objectFactory
+        .property(
+            project.gradle.startParameter.warningMode == WarningMode.All &&
+                GradleVersion.current().baseVersion >= GradleVersion.version("9.3")
+        )
 
     @get:Internal
     val errorsFiles: SetProperty<File> = objectFactory

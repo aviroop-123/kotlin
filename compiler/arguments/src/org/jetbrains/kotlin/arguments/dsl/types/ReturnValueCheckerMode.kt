@@ -5,33 +5,42 @@
 
 package org.jetbrains.kotlin.arguments.dsl.types
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.kotlin.arguments.dsl.base.KotlinReleaseVersion
 import org.jetbrains.kotlin.arguments.dsl.base.KotlinReleaseVersionLifecycle
 import org.jetbrains.kotlin.arguments.dsl.base.WithKotlinReleaseVersionsMetadata
-import org.jetbrains.kotlin.arguments.serialization.json.KotlinReturnValueCheckerModeAsNameSerializer
 
-@Serializable(KotlinReturnValueCheckerModeAsNameSerializer::class)
+@Serializable
 enum class ReturnValueCheckerMode(
     val modeState: String,
     override val releaseVersionsMetadata: KotlinReleaseVersionLifecycle,
-) : WithKotlinReleaseVersionsMetadata {
+) : WithKotlinReleaseVersionsMetadata, WithStringRepresentation {
+    @SerialName("check")
     checker(
         modeState = "check",
         releaseVersionsMetadata = KotlinReleaseVersionLifecycle(
             introducedVersion = KotlinReleaseVersion.v2_2_0,
         ),
     ),
+
+    @SerialName("full")
     full(
         modeState = "full",
         releaseVersionsMetadata = KotlinReleaseVersionLifecycle(
             introducedVersion = KotlinReleaseVersion.v2_2_0,
         ),
     ),
+
+    @SerialName("disable")
     disabled(
         modeState = "disable",
         releaseVersionsMetadata = KotlinReleaseVersionLifecycle(
             introducedVersion = KotlinReleaseVersion.v2_2_0,
         ),
     ),
+    ;
+
+    override val stringRepresentation: String
+        get() = modeState
 }

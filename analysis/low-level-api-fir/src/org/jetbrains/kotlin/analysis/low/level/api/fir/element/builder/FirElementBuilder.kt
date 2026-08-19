@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder
 
 import com.intellij.psi.PsiElement
+import com.intellij.psi.util.parentOfType
 import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirModuleResolveComponents
 import org.jetbrains.kotlin.analysis.low.level.api.fir.file.structure.FileStructure
@@ -15,7 +16,6 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve.elementCanBe
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.findSourceNonLocalFirDeclaration
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.isPartialBodyResolvable
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.requireTypeIntersectionWith
-import org.jetbrains.kotlin.analysis.utils.printer.parentOfType
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.correspondingValueParameterFromPrimaryConstructor
@@ -80,6 +80,10 @@ internal class FirElementBuilder(private val moduleComponents: LLFirModuleResolv
      * For instance, [KtPackageDirective] has nothing to resolve,
      * so it will be returned as is ([FirPackageDirective][org.jetbrains.kotlin.fir.FirPackageDirective]),
      * with the [RAW_FIR][FirResolvePhase.RAW_FIR] phase.
+     *
+     * Note 2: the result element doesn't have to belong to a [FirFile]. In some exceptional cases,
+     * a new synthetic [FirElement] could be created to mitigate some compiler issues.
+     * For more details, see [KtToFirMapping] and [FirElementsRecorder].
      *
      * @return associated [FirElement] in final resolved state if it exists.
      *

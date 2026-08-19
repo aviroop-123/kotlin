@@ -1,5 +1,6 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // WITH_STDLIB
+// API_VERSION: 1.9
 package some
 
 import kotlin.experimental.ExperimentalTypeInference
@@ -10,9 +11,9 @@ fun <T> applyBI(@BuilderInference t: T): T = t
 fun <V> myBuildList(a: MutableList<out V>.() -> Unit) {}
 
 fun main() {
-    <!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>myBuildList<!>(<!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>applyBI<!> {
-        this.<!DEBUG_INFO_MISSING_UNRESOLVED!>add<!>("1")
-    })
+    <!CANNOT_INFER_PARAMETER_TYPE!>myBuildList<!>(<!CANNOT_INFER_PARAMETER_TYPE!>applyBI<!> <!CANNOT_INFER_IT_PARAMETER_TYPE!>{
+        <!CANNOT_INFER_RECEIVER_PARAMETER_TYPE!>this<!>.<!UNRESOLVED_REFERENCE!>add<!>("1")
+    }<!>)
 }
 
 /* GENERATED_FIR_TAGS: classReference, functionDeclaration, functionalType, lambdaLiteral, nullableType, outProjection,

@@ -46,12 +46,12 @@ internal fun Project.locateOrCreateCInteropDependencyConfiguration(
 ): Configuration {
     configurations.findResolvable(compilation.cInteropDependencyConfigurationName)?.let { return it }
 
-    val compileOnlyConfiguration = configurations.getByName(compilation.compileOnlyConfigurationName)
-    val implementationConfiguration = configurations.getByName(compilation.implementationConfigurationName)
+    val compileOnlyConfiguration = configurations.getByName(compilation.legacyCompileOnlyConfigurationName)
+    val implementationConfiguration = configurations.getByName(compilation.legacyImplementationConfigurationName)
 
     return configurations.createResolvable(compilation.cInteropDependencyConfigurationName).apply {
+        setInvisibleIfSupported()
         extendsFrom(compileOnlyConfiguration, implementationConfiguration)
-        isVisible = false
 
         /* Deferring attributes to wait for compilation.attributes to be configured by user */
         launchInStage(AfterFinaliseDsl) {
@@ -88,7 +88,7 @@ internal fun Project.locateOrCreateCInteropApiElementsConfiguration(target: Kotl
     val configurationName = cInteropApiElementsConfigurationName(target)
     configurations.findConsumable(configurationName)?.let { return it }
 
-    return configurations.createConsumable(configurationName).apply {
+    return configurations.createConsumable(configurationName) {
         /* Deferring attributes to wait for target.attributes to be configured by user */
         launchInStage(AfterFinaliseDsl) {
             usesPlatformOf(target)
@@ -102,7 +102,7 @@ internal fun Project.locateOrCreateCInteropApiElementsConfiguration(target: Kotl
                 extendsFrom(compilation.internal.configurations.apiConfiguration)
             }
         }
-    }
+    }.get()
 }
 
 internal fun cInteropApiElementsConfigurationName(target: KotlinTarget): String {

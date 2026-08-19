@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,19 +8,23 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.stubBased.deserializatio
 import com.intellij.extapi.psi.StubBasedPsiElementBase
 import com.intellij.psi.stubs.Stub
 import com.intellij.psi.stubs.StubElement
+import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtRealPsiSourceElement
+import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.fakeElement
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.builder.FirRegularClassBuilder
+import org.jetbrains.kotlin.fir.declarations.builder.buildNamedFunction
 import org.jetbrains.kotlin.fir.declarations.builder.buildOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.builder.buildRegularClass
-import org.jetbrains.kotlin.fir.declarations.builder.buildSimpleFunction
 import org.jetbrains.kotlin.fir.declarations.comparators.FirMemberDeclarationComparator
 import org.jetbrains.kotlin.fir.declarations.impl.FirResolvedDeclarationStatusImpl
 import org.jetbrains.kotlin.fir.declarations.impl.FirResolvedDeclarationStatusWithLazyEffectiveVisibility
 import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.deserialization.addCloneForArrayIfNeeded
+import org.jetbrains.kotlin.fir.deserialization.applyKDoc
 import org.jetbrains.kotlin.fir.deserialization.deserializationExtension
 import org.jetbrains.kotlin.fir.deserialization.toLazyEffectiveVisibility
 import org.jetbrains.kotlin.fir.resolve.transformers.setLazyPublishedVisibility
@@ -155,8 +159,13 @@ internal fun deserializeClassToSymbol(
             symbol,
             initialOrigin
         )
+
+    val classStub: KotlinClassStubImpl? = (classOrObject as? KtClass)?.compiledStub
+
     buildRegularClass {
-        source = KtRealPsiSourceElement(classOrObject)
+        val sourceElement = KtRealPsiSourceElement(classOrObject)
+
+        source = sourceElement
         this.moduleData = moduleData
         this.origin = initialOrigin
         name = classId.shortClassName
@@ -192,36 +201,39 @@ internal fun deserializeClassToSymbol(
             addDeclaration(memberDeserializer.loadConstructor(constructor, classOrObject, this))
         }
 
-        classOrObject.body?.declarations?.forEach { declaration ->
-            when (declaration) {
-                is KtConstructor<*> -> addDeclaration(memberDeserializer.loadConstructor(declaration, classOrObject, this))
-                is KtNamedFunction -> addDeclaration(memberDeserializer.loadFunction(declaration, symbol, session))
-                is KtProperty -> addDeclaration(
-                    memberDeserializer.loadProperty(
-                        property = declaration,
-                        classSymbol = symbol,
-                        isFromAnnotation = kind == ClassKind.ANNOTATION_CLASS,
+        @OptIn(KtExperimentalApi::class)
+        classOrObject.body
+            ?.declarationsAndCompanionBlocks
+            ?.asSequence()
+            ?.flatMap { if (it is KtCompanionBlock) it.declarations else listOf(it) }
+            ?.forEach { declaration ->
+                when (declaration) {
+                    is KtConstructor<*> -> addDeclaration(memberDeserializer.loadConstructor(declaration, classOrObject, this))
+                    is KtNamedFunction -> addDeclaration(memberDeserializer.loadFunction(declaration, symbol, session))
+                    is KtProperty -> addDeclaration(
+                        memberDeserializer.loadProperty(
+                            property = declaration,
+                            classSymbol = symbol,
+                            isFromAnnotation = kind == ClassKind.ANNOTATION_CLASS,
+                        )
                     )
-                )
-                is KtEnumEntry -> addDeclaration(memberDeserializer.loadEnumEntry(declaration, symbol, classId))
-                is KtClassOrObject,
-                is KtTypeAlias
-                    -> {
-                    val name = declaration.name
-                        ?: errorWithAttachment("${if (declaration is KtClassOrObject) "Class" else "Typealias"} doesn't have name") {
-                            withPsiEntry(if (declaration is KtClassOrObject) "Class" else "Typealias", declaration)
-                        }
+                    is KtEnumEntry -> addDeclaration(memberDeserializer.loadEnumEntry(declaration, symbol, classId))
+                    is KtClassLikeDeclaration -> {
+                        val name = declaration.name
+                            ?: errorWithAttachment("${if (declaration is KtClassOrObject) "Class" else "Typealias"} doesn't have name") {
+                                withPsiEntry(if (declaration is KtClassOrObject) "Class" else "Typealias", declaration)
+                            }
 
-                    val nestedClassId = classId.createNestedClassId(Name.identifier(name))
-                    // Add declaration to the context to avoid redundant provider access to the class/typealias map
-                    deserializeNestedClassLikeDeclaration(
-                        nestedClassId,
-                        declaration,
-                        context.withClassLikeDeclaration(declaration),
-                    )?.fir?.let(this::addDeclaration)
+                        val nestedClassId = classId.createNestedClassId(Name.identifier(name))
+                        // Add declaration to the context to avoid redundant provider access to the class/typealias map
+                        deserializeNestedClassLikeDeclaration(
+                            nestedClassId,
+                            declaration,
+                            context.withClassLikeDeclaration(declaration),
+                        )?.fir?.let(this::addDeclaration)
+                    }
                 }
             }
-        }
 
         if (classKind == ClassKind.ENUM_CLASS) {
             generateValuesFunction(
@@ -237,7 +249,7 @@ internal fun deserializeClassToSymbol(
         addCloneForArrayIfNeeded(classId, context.dispatchReceiver, session)
 
         if (classId == StandardClassIds.Enum) {
-            addCloneForEnumIfNeeded(classOrObject, context.dispatchReceiver)
+            addCloneForEnumIfNeeded(classOrObject, sourceElement, context.dispatchReceiver)
         }
 
         session.deserializationExtension?.run {
@@ -257,9 +269,12 @@ internal fun deserializeClassToSymbol(
         companionObjectSymbol = (declarations.firstOrNull { it is FirRegularClass && it.isCompanion } as FirRegularClass?)?.symbol
 
         contextParameters.addAll(memberDeserializer.createContextReceiversForClass(classOrObject, symbol))
+
+        if (classStub != null) {
+            applyKDoc(classStub.kdocText)
+        }
     }.apply {
-        if (classOrObject is KtClass) {
-            val classStub: KotlinClassStubImpl = classOrObject.compiledStub
+        if (classStub != null) {
             if (isInlineOrValue) {
                 valueClassRepresentation = classStub.deserializeValueClassRepresentation(this)
             }
@@ -300,7 +315,7 @@ private fun KotlinClassStubImpl.deserializeValueClassRepresentation(klass: FirRe
 
     @OptIn(SuspiciousValueClassCheck::class)
     if (klass.isValue) {
-        return MultiFieldValueClassRepresentation(constructor.valueParameters.map { parameter ->
+        return JvmInlineMultiFieldValueClassRepresentation(constructor.valueParameters.map { parameter ->
             parameter.name to parameter.coneRigidType()
         })
     }
@@ -318,7 +333,11 @@ private fun FirValueParameter.coneRigidType(): ConeRigidType {
     return type
 }
 
-private fun FirRegularClassBuilder.addCloneForEnumIfNeeded(classOrObject: KtClassOrObject, dispatchReceiver: ConeClassLikeType?) {
+private fun FirRegularClassBuilder.addCloneForEnumIfNeeded(
+    classOrObject: KtClassOrObject,
+    classSourceElement: KtSourceElement,
+    dispatchReceiver: ConeClassLikeType?,
+) {
     val hasCloneFunction = classOrObject.declarations
         .any { it is KtNamedFunction && it.name == "clone" && it.valueParameters.isEmpty() }
 
@@ -329,10 +348,12 @@ private fun FirRegularClassBuilder.addCloneForEnumIfNeeded(classOrObject: KtClas
     val anyLookupId = StandardClassIds.Any.toLookupTag()
     val cloneCallableId = StandardClassIds.Callables.clone
 
-    declarations += buildSimpleFunction {
+    val sourceElement = classSourceElement.fakeElement(KtFakeSourceElementKind.EnumGeneratedDeclaration.CloneFunction)
+
+    declarations += buildNamedFunction {
         moduleData = this@addCloneForEnumIfNeeded.moduleData
         origin = this@addCloneForEnumIfNeeded.origin
-        source = this@addCloneForEnumIfNeeded.source
+        source = sourceElement
 
         resolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
 
@@ -345,6 +366,7 @@ private fun FirRegularClassBuilder.addCloneForEnumIfNeeded(classOrObject: KtClas
             Modality.FINAL,
             EffectiveVisibility.Protected(anyLookupId)
         )
+        isLocal = false
 
         name = cloneCallableId.callableName
         symbol = FirNamedFunctionSymbol(cloneCallableId)

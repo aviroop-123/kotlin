@@ -5,13 +5,18 @@
 
 package org.jetbrains.kotlin.scripting.extensions
 
+import org.jetbrains.kotlin.compiler.plugin.getCompilerExtensions
+import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtImportInfo
 import org.jetbrains.kotlin.resolve.ImportPath
 import org.jetbrains.kotlin.resolve.extensions.ExtraImportsProviderExtension
+import org.jetbrains.kotlin.scripting.definitions.K1SpecificScriptingServiceAccessor
 import org.jetbrains.kotlin.scripting.definitions.ScriptConfigurationsProvider
 import org.jetbrains.kotlin.scripting.definitions.runReadAction
+import org.jetbrains.kotlin.scripting.resolve.KtFileScriptSource
+import kotlin.script.experimental.api.valueOrNull
 
 class ScriptExtraImportsProviderExtension : ExtraImportsProviderExtension {
 
@@ -24,13 +29,16 @@ class ScriptExtraImportsProviderExtension : ExtraImportsProviderExtension {
 
         override val aliasName: String? get() = importPath.alias?.asString()
 
-        override val importedFqName: FqName? get() = importPath.fqName
+        override val importedFqName: FqName get() = importPath.fqName
     }
 
-    override fun getExtraImports(ktFile: KtFile): Collection<KtImportInfo> =
+    @OptIn(K1SpecificScriptingServiceAccessor::class)
+    override fun getExtraImports(ktFile: KtFile, configuration: CompilerConfiguration?): Collection<KtImportInfo> =
         ktFile.takeIf { runReadAction { it.isScript() } }?.let { file ->
-            val refinedConfiguration = ScriptConfigurationsProvider.getInstance(file.project)
-                ?.getScriptConfiguration(file.originalFile as KtFile)
+            val refinedConfiguration = configuration?.getCompilerExtensions(ScriptConfigurationsProvider)?.firstOrNull()?.let {
+                it.project = file.project
+                it.getScriptCompilationConfiguration(KtFileScriptSource(file.originalFile as KtFile))?.valueOrNull()
+            }
             refinedConfiguration?.defaultImports?.map {
                 ScriptExtraImportImpl(
                     ImportPath.fromString(it)

@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.konan.util.Named
 import java.io.Serializable
 
 private const val DEPRECATION_LINK = "https://kotl.in/native-targets-tiers"
-const val DEPRECATED_TARGET_MESSAGE = "Target is no longer available. See: $DEPRECATION_LINK"
+const val DEPRECATED_TARGET_MESSAGE = "Target will be removed in a future release. See: $DEPRECATION_LINK"
 
 @Suppress("ClassName")
 sealed class KonanTarget(override val name: String, val family: Family, val architecture: Architecture) : Named, Serializable {
@@ -54,8 +54,9 @@ sealed class KonanTarget(override val name: String, val family: Family, val arch
             ).associateBy { it.name }
         }
 
-        val deprecatedTargets = setOf(LINUX_ARM32_HFP)
-        val toleratedDeprecatedTargets = setOf(LINUX_ARM32_HFP)
+        // Made lazy to break a class initialization cycle. See KT-82886
+        val deprecatedTargets by lazy { setOf(LINUX_ARM32_HFP, WATCHOS_X64, TVOS_X64, MACOS_X64) }
+        val toleratedDeprecatedTargets by lazy { setOf(LINUX_ARM32_HFP, WATCHOS_X64, TVOS_X64, MACOS_X64) }
     }
 
     override fun equals(other: Any?): Boolean {

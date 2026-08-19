@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -16,7 +16,6 @@ import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.config.FirContextParametersLanguageVersionSettingsChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
-import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirContextParametersDeclarationChecker.checkSubTypes
 import org.jetbrains.kotlin.fir.analysis.checkers.requireFeatureSupport
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.analysis.forEachChildOfType
@@ -48,18 +47,7 @@ object FirContextualFunctionTypeChecker : FirResolvedTypeRefChecker(MppCheckerKi
             reporter.reportOn(it, FirErrors.NAMED_CONTEXT_PARAMETER_IN_FUNCTION_TYPE)
         }
 
-        if (LanguageFeature.ContextReceivers.isEnabled()) {
-            if (checkSubTypes(typeRef.coneType.contextParameterTypes(context.session))) {
-                reporter.reportOn(
-                    source,
-                    FirErrors.SUBTYPING_BETWEEN_CONTEXT_RECEIVERS
-                )
-            }
-            val message = FirContextParametersLanguageVersionSettingsChecker.getMessage(context.languageVersionSettings)
-            reporter.reportOn(typeRef.source, FirErrors.CONTEXT_RECEIVERS_DEPRECATED, message)
-        } else {
-            source.requireFeatureSupport(LanguageFeature.ContextParameters)
-        }
+        source.requireFeatureSupport(LanguageFeature.ContextParameters)
     }
 
     private val valueParameterElementSet = setOf(KtStubElementTypes.VALUE_PARAMETER)
@@ -69,7 +57,7 @@ object FirContextualFunctionTypeChecker : FirResolvedTypeRefChecker(MppCheckerKi
             return when (this) {
                 is KtTypeReference -> typeElement?.findContextReceiverListSource()
                 is KtNullableType -> innerType?.findContextReceiverListSource()
-                is KtFunctionType -> contextReceiverList?.toKtPsiSourceElement()
+                is KtFunctionType -> contextParameterList?.toKtPsiSourceElement()
                 else -> null
             }
         }
@@ -80,7 +68,7 @@ object FirContextualFunctionTypeChecker : FirResolvedTypeRefChecker(MppCheckerKi
                     .findChildByType(this, KtTokenSets.TYPE_ELEMENT_TYPES)
                     ?.findContextReceiverListSource(tree)
                 KtNodeTypes.FUNCTION_TYPE -> tree
-                    .findChildByType(this, KtNodeTypes.CONTEXT_RECEIVER_LIST)
+                    .findChildByType(this, KtNodeTypes.CONTEXT_PARAMETER_LIST)
                     ?.toKtLightSourceElement(tree)
                 else -> null
             }

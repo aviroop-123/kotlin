@@ -3,6 +3,7 @@ KaTypeParameterSymbol:
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   isReified: false
   location: CLASS
   modality: FINAL
@@ -14,6 +15,7 @@ KaTypeParameterSymbol:
   getContainingFileSymbol: KaFileSymbol(typeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -45,6 +47,7 @@ KaNamedClassSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: CLASS
       modality: FINAL
@@ -56,18 +59,21 @@ KaNamedClassSymbol:
       getContainingFileSymbol: KaFileSymbol(typeAlias.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(typeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: X
 
 KaTypeParameterSymbol:
   annotations: []
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   isReified: false
   location: LOCAL
   modality: FINAL
@@ -79,6 +85,7 @@ KaTypeParameterSymbol:
   getContainingFileSymbol: KaFileSymbol(typeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaTypeAliasSymbol:
   annotations: []
@@ -94,6 +101,7 @@ KaTypeAliasSymbol:
     type: X<Z>
   isActual: false
   isExpect: false
+  isExternal: false
   location: TOP_LEVEL
   modality: FINAL
   name: Y
@@ -104,6 +112,7 @@ KaTypeAliasSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: LOCAL
       modality: FINAL
@@ -115,8 +124,10 @@ KaTypeAliasSymbol:
       getContainingFileSymbol: KaFileSymbol(typeAlias.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PRIVATE
   getContainingFileSymbol: KaFileSymbol(typeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: Y

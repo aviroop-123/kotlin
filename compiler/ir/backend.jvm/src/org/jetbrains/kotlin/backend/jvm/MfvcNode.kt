@@ -209,7 +209,7 @@ sealed class MfvcNodeWithSubnodes(val subnodes: List<NameableMfvcNode>) : MfvcNo
             subnodes
                 .groupBy { it.name }
                 .filterValues { it.size > 1 }
-                .entries.joinToString(prefix = "Repeating node names found: ") { (name, nodes) -> "${nodes.size} nodes with name '$name'" }
+                .entries.joinToString(prefix = "Repeating node names found: ") { [name, nodes] -> "${nodes.size} nodes with name '$name'" }
         }
     }
 
@@ -246,7 +246,7 @@ fun MfvcNodeWithSubnodes.makeBoxedExpression(
 ): IrExpression = scope.irCall(boxMethod).apply {
     val resultType = type.substitute(typeArguments) as IrSimpleType
     require(resultType.erasedUpperBound == type.erasedUpperBound) { "Substitution of $type led to $resultType" }
-    for ((index, typeArgument) in resultType.arguments.withIndex()) {
+    for ([index, typeArgument] in resultType.arguments.withIndex()) {
         this.typeArguments[index] = typeArgument.typeOrNull ?: resultType.erasedUpperBound.typeParameters[index].defaultType
     }
     arguments.assignFrom(valueArguments)
@@ -279,7 +279,7 @@ val List<NameableMfvcNode>.subnodeIndices: Map<NameableMfvcNode, IntRange>
                 is IntermediateMfvcNode -> {
                     val nodeSize = node.leavesCount
                     put(node, offset until offset + nodeSize)
-                    putAll(node.subnodeIndices.mapValues { (_, v) -> (v.first + offset)..(v.last + offset) })
+                    putAll(node.subnodeIndices.mapValues { [_, v] -> (v.first + offset)..(v.last + offset) })
                     offset += nodeSize
                 }
 
@@ -292,7 +292,6 @@ val List<NameableMfvcNode>.subnodeIndices: Map<NameableMfvcNode, IntRange>
     }
 
 inline fun <R> MfvcNode.mapLeaves(crossinline f: (LeafMfvcNode) -> R): List<R> = flatMapLeaves { listOf(f(it)) }
-inline fun <R> MfvcNode.mapLeavesIndexed(crossinline f: (Int, LeafMfvcNode) -> R): List<R> = mapLeaves { it }.mapIndexed(f)
 
 fun <R> MfvcNode.flatMapLeaves(f: (LeafMfvcNode) -> List<R>): List<R> = when (this) {
     is MfvcNodeWithSubnodes -> subnodes.flatMap { it.flatMapLeaves(f) }

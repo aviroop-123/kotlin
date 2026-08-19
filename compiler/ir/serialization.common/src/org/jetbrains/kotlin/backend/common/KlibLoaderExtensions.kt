@@ -5,25 +5,21 @@
 
 package org.jetbrains.kotlin.backend.common
 
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.backend.common.diagnostics.SerializationErrors
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.cli.report
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.DuplicatedUniqueNameStrategy
 import org.jetbrains.kotlin.config.duplicatedUniqueNameStrategy
-import org.jetbrains.kotlin.config.messageCollector
-import org.jetbrains.kotlin.library.KotlinAbiVersion
 import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.library.loader.KlibLoader
 import org.jetbrains.kotlin.library.loader.KlibLoaderResult
-import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase
-import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.IncompatibleAbiVersion
-import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.InvalidLibraryFormat
-import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.LibraryNotFound
-import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.PlatformCheckMismatch
-import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblematicLibrary
+import org.jetbrains.kotlin.library.loader.reportLoadingProblemsIfAny
 import org.jetbrains.kotlin.library.uniqueName
 import java.nio.file.InvalidPathException
+import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.io.path.exists
 
 /**
  * Checks for existence of duplicated [uniqueName]s among [KlibLoaderResult.librariesStdlibFirst].
@@ -42,16 +38,15 @@ fun KlibLoaderResult.eliminateLibrariesWithDuplicatedUniqueNames(configuration: 
         return this
     }
 
-    val messageCollector = configuration.messageCollector
     val duplicatedUniqueNameStrategy = configuration.duplicatedUniqueNameStrategy ?: DuplicatedUniqueNameStrategy.DENY
 
-    for ((uniqueName, libraries) in librariesWithDuplicatedUniqueNames) {
+    for ([uniqueName, libraries] in librariesWithDuplicatedUniqueNames) {
         val message =
             "KLIB loader: The same 'unique_name=$uniqueName' found in more than one library: ${libraries.joinToString { it.libraryFile.path }}"
 
         if (duplicatedUniqueNameStrategy == DuplicatedUniqueNameStrategy.DENY) {
-            messageCollector.report(
-                CompilerMessageSeverity.ERROR,
+            configuration.report(
+                SerializationErrors.KLIB_LOADING_ERROR,
                 message +
                         "\nPlease file an issue to https://kotl.in/issue and meanwhile use CLI parameter -Xklib-duplicated-unique-name-strategy with one of the following values:\n" +
                         "${DuplicatedUniqueNameStrategy.ALLOW_ALL_WITH_WARNING}: Use all KLIB dependencies, even when they have same 'unique_name' property.\n" +
@@ -59,7 +54,7 @@ fun KlibLoaderResult.eliminateLibrariesWithDuplicatedUniqueNames(configuration: 
                         "${DuplicatedUniqueNameStrategy.DENY}: Fail a compilation with the error."
             )
         } else {
-            messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, message)
+            configuration.report(SerializationErrors.KLIB_LOADING_WARNING, message)
         }
     }
 
@@ -80,69 +75,15 @@ fun KlibLoaderResult.reportLoadingProblemsIfAny(
     configuration: CompilerConfiguration,
     allAsErrors: Boolean = false
 ) {
-    if (!hasProblems) return
-
-    val messageCollector = configuration.messageCollector
-    problematicLibraries.forEach { problematicLibrary ->
-        messageCollector.report(
-            severity = if (allAsErrors) CompilerMessageSeverity.ERROR else problematicLibrary.problemCase.computeSeverity(),
-            message = problematicLibrary.computeMessageText()
-        )
-    }
-}
-
-private fun ProblemCase.computeSeverity(): CompilerMessageSeverity = when (this) {
-    LibraryNotFound, InvalidLibraryFormat -> CompilerMessageSeverity.INFO
-    is PlatformCheckMismatch, is IncompatibleAbiVersion -> CompilerMessageSeverity.STRONG_WARNING
-}
-
-private fun ProblematicLibrary.computeMessageText(): String {
-    val messageText = when (val problemCase = problemCase) {
-        LibraryNotFound -> "Library not found: $libraryPath"
-        InvalidLibraryFormat -> "Not a Kotlin library, or a library with invalid format: $libraryPath"
-
-        is PlatformCheckMismatch -> with(problemCase) {
-            "Library failed platform-specific check: $libraryPath\n" +
-                    "Expected $property is $expected while found $actual."
+    reportLoadingProblemsIfAny { defaultSeverity, message ->
+        val factory = if (allAsErrors) SerializationErrors.KLIB_LOADING_ERROR else when (defaultSeverity) {
+            KlibLoaderResult.ProblemSeverity.INFO -> SerializationErrors.KLIB_LOADING_INFO
+            KlibLoaderResult.ProblemSeverity.WARNING -> SerializationErrors.KLIB_LOADING_WARNING
+            KlibLoaderResult.ProblemSeverity.ERROR -> SerializationErrors.KLIB_LOADING_ERROR
         }
 
-        is IncompatibleAbiVersion -> with(problemCase) {
-            val libraryCompilerLine: String? = libraryVersions.compilerVersion?.let { "The library was produced by $it compiler." }
-
-            val abiVersionCheckExplanation: String = when {
-                minPermittedAbiVersion != null && maxPermittedAbiVersion != null ->
-                    "ABI version in the range [$minPermittedAbiVersion, $maxPermittedAbiVersion]"
-
-                maxPermittedAbiVersion != null ->
-                    "ABI version <= $maxPermittedAbiVersion"
-
-                else /*if (minPermittedAbiVersion != null)*/ ->
-                    "ABI version >= $minPermittedAbiVersion"
-            }
-
-            val libraryAbiVersion: KotlinAbiVersion? = libraryVersions.abiVersion
-            val lines: List<String> = if (libraryAbiVersion != null) {
-                listOfNotNull(
-                    "Incompatible ABI version $libraryAbiVersion in library: $libraryPath",
-                    libraryCompilerLine,
-                    "The current Kotlin compiler can consume libraries having $abiVersionCheckExplanation",
-                    "Please upgrade your Kotlin compiler version to consume this library."
-                )
-            } else {
-                // This message is not very actionable. However, we shouldn't have to worry about it because
-                // there are no modern libraries without the ABI version in the wild.
-                listOfNotNull(
-                    "Library with unknown ABI version: $libraryPath",
-                    libraryCompilerLine,
-                    "The current Kotlin compiler can consume libraries having $abiVersionCheckExplanation, but it's not possible to determine the exact ABI version."
-                )
-            }
-
-            lines.joinToString("\n")
-        }
+        configuration.report(factory, message)
     }
-
-    return "KLIB loader: $messageText"
 }
 
 /**
@@ -157,16 +98,23 @@ fun KlibLoaderResult.loadFriendLibraries(friendLibraryPaths: List<String>): List
     val canonicalFriendLibraryPaths: Set<String> = friendLibraryPaths.mapNotNullTo(linkedSetOf()) { rawPath ->
         if (rawPath.isEmpty()) return@mapNotNullTo null
 
-        try {
-            Paths.get(rawPath).toRealPath().toString()
+        val validPath: Path = try {
+            Paths.get(rawPath)
         } catch (_: InvalidPathException) {
             return@mapNotNullTo null
         }
+
+        // First, check if this path exists on the file system.
+        if (!validPath.exists()) return@mapNotNullTo null
+
+        // And only then attempt to resolve it to a canonical path.
+        // Otherwise, we might end up with a Java IO exception.
+        validPath.toRealPath().toString()
     }
 
     if (canonicalFriendLibraryPaths.isEmpty()) return emptyList()
 
-    val canonicalLibraryPathsToLibraries: Map<String, KotlinLibrary> = librariesStdlibFirst.associateBy { it.libraryFile.path }
+    val canonicalLibraryPathsToLibraries: Map<String, KotlinLibrary> = librariesStdlibFirst.associateBy { it.libraryFile.canonicalPath }
 
     return canonicalFriendLibraryPaths.mapNotNull { canonicalLibraryPathsToLibraries[it] }
 }

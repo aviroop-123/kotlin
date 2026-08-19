@@ -6,23 +6,21 @@
 package org.jetbrains.kotlin.backend.konan.ir
 
 import org.jetbrains.kotlin.backend.common.ErrorReportingContext
+import org.jetbrains.kotlin.backend.common.ir.BackendKlibSymbols
 import org.jetbrains.kotlin.backend.common.ir.PreSerializationNativeSymbols
-import org.jetbrains.kotlin.backend.common.ir.KlibSymbols
 import org.jetbrains.kotlin.backend.konan.*
-import org.jetbrains.kotlin.backend.konan.lower.TestProcessorFunctionKind
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.ir.InternalSymbolFinderAPI
-import org.jetbrains.kotlin.ir.IrBuiltIns
-import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
+import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.declarations.IrFunction
-import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
-import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.konan.config.generateTestRunner
+import org.jetbrains.kotlin.konan.config.konanEntryPoint
+import org.jetbrains.kotlin.konan.config.konanProducedArtifactKind
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.name.*
 import org.jetbrains.kotlin.util.OperatorNameConventions
@@ -46,6 +44,7 @@ private object ClassIds {
     val filterExceptions = ClassId.topLevel(RuntimeNames.filterExceptions)
     val exportForCppRuntime = ClassId.topLevel(RuntimeNames.exportForCppRuntime)
     val typedIntrinsic = ClassId.topLevel(RuntimeNames.typedIntrinsicAnnotation)
+    val transparentForDebugger = ClassId.topLevel(KonanFqNames.transparentForDebugger)
 
     // Internal classes
     private val String.internalClassId get() = ClassId(RuntimeNames.kotlinNativeInternalPackageName, Name.identifier(this))
@@ -69,6 +68,12 @@ private object ClassIds {
     val kTypeProjectionList = "KTypeProjectionList".internalClassId
     val nativePtr = "NativePtr".internalClassId
     val functionAdapter = "FunctionAdapter".internalClassId
+    val defaultConstructorMarker = "DefaultConstructorMarker".internalClassId
+
+    // Internal test classes
+    private val String.internalTestClassId get() = ClassId(RuntimeNames.kotlinNativeInternalTestPackageName, Name.identifier(this))
+    val testInitializer = "TestInitializer".internalTestClassId
+    val testsProcessed = "TestsProcessed".internalTestClassId
 
     // Interop classes
     private val String.interopClassId get() = ClassId(InteropFqNames.packageName, Name.identifier(this))
@@ -78,12 +83,7 @@ private object ClassIds {
     val kotlinToCBridge = InteropFqNames.kotlinToCBridgeName.interopInternalClassId
     val nativePointed = InteropFqNames.nativePointedName.interopClassId
     val interopCPointer = InteropFqNames.cPointerName.interopClassId
-    val interopCPointed = InteropFqNames.cPointedName.interopClassId
-    val interopCVariable = InteropFqNames.cVariableName.interopClassId
     val interopMemScope = InteropFqNames.memScopeName.interopClassId
-    val interopCValue = InteropFqNames.cValueName.interopClassId
-    val interopCValues = InteropFqNames.cValuesName.interopClassId
-    val interopCValuesRef = InteropFqNames.cValuesRefName.interopClassId
     val interopCOpaque = InteropFqNames.cOpaqueName.interopClassId
     val interopObjCObject = InteropFqNames.objCObjectName.interopClassId
     val interopObjCObjectBase = InteropFqNames.objCObjectBaseName.interopClassId
@@ -96,7 +96,6 @@ private object ClassIds {
     val interopCPrimitiveVar = InteropFqNames.cPrimitiveVarName.interopClassId
     val interopCPrimitiveVarType = interopCPrimitiveVar.createNestedClassId(Name.identifier(InteropFqNames.TypeName))
     val nativeMemUtils = InteropFqNames.nativeMemUtilsName.interopClassId
-    val nativeHeap = InteropFqNames.nativeHeapName.interopClassId
     val cStuctVar = InteropFqNames.cStructVarName.interopClassId
     val cStructVarType = cStuctVar.createNestedClassId(Name.identifier(InteropFqNames.TypeName))
     val objCMethodImp = InteropFqNames.objCMethodImpName.interopClassId
@@ -107,9 +106,6 @@ private object ClassIds {
 
     // Reflection classes
     private val String.reflectionClassId get() = ClassId(StandardNames.KOTLIN_REFLECT_FQ_NAME, Name.identifier(this))
-    val kMutableProperty0 = "KMutableProperty0".reflectionClassId
-    val kMutableProperty1 = "KMutableProperty1".reflectionClassId
-    val kMutableProperty2 = "KMutableProperty2".reflectionClassId
     val kType = "KType".reflectionClassId
     val kTypeImpl = "KTypeImpl".reflectionClassId
 
@@ -121,16 +117,11 @@ private object ClassIds {
     val kotlinResult = ClassId(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, Name.identifier("Result"))
 
     // Internal coroutines classes
-    private val String.internalCoroutinesClassId get() = ClassId(RuntimeNames.kotlinNativeCoroutinesInternalPackageName, Name.identifier(this))
+    private val String.internalCoroutinesClassId
+        get() = ClassId(RuntimeNames.kotlinNativeCoroutinesInternalPackageName, Name.identifier(this))
     val baseContinuationImpl = "BaseContinuationImpl".internalCoroutinesClassId
     val restrictedContinuationImpl = "RestrictedContinuationImpl".internalCoroutinesClassId
     val continuationImpl = "ContinuationImpl".internalCoroutinesClassId
-
-    // Test classes
-    private val String.internalTestClassId get() = ClassId(RuntimeNames.kotlinNativeInternalTestPackageName, Name.identifier(this))
-    val baseClassSuite = "BaseClassSuite".internalTestClassId
-    val topLevelSuite = "TopLevelSuite".internalTestClassId
-    val testFunctionKind = "TestFunctionKind".internalTestClassId
 }
 
 // TODO: KT-77494 - move this callable ids into more appropriate places.
@@ -140,7 +131,6 @@ private object CallableIds {
     private val String.nativeCallableId get() = CallableId(KonanFqNames.packageName, Name.identifier(this))
     val processUnhandledException = "processUnhandledException".nativeCallableId
     val terminateWithUnhandledException = "terminateWithUnhandledException".nativeCallableId
-    val immutableBlobOf = "immutableBlobOf".nativeCallableId
 
     // Internal functions
     private val String.internalCallableId get() = CallableId(RuntimeNames.kotlinNativeInternalPackageName, Name.identifier(this))
@@ -164,7 +154,6 @@ private object CallableIds {
     val throwInvalidReceiverTypeException = "ThrowInvalidReceiverTypeException".internalCallableId
     val throwIllegalStateException = "ThrowIllegalStateException".internalCallableId
     val throwIllegalStateExceptionWithMessage = "ThrowIllegalStateExceptionWithMessage".internalCallableId
-    val throwIllegalArgumentException = "ThrowIllegalArgumentException".internalCallableId
     val throwIllegalArgumentExceptionWithMessage = "ThrowIllegalArgumentExceptionWithMessage".internalCallableId
     val valuesForEnum = "valuesForEnum".internalCallableId
     val valueOfForEnum = "valueOfForEnum".internalCallableId
@@ -173,6 +162,8 @@ private object CallableIds {
     val createEmptyString = "createEmptyString".internalCallableId
     val initInstance = "initInstance".internalCallableId
     val isSubtype = "isSubtype".internalCallableId
+    val downcast = "downcast".internalCallableId
+    val checkNotNull = "checkNotNull".internalCallableId
     val getContinuation = "getContinuation".internalCallableId
     val returnIfSuspended = "returnIfSuspended".internalCallableId
     val saveCoroutineState = "saveCoroutineState".internalCallableId
@@ -232,7 +223,6 @@ private object CallableIds {
     val enumEntries = CallableId(FqName("kotlin.enums"), Name.identifier("enumEntries"))
     val println = CallableId(FqName("kotlin.io"), Name.identifier("println"))
     val executeImpl = CallableId(KonanFqNames.packageName.child(Name.identifier("concurrent")), Name.identifier("executeImpl"))
-    val createCleaner = CallableId(KonanFqNames.packageName.child(Name.identifier("ref")), Name.identifier("createCleaner"))
     val coroutineSuspended = CallableId(StandardNames.COROUTINES_INTRINSICS_PACKAGE_FQ_NAME, StandardNames.COROUTINE_SUSPENDED_NAME)
     val invokeSuspend = CallableId(ClassIds.baseContinuationImpl, Name.identifier("invokeSuspend"))
     val anyEquals = CallableId(StandardClassIds.Any, StandardNames.EQUALS_NAME)
@@ -241,18 +231,21 @@ private object CallableIds {
     private val String.collectionsId get() = CallableId(StandardNames.COLLECTIONS_PACKAGE_FQ_NAME, Name.identifier(this))
     val contentToString = "contentToString".collectionsId
     val contentHashCode = "contentHashCode".collectionsId
-    val contentEquals = "contentEquals".collectionsId
     val copyInto = "copyInto".collectionsId
     val copyOf = "copyOf".collectionsId
+
+    // Internal interop functions
+    private val String.internalInteropCallableId get() = CallableId(RuntimeNames.kotlinxCInteropInternalPackageName, Name.identifier(this))
+    val interopCallMarker = "interopCallMarker".internalInteropCallableId
 }
 
-private fun CompilerConfiguration.getMainCallableId() : CallableId? {
-    if (get(KonanConfigKeys.PRODUCE) != CompilerOutputKind.PROGRAM) return null
-    get(KonanConfigKeys.ENTRY)?.let {
+private fun CompilerConfiguration.getMainCallableId(): CallableId? {
+    if (konanProducedArtifactKind != CompilerOutputKind.PROGRAM) return null
+    konanEntryPoint?.let {
         val entryPointFqName = FqName(it)
         return CallableId(entryPointFqName.parent(), entryPointFqName.shortName())
     }
-    return when (get(KonanConfigKeys.GENERATE_TEST_RUNNER)) {
+    return when (generateTestRunner) {
         TestRunnerKind.MAIN_THREAD -> CallableId(RuntimeNames.kotlinNativeInternalTestPackageName, StandardNames.MAIN)
         TestRunnerKind.WORKER -> CallableId(RuntimeNames.kotlinNativeInternalTestPackageName, Name.identifier("worker"))
         TestRunnerKind.MAIN_THREAD_NO_EXIT -> CallableId(RuntimeNames.kotlinNativeInternalTestPackageName, Name.identifier("mainNoExit"))
@@ -260,31 +253,31 @@ private fun CompilerConfiguration.getMainCallableId() : CallableId? {
     }
 }
 
-// TODO KT-77388 rename to `BackendNativeSymbolsImpl`
 @OptIn(InternalSymbolFinderAPI::class, InternalKotlinNativeApi::class)
-class KonanSymbols(
-        context: ErrorReportingContext,
-        irBuiltIns: IrBuiltIns,
-        config: CompilerConfiguration,
-) : PreSerializationNativeSymbols by PreSerializationNativeSymbols.Impl(irBuiltIns), KlibSymbols(irBuiltIns) {
+class BackendNativeSymbols(
+    context: ErrorReportingContext,
+    irBuiltIns: IrBuiltIns,
+    config: CompilerConfiguration,
+) : PreSerializationNativeSymbols by PreSerializationNativeSymbols.Impl(irBuiltIns), BackendKlibSymbols(irBuiltIns) {
     val entryPoint by run {
-        val mainCallableId = config.getMainCallableId()
-        val unfilteredCandidates = mainCallableId?.functionSymbols()
+        val mainCallableId = config.getMainCallableId() ?: return@run lazyOf(null)
+        val unfilteredCandidates by mainCallableId.functionSymbols()
         lazy {
-            unfilteredCandidates ?: return@lazy null
-            fun IrType.isArrayMaybeOutString() : Boolean {
+            fun IrType.isArrayMaybeOutString(): Boolean {
                 if (this !is IrSimpleType) return false
                 if (classOrNull != irBuiltIns.arrayClass) return false
                 val argument = arguments.getOrNull(0) ?: return false
                 if (argument !is IrTypeProjection) return false
                 return argument.type.classOrNull == irBuiltIns.stringClass
             }
+
             fun IrSimpleFunction.isArrayStringMain() = hasShape(
                 dispatchReceiver = false,
                 extensionReceiver = false,
                 contextParameters = 0,
                 regularParameters = 1,
             ) && parameters[0].type.isArrayMaybeOutString()
+
             fun IrSimpleFunction.isNoArgsMain() = hasShape(
                 dispatchReceiver = false,
                 extensionReceiver = false,
@@ -304,27 +297,17 @@ class KonanSymbols(
         }
     }
 
-    val nothing get() = irBuiltIns.nothingClass
-    val throwable get() = irBuiltIns.throwableClass
-    val enum get() = irBuiltIns.enumClass
     private val nativePtr = ClassIds.nativePtr.classSymbol()
-    val nativePointed = ClassIds.nativePointed.classSymbol()
     val nativePtrType = nativePtr.typeWith(arguments = emptyList())
 
-    val immutableBlobOf = CallableIds.immutableBlobOf.functionSymbol()
-    val immutableBlobOfImpl = CallableIds.immutableBlobOfImpl.functionSymbol()
-
-    val signedIntegerClasses = setOf(byte, short, int, long)
-    val unsignedIntegerClasses = setOf(uByte!!, uShort!!, uInt!!, uLong!!)
-
-    val allIntegerClasses = signedIntegerClasses + unsignedIntegerClasses
+    val immutableBlobOfImpl by CallableIds.immutableBlobOfImpl.functionSymbol()
 
     val unsignedToSignedOfSameBitWidth = unsignedIntegerClasses.associateWith {
         when (it) {
-            uByte -> byte
-            uShort -> short
-            uInt -> int
-            uLong -> long
+            irBuiltIns.ubyteClass -> irBuiltIns.byteClass
+            irBuiltIns.ushortClass -> irBuiltIns.shortClass
+            irBuiltIns.uintClass -> irBuiltIns.intClass
+            irBuiltIns.ulongClass -> irBuiltIns.longClass
             else -> error(it.toString())
         }
     }
@@ -345,11 +328,12 @@ class KonanSymbols(
                     }
                 }
             }
-        }.flatMap { it.functionSymbols() }
+        }.map { it.functionSymbols() }
         lazy {
             symbols
+                .flatMap { it.value }
                 .groupBy { it.owner.parameters[0].type.classOrFail to it.owner.returnType.classOrFail }
-                .mapValues { (k, v) ->
+                .mapValues { [k, v] ->
                     v.singleOrNull() ?: error("No single conversion found from ${k.first} to ${k.second}")
                 }.also {
                     for (from in allIntegerClasses) {
@@ -367,26 +351,20 @@ class KonanSymbols(
     val typedIntrinsic = ClassIds.typedIntrinsic.classSymbol()
     val cToKotlinBridge = ClassIds.cToKotlinBridge.classSymbol()
     val kotlinToCBridge = ClassIds.kotlinToCBridge.classSymbol()
-    val interopCallMarker = symbolFinder.topLevelFunction(RuntimeNames.kotlinxCInteropInternalPackageName, "interopCallMarker")
+    val interopCallMarker by CallableIds.interopCallMarker.functionSymbol()
 
     val objCMethodImp = ClassIds.objCMethodImp.classSymbol()
 
-    val processUnhandledException = CallableIds.processUnhandledException.functionSymbol()
-    val terminateWithUnhandledException = CallableIds.terminateWithUnhandledException.functionSymbol()
+    val processUnhandledException by CallableIds.processUnhandledException.functionSymbol()
+    val terminateWithUnhandledException by CallableIds.terminateWithUnhandledException.functionSymbol()
 
     val interopNativePointedGetRawPointer by CallableIds.nativePointedGetRawPointer.functionSymbol {
         it.extensionReceiverClass == nativePointed
     }
 
-    val interopCPointer = ClassIds.interopCPointer.classSymbol()
-    val interopCPointed = ClassIds.interopCPointed.classSymbol()
-    val interopCVariable = ClassIds.interopCVariable.classSymbol()
-    val interopCstr by CallableIds.cstrProperty.getterSymbol(extensionReceiverClass = string)
-    val interopWcstr by CallableIds.wcstrProperty.getterSymbol(extensionReceiverClass = string)
+    val interopCstr by CallableIds.cstrProperty.getterSymbol(extensionReceiverClass = irBuiltIns.stringClass)
+    val interopWcstr by CallableIds.wcstrProperty.getterSymbol(extensionReceiverClass = irBuiltIns.stringClass)
     val interopMemScope = ClassIds.interopMemScope.classSymbol()
-    val interopCValue = ClassIds.interopCValue.classSymbol()
-    val interopCValues = ClassIds.interopCValues.classSymbol()
-    val interopCValuesRef = ClassIds.interopCValuesRef.classSymbol()
     val interopCValueWrite by CallableIds.cValueWrite.functionSymbol {
         it.extensionReceiverClass == interopCValue
     }
@@ -400,13 +378,13 @@ class KonanSymbols(
         it.typeParameters.isEmpty()
     }
 
-    val interopTypeOf = CallableIds.typeOf.functionSymbol()
+    val interopTypeOf by CallableIds.typeOf.functionSymbol()
 
     val interopCPointerGetRawValue by CallableIds.cPointerGetRawValue.functionSymbol {
         it.extensionReceiverClass == interopCPointer
     }
 
-    val interopAllocObjCObject = CallableIds.allocObjCObject.functionSymbol()
+    val interopAllocObjCObject by CallableIds.allocObjCObject.functionSymbol()
 
     val interopForeignObjCObject = ClassIds.interopForeignObjCObject.classSymbol()
 
@@ -420,72 +398,74 @@ class KonanSymbols(
     val interopObjCClassOf = ClassIds.interopObjCClassOf.classSymbol()
     val interopObjCProtocol = ClassIds.interopObjCProtocol.classSymbol()
 
-    val interopBlockCopy = CallableIds.blockCopy.functionSymbol()
+    val interopBlockCopy by CallableIds.blockCopy.functionSymbol()
 
-    val interopObjCRelease = CallableIds.objcRelease.functionSymbol()
+    val interopObjCRelease by CallableIds.objcRelease.functionSymbol()
 
-    val interopObjCRetain = CallableIds.objcRetain.functionSymbol()
+    val interopObjCRetain by CallableIds.objcRetain.functionSymbol()
 
-    val interopObjcRetainAutoreleaseReturnValue = CallableIds.objcRetainAutoreleaseReturnValue.functionSymbol()
+    val interopObjcRetainAutoreleaseReturnValue by CallableIds.objcRetainAutoreleaseReturnValue.functionSymbol()
 
-    val interopCreateObjCObjectHolder = CallableIds.createObjCObjectHolder.functionSymbol()
+    val interopCreateObjCObjectHolder by CallableIds.createObjCObjectHolder.functionSymbol()
 
-    val interopCreateKotlinObjectHolder = CallableIds.createKotlinObjectHolder.functionSymbol()
-    val interopUnwrapKotlinObjectHolderImpl = CallableIds.unwrapKotlinObjectHolderImpl.functionSymbol()
+    val interopCreateKotlinObjectHolder by CallableIds.createKotlinObjectHolder.functionSymbol()
+    val interopUnwrapKotlinObjectHolderImpl by CallableIds.unwrapKotlinObjectHolderImpl.functionSymbol()
 
-    val interopCreateObjCSuperStruct = CallableIds.createObjCSuperStruct.functionSymbol()
+    val interopCreateObjCSuperStruct by CallableIds.createObjCSuperStruct.functionSymbol()
 
-    val interopGetMessenger = CallableIds.getMessenger.functionSymbol()
-    val interopGetMessengerStret = CallableIds.getMessengerStret.functionSymbol()
+    val interopGetMessenger by CallableIds.getMessenger.functionSymbol()
+    val interopGetMessengerStret by CallableIds.getMessengerStret.functionSymbol()
 
-    val interopGetObjCClass = CallableIds.getObjCClass.functionSymbol()
-    val interopObjCObjectSuperInitCheck = CallableIds.objCObjectSuperInitCheck.functionSymbol()
-    val interopObjCObjectInitBy = CallableIds.objCObjectInitBy.functionSymbol()
-    val interopObjCObjectRawValueGetter = CallableIds.objCObjectRawPtr.functionSymbol()
+    val interopGetObjCClass by CallableIds.getObjCClass.functionSymbol()
+    val interopObjCObjectSuperInitCheck by CallableIds.objCObjectSuperInitCheck.functionSymbol()
+    val interopObjCObjectInitBy by CallableIds.objCObjectInitBy.functionSymbol()
+    val interopObjCObjectRawValueGetter by CallableIds.objCObjectRawPtr.functionSymbol()
 
     val interopNativePointedRawPtrGetter by CallableIds.interopNativePointedRawPtrProperty.getterSymbol()
     val interopCPointerRawValueGetter by CallableIds.cPointerRawValueProperty.getterSymbol()
 
-    val interopInterpretObjCPointer = CallableIds.interpretObjCPointer.functionSymbol()
-    val interopInterpretObjCPointerOrNull = CallableIds.interpretObjCPointerOrNull.functionSymbol()
-    val interopInterpretNullablePointed = CallableIds.interpretNullablePointed.functionSymbol()
-    val interopInterpretCPointer = CallableIds.interpretCPointer.functionSymbol()
+    val interopInterpretObjCPointer by CallableIds.interpretObjCPointer.functionSymbol()
+    val interopInterpretObjCPointerOrNull by CallableIds.interpretObjCPointerOrNull.functionSymbol()
+    val interopInterpretNullablePointed by CallableIds.interpretNullablePointed.functionSymbol()
+    val interopInterpretCPointer by CallableIds.interpretCPointer.functionSymbol()
 
-    val createForeignException = CallableIds.createForeignException.functionSymbol()
-
-    val interopCEnumVar = ClassIds.interopCEnumVar.classSymbol()
+    val createForeignException by CallableIds.createForeignException.functionSymbol()
 
     val nativeMemUtils = ClassIds.nativeMemUtils.classSymbol()
-    val nativeHeap = ClassIds.nativeHeap.classSymbol()
 
     val cStructVarConstructorSymbol by ClassIds.cStuctVar.primaryConstructorSymbol()
     val structVarTypePrimaryConstructor by ClassIds.cStructVarType.primaryConstructorSymbol()
 
-    val readBits = CallableIds.readBits.functionSymbol()
-    val writeBits = CallableIds.writeBits.functionSymbol()
+    val readBits by CallableIds.readBits.functionSymbol()
+    val writeBits by CallableIds.writeBits.functionSymbol()
 
-    val objCExportTrapOnUndeclaredException = CallableIds.trapOnUndeclaredException.functionSymbol()
-    val objCExportResumeContinuation = CallableIds.resumeContinuation.functionSymbol()
-    val objCExportResumeContinuationWithException = CallableIds.resumeContinuationWithException.functionSymbol()
-    val objCExportGetCoroutineSuspended = CallableIds.getCoroutineSuspended.functionSymbol()
-    val objCExportInterceptedContinuation = CallableIds.interceptedContinuation.functionSymbol()
+    val objCExportTrapOnUndeclaredException by CallableIds.trapOnUndeclaredException.functionSymbol()
+    val objCExportResumeContinuation by CallableIds.resumeContinuation.functionSymbol()
+    val objCExportResumeContinuationWithException by CallableIds.resumeContinuationWithException.functionSymbol()
+    val objCExportGetCoroutineSuspended by CallableIds.getCoroutineSuspended.functionSymbol()
+    val objCExportInterceptedContinuation by CallableIds.interceptedContinuation.functionSymbol()
 
-    val getNativeNullPtr = CallableIds.getNativeNullPtr.functionSymbol()
+    val getNativeNullPtr by CallableIds.getNativeNullPtr.functionSymbol()
 
-    val boxCachePredicates = BoxCache.entries.associateWith {
-        CallableIds.inBoxCache(it).functionSymbol()
+    val boxCachePredicates: Map<BoxCache, IrSimpleFunctionSymbol> by run {
+        val lazyValues = BoxCache.entries.map { CallableIds.inBoxCache(it).functionSymbol() }
+        lazy {
+            BoxCache.entries.zip(lazyValues) { boxCache, symbol -> boxCache to symbol.value }.toMap()
+        }
     }
 
-    val boxCacheGetters = BoxCache.entries.associateWith {
-        CallableIds.getCached(it).functionSymbol()
+    val boxCacheGetters: Map<BoxCache, IrSimpleFunctionSymbol> by run {
+        val lazyValues = BoxCache.entries.map { CallableIds.getCached(it).functionSymbol() }
+        lazy {
+            BoxCache.entries.zip(lazyValues) { boxCache, symbol -> boxCache to symbol.value }.toMap()
+        }
     }
 
     val immutableBlob = ClassIds.immutableBlob.classSymbol()
 
-    val executeImpl = CallableIds.executeImpl.functionSymbol()
-    val createCleaner = CallableIds.createCleaner.functionSymbol()
+    val executeImpl by CallableIds.executeImpl.functionSymbol()
 
-    val areEqualByValueFunctions = CallableIds.areEqualByValue.functionSymbols()
+    val areEqualByValueFunctions by CallableIds.areEqualByValue.functionSymbols()
 
     // TODO: this is strange. It should be a map from IrClassSymbol
     val areEqualByValue: Map<PrimitiveBinaryType, IrSimpleFunctionSymbol> by lazy {
@@ -496,39 +476,39 @@ class KonanSymbols(
         }
     }
 
-    val reinterpret = CallableIds.reinterpret.functionSymbol()
+    val reinterpret by CallableIds.reinterpret.functionSymbol()
 
-    val theUnitInstance = CallableIds.theUnitInstance.functionSymbol()
+    val theUnitInstance by CallableIds.theUnitInstance.functionSymbol()
 
-    val ieee754Equals = CallableIds.ieee754Equals.functionSymbols()
+    val ieee754Equals by CallableIds.ieee754Equals.functionSymbols()
 
-    val equals = CallableIds.anyEquals.functionSymbol()
+    val equals by CallableIds.anyEquals.functionSymbol()
 
-    val throwArithmeticException = CallableIds.throwArithmeticException.functionSymbol()
+    val throwArithmeticException by CallableIds.throwArithmeticException.functionSymbol()
 
-    val throwIndexOutOfBoundsException = CallableIds.throwIndexOutOfBoundsException.functionSymbol()
+    val throwIndexOutOfBoundsException by CallableIds.throwIndexOutOfBoundsException.functionSymbol()
 
-    override val throwNullPointerException = CallableIds.throwNullPointerException.functionSymbol()
+    override val throwNullPointerException by CallableIds.throwNullPointerException.functionSymbol()
 
-    val throwNoWhenBranchMatchedException = CallableIds.throwNoWhenBranchMatchedException.functionSymbol()
-    val throwIrLinkageError = CallableIds.throwIrLinkageError.functionSymbol()
+    val throwNoWhenBranchMatchedException by CallableIds.throwNoWhenBranchMatchedException.functionSymbol()
+    val throwIrLinkageError by CallableIds.throwIrLinkageError.functionSymbol()
 
-    override val throwTypeCastException = CallableIds.throwTypeCastException.functionSymbol()
+    override val throwTypeCastException by CallableIds.throwTypeCastException.functionSymbol()
 
-    override val throwKotlinNothingValueException = CallableIds.throwKotlinNothingValueException.functionSymbol()
+    override val throwKotlinNothingValueException by CallableIds.throwKotlinNothingValueException.functionSymbol()
 
-    val throwClassCastException = CallableIds.throwClassCastException.functionSymbol()
+    val throwClassCastException by CallableIds.throwClassCastException.functionSymbol()
 
-    val throwInvalidReceiverTypeException = CallableIds.throwInvalidReceiverTypeException.functionSymbol()
-    val throwIllegalStateException = CallableIds.throwIllegalStateException.functionSymbol()
-    val throwIllegalStateExceptionWithMessage = CallableIds.throwIllegalStateExceptionWithMessage.functionSymbol()
-    val throwIllegalArgumentException = CallableIds.throwIllegalArgumentException.functionSymbol()
-    val throwIllegalArgumentExceptionWithMessage = CallableIds.throwIllegalArgumentExceptionWithMessage.functionSymbol()
+    val throwInvalidReceiverTypeException by CallableIds.throwInvalidReceiverTypeException.functionSymbol()
+    val throwIllegalStateException by CallableIds.throwIllegalStateException.functionSymbol()
+    val throwIllegalStateExceptionWithMessage by CallableIds.throwIllegalStateExceptionWithMessage.functionSymbol()
+    val throwIllegalArgumentExceptionWithMessage by CallableIds.throwIllegalArgumentExceptionWithMessage.functionSymbol()
 
     override val stringBuilder = ClassIds.stringBuilder.classSymbol()
 
+    private val arrays = irBuiltIns.arrays
     private fun arrayToExtensionSymbolMap(callableId: CallableId, condition: (IrFunction) -> Boolean = { true }): Lazy<Map<IrClassSymbol, IrSimpleFunctionSymbol>> {
-        val allSymbols = callableId.functionSymbols()
+        val allSymbols by callableId.functionSymbols()
         return lazy {
             allSymbols
                 .filter { !it.owner.isExpect && condition(it.owner) }
@@ -545,11 +525,6 @@ class KonanSymbols(
     val arrayContentHashCode by arrayToExtensionSymbolMap(CallableIds.contentHashCode) {
         it.extensionReceiverType?.isMarkedNullable() == true
     }
-    val arrayContentEquals by arrayToExtensionSymbolMap(CallableIds.contentEquals) {
-        it.extensionReceiverType?.isMarkedNullable() == true
-    }
-
-    override val arraysContentEquals: Map<IrType, IrSimpleFunctionSymbol> by lazy { arrayContentEquals.mapKeys { it.key.defaultType } }
 
     val copyInto by arrayToExtensionSymbolMap(CallableIds.copyInto)
     val copyOf by arrayToExtensionSymbolMap(CallableIds.copyOf) { it.hasShape(extensionReceiver = true) }
@@ -557,6 +532,7 @@ class KonanSymbols(
     private fun arrayFunctionsMap(name: Name) = lazy {
         arrays.associateWith { clazz -> clazz.owner.simpleFunctions().single { it.name == name }.symbol }
     }
+
     private fun arrayPropertyGettersMap(name: Name) = lazy {
         arrays.associateWith { clazz -> clazz.owner.properties.single { it.name == name }.getter!!.symbol }
     }
@@ -565,50 +541,50 @@ class KonanSymbols(
     val arraySet by arrayFunctionsMap(OperatorNameConventions.SET)
     val arraySize by arrayPropertyGettersMap(Name.identifier("size"))
 
-    val valuesForEnum = CallableIds.valuesForEnum.functionSymbol()
+    val valuesForEnum by CallableIds.valuesForEnum.functionSymbol()
 
-    val valueOfForEnum = CallableIds.valueOfForEnum.functionSymbol()
+    val valueOfForEnum by CallableIds.valueOfForEnum.functionSymbol()
 
     val createEnumEntries by CallableIds.enumEntries.functionSymbol {
-        it.hasShape(regularParameters = 1) && it.parameters[0].type.classOrNull == array
+        it.hasShape(regularParameters = 1) && it.parameters[0].type.classOrNull == irBuiltIns.arrayClass
     }
 
     val enumEntriesInterface = ClassIds.enumEntries.classSymbol()
 
-    val createUninitializedInstance = CallableIds.createUninitializedInstance.functionSymbol()
+    val createUninitializedInstance by CallableIds.createUninitializedInstance.functionSymbol()
 
-    val createUninitializedArray = CallableIds.createUninitializedArray.functionSymbol()
+    val createUninitializedArray by CallableIds.createUninitializedArray.functionSymbol()
 
-    val createEmptyString = CallableIds.createEmptyString.functionSymbol()
+    val createEmptyString by CallableIds.createEmptyString.functionSymbol()
 
-    val initInstance = CallableIds.initInstance.functionSymbol()
+    val initInstance by CallableIds.initInstance.functionSymbol()
 
-    val isSubtype = CallableIds.isSubtype.functionSymbol()
+    val isSubtype by CallableIds.isSubtype.functionSymbol()
+
+    val downcast by CallableIds.downcast.functionSymbol()
+
+    val checkNotNull by CallableIds.checkNotNull.functionSymbol()
 
     val println by CallableIds.println.functionSymbol {
         it.hasShape(regularParameters = 1, parameterTypes = listOf(irBuiltIns.stringType))
     }
 
-    override val getContinuation = CallableIds.getContinuation.functionSymbol()
+    override val getContinuation by CallableIds.getContinuation.functionSymbol()
 
     override val continuationClass = ClassIds.continuation.classSymbol()
 
-    override val returnIfSuspended = CallableIds.returnIfSuspended.functionSymbol()
-
-    override val coroutineImpl get() = TODO()
-
-    val baseContinuationImpl = ClassIds.baseContinuationImpl.classSymbol()
+    override val returnIfSuspended by CallableIds.returnIfSuspended.functionSymbol()
 
     val restrictedContinuationImpl = ClassIds.restrictedContinuationImpl.classSymbol()
 
     val continuationImpl = ClassIds.continuationImpl.classSymbol()
 
-    val invokeSuspendFunction = CallableIds.invokeSuspend.functionSymbol()
+    val invokeSuspendFunction by CallableIds.invokeSuspend.functionSymbol()
 
     override val coroutineSuspendedGetter by CallableIds.coroutineSuspended.getterSymbol()
 
-    val saveCoroutineState = CallableIds.saveCoroutineState.functionSymbol()
-    val restoreCoroutineState = CallableIds.restoreCoroutineState.functionSymbol()
+    val saveCoroutineState by CallableIds.saveCoroutineState.functionSymbol()
+    val restoreCoroutineState by CallableIds.restoreCoroutineState.functionSymbol()
 
     val cancellationException = ClassIds.cancellationException.classSymbol()
 
@@ -620,15 +596,12 @@ class KonanSymbols(
 
     override val functionAdapter = ClassIds.functionAdapter.classSymbol()
 
+    override val defaultConstructorMarker = ClassIds.defaultConstructorMarker.classSymbol()
+
     val kFunctionImpl = ClassIds.kFunctionImpl.classSymbol()
-    val kFunctionDescription = ClassIds.kFunctionDescription.classSymbol()
     val kFunctionDescriptionCorrect = ClassIds.kFunctionDescriptionCorrect.classSymbol()
     val kFunctionDescriptionLinkageError = ClassIds.kFunctionDescriptionLinkageError.classSymbol()
     val kSuspendFunctionImpl = ClassIds.kSuspendFunctionImpl.classSymbol()
-
-    val kMutableProperty0 = ClassIds.kMutableProperty0.classSymbol()
-    val kMutableProperty1 = ClassIds.kMutableProperty1.classSymbol()
-    val kMutableProperty2 = ClassIds.kMutableProperty2.classSymbol()
 
     val kProperty0Impl = ClassIds.kProperty0Impl.classSymbol()
     val kProperty1Impl = ClassIds.kProperty1Impl.classSymbol()
@@ -641,7 +614,7 @@ class KonanSymbols(
     val kLocalDelegatedMutablePropertyImpl = ClassIds.kLocalDelegatedMutablePropertyImpl.classSymbol()
 
     val kType = ClassIds.kType.classSymbol()
-    val getObjectTypeInfo = CallableIds.getObjectTypeInfo.functionSymbol()
+    val getObjectTypeInfo by CallableIds.getObjectTypeInfo.functionSymbol()
     val kClassImpl = ClassIds.kClassImpl.classSymbol()
     val kClassImplConstructor by ClassIds.kClassImpl.primaryConstructorSymbol()
     val kClassImplIntrinsicConstructor by ClassIds.kClassImpl.noParametersConstructorSymbol()
@@ -651,7 +624,7 @@ class KonanSymbols(
     val kTypeImpl = ClassIds.kTypeImpl.classSymbol()
     val kTypeImplForTypeParametersWithRecursiveBounds = ClassIds.kTypeImplForTypeParametersWithRecursiveBounds.classSymbol()
     val kTypeProjectionList = ClassIds.kTypeProjectionList.classSymbol()
-    val typeOf = CallableIds.typeOfReflection.functionSymbol()
+    val typeOf by CallableIds.typeOfReflection.functionSymbol()
 
     val threadLocal = ClassIds.threadLocal.classSymbol()
 
@@ -659,30 +632,17 @@ class KonanSymbols(
 
     val noInline = ClassIds.noInline.classSymbol()
 
+    val transparentForDebugger = ClassIds.transparentForDebugger.classSymbol()
+
     val enumVarConstructorSymbol by ClassIds.interopCEnumVar.primaryConstructorSymbol()
     val primitiveVarTypePrimaryConstructor by ClassIds.interopCPrimitiveVarType.primaryConstructorSymbol()
 
-    val isAssertionThrowingErrorEnabled = CallableIds.isAssertionThrowingErrorEnabled.functionSymbol()
+    val isAssertionThrowingErrorEnabled by CallableIds.isAssertionThrowingErrorEnabled.functionSymbol()
 
-    val baseClassSuite = ClassIds.baseClassSuite.classSymbol()
-    val topLevelSuite = ClassIds.topLevelSuite.classSymbol()
-    val testFunctionKind = ClassIds.testFunctionKind.classSymbol()
+    override val getWithoutBoundCheckName: Name = KonanNameConventions.getWithoutBoundCheck
 
-    override val getWithoutBoundCheckName: Name? = KonanNameConventions.getWithoutBoundCheck
+    override val setWithoutBoundCheckName: Name = KonanNameConventions.setWithoutBoundCheck
 
-    override val setWithoutBoundCheckName: Name? = KonanNameConventions.setWithoutBoundCheck
-
-    private val testFunctionKindCache by lazy {
-        TestProcessorFunctionKind.entries.associateWith { kind ->
-            if (kind.runtimeKindString.isEmpty())
-                null
-            else
-                testFunctionKind.owner.declarations
-                        .filterIsInstance<IrEnumEntry>()
-                        .single { it.name == Name.identifier(kind.runtimeKindString) }
-                        .symbol
-        }
-    }
-
-    fun getTestFunctionKind(kind: TestProcessorFunctionKind) = testFunctionKindCache[kind]!!
+    override val testInitializer = ClassIds.testInitializer.classSymbol()
+    override val testsProcessed = ClassIds.testsProcessed.classSymbol()
 }

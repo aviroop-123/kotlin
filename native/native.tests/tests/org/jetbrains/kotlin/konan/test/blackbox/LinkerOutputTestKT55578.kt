@@ -6,12 +6,12 @@
 package org.jetbrains.kotlin.konan.test.blackbox
 
 import com.intellij.testFramework.TestDataPath
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.konan.test.blackbox.support.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationArtifact
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationArtifact.KLIB
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
-import org.jetbrains.kotlin.konan.test.blackbox.support.group.ClassicPipeline
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.assertContains
@@ -20,11 +20,10 @@ import kotlin.test.assertTrue
 
 @TestDataPath("\$PROJECT_ROOT")
 @EnforcedProperty(ClassLevelProperty.COMPILER_OUTPUT_INTERCEPTOR, "NONE")
-@ClassicPipeline()
 class LinkerOutputTestKT55578 : AbstractNativeLinkerOutputTest() {
     private val defaultCompilerArguments = listOf("-opt-in=kotlinx.cinterop.ExperimentalForeignApi")
 
-    private val testDir = File("native/native.tests/testData/CInterop/KT-55578/")
+    private val testDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/CInterop/KT-55578/")
 
     private val hint1 = "<<HINT1>>"
     private val hint2 = "<<HINT2>>"
@@ -178,7 +177,12 @@ class LinkerOutputTestKT55578 : AbstractNativeLinkerOutputTest() {
     }
 
     private fun compileKlib(defFile: File, sourceFile: File? = null, extraArgs: List<String> = emptyList()): KLIB {
-        val sourceArguments = sourceFile?.let { listOf("-Xcompile-source", sourceFile.absolutePath) } ?: emptyList()
+        val sourceArguments = sourceFile?.let {
+            listOf(
+                "-Xcompile-source", sourceFile.absolutePath,
+                "-Xccall-mode", "indirect", // Required for -Xcompile-source
+            )
+        } ?: emptyList()
         return cinteropToLibrary(defFile, buildDir, TestCInteropArgs(extraArgs + sourceArguments))
             .assertSuccess().resultingArtifact
     }

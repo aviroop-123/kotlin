@@ -1,3 +1,0 @@
-KtNameReferenceExpression(136,137): 's'
-  KtSimpleNameReference:
-    (in <local>: usage) val s: kotlin.String

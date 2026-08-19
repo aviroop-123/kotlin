@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #include <clang-c/Index.h>
 
 // TODO: the API declared below should eventually be refined and contributed to libclang.
@@ -30,6 +33,17 @@ enum CXNullabilityKind {
   CXNullabilityKind_NonNull,
   CXNullabilityKind_Unspecified
 };
+
+// Dynamically allocated null-terminated string.
+// Must be freed with clang_disposeCString.
+// Ideally, we should've used CXString instead, but that would require
+// breaking encapsulation of libclang even more.
+typedef struct {
+  char* data;
+} CString;
+
+// `spelling` is owned by the producer and shouldn't be freed by the client and valid only during callback invocation.
+typedef void (*MacroVisitor)(CXClientData clientData, const char* spelling, CXSourceLocation location, CXFile file);
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +64,21 @@ unsigned clang_Cursor_isObjCInitMethod(CXCursor cursor);
 unsigned clang_Cursor_isObjCReturningRetainedMethod(CXCursor cursor);
 
 unsigned clang_Cursor_isObjCConsumingSelfMethod(CXCursor cursor);
+
+CString clang_Cursor_getSwiftName(CXCursor cursor);
+
+void clang_disposeCString(CString str);
+
+CString clang_Cursor_getObjCProtocolRuntimeName(CXCursor cursor);
+
+unsigned clang_visitObjectLikeMacroDefinitions(
+  CXTranslationUnit translationUnit,
+  bool excludeSystemHeaders,
+  MacroVisitor visitor,
+  CXClientData client_data
+);
+
+int32_t clang_getFileUniqueIDHash(CXFile file);
 
 #ifdef __cplusplus
 }

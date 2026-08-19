@@ -1,0 +1,286 @@
+KtFile: 'ClassNameBeforeOneUnsresolvedClassWithTwoResolved.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtClass(1,28): 'class Foo {'
+  null
+
+KtClassBody(11,28): '{'
+  null
+
+KtClass(17,26): 'class Bar'
+  null
+
+KtClass(30,67): 'class C {'
+  null
+
+KtClassBody(38,67): '{'
+  null
+
+KtProperty(44,65): 'val prop: Foo.Bar.Baz'
+  null
+
+KtTypeReference(54,65): 'Foo.Bar.Baz'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtUserType(54,65): 'Foo.Bar.Baz'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtUserType(54,61): 'Foo.Bar'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo.Bar
+    ]
+
+KtUserType(54,57): 'Foo'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo
+    ]
+
+KtNameReferenceExpression(54,57): 'Foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo
+    ]
+
+KtNameReferenceExpression(58,61): 'Bar'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo.Bar
+    ]
+
+KtNameReferenceExpression(62,65): 'Baz'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtNamedFunction(69,117): 'fun testFun() {'
+  null
+
+KtParameterList(80,82): '()'
+  null
+
+KtBlockExpression(83,117): '{'
+  null
+
+KtProperty(89,115): 'val localProp: Foo.Bar.Baz'
+  null
+
+KtTypeReference(104,115): 'Foo.Bar.Baz'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtUserType(104,115): 'Foo.Bar.Baz'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtUserType(104,111): 'Foo.Bar'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo.Bar
+    ]
+
+KtUserType(104,107): 'Foo'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo
+    ]
+
+KtNameReferenceExpression(104,107): 'Foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo
+    ]
+
+KtNameReferenceExpression(108,111): 'Bar'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo.Bar
+    ]
+
+KtNameReferenceExpression(112,115): 'Baz'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtNamedFunction(119,155): 'fun <T> take(action: (T) -> Unit) {}'
+  null
+
+KtTypeParameterList(123,126): '<T>'
+  null
+
+KtTypeParameter(124,125): 'T'
+  null
+
+KtParameterList(131,152): '(action: (T) -> Unit)'
+  null
+
+KtParameter(132,151): 'action: (T) -> Unit'
+  null
+
+KtTypeReference(140,151): '(T) -> Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Function1
+    ]
+
+KtFunctionType(140,151): '(T) -> Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Function1
+    ]
+
+KtParameterList(140,143): '(T)'
+  null
+
+KtParameter(141,142): 'T'
+  null
+
+KtTypeReference(141,142): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtUserType(141,142): 'T'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtNameReferenceExpression(141,142): 'T'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      T
+    ]
+
+KtTypeReference(147,151): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtUserType(147,151): 'Unit'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtNameReferenceExpression(147,151): 'Unit'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Unit
+    ]
+
+KtBlockExpression(153,155): '{}'
+  null
+
+KtProperty(157,208): 'val prop = take {'
+  null
+
+KtCallExpression(168,208): 'take {'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /take(action: (T) -> kotlin.Unit): kotlin.Unit
+    ]
+    diagnostic = ERROR<EXPECTED_PARAMETER_TYPE_MISMATCH: Parameter type mismatch: actual type is '??? (Unresolved qualified name: Foo.Bar.Baz)', but 'uninferred T (of fun <T> take)' was expected.>
+
+KtNameReferenceExpression(168,172): 'take'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /take(action: (T) -> kotlin.Unit): kotlin.Unit
+    ]
+    diagnostic = ERROR<EXPECTED_PARAMETER_TYPE_MISMATCH: Parameter type mismatch: actual type is '??? (Unresolved qualified name: Foo.Bar.Baz)', but 'uninferred T (of fun <T> take)' was expected.>
+
+KtLambdaArgument(173,208): '{'
+  null
+
+KtLambdaExpression(173,208): '{'
+  null
+
+KtFunctionLiteral(173,208): '{'
+  null
+
+KtParameterList(179,203): 'lambdaParam: Foo.Bar.Baz'
+  null
+
+KtParameter(179,203): 'lambdaParam: Foo.Bar.Baz'
+  null
+
+KtTypeReference(192,203): 'Foo.Bar.Baz'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtUserType(192,203): 'Foo.Bar.Baz'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtUserType(192,199): 'Foo.Bar'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo.Bar
+    ]
+
+KtUserType(192,195): 'Foo'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo
+    ]
+
+KtNameReferenceExpression(192,195): 'Foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo
+    ]
+
+KtNameReferenceExpression(196,199): 'Bar'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /Foo.Bar
+    ]
+
+KtNameReferenceExpression(200,203): 'Baz'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Baz'.>
+
+KtBlockExpression(207,207): ''
+  null

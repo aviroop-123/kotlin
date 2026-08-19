@@ -32,8 +32,11 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         isActual: false
+        isCompanion: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isVal: true
         location: LOCAL
         modality: FINAL
@@ -51,11 +54,15 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -117,8 +124,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -143,6 +153,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -175,6 +186,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -208,8 +220,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -234,6 +249,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -261,11 +277,15 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             generatedPrimaryConstructorProperty: null
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -295,4 +315,3 @@ scopes:
     constructors: 0
 
   DefaultStarImportingScope, index = 9
-

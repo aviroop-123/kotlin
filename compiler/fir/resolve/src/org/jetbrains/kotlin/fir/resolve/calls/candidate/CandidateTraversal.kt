@@ -53,6 +53,12 @@ private fun Context.processCandidatesAndPostponedAtoms(atom: ConeResolutionAtom?
         }
 
         is ConeSimpleNameForContextSensitiveResolution -> postponedAtomsProcessor(atom)
+        is ConeContextSensitiveAlternativeForQualifierAtom -> postponedAtomsProcessor(atom)
+
+        is ConeCollectionLiteralAtom -> {
+            postponedAtomsProcessor(atom)
+            processCandidatesAndPostponedAtoms(atom.subAtom)
+        }
 
         // candidates
         is ConeAtomWithCandidate -> {
@@ -68,5 +74,23 @@ private fun Context.processCandidatesAndPostponedAtoms(atom: ConeResolutionAtom?
 
         is ConeResolutionAtomWithSingleChild -> processCandidatesAndPostponedAtoms(atom.subAtom)
         is ConeResolutionAtomWithPostponedChild -> processCandidatesAndPostponedAtoms(atom.subAtom)
+    }
+}
+
+/**
+ * For `call([subCall([]), [[]]])` processes all collection literals except the one in `subCall`, i.e.,
+ * immediate subtree of collection literals.
+ */
+fun processCollectionLiteralsTree(
+    atom: ConeAtomWithCandidate?,
+    collectionLiteralProcessor: (ConeCollectionLiteralAtom) -> Unit
+) {
+    if (atom == null) return
+
+    for (argumentAtom in atom.candidate.arguments) {
+        if (argumentAtom !is ConeResolutionAtomWithPostponedChild) continue
+        val clAtom = argumentAtom.subAtom as? ConeCollectionLiteralAtom ?: continue
+        collectionLiteralProcessor(clAtom)
+        processCollectionLiteralsTree(clAtom.subAtom, collectionLiteralProcessor)
     }
 }

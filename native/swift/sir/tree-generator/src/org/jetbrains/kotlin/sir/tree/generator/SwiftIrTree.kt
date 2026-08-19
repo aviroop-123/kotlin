@@ -44,7 +44,7 @@ object SwiftIrTree : AbstractSwiftIrTreeBuilder() {
     val module by element {
         customParentInVisitor = rootElement
         parent(mutableDeclarationContainer)
-        parent(named)
+        parent(scopeDefiningElement)
         +listField("imports", importType, isMutableList = true)
     }
 
@@ -90,35 +90,46 @@ object SwiftIrTree : AbstractSwiftIrTreeBuilder() {
         +field("extendedType", typeType)
     }
 
-    val named by sealedElement {
+    val scopeDefiningElement by sealedElement {
+        kDoc = "This interface describes elements (module or declaration) that have a name, define a scope and can appear as part of a Swift FQ name"
+
         +field("name", string)
     }
 
-    val namedDeclaration by sealedElement {
+    val scopeDefiningDeclaration by sealedElement {
+        kDoc = "This interface describes declarations that have a name, define a scope and can appear as part of a Swift FQ name"
+
         customParentInVisitor = declaration
         parent(declaration)
-        parent(named)
+        parent(scopeDefiningElement)
 
         visitorParameterName = "declaration"
     }
 
     val enum: Element by element {
-        customParentInVisitor = namedDeclaration
-        parent(namedDeclaration)
+        customParentInVisitor = scopeDefiningDeclaration
+        parent(scopeDefiningDeclaration)
         parent(declarationContainer)
+        parent(protocolConformingDeclaration)
+    }
 
-        +listField("cases", enumCaseType)
+    val enumCase: Element by element {
+        customParentInVisitor = declaration
+        parent(declaration)
+        parent(bridged)
+
+        +field("name", string)
     }
 
     val struct: Element by element {
-        customParentInVisitor = namedDeclaration
-        parent(namedDeclaration)
+        customParentInVisitor = scopeDefiningDeclaration
+        parent(scopeDefiningDeclaration)
         parent(declarationContainer)
     }
 
     val protocol: Element by element {
-        customParentInVisitor = namedDeclaration
-        parent(namedDeclaration)
+        customParentInVisitor = scopeDefiningDeclaration
+        parent(scopeDefiningDeclaration)
         // FIXME KT-75706: Protocols are only mutable due to the fact that we reorder declarations at some late stage.
         parent(mutableDeclarationContainer)
         parent(classInhertingDeclaration)
@@ -127,8 +138,8 @@ object SwiftIrTree : AbstractSwiftIrTreeBuilder() {
     }
 
     val `class`: Element by element {
-        customParentInVisitor = namedDeclaration
-        parent(namedDeclaration)
+        customParentInVisitor = scopeDefiningDeclaration
+        parent(scopeDefiningDeclaration)
         parent(declarationContainer)
         parent(classInhertingDeclaration)
         parent(protocolConformingDeclaration)
@@ -138,8 +149,8 @@ object SwiftIrTree : AbstractSwiftIrTreeBuilder() {
     }
 
     val `typealias`: Element by element {
-        customParentInVisitor = namedDeclaration
-        parent(namedDeclaration)
+        customParentInVisitor = scopeDefiningDeclaration
+        parent(scopeDefiningDeclaration)
 
         +field("type", typeType)
     }
@@ -151,6 +162,7 @@ object SwiftIrTree : AbstractSwiftIrTreeBuilder() {
         +field("body", functionBodyType, nullable = true, mutable = true)
 
         +field("errorType", typeType)
+        +field("isAsync", boolean)
     }
 
     val init by element {
@@ -172,6 +184,7 @@ object SwiftIrTree : AbstractSwiftIrTreeBuilder() {
         parent(classMemberDeclaration)
 
         +field("name", string)
+        +field("contextParameter", parameterType, nullable = true)
         +field("extensionReceiverParameter", parameterType, nullable = true)
         +listField("parameters", parameterType)
         +field("returnType", typeType)

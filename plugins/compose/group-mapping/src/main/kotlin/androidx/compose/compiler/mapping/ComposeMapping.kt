@@ -23,13 +23,12 @@ class ComposeMapping(
         val functionRoot: Boolean
     )
 
-    fun append(bytecode: ByteArray) {
-        val cls = context(reporter, keyCache) { ClassInfo(bytecode) }
+    fun append(fileName: String, bytecode: ByteArray) {
+        val cls = classInfoFromBytecode(keyCache, reporter, fileName, bytecode) ?: return
         val entries = buildList {
             cls.methods.forEach { method ->
-                method.groups.forEachIndexed { i, group ->
-                    // last closed group is always root
-                    val isRoot = i == method.groups.lastIndex
+                method.groups.forEach { group ->
+                    val isRoot = group.type == GroupType.Root
                     add(Entry(cls, method, group, isRoot))
                 }
             }
@@ -52,7 +51,7 @@ class ComposeMapping(
         if (group.key == null) return
         if (group.line == -1) return
 
-        append("  ")
+        append("    ")
         append("1:1:")
         append(descriptorToProguardString("${cls.classId.fqName}.${method.id.methodName}", method.id.methodDescriptor))
         append(":")

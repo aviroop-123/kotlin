@@ -1,0 +1,24 @@
+#include <Foundation/Foundation.h>
+#include <stdint.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+_Bool Base_g__TypesOfArguments__anyU20override_P____reverse_swift(void * self, void * x);
+
+_Bool Sub_g__TypesOfArguments__anyU20override_P____reverse_swift(void * self, void * x);
+
+_Bool Base_g__TypesOfArguments__anyU20override_P__(void * self, void * x);
+
+_Bool P_f(void * self);
+
+_Bool Sub_g__TypesOfArguments__anyU20override_P__(void * self, void * x);
+
+void * __root___Base_init_allocate();
+
+_Bool __root___Base_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(void * __kt);
+
+void * __root___Sub_init_allocate();
+
+_Bool __root___Sub_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(void * __kt);
+
+NS_ASSUME_NONNULL_END

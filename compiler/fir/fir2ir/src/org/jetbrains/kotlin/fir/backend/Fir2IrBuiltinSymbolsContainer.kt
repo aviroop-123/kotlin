@@ -8,30 +8,33 @@ package org.jetbrains.kotlin.fir.backend
 import org.jetbrains.kotlin.builtins.PrimitiveType
 import org.jetbrains.kotlin.builtins.UnsignedType
 import org.jetbrains.kotlin.fir.backend.utils.ConversionTypeOrigin
-import org.jetbrains.kotlin.fir.backend.utils.defaultTypeWithoutArguments
 import org.jetbrains.kotlin.fir.backend.utils.toIrSymbol
 import org.jetbrains.kotlin.fir.backend.utils.unsubstitutedScope
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
+import org.jetbrains.kotlin.fir.declarations.utils.isExpect
+import org.jetbrains.kotlin.fir.resolve.calls.overloads.ConeEquivalentCallConflictResolver
 import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProvider
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.scopes.getDeclaredConstructors
 import org.jetbrains.kotlin.fir.scopes.getFunctions
 import org.jetbrains.kotlin.fir.scopes.getProperties
+import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.isBoolean
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
-import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImplWithShape
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImplWithShape
 import org.jetbrains.kotlin.ir.symbols.*
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -99,17 +102,17 @@ class Fir2IrBuiltinSymbolsContainer(
     val longClass: IrClassSymbol by lazy { loadClass(StandardClassIds.Long) }
     val longType: IrType get() = longClass.defaultTypeWithoutArguments
 
-    val ubyteClass: IrClassSymbol by lazy { loadClass(StandardClassIds.UByte) }
-    val ubyteType: IrType get() = ubyteClass.defaultTypeWithoutArguments
+    val ubyteClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.UByte) }
+    val ubyteType: IrType by lazy { ubyteClass!!.defaultTypeWithoutArguments }
 
-    val ushortClass: IrClassSymbol by lazy { loadClass(StandardClassIds.UShort) }
-    val ushortType: IrType get() = ushortClass.defaultTypeWithoutArguments
+    val ushortClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.UShort) }
+    val ushortType: IrType by lazy { ushortClass!!.defaultTypeWithoutArguments }
 
-    val uintClass: IrClassSymbol by lazy { loadClass(StandardClassIds.UInt) }
-    val uintType: IrType get() = uintClass.defaultTypeWithoutArguments
+    val uintClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.UInt) }
+    val uintType: IrType by lazy { uintClass!!.defaultTypeWithoutArguments }
 
-    val ulongClass: IrClassSymbol by lazy { loadClass(StandardClassIds.ULong) }
-    val ulongType: IrType get() = ulongClass.defaultTypeWithoutArguments
+    val ulongClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.ULong) }
+    val ulongType: IrType by lazy { ulongClass!!.defaultTypeWithoutArguments }
 
     val floatClass: IrClassSymbol by lazy { loadClass(StandardClassIds.Float) }
     val floatType: IrType get() = floatClass.defaultTypeWithoutArguments
@@ -125,15 +128,15 @@ class Fir2IrBuiltinSymbolsContainer(
     val throwableClass: IrClassSymbol by lazy { loadClass(StandardClassIds.Throwable) }
     val throwableType: IrType get() = throwableClass.defaultTypeWithoutArguments
 
-    val extensionFunctionTypeAnnotationCall: IrConstructorCall? by lazy {
-        generateAnnotationCall(StandardClassIds.Annotations.ExtensionFunctionType)
+    val extensionFunctionTypeAnnotation: IrAnnotation? by lazy {
+        generateAnnotation(StandardClassIds.Annotations.ExtensionFunctionType)
     }
 
-    val noInferAnnotationCall: IrConstructorCall? by lazy {
-        generateAnnotationCall(StandardClassIds.Annotations.NoInfer)
+    val noInferAnnotation: IrAnnotation? by lazy {
+        generateAnnotation(StandardClassIds.Annotations.NoInfer)
     }
 
-    private fun generateAnnotationCall(classId: ClassId): IrConstructorCallImpl? {
+    private fun generateAnnotation(classId: ClassId): IrAnnotationImpl? {
         val firSymbol =
             session.symbolProvider.getClassLikeSymbolByClassId(classId) as? FirRegularClassSymbol
                 ?: return null
@@ -141,7 +144,7 @@ class Fir2IrBuiltinSymbolsContainer(
         val firConstructorSymbol = firSymbol.unsubstitutedScope().getDeclaredConstructors().singleOrNull() ?: return null
         val constructorSymbol = declarationStorage.getIrConstructorSymbol(firConstructorSymbol)
 
-        return IrConstructorCallImplWithShape(
+        return IrAnnotationImplWithShape(
             startOffset = UNDEFINED_OFFSET,
             endOffset = UNDEFINED_OFFSET,
             type = IrSimpleTypeImpl(
@@ -240,7 +243,7 @@ class Fir2IrBuiltinSymbolsContainer(
 
     @OptIn(UnsafeDuringIrConstructionAPI::class)
     val unsignedArraysElementTypes: Map<IrClassSymbol, IrType?> by lazy {
-        unsignedTypesToUnsignedArrays.map { (k, v) -> v to loadClass(k.classId).owner.defaultType }.toMap()
+        unsignedTypesToUnsignedArrays.map { [k, v] -> v to loadClass(k.classId).owner.defaultType }.toMap()
     }
 
     // --------------------------- synthetic symbols ---------------------------
@@ -274,7 +277,7 @@ class Fir2IrBuiltinSymbolsContainer(
         syntheticMap: Map<PrimitiveType, IrSimpleFunctionSymbol>
     ): Map<IrClassifierSymbol, IrSimpleFunctionSymbol> {
         return buildMap {
-            for ((classSymbol, type) in primitiveSymbolToPrimitiveType) {
+            for ([classSymbol, type] in primitiveSymbolToPrimitiveType) {
                 val functionSymbol = syntheticMap[type] ?: continue
                 put(classSymbol, functionSymbol)
             }
@@ -310,24 +313,52 @@ class Fir2IrBuiltinSymbolsContainer(
 
     @Fir2IrBuiltInsInternals
     internal fun findFunctions(callableId: CallableId): List<IrSimpleFunctionSymbol> {
+        @OptIn(ClassIdBasedLocality::class)
         require(!callableId.isLocal)
         val classId = callableId.classId
-        return if (classId == null) {
+        val symbols = if (classId == null) {
             symbolProvider.getTopLevelFunctionSymbols(callableId.packageName, callableId.callableName)
         } else {
             findFirMemberFunctions(classId, callableId.callableName)
-        }.map { findFunction(it) }
+        }
+
+        return symbols
+            .filter { !it.isExpect }
+            .ifEmpty { symbols } // The only found symbols are `expect`. Let's return at least something.
+            .filterEquivalentSymbols()
+            .map { findFunction(it) }
     }
 
     @Fir2IrBuiltInsInternals
     internal fun findProperties(callableId: CallableId): List<IrPropertySymbol> {
+        @OptIn(ClassIdBasedLocality::class)
         require(!callableId.isLocal)
         val classId = callableId.classId
-        return if (classId == null) {
+        val symbols = if (classId == null) {
             symbolProvider.getTopLevelPropertySymbols(callableId.packageName, callableId.callableName)
         } else {
             findFirMemberProperties(classId, callableId.callableName)
-        }.map { findProperty(it) }
+        }
+
+        return symbols
+            .filter { !it.isExpect }
+            .ifEmpty { symbols } // The only found symbols are `expect`. Let's return at least something.
+            .filterEquivalentSymbols()
+            .map { findProperty(it) }
+    }
+
+    private fun <T : FirCallableSymbol<*>> List<T>.filterEquivalentSymbols(): List<T> {
+        fun T.isEquivalentTo(other: T): Boolean {
+            return ConeEquivalentCallConflictResolver.areEquivalentTopLevelCallables(fir, other.fir, session, null)
+        }
+
+        return buildList {
+            for (symbol in this@filterEquivalentSymbols) {
+                if (this.none(symbol::isEquivalentTo)) {
+                    add(symbol)
+                }
+            }
+        }
     }
 
     @Fir2IrBuiltInsInternals

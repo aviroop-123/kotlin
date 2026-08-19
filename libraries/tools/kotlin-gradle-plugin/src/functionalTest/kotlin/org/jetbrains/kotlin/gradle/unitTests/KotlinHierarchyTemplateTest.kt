@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.gradle.plugin.hierarchy.buildHierarchy
 import org.jetbrains.kotlin.gradle.util.buildProjectWithMPP
 import org.jetbrains.kotlin.gradle.util.runLifecycleAwareTest
 import org.jetbrains.kotlin.gradle.util.main
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.*
 
 class KotlinHierarchyTemplateTest {
@@ -192,56 +192,6 @@ class KotlinHierarchyTemplateTest {
             listOf(Node.Group("a"), Node.Group("b"), Node.Group("c"), Node.Group("a")),
             cycleStack
         )
-    }
-
-    @Suppress("DEPRECATION_ERROR")
-    @Test
-    fun `test - filterCompilations`() = project.runLifecycleAwareTest {
-        val template = KotlinHierarchyTemplate {
-            filterCompilations { it.name in setOf("a", "b") }
-            common {
-                group("x") {
-                    withCompilations { true }
-                }
-            }
-        }
-
-        assertEquals(
-            hierarchy {
-                group("common") {
-                    group("x")
-                }
-            },
-            template.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("a"))
-        )
-
-        assertEquals(
-            template.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("a")),
-            template.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("b"))
-        )
-
-        assertNull(
-            template.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("c"))
-        )
-    }
-
-    @Suppress("DEPRECATION_ERROR")
-    @Test
-    fun `test - filterCompilations - include them again`() = project.runLifecycleAwareTest {
-        val template = KotlinHierarchyTemplate {
-            withCompilations { true }
-            filterCompilations { it.name == "a" }
-        }
-
-        assertNotNull(template.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("a")))
-        assertNull(template.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("b")))
-
-        val extended = template.extend {
-            withCompilations { true } // <- adds all compilations back again!
-        }
-
-        assertNull(template.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("b")))
-        assertNotNull(extended.buildHierarchy(kotlin.linuxX64().compilations.maybeCreate("b")))
     }
 }
 

@@ -18,8 +18,8 @@ import org.jetbrains.kotlin.gradle.util.buildProjectWithMPP
 import org.jetbrains.kotlin.gradle.util.kotlin
 import org.jetbrains.kotlin.gradle.utils.getFile
 import org.jetbrains.kotlin.konan.target.HostManager
-import org.junit.Assume
-import org.junit.Before
+import org.junit.jupiter.api.Assumptions
+import org.junit.jupiter.api.BeforeEach
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,9 +28,9 @@ import kotlin.test.assertTrue
 
 class EmbedAndSignTaskTests {
 
-    @Before
+    @BeforeEach
     fun runOnlyOnMacOS() {
-        Assume.assumeTrue(HostManager.hostIsMac)
+        Assumptions.assumeTrue(HostManager.hostIsMac)
     }
 
     @Test
@@ -321,6 +321,7 @@ class EmbedAndSignTaskTests {
             }
         ) {
             kotlin {
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 listOf(iosSimulatorArm64(), iosX64()).forEach {
                     it.binaries.framework {
                         baseName = "Foo"
@@ -334,4 +335,3 @@ class EmbedAndSignTaskTests {
     }
 
 }
-

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,11 +8,8 @@ package org.jetbrains.kotlin.light.classes.symbol.methods
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi.*
 import org.jetbrains.kotlin.analysis.api.KaSession
-import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
-import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolVisibility
+import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
-import org.jetbrains.kotlin.analysis.api.symbols.sourcePsiSafe
 import org.jetbrains.kotlin.asJava.builder.LightMemberOriginForDeclaration
 import org.jetbrains.kotlin.asJava.classes.METHOD_INDEX_BASE
 import org.jetbrains.kotlin.asJava.classes.METHOD_INDEX_FOR_DEFAULT_CTOR
@@ -163,20 +160,34 @@ internal class SymbolLightConstructor private constructor(
             }
         }
 
+        context(_: KaSession)
         private fun shouldGenerateNoArgOverload(
             lightClass: SymbolLightClassBase,
             primaryConstructor: KaConstructorSymbol,
             constructors: Iterable<KaConstructorSymbol>,
         ): Boolean {
             val classOrObject = lightClass.kotlinOrigin ?: return false
-            return primaryConstructor.visibility != KaSymbolVisibility.PRIVATE &&
-                    !classOrObject.hasModifier(INNER_KEYWORD) && !lightClass.isEnum &&
+            val valueParameters = primaryConstructor.valueParameters
+            val defaultValueMask = defaultParameterValueMask(primaryConstructor)
+            return !classOrObject.hasModifier(INNER_KEYWORD) &&
                     !classOrObject.hasModifier(SEALED_KEYWORD) &&
-                    primaryConstructor.valueParameters.isNotEmpty() &&
-                    primaryConstructor.valueParameters.all { it.hasDefaultValue } &&
-                    constructors.none { it.valueParameters.isEmpty() } &&
-                    !primaryConstructor.hasJvmOverloadsAnnotation()
+                    !lightClass.isEnum &&
+                    valueParameters.indices.all { defaultValueMask[it] && !valueParameters[it].hasIntroducedAtAnnotation() } &&
+                    constructors.none { it.isEffectivelyParameterless } &&
+                    primaryConstructor.visibility != KaSymbolVisibility.PRIVATE
         }
+
+        /**
+         * Whether the constructor either has no arguments or has [JvmOverloads] which would result in a method with no arguments.
+         * */
+        context(_: KaSession)
+        private val KaConstructorSymbol.isEffectivelyParameterless: Boolean
+            get() {
+                val valueParameters = valueParameters
+                return valueParameters.isEmpty() ||
+                        hasJvmOverloadsAnnotation() &&
+                        defaultParameterValueMask(this).nextClearBit(0) >= valueParameters.size
+            }
 
         private fun SymbolLightClassBase.defaultConstructor(): KtLightMethod {
             val classOrObject = kotlinOrigin

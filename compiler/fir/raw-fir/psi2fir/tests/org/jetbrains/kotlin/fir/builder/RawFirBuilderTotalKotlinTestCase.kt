@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,12 +7,16 @@ package org.jetbrains.kotlin.fir.builder
 
 import com.intellij.testFramework.TestDataPath
 import org.jetbrains.kotlin.ObsoleteTestInfrastructure
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.diagnostics.FirDiagnosticHolder
-import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.expressions.FirErrorExpression
+import org.jetbrains.kotlin.fir.expressions.FirExpression
+import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
+import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.expressions.impl.FirExpressionStub
 import org.jetbrains.kotlin.fir.isCatchParameter
 import org.jetbrains.kotlin.fir.psi
@@ -27,6 +31,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.parents
 import org.jetbrains.kotlin.test.JUnit3RunnerWithInners
 import org.junit.runner.RunWith
+import org.jetbrains.kotlin.test.util.walkRepositoryKotlinFilesWithoutTestData
 import java.io.File
 import kotlin.system.measureNanoTime
 
@@ -53,15 +58,7 @@ class RawFirBuilderTotalKotlinTestCase : AbstractRawFirBuilderTestCase() {
         var ktDeclarations = 0
         var ktReferences = 0
         println("BASE PATH: $testDataPath")
-        for (file in root.walkTopDown()) {
-            if (file.isDirectory) continue
-            val path = file.path.lowercase()
-            if ("testdata" in path ||
-                "kotlin-native" in path ||
-                "resources" in path ||
-                "api/js" in path.replace('\\', '/')
-            ) continue
-            if (file.extension != "kt") continue
+        testDataPath.walkRepositoryKotlinFilesWithoutTestData { file ->
             try {
                 val ktFile = createKtFile(file.toRelativeString(root))
                 val firFile: FirFile
@@ -171,15 +168,7 @@ class RawFirBuilderTotalKotlinTestCase : AbstractRawFirBuilderTestCase() {
 
     private fun testConsistency(checkConsistency: FirFile.() -> Unit) {
         val root = File(testDataPath)
-        for (file in root.walkTopDown()) {
-            if (file.isDirectory) continue
-            val path = file.path.lowercase()
-            if ("kotlin-native" in path ||
-                "testdata" in path ||
-                "resources" in path ||
-                "api/js" in path.replace('\\', '/')
-            ) continue
-            if (file.extension != "kt") continue
+        testDataPath.walkRepositoryKotlinFilesWithoutTestData { file ->
             val ktFile = createKtFile(file.toRelativeString(root))
             val firFile = ktFile.toFirFile()
             try {
@@ -202,16 +191,11 @@ class RawFirBuilderTotalKotlinTestCase : AbstractRawFirBuilderTestCase() {
     fun testPsiConsistency() {
         val root = File(testDataPath)
         var counter = 0
-        for (file in root.walkTopDown()) {
-            if (file.isDirectory) continue
-            val path = file.path.lowercase()
-            if ("kotlin-native" in path ||
-                "testdata" in path ||
-                "resources" in path ||
-                "api/js" in path.replace('\\', '/')) continue
-            if (file.extension != "kt") continue
+        testDataPath.walkRepositoryKotlinFilesWithoutTestData { file ->
             val ktFile = createKtFile(file.toRelativeString(root))
-            val firFile: FirFile = ktFile.toFirFile()
+            val firFile: FirFile = ktFile.toFirFile(
+                features = mapOf(LanguageFeature.EnableNameBasedDestructuringShortForm to LanguageFeature.State.ENABLED)
+            )
             val psiSetViaFir = mutableSetOf<KtElement>()
             val psiSetDirect = mutableSetOf<KtElement>()
             firFile.accept(object : FirVisitorVoid() {
@@ -292,8 +276,8 @@ class RawFirBuilderTotalKotlinTestCase : AbstractRawFirBuilderTestCase() {
                 it is KtDestructuringDeclarationEntry && it.text == "_" ||
                 it is KtConstructorDelegationCall && it.text == "" ||
                 it is KtIfExpression && it.parent is KtContainerNodeForControlStructureBody && it.parent.parent is KtIfExpression ||
-                it is KtContextReceiverList ||
-                it is KtContextReceiver && it.parent is KtContextReceiverList && it.parent?.parent is KtFunctionType ||
+                it is KtContextParameterList ||
+                it is KtContextReceiver && it.parent is KtContextParameterList && it.parent?.parent is KtFunctionType ||
                 it is KtConstantExpression && it.parent.let { parent ->
             parent is KtPrefixExpression && (parent.operationToken == KtTokens.MINUS || parent.operationToken == KtTokens.PLUS)
         }

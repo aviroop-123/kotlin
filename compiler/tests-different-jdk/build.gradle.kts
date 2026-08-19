@@ -1,7 +1,11 @@
+import org.jetbrains.kotlin.testFederation.SmokeTestConfig
+import org.jetbrains.kotlin.testFederation.TemporaryTestFederationApi
+import org.jetbrains.kotlin.testFederation.smokeTestConfig
+
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 dependencies {
@@ -14,7 +18,7 @@ dependencies {
     testImplementation(kotlinStdlib())
     testImplementation(project(":libraries:tools:abi-comparator"))
 
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.platform.suite)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
@@ -53,15 +57,23 @@ projectTests {
         testTask(
             taskName = "codegenTarget${targetInTestClass}Jvm${jvm}Test",
             jUnitMode = JUnitMode.JUnit5,
+            javaLauncher = jdk,
             maxMetaspaceSizeMb = 1024,
-            skipInLocalBuild = false
+            skipInLocalBuild = false,
+            defineJDKEnvVariables = listOf(jdk, JdkMajorVersion.JDK_11_0)
         ) {
             val testName = "JvmTarget${targetInTestClass}OnJvm${jvm}"
             filter.includeTestsMatching("org.jetbrains.kotlin.codegen.jdk.$testName")
 
-            javaLauncher.set(project.getToolchainLauncherFor(jdk))
+            /* No smoke tests are defined here, yet, and the 'CustomJvmTargetOnJvmBaseTest' is defined to fail if no tests are executed */
+            @OptIn(TemporaryTestFederationApi::class)
+            smokeTestConfig = SmokeTestConfig.Disabled
 
             systemProperty("kotlin.test.default.jvm.target", "${if (target <= 8) "1." else ""}$target")
+            if (jdk.majorVersion >= 17 && kotlinBuildProperties.isTeamcityBuild.get()) {
+                // Reduce parallelism on JDK 17+ to allow test tasks to have more memory to avoid OOM (KTI-2491), likely caused by KT-69758.
+                systemProperty("junit.jupiter.execution.parallel.config.fixed.threshold", 4)
+            }
             body()
             doFirst {
                 logger.warn("Running tests with $target target and ${javaLauncher.get().metadata.installationPath.asFile}")

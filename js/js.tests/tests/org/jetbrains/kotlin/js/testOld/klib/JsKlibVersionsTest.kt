@@ -26,7 +26,7 @@ class JsKlibVersionsTest : AbstractWebKlibVersionsTest() {
         ).joinToString(File.pathSeparator) { it.absolutePath }
 
         val args = arrayOf(
-            K2JSCompilerArguments::irProduceKlibDir.cliArgument,
+            K2JSCompilerArguments::nopack.cliArgument,
             K2JSCompilerArguments::libraries.cliArgument, libraries,
             K2JSCompilerArguments::outputDir.cliArgument, outputFile.absolutePath,
             K2JSCompilerArguments::moduleName.cliArgument, outputFile.nameWithoutExtension,

@@ -1,0 +1,26 @@
+STEP 0:
+    dependencies: second
+    modifications:
+        U : m.0.kt -> m.kt
+        U : b.0.kt -> b.kt
+    added file: m.kt, b.kt
+STEP 1:
+    dependencies: second
+    modifications:
+        U : a.1.kt -> a.kt
+    added file: a.kt
+STEP 2:
+    dependencies: second
+    modifications:
+        U : c.2.kt -> c.kt
+    added file: c.kt
+STEP 3:
+    dependencies: second
+    modifications:
+        D : a.kt
+    removed file: a.kt
+STEP 4:
+    dependencies: second
+    modifications:
+        D : b.kt
+    removed file: b.kt

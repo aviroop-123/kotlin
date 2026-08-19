@@ -53,7 +53,7 @@ object LivenessAnalysis {
 
         fun run(body: IrBody): Map<IrElement, List<IrVariable>> {
             body.accept(this, BitSet() /* No variable is live at the end */)
-            return filteredElementEndsLV.mapValues { (_, liveVariables) ->
+            return filteredElementEndsLV.mapValues { [_, liveVariables] ->
                 buildList { liveVariables.forEachBit { add(variables[it]) } }
             }
         }
@@ -181,9 +181,12 @@ object LivenessAnalysis {
                 currentCatchesLV.or(aCatch.accept(this, data))
             }
             val prevCatchesLV = catchesLV
-            catchesLV = currentCatchesLV
+            // When processing `try` body, catches must be extended with live variables from the current catch blocks
+            catchesLV = catchesLV.copy().also { it.or(currentCatchesLV) }
             val lvAfterTry = data.copy().also { it.or(currentCatchesLV) }
             currentCatchesLV.or(aTry.tryResult.accept(this, lvAfterTry))
+            // Drop current catch blocks from catches, keep the original values. The live variables from current catches
+            // are present in currentCatchesLV.
             catchesLV = prevCatchesLV
             currentCatchesLV
         }

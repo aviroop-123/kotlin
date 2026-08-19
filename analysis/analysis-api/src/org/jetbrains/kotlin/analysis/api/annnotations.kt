@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -69,10 +69,7 @@ public annotation class KaIdeApi
 public annotation class KaExperimentalApi
 
 /**
- * Marks an API intended for Analysis API implementations & platforms. The API is neither stable nor intended for user consumption.
- *
- * Only declarations inside the user-facing part of the Analysis API (`analysis-api` module) require this opt-in annotation. Platform
- * interface services defined in `analysis-api-platform-interface` are not annotated with [KaPlatformInterface].
+ * Marks an API intended for Analysis API implementations and platforms. The API is neither stable nor intended for user consumption.
  */
 @Target(
     AnnotationTarget.CLASS,
@@ -81,7 +78,7 @@ public annotation class KaExperimentalApi
     AnnotationTarget.FUNCTION,
     AnnotationTarget.TYPEALIAS,
 )
-@RequiresOptIn("An API intended for Analysis API implementations & platforms. The API is neither stable nor intended for user consumption.")
+@RequiresOptIn("An API intended for Analysis API implementations and platforms. The API is neither stable nor intended for user consumption.")
 public annotation class KaPlatformInterface
 
 /**
@@ -99,6 +96,7 @@ public annotation class KaContextParameterApi
  * Marks an API as only available in the K2 implementation of the Analysis API.
  * In the K1 implementation, the behavior is undefined.
  */
+@Deprecated("The annotation is obsolete since K1 doesn't provide any implementations anymore")
 @Target(
     AnnotationTarget.CLASS,
     AnnotationTarget.PROPERTY,
@@ -107,3 +105,48 @@ public annotation class KaContextParameterApi
     AnnotationTarget.TYPEALIAS,
 )
 public annotation class KaK1Unsupported
+
+/**
+ * Marks an API not supposed to provide a context parameter bridge.
+ *
+ * @see KaContextParameterApi
+ */
+@Target(
+    AnnotationTarget.PROPERTY,
+    AnnotationTarget.FUNCTION,
+)
+internal annotation class KaNoContextParameterBridgeRequired
+
+/**
+ * Marks a context parameter bridge that wasn't auto-generated.
+ *
+ * @see KaContextParameterApi
+ */
+@Target(
+    AnnotationTarget.PROPERTY,
+    AnnotationTarget.FUNCTION,
+)
+@OptIn(KaContextParameterApi::class)
+internal annotation class KaCustomContextParameterBridge
+
+/**
+ * Marks a class designed as a service provider interface.
+ *
+ * Apply this to classes that are intended to be subclassed or implemented by external clients.
+ *
+ * The class members that are intended to be implemented by clients and are not directly accessible should be marked with [KaSpiExtensionPoint].
+ *
+ * @see KaSpiExtensionPoint
+ */
+@Target(AnnotationTarget.CLASS)
+internal annotation class KaSpi
+
+/**
+ * Marks an API as a service provider interface extension point. Such APIs are designed to be implemented, not called directly. There are no
+ * compatibility guarantees for usage of these APIs, only for their implementation.
+ *
+ * @see KaSpi
+ */
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
+@RequiresOptIn("An API designed for implementation only. Direct usage has no compatibility guarantees.")
+public annotation class KaSpiExtensionPoint

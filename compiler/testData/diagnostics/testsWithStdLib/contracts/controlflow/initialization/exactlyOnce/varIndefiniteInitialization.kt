@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseCallsInPlaceEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -32,7 +31,7 @@ fun branchingIndetermineFlow(a: Any) {
     var x: Int
 
     if (a is String) {
-        repeat(<!DEBUG_INFO_SMARTCAST!>a<!>.length) {
+        repeat(a.length) {
             myRun { x = 42 }
         }
     }

@@ -7,3 +7,4 @@ reportPerfK2
 libraries/stdlib/build/classes/kotlin/js/main
 -Xreport-perf=true
 -Xdetailed-perf=true
+-Xklib-ir-inliner=disabled

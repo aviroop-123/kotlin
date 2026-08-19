@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (NEGATIVE)
@@ -16,7 +15,7 @@
 fun case_1() {
     var x: Int? = 11
     x!!
-    try {x = null;} finally { <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int?"), DEBUG_INFO_SMARTCAST!>x<!> += 10; }
+    try {x = null;} finally { <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int?"), DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int?")!>x<!> <!UNSAFE_OPERATOR_CALL!>+=<!> 10; }
 }
 
 // TESTCASE NUMBER: 2
@@ -28,7 +27,7 @@ fun case_2() {
         } catch (e: Exception) {
             x = null
         }
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Boolean & kotlin.Boolean?"), DEBUG_INFO_SMARTCAST!>x<!>.not()
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing?")!>x<!><!UNSAFE_CALL!>.<!>not()
     }
 }
 
@@ -41,7 +40,7 @@ fun case_3() {
         } catch (e: Exception) {
             x = null
         }
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Boolean & kotlin.Boolean?"), DEBUG_INFO_SMARTCAST!>x<!>.not()
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing?")!>x<!><!UNSAFE_CALL!>.<!>not()
     }
 }
 
@@ -52,5 +51,5 @@ fun case_4() {
     try {
         x = null
     } finally { }
-    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Boolean & kotlin.Boolean?"), DEBUG_INFO_SMARTCAST!>x<!>.not()
+    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing?")!>x<!><!UNSAFE_CALL!>.<!>not()
 }

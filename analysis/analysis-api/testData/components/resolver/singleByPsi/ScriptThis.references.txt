@@ -1,3 +1,0 @@
-KtNameReferenceExpression(16,20): 'this'
-  KtSimpleNameReference:
-    script <script-ScriptThis.kts>

@@ -12,6 +12,8 @@ repositories {
     maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies") {
         content {
             includeGroupByRegex("org\\.jetbrains\\.intellij\\.deps(\\..+)?")
+            includeGroupByRegex("com.intellij.platform.*")
+            includeGroupByRegex("org.jetbrains.jps.*")
         }
     }
 }
@@ -19,7 +21,7 @@ repositories {
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalBuildToolsApi::class)
     compilerVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation
-    jvmToolchain(11)
+    jvmToolchain(17)
 
     compilerOptions {
         allWarningsAsErrors.set(true)
@@ -35,3 +37,13 @@ dependencies {
     implementation(libs.diff.utils)
     compileOnly(libs.shadow.gradlePlugin)
 }
+
+project.configurations.named(org.jetbrains.kotlin.gradle.plugin.PLUGIN_CLASSPATH_CONFIGURATION_NAME + "Main") {
+    resolutionStrategy {
+        eachDependency {
+            if (this.requested.group == "org.jetbrains.kotlin") useVersion(libs.versions.kotlin.`for`.gradle.plugins.compilation.get())
+        }
+    }
+}
+
+kotlin.compilerOptions.moduleName.value(project.name)

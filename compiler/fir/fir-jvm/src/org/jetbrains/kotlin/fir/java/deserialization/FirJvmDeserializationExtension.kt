@@ -6,10 +6,12 @@
 package org.jetbrains.kotlin.fir.java.deserialization
 
 import org.jetbrains.kotlin.builtins.jvm.JvmBuiltInsSignatures
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.builder.FirRegularClassBuilder
 import org.jetbrains.kotlin.fir.deserialization.FirConstDeserializer
 import org.jetbrains.kotlin.fir.deserialization.FirDeserializationExtension
+import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.fir.types.ConeTypeProjection
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
@@ -40,6 +42,7 @@ class FirJvmDeserializationExtension(session: FirSession) : FirDeserializationEx
     }
 
     private fun FirRegularClassBuilder.addSerializableIfNeeded(classId: ClassId) {
+        if (this.status.isExpect) return
         if (!JvmBuiltInsSignatures.isSerializableInJava(classId.asSingleFqName().toUnsafe())) return
         superTypeRefs += buildResolvedTypeRef {
             coneType = ConeClassLikeTypeImpl(
@@ -62,6 +65,16 @@ class FirJvmDeserializationExtension(session: FirSession) : FirDeserializationEx
         // metadata. So we can only treat value classes without those fields in metadata as MFVC starting from version 1.5.1.
         return binaryClass.classHeader.metadataVersion.isAtLeast(1, 5, 1)
     }
+
+    override fun isMaybeFullValueClass(containerSource: DeserializedContainerSource?): Boolean {
+        val binaryClass = (containerSource as? KotlinJvmBinarySourceElement)?.binaryClass ?: return true
+        // Since metadata version 2.4.0 annotations are stored in metadata,
+        // so it is possible to distinguish full value classes from @JvmInline-based by the annotation
+        return binaryClass.classHeader.metadataVersion.isAtLeast(2, 4, 0)
+    }
+
+    override val isLoadingOfAnnotationsOnAnnotationPropertiesEnabled: Boolean
+        get() = session.languageVersionSettings.supportsFeature(LanguageFeature.JvmLoadAnnotationsOnAnnotationProperties)
 
     companion object {
         private val JAVA_IO_SERIALIZABLE = ClassId.topLevel(FqName("java.io.Serializable"))

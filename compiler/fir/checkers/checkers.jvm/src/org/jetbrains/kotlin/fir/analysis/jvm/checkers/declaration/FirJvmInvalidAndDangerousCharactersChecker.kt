@@ -13,12 +13,15 @@ import org.jetbrains.kotlin.fir.analysis.jvm.FirJvmNamesChecker
 import org.jetbrains.kotlin.fir.declarations.*
 
 object FirJvmInvalidAndDangerousCharactersChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirDeclaration) {
         val source = declaration.source
         when (declaration) {
             is FirRegularClass -> FirJvmNamesChecker.checkNameAndReport(declaration.name, source)
-            is FirSimpleFunction -> FirJvmNamesChecker.checkNameAndReport(declaration.name, source)
+            is FirNamedFunction -> FirJvmNamesChecker.checkNameAndReport(declaration.name, source)
             is FirTypeParameter -> FirJvmNamesChecker.checkNameAndReport(declaration.name, source)
             is FirProperty -> FirJvmNamesChecker.checkNameAndReport(declaration.name, source)
             is FirTypeAlias -> FirJvmNamesChecker.checkNameAndReport(declaration.name, source)

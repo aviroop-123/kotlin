@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.mainKts.MainKtsScript
 import org.jetbrains.kotlin.mainKts.SCRIPT_FILE_LOCATION_DEFAULT_VARIABLE_NAME
 import org.jetbrains.kotlin.mainKts.impl.Directories
 import org.jetbrains.kotlin.scripting.compiler.plugin.assertTrue
+import org.jetbrains.kotlin.testFederation.SmokeTest
 import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Ignore
@@ -23,6 +24,9 @@ import kotlin.script.experimental.jvm.baseClassLoader
 import kotlin.script.experimental.jvm.jvm
 import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 import kotlin.script.experimental.jvmhost.createJvmScriptDefinitionFromTemplate
+
+internal const val SCRIPT_BASE_COMPILER_ARGUMENTS_PROPERTY = "kotlin.script.base.compiler.arguments"
+internal val isRunningTestOnK2 = System.getProperty(SCRIPT_BASE_COMPILER_ARGUMENTS_PROPERTY)?.contains("-language-version 1.9") != true
 
 fun evalFile(
     scriptFile: File,
@@ -51,9 +55,11 @@ fun evalFileWithConfigurations(
         }
     )
 
-    return BasicJvmScriptingHost().eval(
-        scriptFile.toScriptSource(), scriptDefinition.compilationConfiguration, scriptDefinition.evaluationConfiguration
-    )
+    val host =
+        if (isRunningTestOnK2) BasicJvmScriptingHost()
+        else BasicJvmScriptingHost.createLegacy()
+
+    return host.eval(scriptFile.toScriptSource(), scriptDefinition.compilationConfiguration, scriptDefinition.evaluationConfiguration)
 }
 
 
@@ -61,6 +67,7 @@ const val TEST_DATA_ROOT = "libraries/tools/kotlin-main-kts-test/testData"
 val OUT_FROM_IMPORT_TEST = listOf("Hi from common", "Hi from middle", "Hi from main", "sharedVar == 5")
 
 
+@SmokeTest
 class MainKtsTest {
 
     @Test

@@ -5,9 +5,9 @@
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
+    id("java-test-fixtures")
     id("generated-sources")
-    id("project-tests-convention")
+    id("require-explicit-types")
 }
 
 dependencies {
@@ -21,21 +21,13 @@ dependencies {
     compileOnly(intellijCore())
     compileOnly(libs.guava)
 
-    testCompileOnly(intellijCore())
-    testRuntimeOnly(intellijCore())
+    testFixturesCompileOnly(intellijCore())
 }
 
 sourceSets {
-    "main" {
-        projectDefault()
-    }
+    "main" { projectDefault() }
     "test" { none() }
-}
-
-projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit4, parallel = true) {
-        workingDir = rootDir
-    }
+    "testFixtures" { projectDefault() }
 }
 
 generatedDiagnosticContainersAndCheckerComponents()

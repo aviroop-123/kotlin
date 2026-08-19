@@ -123,7 +123,7 @@ open class LiveLiteralTransformer(
         getTopLevelClass(ComposeClassIds.NoLiveLiterals)
 
     private fun IrAnnotationContainer.hasNoLiveLiteralsAnnotation(): Boolean = annotations.any {
-        it.symbol.owner == NoLiveLiteralsAnnotation.owner.primaryConstructor
+        it.classSymbol == NoLiveLiteralsAnnotation
     }
 
     private fun <T> enter(key: String, block: () -> T) = keyVisitor.enter(key, block)
@@ -150,7 +150,7 @@ open class LiveLiteralTransformer(
     private fun irLiveLiteralInfoAnnotation(
         key: String,
         offset: Int,
-    ): IrConstructorCall = IrConstructorCallImpl(
+    ): IrAnnotation = IrAnnotationImpl(
         UNDEFINED_OFFSET,
         UNDEFINED_OFFSET,
         liveLiteralInfoAnnotation.defaultType,
@@ -164,7 +164,7 @@ open class LiveLiteralTransformer(
 
     private fun irLiveLiteralFileInfoAnnotation(
         file: String,
-    ): IrConstructorCall = IrConstructorCallImpl(
+    ): IrAnnotation = IrAnnotationImpl(
         UNDEFINED_OFFSET,
         UNDEFINED_OFFSET,
         liveLiteralFileInfoAnnotation.defaultType,
@@ -335,7 +335,7 @@ open class LiveLiteralTransformer(
                 /* Continue visiting expression */
             }
         }
-        val (key, success) = keyVisitor.buildPath(
+        val [key, success] = keyVisitor.buildPath(
             prefix = expression.kind.asString,
             pathSeparator = "\$",
             siblingSeparator = "-"

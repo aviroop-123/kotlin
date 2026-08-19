@@ -36,5 +36,10 @@ fun usageOutsideClass() {
     }
 }
 
-// LANGUAGE: +ContextParameters
-// IGNORE_STABILITY_K1: candidates
+fun usageExplicitContextArguments() {
+    with(Base()) {
+        funMember(a = A())
+    }
+}
+
+// LANGUAGE: +ContextParameters +ExplicitContextArguments

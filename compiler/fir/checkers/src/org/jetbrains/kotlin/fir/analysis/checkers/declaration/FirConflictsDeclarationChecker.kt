@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.getDestructuredParameter
+import org.jetbrains.kotlin.fir.declarations.utils.isExpect
 import org.jetbrains.kotlin.fir.packageFqName
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.scopes.impl.FirPackageMemberScope
@@ -57,9 +58,20 @@ interface PlatformConflictDeclarationsDiagnosticDispatcher : FirSessionComponent
 
 val FirSession.conflictDeclarationsDiagnosticDispatcher: PlatformConflictDeclarationsDiagnosticDispatcher? by FirSession.nullableSessionComponentAccessor()
 
-object FirConflictsDeclarationChecker : FirBasicDeclarationChecker(MppCheckerKind.Platform) {
+abstract class FirConflictsDeclarationChecker(kind: MppCheckerKind) : FirBasicDeclarationChecker(kind) {
+    object Regular : FirConflictsDeclarationChecker(MppCheckerKind.Platform)
+    object ForExpectClass : FirConflictsDeclarationChecker(MppCheckerKind.Common)
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirDeclaration) {
+        val isCommon = mppKind == MppCheckerKind.Common
+        val isExpectClass = declaration is FirClass && declaration.isExpect
+        if (isCommon != isExpectClass) return
+        checkImpl(declaration)
+    }
+
+    context(context: CheckerContext, reporter: DiagnosticReporter)
+    private fun checkImpl(declaration: FirDeclaration) {
         when (declaration) {
             is FirFile -> {
                 val inspector = FirDeclarationCollector<FirBasedSymbol<*>>(context)
@@ -103,7 +115,10 @@ object FirConflictsDeclarationChecker : FirBasicDeclarationChecker(MppCheckerKin
             }
 
             if (declaration is FirProperty) {
-                declaration.setter?.takeUnless { it.source?.kind == KtFakeSourceElementKind.DefaultAccessor }?.valueParameters?.let { addAll(it) }
+                declaration.setter
+                    ?.takeUnless { it.source?.kind is KtFakeSourceElementKind.DefaultAccessor }
+                    ?.valueParameters
+                    ?.let { addAll(it) }
             }
         }
     }
@@ -114,7 +129,7 @@ object FirConflictsDeclarationChecker : FirBasicDeclarationChecker(MppCheckerKin
         declarationShadowedViaContextParameters: Map<FirBasedSymbol<*>, SmartSet<FirBasedSymbol<*>>>,
         container: FirDeclaration,
     ) {
-        declarationConflictingSymbols.forEach { (conflictingDeclaration, symbols) ->
+        declarationConflictingSymbols.forEach { [conflictingDeclaration, symbols] ->
             val typeAliasForConstructorSource =
                 (conflictingDeclaration as? FirConstructorSymbol)?.typeAliasConstructorInfo?.typeAliasSymbol?.source
             val origin = conflictingDeclaration.origin
@@ -147,7 +162,7 @@ object FirConflictsDeclarationChecker : FirBasicDeclarationChecker(MppCheckerKin
             }
         }
 
-        declarationShadowedViaContextParameters.forEach { (conflictingDeclaration, symbols) ->
+        declarationShadowedViaContextParameters.forEach { [conflictingDeclaration, symbols] ->
             if (symbols.isNotEmpty()) {
                 reporter.reportOn(conflictingDeclaration.source, FirErrors.CONTEXTUAL_OVERLOAD_SHADOWED, symbols)
             }

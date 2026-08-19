@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi;
@@ -27,6 +16,15 @@ import org.jetbrains.kotlin.psi.stubs.KotlinPlaceHolderStub;
 
 import java.util.List;
 
+/**
+ * Represents a parenthesized list of value arguments in a call.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ * println("Hello", "World")
+ * //     ^________________^
+ * }</pre>
+ */
 public class KtValueArgumentList extends KtElementImplStub<KotlinPlaceHolderStub<KtValueArgumentList>> {
     public KtValueArgumentList(@NotNull ASTNode node) {
         super(node);
@@ -56,28 +54,52 @@ public class KtValueArgumentList extends KtElementImplStub<KotlinPlaceHolderStub
         return findChildByType(KtTokens.LPAR);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.appendValueArgument(this, argument)}
+     * instead.
+     */
     @NotNull
+    @Deprecated
     public KtValueArgument addArgument(@NotNull KtValueArgument argument) {
-        return EditCommaSeparatedListHelper.INSTANCE.addItem(this, getArguments(), argument);
+        return KtPsiMutationService.getInstance().appendValueArgument(this, argument);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.insertValueArgumentAfter(this, argument, anchor)}
+     * instead.
+     */
     @NotNull
+    @Deprecated
     public KtValueArgument addArgumentAfter(@NotNull KtValueArgument argument, @Nullable KtValueArgument anchor) {
-        return EditCommaSeparatedListHelper.INSTANCE.addItemAfter(this, getArguments(), argument, anchor);
+        return KtPsiMutationService.getInstance().insertValueArgumentAfter(this, argument, anchor);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.insertValueArgumentBefore(this, argument, anchor)}
+     * instead.
+     */
     @NotNull
+    @Deprecated
     public KtValueArgument addArgumentBefore(@NotNull KtValueArgument argument, @Nullable KtValueArgument anchor) {
-        return EditCommaSeparatedListHelper.INSTANCE.addItemBefore(this, getArguments(), argument, anchor);
+        return KtPsiMutationService.getInstance().insertValueArgumentBefore(this, argument, anchor);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.deleteValueArgument(this, argument)}
+     * instead.
+     */
+    @Deprecated
     public void removeArgument(@NotNull KtValueArgument argument) {
-        assert argument.getParent() == this;
-        EditCommaSeparatedListHelper.INSTANCE.removeItem(argument);
+        KtPsiMutationService.getInstance().deleteValueArgument(this, argument);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.deleteValueArgument(this, index)}
+     * instead.
+     */
+    @Deprecated
     public void removeArgument(int index) {
-        removeArgument(getArguments().get(index));
+        KtPsiMutationService.getInstance().deleteValueArgument(this, index);
     }
 
     public PsiElement getTrailingComma() {

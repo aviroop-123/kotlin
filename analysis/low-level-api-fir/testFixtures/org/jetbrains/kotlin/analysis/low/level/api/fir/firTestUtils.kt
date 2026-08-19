@@ -44,12 +44,12 @@ internal fun FirBasedSymbol<*>.name(): String = when (this) {
 
 internal fun FirDeclaration.name(): String = symbol.name()
 
-internal inline fun <R> withResolutionFacade(context: KtElement, action: (LLResolutionFacade) -> R): R {
+inline fun <R> withResolutionFacade(context: KtElement, action: (LLResolutionFacade) -> R): R {
     val module = KotlinProjectStructureProvider.getModule(context.project, context, useSiteModule = null)
     return withResolutionFacade(module, action)
 }
 
-internal inline fun <R> withResolutionFacade(module: KaModule, action: (LLResolutionFacade) -> R): R {
+inline fun <R> withResolutionFacade(module: KaModule, action: (LLResolutionFacade) -> R): R {
     val resolutionFacade = LLResolutionFacadeService.getInstance(module.project).getResolutionFacade(module)
     return action(resolutionFacade)
 }
@@ -77,7 +77,7 @@ internal fun TestConfigurationBuilder.useFirSessionConfigurator(configurator: (T
     usePreAnalysisHandlers(::ConfiguratorPreAnalysisHandler)
 }
 
-internal inline fun <reified E : FirElement> FirElement.collectAllElementsOfType(): List<E> {
+inline fun <reified E : FirElement> FirElement.collectAllElementsOfType(): List<E> {
     val result = mutableListOf<E>()
     this.accept(object : FirVisitorVoid() {
         override fun visitElement(element: FirElement) {
@@ -109,7 +109,7 @@ internal fun Collection<FirFile>.getDeclarationsToResolve(): List<FirDeclaration
 private val FirDeclaration.canBeResolved: Boolean
     get() = when (this) {
         is FirAnonymousFunction -> false
-        is FirProperty -> !isLocal
+        is FirProperty -> this.symbol is FirRegularPropertySymbol
         is FirValueParameter -> containingDeclarationSymbol.fir.canBeResolved
         is FirPropertyAccessor -> propertySymbol.fir.canBeResolved
         is FirBackingField -> propertySymbol.fir.canBeResolved

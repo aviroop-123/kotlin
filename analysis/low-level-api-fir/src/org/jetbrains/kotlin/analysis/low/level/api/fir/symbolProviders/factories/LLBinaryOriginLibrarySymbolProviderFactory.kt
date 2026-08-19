@@ -7,7 +7,9 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders.factorie
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.psi.search.GlobalSearchScope
+import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KaModulePlatformKind
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaLibraryModule
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.LLFirModuleData
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.moduleData
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
@@ -25,26 +27,22 @@ import org.jetbrains.kotlin.fir.session.KlibBasedSymbolProvider
 import org.jetbrains.kotlin.fir.session.MetadataSymbolProvider
 import org.jetbrains.kotlin.fir.session.NativeForwardDeclarationsSymbolProvider
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
-import org.jetbrains.kotlin.konan.file.File
-import org.jetbrains.kotlin.library.KLIB_FILE_EXTENSION
+import org.jetbrains.kotlin.library.KlibConstants.KLIB_FILE_EXTENSION
 import org.jetbrains.kotlin.library.KotlinLibrary
-import org.jetbrains.kotlin.library.ToolingSingleFileKlibResolveStrategy
+import org.jetbrains.kotlin.library.loader.KlibLoader
 import org.jetbrains.kotlin.library.metadata.impl.KlibResolvedModuleDescriptorsFactoryImpl.Companion.FORWARD_DECLARATIONS_MODULE_NAME
 import org.jetbrains.kotlin.load.kotlin.PackageAndMetadataPartProvider
 import org.jetbrains.kotlin.load.kotlin.PackagePartProvider
 import org.jetbrains.kotlin.load.kotlin.VirtualFileFinderFactory
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
-import org.jetbrains.kotlin.platform.JsPlatform
-import org.jetbrains.kotlin.platform.WasmPlatform
-import org.jetbrains.kotlin.platform.jvm.JvmPlatform
-import org.jetbrains.kotlin.platform.konan.NativePlatform
-import org.jetbrains.kotlin.util.Logger as KLogger
 import org.jetbrains.kotlin.utils.exceptions.rethrowIntellijPlatformExceptionIfNeeded
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.extension
 import kotlin.io.path.isDirectory
+import org.jetbrains.kotlin.util.Logger as KLogger
 
 /**
  * [LLLibrarySymbolProviderFactory] for [KotlinDeserializedDeclarationsOrigin.BINARIES][org.jetbrains.kotlin.analysis.api.platform.KotlinDeserializedDeclarationsOrigin.BINARIES].
@@ -68,7 +66,7 @@ internal object LLBinaryOriginLibrarySymbolProviderFactory : LLLibrarySymbolProv
         )
     }
 
-    override fun createCommonLibrarySymbolProvider(
+    override fun createMetadataLibrarySymbolProvider(
         session: LLFirSession,
         packagePartProvider: PackagePartProvider,
         scope: GlobalSearchScope,
@@ -100,7 +98,7 @@ internal object LLBinaryOriginLibrarySymbolProviderFactory : LLLibrarySymbolProv
     ): List<FirSymbolProvider> {
         val moduleData = session.moduleData
         val moduleDataProvider = SingleModuleDataProvider(moduleData)
-        val forwardDeclarationsModuleData = FirBinaryDependenciesModuleData(FORWARD_DECLARATIONS_MODULE_NAME).apply {
+        val forwardDeclarationsModuleData = LLNativeForwardDeclarationsModuleData(moduleData.ktModule).apply {
             bindSession(session)
         }
 
@@ -110,6 +108,16 @@ internal object LLBinaryOriginLibrarySymbolProviderFactory : LLLibrarySymbolProv
             KlibBasedSymbolProvider(session, moduleDataProvider, kotlinScopeProvider, kLibs),
             NativeForwardDeclarationsSymbolProvider(session, forwardDeclarationsModuleData, kotlinScopeProvider, kLibs),
         )
+    }
+
+    /**
+     * The module data specifically for [originalModule]'s associated native forward declarations. In particular, this module data is an
+     * [LLFirModuleData]-compliant replacement for the [FirBinaryDependenciesModuleData] used on the compiler side (see
+     * `FirNativeSessionFactory.createAdditionalDependencyProviders`).
+     */
+    private class LLNativeForwardDeclarationsModuleData(originalModule: KaModule) : LLFirModuleData(originalModule) {
+        override val name: Name
+            get() = FORWARD_DECLARATIONS_MODULE_NAME
     }
 
     override fun createJsLibrarySymbolProvider(
@@ -160,8 +168,7 @@ internal object LLBinaryOriginLibrarySymbolProviderFactory : LLLibrarySymbolProv
 
     private fun Path.tryResolveAsKLib(): KotlinLibrary? {
         return try {
-            val konanFile = File(absolutePathString())
-            ToolingSingleFileKlibResolveStrategy.tryResolve(konanFile, IntellijLogBasedLogger)
+            KlibLoader { libraryPaths(absolutePathString()) }.load().librariesStdlibFirst.singleOrNull()
         } catch (e: Exception) {
             rethrowIntellijPlatformExceptionIfNeeded(e)
             LOG.warn("Cannot resolve a KLib $this", e)
@@ -202,13 +209,12 @@ internal object LLBinaryOriginLibrarySymbolProviderFactory : LLLibrarySymbolProv
  * is a specific visible symptom of this, but might not be the only problem. See KT-79930.
  */
 private fun createFallbackBuiltinsSymbolProvider(session: LLFirSession): FirSymbolProvider {
-    val targetPlatform = session.moduleData.platform
-    val isCloneableAvailable = when {
-        targetPlatform.all { it is JvmPlatform } -> true
-        targetPlatform.all { it is NativePlatform } -> false
-        targetPlatform.all { it is JsPlatform } -> false
-        targetPlatform.all { it is WasmPlatform } -> false
-        else -> true // Common
+    val isCloneableAvailable = when (session.platformKind) {
+        KaModulePlatformKind.JVM -> true
+        KaModulePlatformKind.JS -> false
+        KaModulePlatformKind.WASM -> false
+        KaModulePlatformKind.NATIVE -> false
+        KaModulePlatformKind.METADATA -> true
     }
 
     val baseProvider = FirFallbackBuiltinSymbolProvider(session, session.moduleData, session.kotlinScopeProvider)

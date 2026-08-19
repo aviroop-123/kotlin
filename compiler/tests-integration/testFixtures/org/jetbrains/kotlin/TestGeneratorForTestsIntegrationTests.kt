@@ -6,30 +6,14 @@
 package org.jetbrains.kotlin
 
 import org.jetbrains.kotlin.cli.AbstractCliTest
-import org.jetbrains.kotlin.codegen.AbstractIrCustomScriptCodegenTest
-import org.jetbrains.kotlin.generators.impl.generateTestGroupSuite
+import org.jetbrains.kotlin.generators.dsl.junit4.generateTestGroupSuiteWithJUnit4
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil
 import org.jetbrains.kotlin.multiplatform.AbstractMultiPlatformIntegrationTest
-import org.jetbrains.kotlin.repl.AbstractReplInterpreterTest
-import org.jetbrains.kotlin.test.TargetBackend
 
 fun main(args: Array<String>) {
     val mainClassName = TestGeneratorUtil.getMainClassName()
-
-    generateTestGroupSuite(args, mainClassName) {
+    generateTestGroupSuiteWithJUnit4(args, mainClassName) {
         testGroup("compiler/tests-integration/tests-gen", "compiler/testData") {
-            testClass<AbstractMultiPlatformIntegrationTest> {
-                model("multiplatform", extension = null, recursive = true, excludeParentDirs = true)
-            }
-
-            testClass<AbstractIrCustomScriptCodegenTest> {
-                model("codegen/customScript", pattern = "^(.*)$", targetBackend = TargetBackend.JVM_IR)
-            }
-
-            testClass<AbstractReplInterpreterTest> {
-                model("repl", extension = "repl")
-            }
-
             testClass<AbstractCliTest> {
                 model("cli/jvm/readingConfigFromEnvironment", extension = "args", testMethod = "doJvmTest", recursive = false)
                 model("cli/jvm/plugins", extension = "args", testMethod = "doJvmTest", recursive = false)
@@ -53,8 +37,14 @@ fun main(args: Array<String>) {
                 model("cli/jvm/XXmultiPlatformProject", extension = "args", testMethod = "doJvmTest", recursive = false)
                 model("cli/jvm", extension = "args", testMethod = "doJvmTest", recursive = false)
                 model("cli/js", extension = "args", testMethod = "doJsTest", recursive = false)
-                model("cli/wasm", extension = "args", testMethod = "doJsTest", recursive = false)
+                model("cli/wasm", extension = "args", testMethod = "doWasmTest", recursive = false)
                 model("cli/metadata", extension = "args", testMethod = "doMetadataTest", recursive = false)
+            }
+        }
+
+        testGroup("compiler/tests-integration/tests-gen", "compiler/tests-integration/testData") {
+            testClass<AbstractMultiPlatformIntegrationTest> {
+                model("multiplatform", extension = null, recursive = true, excludeParentDirs = true)
             }
         }
     }

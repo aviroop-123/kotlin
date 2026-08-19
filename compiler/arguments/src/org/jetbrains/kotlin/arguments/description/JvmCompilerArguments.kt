@@ -5,21 +5,13 @@
 
 package org.jetbrains.kotlin.arguments.description
 
-import org.jetbrains.kotlin.arguments.dsl.types.JvmTarget
 import org.jetbrains.kotlin.arguments.dsl.base.*
-import org.jetbrains.kotlin.arguments.dsl.base.ReleaseDependent
+import org.jetbrains.kotlin.arguments.dsl.defaultEmpty
 import org.jetbrains.kotlin.arguments.dsl.defaultFalse
 import org.jetbrains.kotlin.arguments.dsl.defaultNull
 import org.jetbrains.kotlin.arguments.dsl.defaultOne
-import org.jetbrains.kotlin.arguments.dsl.types.BooleanType
-import org.jetbrains.kotlin.arguments.dsl.types.IntType
-import org.jetbrains.kotlin.arguments.dsl.types.KotlinJvmTargetType
-import org.jetbrains.kotlin.arguments.dsl.types.StringArrayType
-import org.jetbrains.kotlin.arguments.dsl.types.StringType
-import org.jetbrains.kotlin.cli.common.arguments.DefaultValue
+import org.jetbrains.kotlin.arguments.dsl.types.*
 import org.jetbrains.kotlin.cli.common.arguments.Enables
-import org.jetbrains.kotlin.cli.common.arguments.GradleInputTypes
-import org.jetbrains.kotlin.cli.common.arguments.GradleOption
 import org.jetbrains.kotlin.config.LanguageFeature
 
 val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelNames.jvmCompilerArguments) {
@@ -36,12 +28,15 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "classpath"
         shortName = "cp"
         description = "List of directories and JAR/ZIP archives to search for user class files.".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "<path>".asReleaseDependent()
+        argumentType = SearchPathType.defaultNull
+        delimiter = KotlinCompilerArgument.Delimiter.PathSeparator
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_0,
@@ -61,11 +56,14 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "jdk-home"
-        description = "Include a custom JDK from the specified location in the classpath instead of the default 'JAVA_HOME'.".asReleaseDependent()
+        description =
+            "Include a custom JDK from the specified location in the classpath instead of the default 'JAVA_HOME'.".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "<path>".asReleaseDependent()
+        argumentType = PathType.defaultNull
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_3,
@@ -86,7 +84,8 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
 
     compilerArgument {
         name = "no-stdlib"
-        description = "Don't automatically include the Kotlin/JVM stdlib and Kotlin reflection dependencies in the classpath.".asReleaseDependent()
+        description =
+            "Don't automatically include the Kotlin/JVM stdlib and Kotlin reflection dependencies in the classpath.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
         lifecycle(
@@ -118,11 +117,13 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "script-templates"
         description = "Script definition template classes.".asReleaseDependent()
         valueType = StringArrayType.defaultNull
         valueDescription = "<fully qualified class name[,]>".asReleaseDependent()
+        argumentType = StringListType.defaultEmpty
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_1_0,
@@ -146,11 +147,16 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         name = "jvm-target"
         description = ReleaseDependent(
             current = "The target version of the generated JVM bytecode (${JvmTarget.CURRENT_SUPPORTED_VERSIONS_DESCRIPTION}), " +
-                    "with ${JvmTarget.CURRENT_DEFAULT_VERSION} as the default."
+                    "with ${JvmTarget.CURRENT_DEFAULT_VERSION} as the default.",
+            valueInVersions = mapOf(
+                KotlinReleaseVersion.v1_0_0..KotlinReleaseVersion.v2_2_20 to
+                        "The target version of the generated JVM bytecode (1.8 and 9-24), with 1.8 as the default.",
+                KotlinReleaseVersion.v2_3_0..KotlinReleaseVersion.v2_3_20 to
+                        "The target version of the generated JVM bytecode (1.8 and 9–25), with 1.8 as the default.",
+            )
         )
 
         valueType = KotlinJvmTargetType(
-            isNullable = true.asReleaseDependent(),
             defaultValue = null.asReleaseDependent(),
         )
         valueDescription = "<version>".asReleaseDependent()
@@ -172,6 +178,7 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "jvm-default"
         compilerName = "jvmDefaultStable"
@@ -183,6 +190,7 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
 -jvm-default=disable             Do not generate JVM default methods. This is the default behavior up to language version 2.1.""".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "{enable|no-compatibility|disable}".asReleaseDependent()
+        argumentType = JvmDefaultModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v2_2_0,
@@ -194,7 +202,8 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
 
     compilerArgument {
         name = "Xallow-unstable-dependencies"
-        description = "Do not report errors on classes in dependencies that were compiled by an unstable version of the Kotlin compiler.".asReleaseDependent()
+        description =
+            "Do not report errors on classes in dependencies that were compiled by an unstable version of the Kotlin compiler.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
         lifecycle(
@@ -202,6 +211,7 @@ val actualJvmCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLevelN
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xabi-stability"
         description = """When using unstable compiler features such as FIR, use 'stable' to mark generated class files as stable
@@ -210,6 +220,7 @@ When using the JVM IR backend, conversely, use 'unstable' to mark generated clas
 to force diagnostics to be reported.""".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "{stable|unstable}".asReleaseDependent()
+        argumentType = AbiStabilityModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_4_30,
@@ -234,30 +245,37 @@ to force diagnostics to be reported.""".asReleaseDependent()
 The default value is 1.""".asReleaseDependent()
         valueType = IntType.defaultOne
         valueDescription = "<N>".asReleaseDependent()
+        affectsCompilationOutcome = false
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_6_20,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xmodule-path"
         compilerName = "javaModulePath"
         description = "Paths to Java 9+ modules.".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "<path>".asReleaseDependent()
+        argumentType = SearchPathType.defaultNull
+        delimiter = KotlinCompilerArgument.Delimiter.PathSeparator
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_1_4,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xadd-modules"
         compilerName = "additionalJavaModules"
-        description = "Root modules to resolve in addition to the initial modules, or all modules on the module path if <module> is ALL-MODULE-PATH.".asReleaseDependent()
+        description =
+            "Root modules to resolve in addition to the initial modules, or all modules on the module path if <module> is ALL-MODULE-PATH.".asReleaseDependent()
         valueType = StringArrayType.defaultNull
         valueDescription = "<module[,]>".asReleaseDependent()
+        argumentType = StringListType.defaultEmpty
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_1_4,
@@ -304,6 +322,7 @@ The default value is 1.""".asReleaseDependent()
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xassertions"
         compilerName = "assertionsMode"
@@ -316,6 +335,7 @@ default: legacy""".asReleaseDependent()
         // TODO: change to JVMAssertionsMode type
         valueType = StringType(defaultValue = "legacy".asReleaseDependent())
         valueDescription = "{always-enable|always-disable|jvm|legacy}".asReleaseDependent()
+        argumentType = AssertionsModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_2_60,
@@ -357,7 +377,8 @@ default: legacy""".asReleaseDependent()
 
     compilerArgument {
         name = "Xuse-old-class-files-reading"
-        description = """Use the old implementation for reading class files. This may slow down the compilation and cause problems with Groovy interop.
+        description =
+            """Use the old implementation for reading class files. This may slow down the compilation and cause problems with Groovy interop.
 This can be used in the event of problems with the new implementation.""".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
@@ -368,7 +389,8 @@ This can be used in the event of problems with the new implementation.""".asRele
 
     compilerArgument {
         name = "Xuse-fast-jar-file-system"
-        description = "Use the fast implementation of Jar FS. This may speed up compilation time, but it is experimental.".asReleaseDependent()
+        description =
+            "Use the fast implementation of Jar FS. This may speed up compilation time, but it is experimental.".asReleaseDependent()
         valueType = BooleanType.defaultNull
 
         lifecycle(
@@ -386,11 +408,13 @@ This can be used in the event of problems with the new implementation.""".asRele
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xscript-resolver-environment"
         description = "Set the script resolver environment in key-value pairs (the value can be quoted and escaped).".asReleaseDependent()
         valueType = StringArrayType.defaultNull
         valueDescription = "<key=value[,]>".asReleaseDependent()
+        argumentType = StringListType.defaultEmpty
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_1_2,
@@ -399,42 +423,13 @@ This can be used in the event of problems with the new implementation.""".asRele
 
     // Javac options
 
-    compilerArgument {
-        name = "Xuse-javac"
-        description = "Use javac for Java source and class file analysis.".asReleaseDependent()
-        valueType = BooleanType.defaultFalse
-
-        lifecycle(
-            introducedVersion = KotlinReleaseVersion.v1_1_4,
-        )
-    }
-
-    compilerArgument {
-        name = "Xcompile-java"
-        description = "Reuse 'javac' analysis and compile Java source files.".asReleaseDependent()
-        valueType = BooleanType.defaultFalse
-
-        lifecycle(
-            introducedVersion = KotlinReleaseVersion.v1_1_50,
-        )
-    }
-
-    compilerArgument {
-        name = "Xjavac-arguments"
-        description = "Java compiler arguments.".asReleaseDependent()
-        valueType = StringArrayType.defaultNull
-        valueDescription = "<option[,]>".asReleaseDependent()
-
-        lifecycle(
-            introducedVersion = KotlinReleaseVersion.v1_1_4,
-        )
-    }
-
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xjava-source-roots"
         description = "Paths to directories with Java source files.".asReleaseDependent()
         valueType = StringArrayType.defaultNull
         valueDescription = "<path>".asReleaseDependent()
+        argumentType = PathListType.defaultEmpty
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_3_40,
@@ -451,6 +446,7 @@ This can be used in the event of problems with the new implementation.""".asRele
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xjsr305"
         deprecatedName = "Xjsr305-annotations"
@@ -463,13 +459,16 @@ Modes:
 * strict (experimental; treat like other supported nullability annotations)
 * warn (report a warning)""".asReleaseDependent()
         valueType = StringArrayType.defaultNull
-        valueDescription = "{ignore/strict/warn}|under-migration:{ignore/strict/warn}|@<fq.name>:{ignore/strict/warn}".asReleaseDependent()
+        valueDescription =
+            "{ignore/strict/warn}|under-migration:{ignore/strict/warn}|@<fq.name>:{ignore/strict/warn}".asReleaseDependent()
+        argumentType = StringListType.defaultEmpty
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_1_50,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xnullability-annotations"
         description = """Specify the behavior for specific Java nullability annotations (provided with fully qualified package name).
@@ -479,24 +478,28 @@ Modes:
 * warn (report a warning)""".asReleaseDependent()
         valueType = StringArrayType.defaultNull
         valueDescription = "@<fq.name>:{ignore/strict/warn}".asReleaseDependent()
+        argumentType = StringListType.defaultEmpty
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_5_30,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xsupport-compatqual-checker-framework-annotations"
         description = """Specify the behavior for Checker Framework 'compatqual' annotations ('NullableDecl'/'NonNullDecl').
 The default value is 'enable'.""".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "enable|disable".asReleaseDependent()
+        argumentType = CompatqualAnnotationsModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_2_20,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xjspecify-annotations"
         description = ReleaseDependent(
@@ -510,6 +513,7 @@ The default value is 'enable'.""".asReleaseDependent()
         )
         valueType = StringType.defaultNull
         valueDescription = "ignore|strict|warn".asReleaseDependent()
+        argumentType = JspecifyAnnotationsModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_4_30,
@@ -537,7 +541,8 @@ The default value is 'enable'.""".asReleaseDependent()
 
     compilerArgument {
         name = "Xdefault-script-extension"
-        description = "Compile expressions and unrecognized scripts passed with the -script argument as scripts with the given filename extension.".asReleaseDependent()
+        description =
+            "Compile expressions and unrecognized scripts passed with the -script argument as scripts with the given filename extension.".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "<script filename extension>".asReleaseDependent()
 
@@ -579,11 +584,13 @@ problems with parentheses in identifiers on certain platforms.""".asReleaseDepen
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xfriend-paths"
         description = "Paths to output directories for friend modules (modules whose internals should be visible).".asReleaseDependent()
         valueType = StringArrayType.defaultNull
         valueDescription = "<path>".asReleaseDependent()
+        argumentType = PathListType.defaultEmpty
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_2_70,
@@ -614,13 +621,13 @@ problems with parentheses in identifiers on certain platforms.""".asReleaseDepen
         name = "Xjvm-expose-boxed"
         description = "Expose inline classes and functions, accepting and returning them, to Java.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
-        additionalAnnotations(Enables(LanguageFeature.ImplicitJvmExposeBoxed))
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v2_2_0,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xstring-concat"
         description = """Select the code generation scheme for string concatenation:
@@ -630,25 +637,41 @@ problems with parentheses in identifiers on certain platforms.""".asReleaseDepen
 default: 'indy-with-constants' for JVM targets 9 or greater, 'inline' otherwise.""".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "{indy-with-constants|indy|inline}".asReleaseDependent()
+        argumentType = StringConcatModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_4_20,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xjdk-release"
-        description = """Compile against the specified JDK API version, similarly to javac's '-release'. This requires JDK 9 or newer.
+        description = ReleaseDependent(
+            current = """Compile against the specified JDK API version, similarly to javac's '-release'. This requires JDK 9 or newer.
 The supported versions depend on the JDK used; for JDK 17+, the supported versions are ${JvmTarget.CURRENT_SUPPORTED_VERSIONS_DESCRIPTION}.
-This also sets the value of '-jvm-target' to be equal to the selected JDK version.""".asReleaseDependent()
+This also sets the value of '-jvm-target' to be equal to the selected JDK version.""",
+            valueInVersions = mapOf(
+                KotlinReleaseVersion.v1_0_0..KotlinReleaseVersion.v2_2_20 to
+                        """Compile against the specified JDK API version, similarly to javac's '-release'. This requires JDK 9 or newer.
+The supported versions depend on the JDK used; for JDK 17+, the supported versions are 1.8 and 9-24.
+This also sets the value of '-jvm-target' to be equal to the selected JDK version.""",
+                KotlinReleaseVersion.v2_3_0..KotlinReleaseVersion.v2_3_20 to
+                        """Compile against the specified JDK API version, similarly to javac's '-release'. This requires JDK 9 or newer.
+The supported versions depend on the JDK used; for JDK 17+, the supported versions are 1.8 and 9–25.
+This also sets the value of '-jvm-target' to be equal to the selected JDK version.""",
+            )
+        )
         valueType = StringType.defaultNull
         valueDescription = "<version>".asReleaseDependent()
+        argumentType = JdkReleaseType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_7_0,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xsam-conversions"
         description = """Select the code generation scheme for SAM conversions.
@@ -657,12 +680,14 @@ This also sets the value of '-jvm-target' to be equal to the selected JDK versio
 The default value is 'indy'.""".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "{class|indy}".asReleaseDependent()
+        argumentType = SamConversionsModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_5_0,
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xlambdas"
         description = """Select the code generation scheme for lambdas.
@@ -672,6 +697,7 @@ The default value is 'indy'.""".asReleaseDependent()
 The default value is 'indy' if language version is 2.0+, and 'class' otherwise.""".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "{class|indy}".asReleaseDependent()
+        argumentType = LambdasModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_5_0,
@@ -688,12 +714,15 @@ The default value is 'indy' if language version is 2.0+, and 'class' otherwise."
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xklib"
         compilerName = "klibLibraries"
         description = "Paths to cross-platform libraries in the .klib format.".asReleaseDependent()
         valueType = StringType.defaultNull
         valueDescription = "<path>".asReleaseDependent()
+        argumentType = SearchPathType.defaultNull
+        delimiter = KotlinCompilerArgument.Delimiter.PathSeparator
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_4_0,
@@ -712,7 +741,8 @@ The default value is 'indy' if language version is 2.0+, and 'class' otherwise."
 
     compilerArgument {
         name = "Xno-unified-null-checks"
-        description = "Use pre-1.4 exception types instead of 'java.lang.NPE' in null checks. See KT-22275 for more details.".asReleaseDependent()
+        description =
+            "Use pre-1.4 exception types instead of 'java.lang.NPE' in null checks. See KT-22275 for more details.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
         lifecycle(
@@ -722,7 +752,8 @@ The default value is 'indy' if language version is 2.0+, and 'class' otherwise."
 
     compilerArgument {
         name = "Xno-source-debug-extension"
-        description = "Don't generate the '@kotlin.jvm.internal.SourceDebugExtension' annotation with an SMAP copy on classes.".asReleaseDependent()
+        description =
+            "Don't generate the '@kotlin.jvm.internal.SourceDebugExtension' annotation with an SMAP copy on classes.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
         lifecycle(
@@ -733,12 +764,29 @@ The default value is 'indy' if language version is 2.0+, and 'class' otherwise."
     compilerArgument {
         name = "Xprofile"
         compilerName = "profileCompilerCommand"
-        description = """Debug option: Run the compiler with the async profiler and save snapshots to `outputDir`; `command` is passed to the async profiler on start.
-`profilerPath` is the path to libasyncProfiler.so; async-profiler.jar should be on the compiler classpath.
-If it's not on the classpath, the compiler will attempt to load async-profiler.jar from the containing directory of profilerPath.
-Example: -Xprofile=<PATH_TO_ASYNC_PROFILER>/async-profiler/build/libasyncProfiler.so:event=cpu,interval=1ms,threads,start:<SNAPSHOT_DIR_PATH>""".asReleaseDependent()
+        description =
+            ReleaseDependent(
+                """
+            Debug option: Run the compiler with the async profiler and save snapshots to `outputDir`; `command` is passed to the async profiler on start.
+            `profilerPath` is the path to libasyncProfiler.so; async-profiler.jar should be on the compiler classpath.
+            If it's not on the classpath, the compiler will attempt to load async-profiler.jar from the containing directory of profilerPath. 
+            Individual parameter values are separated by the system path separator.
+            Example (Unix/Linux): -Xprofile=<PATH_TO_ASYNC_PROFILER>/async-profiler/build/libasyncProfiler.so:event=cpu,interval=1ms,threads,start:<SNAPSHOT_DIR_PATH>
+            Example (Windows): -Xprofile=<PATH_TO_ASYNC_PROFILER>\async-profiler\build\libasyncProfiler.so;event=cpu,interval=1ms,threads,start;<SNAPSHOT_DIR_PATH>
+            """.trimIndent(),
+                valueInVersions = mapOf(
+                    KotlinReleaseVersion.v1_0_0..KotlinReleaseVersion.v2_3_20 to
+                            """
+                    Debug option: Run the compiler with the async profiler and save snapshots to `outputDir`; `command` is passed to the async profiler on start.
+                    `profilerPath` is the path to libasyncProfiler.so; async-profiler.jar should be on the compiler classpath.
+                    If it's not on the classpath, the compiler will attempt to load async-profiler.jar from the containing directory of profilerPath.
+                    Example: -Xprofile=<PATH_TO_ASYNC_PROFILER>/async-profiler/build/libasyncProfiler.so:event=cpu,interval=1ms,threads,start:<SNAPSHOT_DIR_PATH>
+                    """.trimIndent()
+                )
+            )
         valueType = StringType.defaultNull
         valueDescription = "<profilerPath:command:outputDir>".asReleaseDependent()
+        affectsCompilationOutcome = false
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_4_20,
@@ -795,20 +843,6 @@ See KT-45671 for more details.""".asReleaseDependent()
     }
 
     compilerArgument {
-        name = "Xserialize-ir"
-        description = "Save the IR to metadata (Experimental).".asReleaseDependent()
-        valueType = StringType(
-            isNullable = false.asReleaseDependent(),
-            defaultValue = "none".asReleaseDependent()
-        )
-        valueDescription = "{none|inline|all}".asReleaseDependent()
-
-        lifecycle(
-            introducedVersion = KotlinReleaseVersion.v1_6_0,
-        )
-    }
-
-    compilerArgument {
         name = "Xvalidate-bytecode"
         description = "Validate generated JVM bytecode before and after optimizations.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
@@ -820,7 +854,8 @@ See KT-45671 for more details.""".asReleaseDependent()
 
     compilerArgument {
         name = "Xenhance-type-parameter-types-to-def-not-null"
-        description = "Enhance not-null-annotated type parameter types to definitely-non-nullable types ('@NotNull T' => 'T & Any').".asReleaseDependent()
+        description =
+            "Enhance not-null-annotated type parameter types to definitely-non-nullable types ('@NotNull T' => 'T & Any').".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
         additionalAnnotations(Enables(LanguageFeature.ProhibitUsingNullableTypeParameterAgainstNotNullAnnotated))
@@ -887,22 +922,10 @@ inside suspend functions and lambdas to distinguish them from user code by debug
         description = "Enable experimental value classes.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
-        additionalAnnotations(Enables(LanguageFeature.ValueClasses))
+        additionalAnnotations(Enables(LanguageFeature.JvmInlineMultiFieldValueClasses))
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_8_20,
-        )
-    }
-
-    compilerArgument {
-        name = "Xir-inliner"
-        compilerName = "enableIrInliner"
-        description = "Inline functions using the IR inliner instead of the bytecode inliner.".asReleaseDependent()
-        valueType = BooleanType.defaultFalse
-
-        lifecycle(
-            introducedVersion = KotlinReleaseVersion.v1_9_0,
-            removedVersion = KotlinReleaseVersion.v2_3_0
         )
     }
 
@@ -913,28 +936,6 @@ inside suspend functions and lambdas to distinguish them from user code by debug
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v2_0_0,
-        )
-    }
-
-    compilerArgument {
-        name = "Xuse-k2-kapt"
-        description = "Enable the experimental support for K2 KAPT.".asReleaseDependent()
-        valueType = BooleanType.defaultNull
-
-        lifecycle(
-            introducedVersion = KotlinReleaseVersion.v2_1_0,
-            removedVersion = KotlinReleaseVersion.v2_3_0,
-        )
-    }
-
-    compilerArgument {
-        name = "Xcompile-builtins-as-part-of-stdlib"
-        compilerName = "expectBuiltinsAsPartOfStdlib"
-        description = "Enable behaviour needed to compile builtins as part of JVM stdlib".asReleaseDependent()
-        valueType = BooleanType.defaultFalse
-
-        lifecycle(
-            introducedVersion = KotlinReleaseVersion.v2_1_20,
         )
     }
 
@@ -950,7 +951,8 @@ inside suspend functions and lambdas to distinguish them from user code by debug
 
     compilerArgument {
         name = "Xannotations-in-metadata"
-        description = "Write annotations on declarations into the metadata (in addition to the JVM bytecode), and read annotations from the metadata if they are present.".asReleaseDependent()
+        description =
+            "Write annotations on declarations into the metadata (in addition to the JVM bytecode), and read annotations from the metadata if they are present.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
 
         additionalAnnotations(Enables(LanguageFeature.AnnotationsInMetadata))
@@ -960,19 +962,58 @@ inside suspend functions and lambdas to distinguish them from user code by debug
         )
     }
 
+    @OptIn(ExperimentalArgumentApi::class)
     compilerArgument {
         name = "Xwhen-expressions"
         compilerName = "whenExpressionsGeneration"
-        description = """Select the code generation scheme for type-checking 'when' expressions:
+        description = ReleaseDependent(
+            current = """Select the code generation scheme for type-checking 'when' expressions:
 -Xwhen-expressions=indy         Generate type-checking 'when' expressions using 'invokedynamic' with 'SwitchBootstraps.typeSwitch(..)' and 
                                 following 'tableswitch' or 'lookupswitch'. This requires '-jvm-target 21' or greater.
 -Xwhen-expressions=inline       Generate type-checking 'when' expressions as a chain of type checks.
-The default value is 'inline'.""".asReleaseDependent()
+The default value is 'indy' if the JVM target version is 21 or greater, and 'inline' otherwise.""",
+            valueInVersions = mapOf(
+                KotlinReleaseVersion.v2_2_20..KotlinReleaseVersion.v2_4_0 to
+                        """Select the code generation scheme for type-checking 'when' expressions:
+-Xwhen-expressions=indy         Generate type-checking 'when' expressions using 'invokedynamic' with 'SwitchBootstraps.typeSwitch(..)' and 
+                                following 'tableswitch' or 'lookupswitch'. This requires '-jvm-target 21' or greater.
+-Xwhen-expressions=inline       Generate type-checking 'when' expressions as a chain of type checks.
+The default value is 'inline'.""",
+            )
+        )
         valueType = StringType.defaultNull
         valueDescription = "{indy|inline}".asReleaseDependent()
+        argumentType = WhenExpressionsModeType()
 
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v2_2_20
+        )
+    }
+
+    @OptIn(ExperimentalArgumentApi::class)
+    compilerArgument {
+        name = "Xignored-annotations-for-bridges"
+        description = "Do not copy these annotations to the bridge methods from their targets.".asReleaseDependent()
+        valueType = StringArrayType.defaultNull
+        valueDescription = "<fq.name>|*".asReleaseDependent()
+        argumentType = StringListType.defaultEmpty
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_20,
+        )
+    }
+
+    @OptIn(ExperimentalArgumentApi::class)
+    compilerArgument {
+        name = "Xcommon-fragments-metadata-destination"
+        description = """
+            Specifies the destination for common fragments metadata.
+            This metadata is used solely for incremental compilation and should not be used directly.
+        """.trimIndent().asReleaseDependent()
+        valueType = PathType.defaultNull
+        argumentType = StringType.defaultNull
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_4_20,
         )
     }
 }

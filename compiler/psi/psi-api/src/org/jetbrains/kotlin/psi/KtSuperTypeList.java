@@ -1,30 +1,14 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi;
 
 import com.intellij.lang.ASTNode;
-import com.intellij.psi.PsiComment;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiWhiteSpace;
-import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtStubBasedElementTypes;
-import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.stubs.KotlinPlaceHolderStub;
 import org.jetbrains.kotlin.psi.stubs.elements.KtTokenSets;
 
@@ -32,6 +16,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Represents the list of super types after the colon in a class header.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ * class Foo : Bar(), Baz
+ * //          ^________^
+ * }</pre>
+ */
 public class KtSuperTypeList extends KtElementImplStub<KotlinPlaceHolderStub<KtSuperTypeList>> {
     private final AtomicLong modificationStamp = new AtomicLong();
 
@@ -48,23 +41,28 @@ public class KtSuperTypeList extends KtElementImplStub<KotlinPlaceHolderStub<KtS
         return visitor.visitSuperTypeList(this, data);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.addSuperType(this, entry)}
+     * instead.
+     */
     @NotNull
+    @Deprecated
     public KtSuperTypeListEntry addEntry(@NotNull KtSuperTypeListEntry entry) {
-        return EditCommaSeparatedListHelper.INSTANCE.addItem(this, getEntries(), entry);
+        return KtPsiMutationService.getInstance().addSuperType(this, entry);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.removeSuperType(this, entry)}
+     * instead.
+     */
+    @Deprecated
     public void removeEntry(@NotNull KtSuperTypeListEntry entry) {
-        EditCommaSeparatedListHelper.INSTANCE.removeItem(entry);
-        if (getEntries().isEmpty()) {
-            delete();
-        }
+        KtPsiMutationService.getInstance().removeSuperType(this, entry);
     }
 
     @Override
     public void delete() throws IncorrectOperationException {
-        PsiElement left = PsiTreeUtil.skipSiblingsBackward(this, PsiWhiteSpace.class, PsiComment.class);
-        if (left == null || left.getNode().getElementType() != KtTokens.COLON) left = this;
-        getParent().deleteChildRange(left, this);
+        KtPsiMutationService.getInstance().deleteSuperTypeList(this);
     }
 
     public List<KtSuperTypeListEntry> getEntries() {

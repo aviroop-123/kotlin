@@ -50,6 +50,7 @@ import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
  */
 @KaImplementationDetail
 class CompilationPeerCollector private constructor(private val actualizer: LLPlatformActualizer?) {
+    @KaImplementationDetail
     companion object {
         fun process(files: Collection<FirFile>, actualizer: LLPlatformActualizer?): CompilationPeerData {
             val collector = CompilationPeerCollector(actualizer)
@@ -151,16 +152,14 @@ private class CompilationPeerCollectingVisitor(
     val actualizer: LLPlatformActualizer?,
 ) : FirDefaultVisitorVoid() {
     private val collectedFunctions = HashSet<FirFunction>()
-    private val collectedFiles = LinkedHashSet<FirFile>()
-    private val collectedInlinedClasses = LinkedHashSet<KtClassOrObject>()
 
     private var isInlineFunctionContext: Boolean = false
 
     val files: Set<FirFile>
-        get() = collectedFiles
+        field = LinkedHashSet<FirFile>()
 
     val inlinedClasses: Set<KtClassOrObject>
-        get() = collectedInlinedClasses
+        field = LinkedHashSet<KtClassOrObject>()
 
     override fun visitElement(element: FirElement) {
         if (element is FirResolvable) {
@@ -187,11 +186,11 @@ private class CompilationPeerCollectingVisitor(
         super.visitConstructor(constructor)
     }
 
-    override fun visitSimpleFunction(simpleFunction: FirSimpleFunction) {
-        simpleFunction.lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
+    override fun visitNamedFunction(namedFunction: FirNamedFunction) {
+        namedFunction.lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
 
-        withInlineFunctionContext(simpleFunction) {
-            super.visitFunction(simpleFunction)
+        withInlineFunctionContext(namedFunction) {
+            super.visitFunction(namedFunction)
         }
     }
 
@@ -211,7 +210,7 @@ private class CompilationPeerCollectingVisitor(
         super.visitClass(klass)
 
         if (isInlineFunctionContext) {
-            collectedInlinedClasses.addIfNotNull(klass.psi as? KtClassOrObject)
+            inlinedClasses.addIfNotNull(klass.psi as? KtClassOrObject)
         }
     }
 
@@ -253,7 +252,7 @@ private class CompilationPeerCollectingVisitor(
                 if (collectedFunctions.add(originalFunction)) {
                     val calleeFile = callee.getContainingFile()
                     if (calleeFile != null && calleeFile.origin == FirDeclarationOrigin.Source) {
-                        collectedFiles.add(calleeFile)
+                        files.add(calleeFile)
                     }
                 }
             }
@@ -286,7 +285,7 @@ private class CompilationPeerCollectingVisitor(
             if (targetModule == actualModule) {
                 val actualResolutionFacade = resolutionFacadeService.getResolutionFacade(actualModule)
                 val actualFile = actualResolutionFacade.getOrBuildFirFile(actualPsiFile)
-                collectedFiles.add(actualFile)
+                files.add(actualFile)
             }
         }
     }

@@ -19,23 +19,24 @@
 package androidx.compose.compiler.plugins.kotlin.lower
 
 import androidx.compose.compiler.plugins.kotlin.*
-import androidx.compose.compiler.plugins.kotlin.analysis.ComposeWritableSlices
 import androidx.compose.compiler.plugins.kotlin.analysis.StabilityInferencer
 import androidx.compose.compiler.plugins.kotlin.inference.*
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.fir.backend.FirMetadataSource
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
-import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImpl
 import org.jetbrains.kotlin.ir.interpreter.getLastOverridden
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeBuilder
 import org.jetbrains.kotlin.ir.types.impl.buildSimpleType
 import org.jetbrains.kotlin.ir.types.impl.toBuilder
 import org.jetbrains.kotlin.ir.util.*
@@ -327,14 +328,14 @@ class ComposableTargetAnnotationsTransformer(
             else -> null
         }
 
-    val List<IrConstructorCall>.target: Item
+    val List<IrAnnotation>.target: Item
         get() =
             firstOrNull { it.isComposableTarget }?.let { constructor ->
                 constructor.firstParameterOrNull<String>()?.let { Token(it) }
             } ?: firstOrNull { it.isComposableOpenTarget }?.let { constructor ->
                 constructor.firstParameterOrNull<Int>()?.let { Open(it) }
             } ?: firstOrNull { it.isComposableTargetMarked }?.let { constructor ->
-                val fqName = constructor.symbol.owner.parentAsClass.fqNameWhenAvailable
+                val fqName = constructor.classSymbol.owner.fqNameWhenAvailable
                 fqName?.let {
                     Token(it.asString())
                 }
@@ -382,7 +383,7 @@ class ComposableTargetAnnotationsTransformer(
     private val IrElement?.isComposableLambda: Boolean
         get() = when (this) {
             is IrFunctionExpression -> function.isComposable
-            is IrCall -> isComposableSingletonGetter() || hasTransformedLambda()
+            is IrCall -> isComposableSingletonGetter() || hasTransformedLambda
             is IrGetField -> symbol.owner.initializer?.findTransformedLambda() != null
             else -> false
         }
@@ -393,21 +394,15 @@ class ComposableTargetAnnotationsTransformer(
             else -> false
         }
 
-    internal fun IrCall.hasTransformedLambda() =
-        context.irTrace[ComposeWritableSlices.HAS_TRANSFORMED_LAMBDA, this] == true
-
     private fun IrElement.findTransformedLambda(): IrFunctionExpression? =
         when (this) {
             is IrCall -> targetArguments.firstNotNullOfOrNull { it?.findTransformedLambda() }
             is IrGetField -> symbol.owner.initializer?.findTransformedLambda()
             is IrBody -> statements.firstNotNullOfOrNull { it.findTransformedLambda() }
             is IrReturn -> value.findTransformedLambda()
-            is IrFunctionExpression -> if (isTransformedLambda()) this else null
+            is IrFunctionExpression -> if (isTransformedLambda) this else null
             else -> null
         }
-
-    private fun IrFunctionExpression.isTransformedLambda() =
-        context.irTrace[ComposeWritableSlices.IS_TRANSFORMED_LAMBDA, this] == true
 
     internal fun IrElement.transformedLambda(): IrFunctionExpression =
         findTransformedLambda() ?: error("Could not find the lambda for ${dump()}")
@@ -418,7 +413,7 @@ class ComposableTargetAnnotationsTransformer(
         symbol.owner.body?.findTransformedLambda()
             ?: error("Could not find the singleton lambda for ${dump()}")
 
-    private fun Item.toAnnotation(): IrConstructorCall? =
+    private fun Item.toAnnotation(): IrAnnotation? =
         if (ComposableTargetClass != null && ComposableOpenTargetClass != null) {
             when (this) {
                 is Token -> annotation(ComposableTargetClass).also {
@@ -433,10 +428,10 @@ class ComposableTargetAnnotationsTransformer(
             }
         } else null
 
-    private fun Item.toAnnotations(): List<IrConstructorCall> =
+    private fun Item.toAnnotations(): List<IrAnnotation> =
         toAnnotation()?.let { listOf(it) } ?: emptyList()
 
-    private fun Scheme.toAnnotations(): List<IrConstructorCall> =
+    private fun Scheme.toAnnotations(): List<IrAnnotation> =
         if (ComposableInferredTargetClass != null) {
             listOf(
                 annotation(ComposableInferredTargetClass).also {
@@ -446,7 +441,7 @@ class ComposableTargetAnnotationsTransformer(
         } else emptyList()
 
     private fun annotation(classSymbol: IrClassSymbol) =
-        IrConstructorCallImpl(
+        IrAnnotationImpl(
             UNDEFINED_OFFSET,
             UNDEFINED_OFFSET,
             classSymbol.defaultType,
@@ -456,18 +451,32 @@ class ComposableTargetAnnotationsTransformer(
             origin = null
         )
 
-    private fun filteredAnnotations(annotations: List<IrConstructorCall>) = annotations
-        .filter {
-            !it.isComposableTarget &&
-                    !it.isComposableOpenTarget &&
-                    !it.isComposableInferredTarget
+    private fun filteredAnnotations(annotations: List<IrAnnotation>): List<IrAnnotation> =
+        annotations.filterNot(::isComposableTargetAnnotation)
+
+    private fun isComposableTargetAnnotation(it: IrAnnotation): Boolean =
+        it.isComposableTarget || it.isComposableOpenTarget || it.isComposableInferredTarget
+
+    fun addAnnotationToType(type: IrSimpleTypeBuilder, target: Item) {
+        type.annotations = filteredAnnotations(type.annotations) + target.toAnnotations()
+    }
+
+    fun addAnnotationToDeclaration(declaration: IrDeclaration, target: Item) {
+        addMetadataVisibleAnnotations(declaration, target.toAnnotations())
+    }
+
+    fun addAnnotationToDeclaration(declaration: IrDeclaration, scheme: Scheme) {
+        addMetadataVisibleAnnotations(declaration, scheme.toAnnotations())
+    }
+
+    private fun addMetadataVisibleAnnotations(declaration: IrDeclaration, annotations: List<IrAnnotation>) {
+        declaration.annotations = filteredAnnotations(declaration.annotations) + annotations
+        if (declaration is IrMetadataSourceOwner && declaration.metadata is FirMetadataSource) {
+            val metadataVisible = context.metadataDeclarationRegistrar.getMetadataVisibleAnnotationsForElement(declaration)
+            metadataVisible.removeIf(::isComposableTargetAnnotation)
+            metadataVisible += annotations
         }
-
-    fun updatedAnnotations(annotations: List<IrConstructorCall>, target: Item) =
-        filteredAnnotations(annotations) + target.toAnnotations()
-
-    fun updatedAnnotations(annotations: List<IrConstructorCall>, scheme: Scheme) =
-        filteredAnnotations(annotations) + scheme.toAnnotations()
+    }
 
     fun inferenceFunctionOf(function: IrFunction) =
         InferenceFunctionDeclaration(this, function)
@@ -558,18 +567,6 @@ sealed class InferenceFunction(
      * unconstrained or insufficiently constrained type parameters.
      */
     open fun isOverlyWide(): Boolean = false
-
-    /**
-     * Helper routine to produce an updated annotations list.
-     */
-    fun updatedAnnotations(annotations: List<IrConstructorCall>, target: Item) =
-        transformer.updatedAnnotations(annotations, target)
-
-    /**
-     * Helper routine to produce an updated annotations list.
-     */
-    fun updatedAnnotations(annotations: List<IrConstructorCall>, scheme: Scheme) =
-        transformer.updatedAnnotations(annotations, scheme)
 }
 
 /**
@@ -598,9 +595,9 @@ class InferenceFunctionDeclaration(
 
     override fun updateScheme(scheme: Scheme) {
         if (scheme.shouldSerialize) {
-            function.annotations = updatedAnnotations(function.annotations, scheme)
+            transformer.addAnnotationToDeclaration(function, scheme)
         } else {
-            function.annotations = updatedAnnotations(function.annotations, scheme.target)
+            transformer.addAnnotationToDeclaration(function, scheme.target)
             parameters().zip(scheme.parameters) { parameter, parameterScheme ->
                 parameter.updateScheme(parameterScheme)
             }
@@ -749,7 +746,7 @@ class InferenceFunctionParameter(
         val type = parameter.type
         if (type is IrSimpleType) {
             val newType = type.toBuilder().apply {
-                annotations = updatedAnnotations(annotations, scheme.target)
+                transformer.addAnnotationToType(this, scheme.target)
             }.buildSimpleType()
             parameter.type = newType
         }
@@ -833,7 +830,7 @@ class InferenceCallTargetNode(
                     element.isComposableSingletonGetter() ->
                         // If this was a lambda transformed into a singleton, find the singleton function
                         element.singletonFunctionExpression().function
-                    element.hasTransformedLambda() ->
+                    element.hasTransformedLambda ->
                         // If this is a normal lambda, find the lambda's IrFunction
                         element.transformedLambda().function
                     else -> element.symbol.owner
@@ -912,7 +909,7 @@ class InferenceCallExpression(
     override val element: IrCall,
 ) : InferenceNode() {
     private val isSingletonLambda = with(transformer) { element.isComposableSingletonGetter() }
-    private val isTransformedLambda = with(transformer) { element.hasTransformedLambda() }
+    private val isTransformedLambda = with(transformer) { element.hasTransformedLambda }
     override val kind: NodeKind
         get() =
             if (isSingletonLambda || isTransformedLambda) NodeKind.Lambda else NodeKind.Expression
@@ -984,32 +981,20 @@ class InferenceResolvedParameter(
     override fun hashCode(): Int = element.hashCode() * 31 + 103
 }
 
-private inline fun <reified T> IrConstructorCall.firstParameterOrNull() =
+private inline fun <reified T> IrAnnotation.firstParameterOrNull() =
     (arguments.firstOrNull() as? IrConst)?.value as? T
 
-private val IrConstructorCall.isComposableTarget
-    get() =
-        annotationClass?.isClassWithFqName(
-            ComposeFqNames.ComposableTarget.toUnsafe()
-        ) == true
+private val IrAnnotation.isComposableTarget
+    get() = classId == ComposeClassIds.ComposableTarget
 
-private val IrConstructorCall.isComposableTargetMarked: Boolean
-    get() =
-        annotationClass?.owner?.annotations?.hasAnnotation(
-            ComposeFqNames.ComposableTargetMarker
-        ) == true
+private val IrAnnotation.isComposableTargetMarked: Boolean
+    get() = annotationClass?.owner?.annotations?.hasAnnotation(ComposeFqNames.ComposableTargetMarker) == true
 
-private val IrConstructorCall.isComposableInferredTarget
-    get() =
-        annotationClass?.isClassWithFqName(
-            ComposeFqNames.ComposableInferredTarget.toUnsafe()
-        ) == true
+private val IrAnnotation.isComposableInferredTarget
+    get() = classId == ComposeClassIds.ComposableInferredTarget
 
-private val IrConstructorCall.isComposableOpenTarget
-    get() =
-        annotationClass?.isClassWithFqName(
-            ComposeFqNames.ComposableOpenTarget.toUnsafe()
-        ) == true
+private val IrAnnotation.isComposableOpenTarget
+    get() = classId == ComposeClassIds.ComposableOpenTarget
 
 private fun IrType.samOwnerOrNull() =
     classOrNull?.let { cls ->

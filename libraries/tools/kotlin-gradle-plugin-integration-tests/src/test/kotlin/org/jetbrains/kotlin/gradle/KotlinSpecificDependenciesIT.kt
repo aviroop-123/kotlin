@@ -81,7 +81,7 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
             gradleVersion,
         ) {
             buildGradleKts.modify { it.lines().filter { "html" !in it }.joinToString("\n") }
-            kotlinSourcesDir().resolve("Main.kt").modify { "fun f() = listOf(1, 2, 3).joinToString()" }
+            kotlinSourcesDir("jsMain").resolve("Main.kt").modify { "fun f() = listOf(1, 2, 3).joinToString()" }
             removeDependencies(buildGradleKts)
 
             checkTaskCompileClasspath(
@@ -102,7 +102,7 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
             gradleVersion,
         ) {
             buildGradleKts.modify { it.lines().filter { "html" !in it }.joinToString("\n") }
-            kotlinSourcesDir().resolve("Main.kt").modify { "fun f() = listOf(1, 2, 3).joinToString()" }
+            kotlinSourcesDir("jsMain").resolve("Main.kt").modify { "fun f() = listOf(1, 2, 3).joinToString()" }
             removeDependencies(buildGradleKts)
 
             gradleProperties.appendText(
@@ -371,6 +371,7 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
     @AndroidGradlePluginTests
     @DisplayName("Android: Kotlin test single dependency in unit tests")
     @GradleAndroidTest
+    @AndroidTestVersions(maxVersion = TestVersions.AGP.AGP_813)
     fun kotlinTestSingleDependencyAndroidUnitTests(
         gradleVersion: GradleVersion,
         agpVersion: String,
@@ -439,7 +440,7 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
             gradleVersion,
         ) {
             assertKotlinTestDependency(
-                listOf("testImplementation"),
+                listOf("jsTestImplementation"),
                 mapOf("compileTestKotlinJs" to listOf("kotlin-test-js")),
                 isBuildGradleKts = true
             )
@@ -457,16 +458,6 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
                     "compileTestKotlinJvm" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}.jar", "kotlin-test-junit"),
                     "compileTestKotlinJs" to listOf("kotlin-test-js")
                 ),
-                mapOf(
-                    "commonTestImplementationDependenciesMetadata" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}-all"),
-
-                    /*
-                    implementation, api and compileOnly scoped metadata configurations are deprecated and report the same dependencies.
-                    The IDE does not rely on which exact configuration returned the dependencies.
-                    */
-                    "commonTestApiDependenciesMetadata" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}-all"),
-                    "commonTestCompileOnlyDependenciesMetadata" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}-all"),
-                ),
                 isBuildGradleKts = true
             )
         }
@@ -483,12 +474,6 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
                     "compileTestKotlinJvm" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}.jar", "kotlin-test-junit"),
                     "compileTestKotlinJs" to listOf("kotlin-test-js")
                 ),
-                mapOf(
-                    "commonTestApiDependenciesMetadata" to listOf("!kotlin-test-${defaultBuildOptions.kotlinVersion}-all"),
-                    "commonTestCompileOnlyDependenciesMetadata" to listOf("!kotlin-test-${defaultBuildOptions.kotlinVersion}-all"),
-                    "jvmAndJsTestApiDependenciesMetadata" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}-all"),
-                    "jvmAndJsTestCompileOnlyDependenciesMetadata" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}-all"),
-                ),
                 isBuildGradleKts = true
             )
         }
@@ -503,9 +488,6 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
                 listOf("commonTestImplementation"),
                 mapOf(
                     "compileTestKotlinJvm" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}.jar", "kotlin-test-junit"),
-                ),
-                mapOf(
-                    "commonTestImplementationDependenciesMetadata" to listOf("kotlin-test-${defaultBuildOptions.kotlinVersion}-all")
                 ),
                 isBuildGradleKts = true
             )
@@ -692,8 +674,8 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
                 "\ndependencies { \"$configuration\"(\"$kotlinTestMultiplatformDependency\") }"
             }
         )
-        classpathElementsExpectedByTask.forEach { (task, expected) ->
-            val (notInClasspath, inClasspath) = expected.partition { it.startsWith("!") }
+        classpathElementsExpectedByTask.forEach { [task, expected] ->
+            val [notInClasspath, inClasspath] = expected.partition { it.startsWith("!") }
             checkTaskCompileClasspath(
                 task,
                 inClasspath,
@@ -701,8 +683,8 @@ class KotlinSpecificDependenciesIT : KGPBaseTest() {
                 isBuildGradleKts = isBuildGradleKts
             )
         }
-        filesExpectedByConfiguration.forEach { (configuration, expected) ->
-            val (notInItems, inItems) = expected.partition { it.startsWith("!") }
+        filesExpectedByConfiguration.forEach { [configuration, expected] ->
+            val [notInItems, inItems] = expected.partition { it.startsWith("!") }
             checkConfigurationContent(
                 configuration,
                 inItems,

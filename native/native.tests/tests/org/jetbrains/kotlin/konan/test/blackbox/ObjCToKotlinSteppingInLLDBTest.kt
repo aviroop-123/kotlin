@@ -13,13 +13,11 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilat
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestExecutable
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunCheck
-import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunCheck.ExecutionTimeout
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.LLDB
-import org.jetbrains.kotlin.konan.test.blackbox.support.settings.PipelineType
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Timeouts
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.ClangDistribution
-import org.jetbrains.kotlin.konan.test.blackbox.support.util.LLDBSessionSpec
+import org.jetbrains.kotlin.konan.test.blackbox.support.util.ReplLLDBSessionSpec
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.compileWithClang
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
@@ -264,7 +262,7 @@ class ObjCToKotlinSteppingInLLDBTest : AbstractNativeSimpleTest() {
 
         // 2. Build Kotlin framework
         val freeCompilerArgs = TestCompilerArgs(
-            testRunSettings.get<PipelineType>().compilerFlags + additionalKotlinCompilerArgs + listOf(
+            additionalKotlinCompilerArgs + listOf(
                 "-Xstatic-framework",
                 "-Xbinary=bundleId=stub",
                 "-module-name", kotlinFrameworkName
@@ -301,7 +299,7 @@ class ObjCToKotlinSteppingInLLDBTest : AbstractNativeSimpleTest() {
             loggedCompilationToolCall = clangResult.loggedData,
             testNames = listOf(TestName(testName)),
         )
-        val spec = LLDBSessionSpec.parse(lldbSpec)
+        val spec = ReplLLDBSessionSpec.parse(lldbSpec)
         val moduleForTestCase = TestModule.Exclusive(testName, emptySet(), emptySet(), emptySet())
         val testCase = TestCase(
             id = TestCaseId.Named(testName),

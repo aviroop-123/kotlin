@@ -1,7 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// LANGUAGE: +Coroutines
-// SKIP_TXT
 
 import kotlin.reflect.KSuspendFunction0
 

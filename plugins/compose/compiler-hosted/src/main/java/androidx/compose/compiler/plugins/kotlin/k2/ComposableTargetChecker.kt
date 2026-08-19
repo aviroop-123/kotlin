@@ -50,6 +50,7 @@ private open class FirElementInferenceNode(element: FirElement) : FirInferenceNo
 }
 
 private class FirCallableElementInferenceNode(val callable: FirCallableSymbol<*>, element: FirElement) : FirElementInferenceNode(element) {
+    override val kind get() = NodeKind.Function
     override val type: InferenceNodeType = InferenceCallableType(callable)
     override fun toString(): String = "${callable.name.toString()}()@${element.source?.startOffset}"
 }
@@ -66,7 +67,7 @@ private class FirLambdaInferenceNode(val lambda: FirAnonymousFunctionExpression)
     override fun toString() = "<lambda:${lambda.source?.startOffset}>"
 }
 
-private class FirSamInferenceNode(val sam: FirSamConversionExpression): FirElementInferenceNode(sam) {
+private class FirSamInferenceNode(val sam: FirFunctionTypeConversionExpression): FirElementInferenceNode(sam) {
     override val kind: NodeKind get() = NodeKind.Lambda
     override val type: InferenceNodeType? =
         (sam.expression as? FirAnonymousFunctionExpression)?.let {
@@ -85,12 +86,27 @@ private class FirParameterReferenceNode(
     override fun toString(): String = "param:$parameterIndex"
 }
 
-private fun callableInferenceNodeOf(expression: FirElement, callable: FirCallableSymbol<*>, context: CheckerContext) =
-    parameterInferenceNodeOrNull(expression, context) ?: (expression as? FirAnonymousFunction)?.let {
+@OptIn(SymbolInternals::class)
+private fun callableInferenceNodeOf(expression: FirElement, callable: FirCallableSymbol<*>, context: CheckerContext): FirInferenceNode {
+    parameterInferenceNodeOrNull(expression, context)?.let {
+        return it
+    }
+
+    (expression as? FirAnonymousFunction)?.let {
         context.session.composableTargetSessionStorage.getLambdaExpression(expression)
     }?.let {
-        inferenceNodeOf(it, context)
-    } ?: FirCallableElementInferenceNode(callable, expression)
+        return inferenceNodeOf(it, context)
+    }
+
+    (expression as? FirFunctionCall)?.let {
+        return FirCallableElementInferenceNode(callable, callable.fir)
+    }
+
+    // A node's `element` property determines which scheme it is associated with. Falling through to
+    // this case means that it is not safe for the returned node to share a scheme with any other
+    // node, so we set its `element` property to `expression`.
+    return FirCallableElementInferenceNode(callable, expression)
+}
 
 @OptIn(SymbolInternals::class)
 private fun parameterInferenceNodeOrNull(expression: FirElement, context: CheckerContext): FirInferenceNode? {
@@ -391,7 +407,7 @@ internal class ComposableTargetSessionStorage(session: FirSession) : FirExtensio
                 lambdaToExpression[element.anonymousFunction] = element
                 FirLambdaInferenceNode(element)
             }
-            is FirSamConversionExpression -> run {
+            is FirFunctionTypeConversionExpression if element.kind is FirFunctionConversionKind.Sam -> run {
                 (element.expression as? FirAnonymousFunctionExpression)?.let {
                     lambdaToExpression[it.anonymousFunction] = element
                 }

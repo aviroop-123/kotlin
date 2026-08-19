@@ -2,7 +2,6 @@ description = "Kotlin Serialization Compiler Plugin (CLI)"
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
@@ -17,6 +16,11 @@ dependencies {
     implementation(project(":kotlinx-serialization-compiler-plugin.k1"))
     implementation(project(":kotlinx-serialization-compiler-plugin.k2"))
     implementation(project(":kotlinx-serialization-compiler-plugin.backend"))
+    implementation(project(":core:descriptors"))
+    implementation(project(":compiler:container"))
+    implementation(project(":compiler:frontend"))
+    implementation(project(":compiler:resolution"))
+    implementation(project(":compiler:serialization"))
 
     compileOnly(intellijCore())
 }
@@ -27,6 +31,8 @@ sourceSets {
     "main" { projectDefault() }
     "test" { none() }
 }
+
+optInToK1Deprecation()
 
 runtimeJar()
 sourcesJar()

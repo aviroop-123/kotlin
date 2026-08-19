@@ -1,6 +1,6 @@
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-63816
-// REASON: unexpected red code in K1 (see corresponding diagnostic test)
+// WASM_IGNORE_FOR: mode=multi-module os=windows
+// ISSUE: KT-84107
 
 fun box(): String {
     testYield()

@@ -72,8 +72,11 @@ class MoveTemporaryVariableDeclarationToAssignment(private val body: JsBlock) {
 
             override fun visit(x: JsVars.JsVar) {
                 if (x.initExpression == null && x.couldBeMovedToAssignment) {
-                    varWithoutInitDeclarations += x.name
+                    x.name?.let { name ->
+                        varWithoutInitDeclarations += name
+                    }
                 }
+
                 super.visit(x)
             }
 
@@ -81,7 +84,9 @@ class MoveTemporaryVariableDeclarationToAssignment(private val body: JsBlock) {
                 if (x.couldBeMovedToAssignment) {
                     for (variable in x) {
                         if (variable.initExpression == null) {
-                            varWithoutInitDeclarations += variable.name
+                            variable.name?.let { name ->
+                                varWithoutInitDeclarations += name
+                            }
                         }
                     }
                 }
@@ -105,7 +110,7 @@ class MoveTemporaryVariableDeclarationToAssignment(private val body: JsBlock) {
             override fun visitExpressionStatement(x: JsExpressionStatement) {
                 val assignment = JsAstUtils.decomposeAssignmentToVariable(x.expression)
                 if (assignment != null) {
-                    val (name, _) = assignment
+                    val [name, _] = assignment
                     if (name in varWithoutInitDeclarations) {
                         varAssignedInBlocks.getOrPut(name) { hashSetOf() } += currentBlock
                     }
@@ -168,8 +173,9 @@ class MoveTemporaryVariableDeclarationToAssignment(private val body: JsBlock) {
             }
 
             override fun endVisit(x: JsVars.JsVar, ctx: JsContext<*>) {
-                if (canRemoveDeclarationWithoutInit(x.name)) {
-                    removedVarDeclarations[x.name] = x
+                val name = x.name
+                if (name != null && canRemoveDeclarationWithoutInit(name)) {
+                    removedVarDeclarations[name] = x
                     ctx.removeMe()
                     hasChanges = true
                 } else {
@@ -189,14 +195,14 @@ class MoveTemporaryVariableDeclarationToAssignment(private val body: JsBlock) {
             override fun endVisit(x: JsExpressionStatement, ctx: JsContext<JsNode>) {
                 val assignment = JsAstUtils.decomposeAssignmentToVariable(x.expression)
                 if (assignment != null) {
-                    val (name, initExpr) = assignment
+                    val [name, initExpr] = assignment
                     val removedVar = removedVarDeclarations.remove(name)
                     if (removedVar != null) {
                         val varDeclarationWithInit = JsVars.JsVar(name, initExpr).apply {
                             synthetic = removedVar.synthetic
                             source = x.expression.source
                         }
-                        val vars = JsVars(varDeclarationWithInit).apply { synthetic = removedVar.synthetic }
+                        val vars = JsVars(JsVars.Variant.Var, varDeclarationWithInit).apply { synthetic = removedVar.synthetic }
                         ctx.replaceMe(vars)
                     }
                     accept(initExpr)

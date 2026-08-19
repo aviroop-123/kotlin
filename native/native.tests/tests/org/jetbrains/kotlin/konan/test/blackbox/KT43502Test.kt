@@ -8,10 +8,10 @@
 package org.jetbrains.kotlin.konan.test.blackbox
 
 import com.intellij.testFramework.TestDataPath
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.konan.test.blackbox.support.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationFactory
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
-import org.jetbrains.kotlin.konan.test.blackbox.support.group.ClassicPipeline
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestExecutable
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunCheck
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
@@ -29,27 +29,13 @@ import java.io.File
 @EnforcedProperty(property = ClassLevelProperty.C_INTERFACE_MODE, propertyValue = "V1")
 @TestMetadata("native/native.tests/testData/kt43502")
 @TestDataPath("\$PROJECT_ROOT")
-@ClassicPipeline()
-class ClassicDynamicKT43502Test : KT43502TestBase()
+class DynamicKT43502Test : KT43502TestBase()
 
 @EnforcedProperty(property = ClassLevelProperty.BINARY_LIBRARY_KIND, propertyValue = "STATIC")
 @EnforcedProperty(property = ClassLevelProperty.C_INTERFACE_MODE, propertyValue = "V1")
 @TestMetadata("native/native.tests/testData/kt43502")
 @TestDataPath("\$PROJECT_ROOT")
-@ClassicPipeline()
-class ClassicStaticKT43502Test : KT43502TestBase()
-
-@EnforcedProperty(property = ClassLevelProperty.BINARY_LIBRARY_KIND, propertyValue = "DYNAMIC")
-@EnforcedProperty(property = ClassLevelProperty.C_INTERFACE_MODE, propertyValue = "V1")
-@TestMetadata("native/native.tests/testData/kt43502")
-@TestDataPath("\$PROJECT_ROOT")
-class FirDynamicKT43502Test : KT43502TestBase()
-
-@EnforcedProperty(property = ClassLevelProperty.BINARY_LIBRARY_KIND, propertyValue = "STATIC")
-@EnforcedProperty(property = ClassLevelProperty.C_INTERFACE_MODE, propertyValue = "V1")
-@TestMetadata("native/native.tests/testData/kt43502")
-@TestDataPath("\$PROJECT_ROOT")
-class FirStaticKT43502Test : KT43502TestBase()
+class StaticKT43502Test : KT43502TestBase()
 
 abstract class KT43502TestBase : AbstractNativeSimpleTest() {
     private val testCompilationFactory = TestCompilationFactory()
@@ -57,7 +43,7 @@ abstract class KT43502TestBase : AbstractNativeSimpleTest() {
     @Test
     fun test() {
         testRunSettings.assumeLibraryKindSupported()
-        val rootDir = File("native/native.tests/testData/kt43502")
+        val rootDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/kt43502")
 
         val libFile = buildDir.resolve("kt43502.a")
         compileWithClangToStaticLibrary(sourceFiles = listOf(rootDir.resolve("kt43502.c")), outputFile = libFile).assertSuccess()

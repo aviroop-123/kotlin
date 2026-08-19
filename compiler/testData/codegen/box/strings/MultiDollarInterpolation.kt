@@ -2,7 +2,6 @@
 
 // WITH_STDLIB
 
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-69062
 
 fun box(): String {

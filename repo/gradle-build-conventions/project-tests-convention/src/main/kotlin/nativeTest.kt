@@ -7,12 +7,15 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileCollection
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.*
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.environment
+import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.newInstance
 import org.gradle.kotlin.dsl.project
 import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -42,6 +45,7 @@ private enum class TestProperty(shortName: String) {
     GC_TYPE("gcType"),
     GC_SCHEDULER("gcScheduler"),
     ALLOCATOR("alloc"),
+    PAGED_ALLOCATOR("pagedAllocator"),
     CACHE_MODE("cacheMode"),
     EXECUTION_TIMEOUT("executionTimeout"),
     SANITIZER("sanitizer"),
@@ -51,6 +55,7 @@ private enum class TestProperty(shortName: String) {
     XCTEST_FRAMEWORK("xctest"),
     TEAMCITY("teamcity"),
     MINIDUMP_ANALYZER("minidumpAnalyzer"),
+    JDK_VERSION("jdkVersion"),
     ;
 
     val fullName = "kotlin.internal.native.test.$shortName"
@@ -65,7 +70,7 @@ private open class NativeArgsProvider @Inject constructor(
     project: Project,
     objects: ObjectFactory,
     providers: ProviderFactory,
-    @Internal val requirePlatformLibs: Boolean = false,
+    requirePlatformLibs: Boolean,
 ) : CommandLineArgumentProvider {
     @get:Input
     @get:Optional
@@ -113,6 +118,10 @@ private open class NativeArgsProvider @Inject constructor(
 
     @get:Input
     @get:Optional
+    protected val pagedAllocator = providers.testProperty(PAGED_ALLOCATOR)
+
+    @get:Input
+    @get:Optional
     protected val cacheMode = providers.testProperty(CACHE_MODE)
 
     @get:Input
@@ -135,11 +144,17 @@ private open class NativeArgsProvider @Inject constructor(
     @get:Optional
     protected val xctestFramework = providers.testProperty(XCTEST_FRAMEWORK)
 
+    private val xcTestEnabled = xctestFramework.map { it == "true" }.orElse(false)
+
+    // XCTest depends on platform libraries, so platform libraries must be available.
     @get:Input
-    protected val teamcity: Boolean = project.kotlinBuildProperties.isTeamcityBuild
+    protected val dependOnPlatformLibs = xcTestEnabled.map { it || requirePlatformLibs }
+
+    @get:Input
+    protected val teamcity: Boolean = project.kotlinBuildProperties.isTeamcityBuild.get()
 
     @get:Internal
-    protected val customNativeHome: Provider<String?> = providers.testProperty(KOTLIN_NATIVE_HOME)
+    protected val customNativeHome: Provider<String> = providers.testProperty(KOTLIN_NATIVE_HOME)
 
     @get:Classpath
     val customCompilerDependencies: ConfigurableFileCollection = objects.fileCollection()
@@ -150,8 +165,7 @@ private open class NativeArgsProvider @Inject constructor(
     @get:Classpath
     val customTestDependencies: ConfigurableFileCollection = objects.fileCollection()
 
-    @get:InputDirectory
-    @get:PathSensitive(PathSensitivity.RELATIVE)
+    @get:Classpath
     @get:Optional
     val customCompilerDist: DirectoryProperty = objects.directoryProperty()
 
@@ -170,22 +184,22 @@ private open class NativeArgsProvider @Inject constructor(
             val nativeHomeBuiltBy: Provider<List<String>> = testTarget.map {
                 listOfNotNull(
                     ":kotlin-native:${it}CrossDist",
-                    if (requirePlatformLibs) ":kotlin-native:${it}PlatformLibs" else null,
+                    if (dependOnPlatformLibs.get()) ":kotlin-native:${it}PlatformLibs" else null,
                 )
             }.orElse(
                 listOfNotNull(
                     ":kotlin-native:dist",
-                    if (requirePlatformLibs) ":kotlin-native:distPlatformLibs" else null,
+                    if (dependOnPlatformLibs.get()) ":kotlin-native:distPlatformLibs" else null,
                 )
             )
 
             val distDir = project.project(":kotlin-native").isolated.projectDirectory.dir("dist")
-            if (!requirePlatformLibs) {
+            if (!dependOnPlatformLibs.get()) {
                 from(distDir.dir("bin/"))
                 from(distDir.dir("konan/"))
                 from(distDir.dir("tools/"))
                 from(distDir.dir("klib/common/"))
-                from(distDir.dir("klib/cache/${testTargetWithDefault.get()}-gSTATIC-system/stdlib-cache/"))
+                from(distDir.dir("klib/cache/${testTargetWithDefault.get()}-gSTATIC-system/stdlib-per-file-cache/"))
             } else {
                 from(distDir)
             }
@@ -209,7 +223,6 @@ private open class NativeArgsProvider @Inject constructor(
 
     @get:Classpath
     val xcTestConfiguration: ConfigurableFileCollection = objects.fileCollection().apply {
-        val xcTestEnabled = xctestFramework.map { it == "true" }.orElse(false)
         val isAppleTarget: Provider<Boolean> =
             testTargetWithDefault.map { KonanTarget.predefinedTargets[it]?.family?.isAppleFamily ?: false }.orElse(false)
         if (xcTestEnabled.get() && isAppleTarget.get()) {
@@ -259,6 +272,7 @@ private open class NativeArgsProvider @Inject constructor(
             binaryOptions.orNull?.let { "-D${BINARY_OPTIONS.fullName}=$it" },
             gcScheduler.orNull?.let { "-D${GC_SCHEDULER.fullName}=$it" },
             allocator.orNull?.let { "-D${ALLOCATOR.fullName}=$it" },
+            pagedAllocator.orNull?.let { "-D${PAGED_ALLOCATOR.fullName}=$it" },
             cacheMode.orNull?.let { "-D${CACHE_MODE.fullName}=$it" },
             executionTimeout.orNull?.let { "-D${EXECUTION_TIMEOUT.fullName}=$it" },
             sanitizer.orNull?.let { "-D${SANITIZER.fullName}=$it" },
@@ -268,6 +282,35 @@ private open class NativeArgsProvider @Inject constructor(
             "-D${CUSTOM_KLIBS.fullName}=${customKlibs.joinToString(File.pathSeparator) { it.absolutePath }}".takeIf { customKlibs.isNotEmpty() },
             if (minidumpAnalyzer.isEmpty) null else "-D${MINIDUMP_ANALYZER.fullName}=${minidumpAnalyzer.singleFile.absolutePath}",
         )
+    }
+}
+
+private abstract class JdkVersionDependentFlagsProvider : CommandLineArgumentProvider {
+    @get:Input
+    abstract val jdkVersion: Property<JdkMajorVersion>
+
+    @get:Input
+    abstract val allowUnsafe: Property<Boolean>
+
+    override fun asArguments() = buildList {
+        val version = jdkVersion.get().majorVersion
+        if (version >= 24) {
+            // Allow JNI native access on JDK 24+ to suppress warnings (https://openjdk.org/jeps/472).
+            // The same flag is needed for restricted FFM API (https://openjdk.org/jeps/454).
+            add("--enable-native-access=ALL-UNNAMED")
+
+            val unsafeMode = when {
+                // The test task still relies on `sun.misc.Unsafe`.
+                // Allow it to suppress warnings (https://openjdk.org/jeps/498).
+                allowUnsafe.get() -> "allow"
+                // `MemorySegmentMemoryAccess` is not used when running on versions earlier than JDK 25.
+                version < 25 -> "allow"
+                // `MemorySegmentMemoryAccess` is used. The task must not use `sun.misc.Unsafe`.
+                // Deny that to make sure it doesn't.
+                else -> "deny"
+            }
+            add("--sun-misc-unsafe-memory-access=$unsafeMode")
+        }
     }
 }
 
@@ -288,7 +331,7 @@ private fun ProviderFactory.testProperty(property: TestProperty) =
 @Suppress("UNCHECKED_CAST")
 fun ProjectTestsExtension.nativeTestTask(
     taskName: String,
-    tag: String?,
+    tag: String? = null,
     requirePlatformLibs: Boolean = false,
     customCompilerDependencies: List<FileCollection> = emptyList(),
     customTestDependencies: List<FileCollection> = emptyList(),
@@ -296,7 +339,9 @@ fun ProjectTestsExtension.nativeTestTask(
     allowParallelExecution: Boolean = true,
     customCompilerDist: TaskProvider<Sync>? = null,
     maxMetaspaceSizeMb: Int = 512,
+    allowUnsafe: Boolean = false,
     defineJDKEnvVariables: List<JdkMajorVersion> = emptyList(),
+    enableGroupingTestEngine: Boolean = false,
     body: Test.() -> Unit = {},
 ): TaskProvider<Test> = testTask(
     taskName = taskName,
@@ -304,6 +349,7 @@ fun ProjectTestsExtension.nativeTestTask(
     maxHeapSizeMb = 3072, // Extra heap space for Kotlin/Native compiler.
     maxMetaspaceSizeMb = maxMetaspaceSizeMb,
     defineJDKEnvVariables = defineJDKEnvVariables,
+    enableGroupingTestEngine = enableGroupingTestEngine,
     skipInLocalBuild = false,
 ) {
     val project = this@nativeTestTask.project
@@ -311,12 +357,33 @@ fun ProjectTestsExtension.nativeTestTask(
 
     group = "verification"
 
-    if (kotlinBuildProperties.isKotlinNativeEnabled) {
-        workingDir = project.rootDir
+    if (kotlinBuildProperties.isKotlinNativeEnabled.get()) {
+        if (!project.plugins.hasPlugin("test-inputs-check")) {
+            workingDir = project.rootDir
+        }
 
         // Use ARM64 JDK on ARM64 Mac as required by the K/N compiler.
         // See https://youtrack.jetbrains.com/issue/KTI-2421#focus=Comments-27-12231298.0-0.
-        javaLauncher.set(project.getToolchainLauncherFor(JdkMajorVersion.JDK_11_0))
+        val defaultJdkVersion = JdkMajorVersion.JDK_11_0
+
+        val nativeTestJdkVersion = project.providers.testProperty(JDK_VERSION)
+            .map { versionString ->
+                val majorVersion = versionString.toIntOrNull()
+                    ?: error("Invalid JDK version '$versionString'. Expected an integer (e.g., 11, 17, 21).")
+                JdkMajorVersion.entries.find { it.majorVersion == majorVersion }
+                    ?: error(
+                        "Unsupported JDK major version: $majorVersion." +
+                                "Supported versions: ${JdkMajorVersion.entries.joinToString { it.majorVersion.toString() }}"
+                    )
+            }
+            .orElse(defaultJdkVersion)
+
+        javaLauncher.set(nativeTestJdkVersion.flatMap { project.getToolchainLauncherFor(it) })
+
+        jvmArgumentProviders.add(project.objects.newInstance<JdkVersionDependentFlagsProvider>().apply {
+            this.jdkVersion.set(nativeTestJdkVersion)
+            this.allowUnsafe.set(allowUnsafe)
+        })
 
         // Using JDK 11 instead of JDK 8 (project default) makes some tests take 15-25% more time.
         // This seems to be caused by the fact that JDK 11 uses G1 GC by default, while JDK 8 uses Parallel GC.
@@ -336,6 +403,10 @@ fun ProjectTestsExtension.nativeTestTask(
         // additional stack frames more compared to the old one because of another launcher, etc. and it turns out this is not enough.
         jvmArgs("-Xss2m")
 
+        // Allow the test to access Kotlin/Native-specific locations.
+        // See `repo/gradle-build-conventions/project-tests-convention/Readme.md` for more details
+        extensions.findByType<TestInputsCheckExtension>()?.isNative?.set(true)
+
         jvmArgumentProviders.add(project.objects.newInstance(NativeArgsProvider::class.java, requirePlatformLibs).apply {
             this.customCompilerDependencies.from(customCompilerDependencies)
             this.compilerPluginDependencies.from(compilerPluginDependencies)
@@ -346,7 +417,7 @@ fun ProjectTestsExtension.nativeTestTask(
         })
 
         val availableCpuCores: Int = if (allowParallelExecution) Runtime.getRuntime().availableProcessors() else 1
-        if (!kotlinBuildProperties.isTeamcityBuild
+        if (!kotlinBuildProperties.isTeamcityBuild.get()
             && minOf(kotlinBuildProperties.junit5NumberOfThreadsForParallelExecution ?: 16, availableCpuCores) > 4
         ) {
             logger.info("$path JIT C2 compiler has been disabled")
@@ -357,7 +428,15 @@ fun ProjectTestsExtension.nativeTestTask(
         environment("GRADLE_TASK_NAME", path)
 
         useJUnitPlatform {
-            tag?.let { includeTags(it) }
+            // Note: arbitrary JUnit tag expressions can be used in this property.
+            // See https://junit.org/junit5/docs/current/user-guide/#running-tests-tag-expressions
+            val globalTags = project.findProperty("kotlin.native.tests.tags")?.toString()
+            val testTags = when {
+                tag == null -> globalTags
+                globalTags == null -> tag
+                else -> "($tag)&($globalTags)"
+            }
+            testTags?.let { includeTags(it) }
         }
 
         if (!allowParallelExecution) {

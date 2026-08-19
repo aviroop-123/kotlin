@@ -307,6 +307,10 @@ object Elements : TemplateGroupBase() {
             """
         }
 
+        specialFor(CharSequences) {
+            sample("samples.text.Strings.elementAt")
+        }
+
         specialFor(CharSequences, Lists, ArraysOfObjects, ArraysOfPrimitives, ArraysOfUnsigned) {
             inlineOnly()
             body { "return get(index)" }
@@ -402,6 +406,13 @@ object Elements : TemplateGroupBase() {
         include(CharSequences, Lists, ArraysOfObjects, ArraysOfPrimitives, ArraysOfUnsigned)
     } builder {
         doc { "Returns ${f.element.prefixWithArticle()} at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this ${f.collection}." }
+        sample(
+            when (family) {
+                CharSequences, Lists -> "samples.collections.Collections.Elements.getOrElse"
+                ArraysOfObjects, ArraysOfPrimitives, ArraysOfUnsigned -> "samples.collections.Arrays.Usage.getOrElse"
+                else -> "samples.collections.Collections.Elements.getOrElse"
+            }
+        )
         returns("T")
         inlineOnly()
         val indices = if (family == Lists) "0..<size" else "indices"

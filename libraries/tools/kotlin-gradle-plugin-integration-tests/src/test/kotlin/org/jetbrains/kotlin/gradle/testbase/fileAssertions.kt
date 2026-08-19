@@ -55,6 +55,13 @@ fun assertFileExists(
     }
 }
 
+fun assertFilesExist(
+    vararg files: Path,
+    message: String? = null,
+) {
+    files.forEach { assertFileExists(it, message) }
+}
+
 /**
  * Asserts file under [pathToFile] relative to the test project exists and is a regular file.
  */
@@ -182,13 +189,13 @@ fun assertDirectoriesExist(
     vararg dirPaths: Path,
     message: String? = null,
 ) {
-    val (exist, notExist) = dirPaths.partition { it.exists() }
+    val [exist, notExist] = dirPaths.partition { it.exists() }
     val notDirectories = exist.filterNot { it.isDirectory() }
 
     assert(notExist.isEmpty() && notDirectories.isEmpty()) {
         message ?: buildString {
             if (notExist.isNotEmpty()) {
-                appendLine("Following directories does not exist:")
+                appendLine("Following directories do not exist:")
                 appendLine(notExist.joinToString(separator = "\n"))
             }
             if (notDirectories.isNotEmpty()) {
@@ -398,7 +405,7 @@ class GradleVariantAssertions(
 
 private fun Map<String, Any?>.toSortedStringWithLines() = entries
     .sortedBy { it.key }
-    .joinToString("\n") { (key, value) -> "'$key' => '$value'" }
+    .joinToString("\n") { [key, value] -> "'$key' => '$value'" }
 
 fun assertGradleVariant(gradleModuleFile: Path, variantName: String, code: GradleVariantAssertions.() -> Unit) {
     val moduleJson = JsonParser.parseString(gradleModuleFile.readText()).asJsonObject

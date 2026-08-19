@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2023 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,13 +7,11 @@ package org.jetbrains.kotlin.test
 
 import com.intellij.openapi.vfs.StandardFileSystems
 import com.intellij.openapi.vfs.VirtualFileManager
-import org.jetbrains.kotlin.cli.common.LegacyK2CliPipeline
 import org.jetbrains.kotlin.cli.common.SessionWithSources
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.prepareJsSessions
-import org.jetbrains.kotlin.cli.common.prepareJvmSessions
+import org.jetbrains.kotlin.cli.common.prepareWasmSessions
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment
-import org.jetbrains.kotlin.cli.jvm.compiler.legacy.pipeline.MinimizedFrontendContext
+import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelinePhase
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.fir.DependencyListForCliModule
 import org.jetbrains.kotlin.fir.FirSession
@@ -24,29 +22,27 @@ import org.jetbrains.kotlin.fir.renderer.FirDeclarationRendererWithFilteredAttri
 import org.jetbrains.kotlin.fir.renderer.FirRenderer
 import org.jetbrains.kotlin.fir.resolve.providers.firProvider
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
-import org.jetbrains.kotlin.ir.backend.js.loadWebKlibsInTestPipeline
-import org.jetbrains.kotlin.js.resolve.JsPlatformAnalyzerServices
+import org.jetbrains.kotlin.ir.backend.js.loadWebKlibs
 import org.jetbrains.kotlin.library.loader.KlibPlatformChecker
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.isJs
+import org.jetbrains.kotlin.platform.isWasm
 import org.jetbrains.kotlin.platform.js.JsPlatforms
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.platform.jvm.isJvm
+import org.jetbrains.kotlin.platform.konan.isNative
+import org.jetbrains.kotlin.platform.wasm.WasmPlatforms
+import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.PlatformDependentAnalyzerServices
-import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatformAnalyzerServices
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.PLATFORM_DEPENDANT_METADATA
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
-import org.jetbrains.kotlin.test.frontend.classic.ClassicFrontendOutputArtifact
 import org.jetbrains.kotlin.test.frontend.fir.FirFrontendFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
-import org.jetbrains.kotlin.test.frontend.fir.getAllJsDependenciesPaths
 import org.jetbrains.kotlin.test.model.*
 import org.jetbrains.kotlin.test.services.*
 import org.jetbrains.kotlin.test.util.trimTrailingWhitespacesAndRemoveRedundantEmptyLinesAtTheEnd
@@ -61,12 +57,10 @@ class JvmLoadedMetadataDumpHandler(testServices: TestServices) : AbstractLoadedM
 ) {
     override val targetPlatform: TargetPlatform
         get() = JvmPlatforms.defaultJvmPlatform
-    override val platformAnalyzerServices: PlatformDependentAnalyzerServices
-        get() = JvmPlatformAnalyzerServices
+
     override val dependencyKind: DependencyKind
         get() = DependencyKind.Binary
 
-    @OptIn(LegacyK2CliPipeline::class)
     override fun prepareSessions(
         module: TestModule,
         configuration: CompilerConfiguration,
@@ -77,35 +71,33 @@ class JvmLoadedMetadataDumpHandler(testServices: TestServices) : AbstractLoadedM
         return prepareJvmSessionsWithoutFiles(configuration, environment, moduleName, libraryList)
     }
 
-    @LegacyK2CliPipeline
     private fun prepareJvmSessionsWithoutFiles(
         configuration: CompilerConfiguration,
         environment: VfsBasedProjectEnvironment,
         moduleName: Name,
         libraryList: DependencyListForCliModule
     ): List<SessionWithSources<KtFile>> {
-        return MinimizedFrontendContext(environment, MessageCollector.NONE, emptyList(), configuration).prepareJvmSessions(
+        return JvmFrontendPipelinePhase.prepareJvmSessions(
             files = emptyList(),
-            moduleName,
-            environment.getSearchScopeForProjectLibraries(),
-            libraryList,
+            rootModuleName = moduleName,
+            configuration = configuration,
+            projectEnvironment = environment,
+            librariesScope = environment.getSearchScopeForProjectLibraries(),
+            libraryList = libraryList,
             isCommonSource = { false },
             isScript = { false },
             fileBelongsToModule = { _, _ -> false },
-            createProviderAndScopeForIncrementalCompilation = { null }
+            incrementalCompilationContext = null,
         )
     }
-
 }
 
-class KlibLoadedMetadataDumpHandler(testServices: TestServices) : AbstractLoadedMetadataDumpHandler<BinaryArtifacts.KLib>(
+class KlibJsLoadedMetadataDumpHandler(testServices: TestServices) : AbstractLoadedMetadataDumpHandler<BinaryArtifacts.KLib>(
     testServices,
     ArtifactKinds.KLib
 ) {
     override val targetPlatform: TargetPlatform
         get() = JsPlatforms.defaultJsPlatform
-    override val platformAnalyzerServices: PlatformDependentAnalyzerServices
-        get() = JsPlatformAnalyzerServices
     override val dependencyKind: DependencyKind
         get() = DependencyKind.Binary
 
@@ -116,13 +108,47 @@ class KlibLoadedMetadataDumpHandler(testServices: TestServices) : AbstractLoaded
         moduleName: Name,
         libraryList: DependencyListForCliModule,
     ): List<SessionWithSources<KtFile>> {
-        val klibs = loadWebKlibsInTestPipeline(
+        val klibs = loadWebKlibs(
             configuration = configuration,
-            libraryPaths = getAllJsDependenciesPaths(module, testServices),
             platformChecker = KlibPlatformChecker.JS,
         )
 
         return prepareJsSessions(
+            files = emptyList(),
+            configuration,
+            moduleName,
+            klibs.all,
+            libraryList,
+            extensionRegistrars = emptyList(),
+            isCommonSource = { false },
+            fileBelongsToModule = { _, _ -> false },
+            icData = null
+        )
+    }
+}
+
+class KlibWasmJsLoadedMetadataDumpHandler(testServices: TestServices) : AbstractLoadedMetadataDumpHandler<BinaryArtifacts.KLib>(
+    testServices,
+    ArtifactKinds.KLib
+) {
+    override val targetPlatform: TargetPlatform
+        get() = WasmPlatforms.wasmJs
+    override val dependencyKind: DependencyKind
+        get() = DependencyKind.Binary
+
+    override fun prepareSessions(
+        module: TestModule,
+        configuration: CompilerConfiguration,
+        environment: VfsBasedProjectEnvironment,
+        moduleName: Name,
+        libraryList: DependencyListForCliModule,
+    ): List<SessionWithSources<KtFile>> {
+        val klibs = loadWebKlibs(
+            configuration = configuration,
+            platformChecker = KlibPlatformChecker.Wasm(WasmTarget.JS.alias),
+        )
+
+        return prepareWasmSessions(
             files = emptyList(),
             configuration,
             moduleName,
@@ -189,7 +215,6 @@ abstract class AbstractLoadedMetadataDumpHandler<A : ResultingArtifact.Binary<A>
     }
 
     protected abstract val targetPlatform: TargetPlatform
-    protected abstract val platformAnalyzerServices: PlatformDependentAnalyzerServices
     protected abstract val dependencyKind: DependencyKind
 
     protected abstract fun prepareSessions(
@@ -207,8 +232,7 @@ abstract class AbstractLoadedMetadataDumpHandler<A : ResultingArtifact.Binary<A>
         val frontendKind = testServices.defaultsProvider.frontendKind
 
         val commonExtension = ".fir.txt"
-        val (specificExtension, otherSpecificExtension) = when (frontendKind) {
-            FrontendKinds.ClassicFrontend -> ".fir.k1.txt" to ".fir.k2.txt"
+        val [specificExtension, otherSpecificExtension] = when (frontendKind) {
             FrontendKinds.FIR -> ".fir.k2.txt" to ".fir.k1.txt"
             else -> shouldNotBeCalled()
         }
@@ -269,6 +293,8 @@ abstract class AbstractLoadedMetadataDumpHandler<A : ResultingArtifact.Binary<A>
         get() = when {
             isJvm() -> ".jvm"
             isJs() -> ".klib"
+            isWasm() -> ".klib"
+            isNative() -> ".klib"
             else -> error("Unsupported platform: $this")
         }
 
@@ -276,6 +302,8 @@ abstract class AbstractLoadedMetadataDumpHandler<A : ResultingArtifact.Binary<A>
         get() = when {
             isJvm() -> ".klib"
             isJs() -> ".jvm"
+            isWasm() -> ".jvm"
+            isNative() -> ".jvm"
             else -> error("Unsupported platform: $this")
         }
 
@@ -335,16 +363,9 @@ abstract class AbstractLoadedMetadataDumpHandler<A : ResultingArtifact.Binary<A>
     }
 
     private fun extractNames(module: TestModule, packageFqName: FqName): Collection<Name> {
-        testServices.artifactsProvider.getArtifactSafe(module, FrontendKinds.ClassicFrontend)
-            ?.let { return extractNames(it, packageFqName) }
         testServices.artifactsProvider.getArtifactSafe(module, FrontendKinds.FIR)
             ?.let { return extractNames(it, packageFqName) }
         error("Frontend artifact for module $module not found")
-    }
-
-    private fun extractNames(artifact: ClassicFrontendOutputArtifact, packageFqName: FqName): Collection<Name> {
-        return DescriptorUtils.getAllDescriptors(artifact.analysisResult.moduleDescriptor.getPackage(packageFqName).memberScope)
-            .mapTo(sortedSetOf()) { it.name }
     }
 
     private fun extractNames(artifact: FirOutputArtifact, packageFqName: FqName): Collection<Name> {

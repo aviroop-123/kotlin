@@ -9,13 +9,6 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <registryKey
-        defaultValue="false"
-        description="Run resolve under a global lock."
-        key="kotlin.parallel.resolve.under.global.lock"
-        restartRequired="true"
-    />
-
-    <registryKey
         defaultValue="100"
         description="A frequency in milliseconds for re-acquiring a phase lock during parallel resolve to perform `checkCanceled()`."
         key="kotlin.analysis.ll.locking.interval"
@@ -42,11 +35,11 @@
         serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.services.LLRealFirElementByPsiElementChooser"
     />
 
-    <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.LLFirBuiltinsSessionFactory"/>
-    <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionCache"/>
-    <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationService"/>
+    <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.factory.LLFirBuiltinsSessionFactory"/>
+    <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCache"/>
+    <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationService"/>
     <projectService
-        serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationEventPublisher"
+        serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationEventPublisher"
     />
     <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirGlobalResolveComponents"/>
     <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.LLResolutionFacadeService"/>
@@ -68,11 +61,11 @@
 
   <projectListeners>
     <listener
-        class="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationService$LLKotlinModificationEventListener"
+        class="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationService$LLKotlinModificationEventListener"
         topic="org.jetbrains.kotlin.analysis.api.platform.modification.KotlinModificationEventListener"
     />
     <listener
-        class="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationService$LLPsiModificationTrackerListener"
+        class="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationService$LLPsiModificationTrackerListener"
         topic="com.intellij.psi.util.PsiModificationTracker$Listener"
     />
     <listener

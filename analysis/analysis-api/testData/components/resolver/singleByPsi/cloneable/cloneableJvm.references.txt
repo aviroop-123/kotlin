@@ -1,3 +1,0 @@
-KtNameReferenceExpression(66,75): 'Cloneable'
-  KtSimpleNameReference:
-    (in kotlin) interface Cloneable

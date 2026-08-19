@@ -39,6 +39,8 @@ object JavaToKotlinClassMap {
     private val mutableToReadOnlyClassId = HashMap<ClassId, ClassId>()
     private val readOnlyToMutableClassId = HashMap<ClassId, ClassId>()
 
+    private val mappedKotlinClassFqNames = mutableSetOf<FqName>()
+
     // describes mapping for a java class that has separate readOnly and mutable equivalents in Kotlin
     data class PlatformMutabilityMapping(
         val javaClass: ClassId,
@@ -98,9 +100,7 @@ object JavaToKotlinClassMap {
             addKotlinToJava(FqName(NUMBERED_K_FUNCTION_PREFIX + i), K_FUNCTION_CLASS_ID)
         }
         for (i in 0 until BuiltInFunctionArity.BIG_ARITY - 1) {
-            val kSuspendFunction = FunctionTypeKind.KSuspendFunction
-            val kSuspendFun = kSuspendFunction.packageFqName.toString() + "." + kSuspendFunction.classNamePrefix
-            addKotlinToJava(FqName(kSuspendFun + i), K_FUNCTION_CLASS_ID)
+            addKotlinToJava(FqName(NUMBERED_K_SUSPEND_FUNCTION_PREFIX + i), K_FUNCTION_CLASS_ID)
         }
 
         addKotlinToJava(FqName("kotlin.concurrent.atomics.AtomicInt"), classId(AtomicInteger::class.java))
@@ -144,31 +144,41 @@ object JavaToKotlinClassMap {
      * - kotlin.Function3 -> kotlin.jvm.functions.Function3
      * - kotlin.coroutines.SuspendFunction3 -> null
      *     - NOT kotlin.jvm.functions.Function4, to make sure that Continuation type argument is correctly added manually at the call site.
-     * - kotlin.Function42 -> kotlin.jvm.functions.FunctionN
-     * - kotlin.coroutines.SuspendFunction42 -> kotlin.jvm.functions.FunctionN
+     * - kotlin.Function23 -> kotlin.jvm.functions.FunctionN
+     * - kotlin.coroutines.SuspendFunction22 -> kotlin.jvm.functions.FunctionN
      * - kotlin.reflect.KFunction3 -> kotlin.reflect.KFunction
      * - kotlin.reflect.KSuspendFunction3 -> kotlin.reflect.KFunction
-     * - kotlin.reflect.KFunction42 -> kotlin.reflect.KFunction
-     * - kotlin.reflect.KSuspendFunction42 -> kotlin.reflect.KFunction
+     * - kotlin.reflect.KFunction23 -> kotlin.reflect.KFunction
+     * - kotlin.reflect.KSuspendFunction22 -> kotlin.reflect.KFunction
      */
     fun mapKotlinToJava(kotlinFqName: FqNameUnsafe): ClassId? = when {
         isKotlinFunctionWithBigArity(kotlinFqName, NUMBERED_FUNCTION_PREFIX) -> FUNCTION_N_CLASS_ID
-        isKotlinFunctionWithBigArity(kotlinFqName, NUMBERED_SUSPEND_FUNCTION_PREFIX) -> FUNCTION_N_CLASS_ID
+        isKotlinFunctionWithBigArity(kotlinFqName, NUMBERED_SUSPEND_FUNCTION_PREFIX, isSuspend = true) -> FUNCTION_N_CLASS_ID
+
+        // TODO: Simplify handling KFunction and KSuspendFunction, since they all map directly to kotlin.reflect.KFunction
         isKotlinFunctionWithBigArity(kotlinFqName, NUMBERED_K_FUNCTION_PREFIX) -> K_FUNCTION_CLASS_ID
-        isKotlinFunctionWithBigArity(kotlinFqName, NUMBERED_K_SUSPEND_FUNCTION_PREFIX) -> K_FUNCTION_CLASS_ID
+        isKotlinFunctionWithBigArity(kotlinFqName, NUMBERED_K_SUSPEND_FUNCTION_PREFIX, isSuspend = true) -> K_FUNCTION_CLASS_ID
+
         else -> kotlinToJava[kotlinFqName]
     }
 
-    private fun isKotlinFunctionWithBigArity(kotlinFqName: FqNameUnsafe, prefix: String): Boolean {
+    private fun isKotlinFunctionWithBigArity(kotlinFqName: FqNameUnsafe, prefix: String, isSuspend: Boolean = false): Boolean {
         val fqNameAsString = kotlinFqName.asString()
         if (!fqNameAsString.startsWith(prefix)) return false
         val arityString = fqNameAsString.substring(prefix.length)
         val arity = if (!arityString.startsWith('0')) arityString.toIntOrNull() else return false
-        return arity != null && arity >= BuiltInFunctionArity.BIG_ARITY
+
+        val cutOffArity = if (isSuspend) {
+            BuiltInFunctionArity.BIG_ARITY - 1
+        } else {
+            BuiltInFunctionArity.BIG_ARITY
+        }
+
+        return arity != null && arity >= cutOffArity
     }
 
     private fun addMapping(platformMutabilityMapping: PlatformMutabilityMapping) {
-        val (javaClassId, readOnlyClassId, mutableClassId) = platformMutabilityMapping
+        (val javaClassId = javaClass, val readOnlyClassId = kotlinReadOnly, val mutableClassId = kotlinMutable) = platformMutabilityMapping
         add(javaClassId, readOnlyClassId)
         addKotlinToJava(mutableClassId.asSingleFqName(), javaClassId)
 
@@ -198,9 +208,12 @@ object JavaToKotlinClassMap {
         javaToKotlin[javaClassId.asSingleFqName().toUnsafe()] = kotlinClassId
     }
 
-    private fun addKotlinToJava(kotlinFqNameUnsafe: FqName, javaClassId: ClassId) {
-        kotlinToJava[kotlinFqNameUnsafe.toUnsafe()] = javaClassId
+    private fun addKotlinToJava(kotlinFqName: FqName, javaClassId: ClassId) {
+        mappedKotlinClassFqNames.add(kotlinFqName)
+        kotlinToJava[kotlinFqName.toUnsafe()] = javaClassId
     }
+
+    fun isMappedKotlinClass(kotlinClassId: ClassId): Boolean = mappedKotlinClassFqNames.contains(kotlinClassId.asSingleFqName())
 
     fun isJavaPlatformClass(fqName: FqName): Boolean = mapJavaToKotlin(fqName) != null
 

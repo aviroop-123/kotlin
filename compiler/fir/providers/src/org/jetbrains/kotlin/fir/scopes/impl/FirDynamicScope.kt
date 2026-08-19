@@ -11,15 +11,16 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSessionComponent
+import org.jetbrains.kotlin.fir.SessionAndScopeSessionHolder
 import org.jetbrains.kotlin.fir.caches.FirCache
 import org.jetbrains.kotlin.fir.caches.createCache
 import org.jetbrains.kotlin.fir.caches.firCachesFactory
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.builder.buildProperty
-import org.jetbrains.kotlin.fir.declarations.builder.buildSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.builder.buildNamedFunction
 import org.jetbrains.kotlin.fir.declarations.builder.buildValueParameter
 import org.jetbrains.kotlin.fir.declarations.impl.FirResolvedDeclarationStatusImpl
 import org.jetbrains.kotlin.fir.moduleData
@@ -44,17 +45,17 @@ import org.jetbrains.kotlin.name.StandardClassIds
 annotation class FirDynamicScopeConstructor
 
 class FirDynamicScope @FirDynamicScopeConstructor constructor(
-    private val session: FirSession,
-    private val scopeSession: ScopeSession,
-) : FirTypeScope() {
+    override val session: FirSession,
+    override val scopeSession: ScopeSession,
+) : FirTypeScope(), SessionAndScopeSessionHolder {
     override fun processDirectOverriddenFunctionsWithBaseScope(
         functionSymbol: FirNamedFunctionSymbol,
-        processor: (FirNamedFunctionSymbol, FirTypeScope) -> ProcessorAction
+        processor: (FirNamedFunctionSymbol, FirTypeScope) -> ProcessorAction,
     ): ProcessorAction = ProcessorAction.NEXT
 
     override fun processDirectOverriddenPropertiesWithBaseScope(
         propertySymbol: FirPropertySymbol,
-        processor: (FirPropertySymbol, FirTypeScope) -> ProcessorAction
+        processor: (FirPropertySymbol, FirTypeScope) -> ProcessorAction,
     ): ProcessorAction = ProcessorAction.NEXT
 
     override fun getCallableNames(): Set<Name> = emptySet()
@@ -63,8 +64,6 @@ class FirDynamicScope @FirDynamicScopeConstructor constructor(
 
     private val anyTypeScope by lazy {
         session.builtinTypes.anyType.coneType.scope(
-            session,
-            scopeSession,
             CallableCopyTypeCalculator.DoNothing,
             requiredMembersPhase = null,
         )
@@ -126,7 +125,7 @@ class FirDynamicMembersStorage(val session: FirSession) : FirSessionComponent {
 
     fun getDynamicScopeFor(scopeSession: ScopeSession): FirDynamicScope = dynamicScopeCacheByScope.getValue(scopeSession, null)
 
-    val functionsCacheByName: FirCache<Name, FirSimpleFunction, Nothing?> =
+    val functionsCacheByName: FirCache<Name, FirNamedFunction, Nothing?> =
         cachesFactory.createCache { name -> buildPseudoFunctionByName(name) }
 
     val propertiesCacheByName: FirCache<Name, FirProperty, Nothing?> =
@@ -144,7 +143,7 @@ class FirDynamicMembersStorage(val session: FirSession) : FirSessionComponent {
         )
     }
 
-    private fun buildPseudoFunctionByName(name: Name): FirSimpleFunction = buildSimpleFunction {
+    private fun buildPseudoFunctionByName(name: Name): FirNamedFunction = buildNamedFunction {
         status = FirResolvedDeclarationStatusImpl(
             Visibilities.Public,
             Modality.FINAL,
@@ -156,6 +155,7 @@ class FirDynamicMembersStorage(val session: FirSession) : FirSessionComponent {
 
         this.name = name
         this.symbol = FirNamedFunctionSymbol(CallableId(DYNAMIC_FQ_NAME, this.name))
+        isLocal = false
 
         moduleData = session.moduleData
         origin = FirDeclarationOrigin.DynamicScope
@@ -165,7 +165,7 @@ class FirDynamicMembersStorage(val session: FirSession) : FirSessionComponent {
 
         val parameter = buildValueParameter {
             moduleData = session.moduleData
-            containingDeclarationSymbol = this@buildSimpleFunction.symbol
+            containingDeclarationSymbol = this@buildNamedFunction.symbol
             origin = FirDeclarationOrigin.DynamicScope
             resolvePhase = FirResolvePhase.BODY_RESOLVE
             returnTypeRef = anyArrayTypeRef
@@ -188,6 +188,7 @@ class FirDynamicMembersStorage(val session: FirSession) : FirSessionComponent {
             Modality.FINAL,
             EffectiveVisibility.Public,
         )
+        isLocal = false
 
         moduleData = session.moduleData
         origin = FirDeclarationOrigin.DynamicScope

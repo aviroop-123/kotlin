@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -10,11 +10,12 @@ import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.synthetic.FirSyntheticProperty
 import org.jetbrains.kotlin.fir.declarations.utils.isConst
-import org.jetbrains.kotlin.fir.declarations.utils.isLocal
+import org.jetbrains.kotlin.fir.declarations.utils.replExpressionReference
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.diagnostics.ConeSimpleDiagnostic
 import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
+import org.jetbrains.kotlin.fir.expressions.FirLazyExpression
 import org.jetbrains.kotlin.fir.resolve.FirRegularTowerDataContexts
 import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
@@ -29,12 +30,14 @@ import org.jetbrains.kotlin.fir.scopes.CallableCopyTypeCalculator
 import org.jetbrains.kotlin.fir.scopes.impl.originalForWrappedIntegerOperator
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirSyntheticPropertySymbol
-import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.FirErrorTypeRef
 import org.jetbrains.kotlin.fir.types.FirImplicitTypeRef
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
+import org.jetbrains.kotlin.fir.types.hasResolvedType
 import org.jetbrains.kotlin.fir.utils.exceptions.withFirEntry
 import org.jetbrains.kotlin.fir.visitors.FirTransformer
 import org.jetbrains.kotlin.util.PrivateForInline
@@ -82,7 +85,7 @@ fun <F : FirClassLikeDeclaration> F.runContractAndBodiesResolutionForLocalClass(
     val currentReturnTypeCalculator = components.context.returnTypeCalculator as? ReturnTypeCalculatorWithJump
     val prevDesignation = currentReturnTypeCalculator?.designationMapForLocalClasses ?: emptyMap()
 
-    val (designationMap, targetedClasses) = localClassesNavigationInfo.run {
+    val [designationMap, targetedClasses] = localClassesNavigationInfo.run {
         (prevDesignation + designationMap) to
                 (parentForClass.keys + this@runContractAndBodiesResolutionForLocalClass) + components.context.targetedLocalClasses
     }
@@ -146,12 +149,12 @@ open class FirImplicitAwareBodyResolveTransformer(
         super.transformDeclarationContent(declaration, data)
     }
 
-    override fun transformSimpleFunction(
-        simpleFunction: FirSimpleFunction,
+    override fun transformNamedFunction(
+        namedFunction: FirNamedFunction,
         data: ResolutionMode
-    ): FirSimpleFunction {
-        return computeCachedTransformationResult(simpleFunction) {
-            super.transformSimpleFunction(simpleFunction, data)
+    ): FirNamedFunction {
+        return computeCachedTransformationResult(namedFunction) {
+            super.transformNamedFunction(namedFunction, data)
         }
     }
 
@@ -214,7 +217,7 @@ open class ReturnTypeCalculatorWithJump(
             )
         }
 
-        if (declaration is FirSimpleFunction) {
+        if (declaration is FirNamedFunction) {
             // Effectively this logic is redundant now, because all methods of Int have an explicit return type,
             // so explicit call here just to be sure (probably some method from Int will have an implicit type)
             declaration.originalForWrappedIntegerOperator?.let {
@@ -256,26 +259,52 @@ open class ReturnTypeCalculatorWithJump(
     }
 
     private fun resolvedToContractsIfNecessary(declaration: FirCallableDeclaration) {
-        val canHaveContracts = when {
-            declaration is FirProperty && !declaration.isLocal -> true
-            declaration is FirSimpleFunction && !declaration.isLocal -> true
-            else -> false
-        }
+        when (declaration) {
+            is FirProperty if declaration.symbol is FirRegularPropertySymbol -> {
+                declaration.getter?.symbol?.calculateContractDescription()
+                declaration.setter?.symbol?.calculateContractDescription()
+            }
 
-        if (canHaveContracts) {
-            declaration.lazyResolveToPhase(FirResolvePhase.CONTRACTS)
+            is FirNamedFunction if declaration.status.visibility != Visibilities.Local -> {
+                declaration.symbol.calculateContractDescription()
+            }
+
+            else -> {}
         }
     }
 
 
-    protected fun recursionInImplicitTypeRef(): FirErrorTypeRef = buildErrorTypeRef {
-        diagnostic = ConeSimpleDiagnostic("cycle", DiagnosticKind.RecursionInImplicitTypes)
+    protected fun recursionInImplicitTypeRef(declaration: FirCallableDeclaration): FirErrorTypeRef = buildErrorTypeRef {
+        diagnostic = ConeSimpleDiagnostic("Recursive implicit type", DiagnosticKind.RecursionInImplicitTypes)
+    }.also {
+        // It also might be useful to use an extended cone diagnostic that will store info about loops
+        // that are encountered during implicit body resolving.
+        implicitBodyResolveComputationSession.calculateAndStoreNonTrivialLoop(declaration.symbol)
     }
+
+    private val FirCallableSymbol<*>.isUnresolvedReplProperty: Boolean
+        get() {
+            if (this !is FirPropertySymbol) return false
+
+            // Some properties like constants are not moved to the eval (don't have an expression reference),
+            // so they should be treated as regular ones
+            val expressionReference = fir.replExpressionReference ?: return false
+
+            return expressionReference.expressionRef.value.takeUnless { it is FirLazyExpression }?.hasResolvedType != true
+        }
 
     private fun computeReturnTypeRef(declaration: FirCallableDeclaration): FirResolvedTypeRef {
-        val computedReturnType = when (val status = implicitBodyResolveComputationSession.getStatus(declaration.symbol)) {
+        val symbolForStatus = when {
+            declaration is FirBackingField -> declaration.propertySymbol
+            else -> declaration.symbol
+        }
+
+        val computedReturnType = when (val status = implicitBodyResolveComputationSession.getStatus(symbolForStatus)) {
             is ImplicitBodyResolveComputationStatus.Computed -> status.resolvedTypeRef
-            is ImplicitBodyResolveComputationStatus.Computing -> recursionInImplicitTypeRef()
+            is ImplicitBodyResolveComputationStatus.Computing -> recursionInImplicitTypeRef(declaration)
+            // REPL properties cannot be resolved directly, the eval function must be resolved first.
+            // TODO(KT-84153): reconsider what error is reported here.
+            else if symbolForStatus.isUnresolvedReplProperty -> recursionInImplicitTypeRef(declaration)
             else -> null
         }
 
@@ -286,7 +315,8 @@ open class ReturnTypeCalculatorWithJump(
                     "$symbol with origin ${declaration.origin} and return type ${declaration.returnTypeRef}"
         }
 
-        return resolveDeclaration(declaration)
+        resolveDeclaration(symbolForStatus.fir)
+        return declaration.returnTypeRef as FirResolvedTypeRef
     }
 
     @OptIn(PrivateForInline::class)
@@ -295,7 +325,7 @@ open class ReturnTypeCalculatorWithJump(
         val session = declaration.moduleData.session
         val symbol = declaration.symbol
 
-        val (designation, outerBodyResolveContext) = if (declaration in designationMapForLocalClasses) {
+        val [designation, outerBodyResolveContext] = if (declaration in designationMapForLocalClasses) {
             designationMapForLocalClasses.getValue(declaration) to outerBodyResolveContext
         } else {
             (outerTransformer?.returnTypeCalculator as? ReturnTypeCalculatorWithJump)?.resolveDeclaration(declaration)?.let {
@@ -387,6 +417,12 @@ open class FirDesignatedBodyResolveTransformerForReturnTypeCalculator(
 
 open class ImplicitBodyResolveComputationSession {
     private val implicitBodyResolveStatusMap = hashMapOf<FirCallableSymbol<*>, ImplicitBodyResolveComputationStatus>()
+    private val computingSymbolsStack: MutableList<FirCallableSymbol<*>> = mutableListOf()
+
+    /**
+     * Stores all symbols that belong to a loop of length > 1
+     */
+    private val nonTrivialLoops: MutableSet<FirCallableSymbol<*>> = mutableSetOf()
 
     internal fun getStatus(symbol: FirCallableSymbol<*>): ImplicitBodyResolveComputationStatus {
         if (symbol is FirSyntheticPropertySymbol) {
@@ -415,6 +451,7 @@ open class ImplicitBodyResolveComputationSession {
         }
 
         implicitBodyResolveStatusMap[symbol] = ImplicitBodyResolveComputationStatus.Computing
+        computingSymbolsStack.add(symbol)
     }
 
     private fun storeResult(
@@ -430,7 +467,27 @@ open class ImplicitBodyResolveComputationSession {
             "Not FirResolvedTypeRef (${transformedDeclaration.returnTypeRef.render()}) in storeResult for: ${symbol.fir.render()}"
         }
 
+        computingSymbolsStack.removeLast()
         implicitBodyResolveStatusMap[symbol] = ImplicitBodyResolveComputationStatus.Computed(returnTypeRef, transformedDeclaration)
+    }
+
+    /**
+     * Calculates a loop that the declaration of [symbol] forms with other ones and stores it if only it's not trivial (of length > 1)
+     */
+    fun calculateAndStoreNonTrivialLoop(symbol: FirCallableSymbol<*>) {
+        val loopTail = computingSymbolsStack.takeLastWhile { it != symbol }.takeIf { it.isNotEmpty() } ?: return
+
+        nonTrivialLoops.addAll(buildSet {
+            add(symbol)
+            addAll(loopTail)
+        })
+    }
+
+    /**
+     * Returns `true` if only ths [symbol] belongs to a nontrivial loop of length > 1
+     */
+    fun belongToSomeNonTrivialLoop(symbol: FirCallableSymbol<*>): Boolean {
+        return nonTrivialLoops.contains(symbol)
     }
 }
 

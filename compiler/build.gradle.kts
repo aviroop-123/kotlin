@@ -1,9 +1,9 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("d8-configuration")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 val compilerModules: Array<String> by rootProject.extra
@@ -12,13 +12,15 @@ val otherCompilerModules = compilerModules.filter { it != path }
 dependencies {
     testImplementation(intellijCore()) // Should come before compiler, because of "progarded" stuff needed for tests
 
-    testApi(project(":kotlin-script-runtime"))
+    testImplementation(project(":kotlin-script-runtime"))
 
-    testApi(kotlinStdlib())
+    testImplementation(kotlinStdlib())
 
-    testApi(kotlinTest())
+    testImplementation(kotlinTest())
     testCompileOnly(kotlinTest("junit"))
     testImplementation(libs.junit4)
+    testRuntimeOnly(libs.junit.vintage.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
     testFixturesApi(testFixtures(project(":compiler:tests-common")))
     testFixturesApi(testFixtures(project(":compiler:tests-common-new")))
     testFixturesApi(testFixtures(project(":compiler:fir:raw-fir:psi2fir")))
@@ -51,30 +53,41 @@ sourceSets {
 
 projectTests {
     testTask(
-        jUnitMode = JUnitMode.JUnit4,
-        parallel = true,
+        jUnitMode = JUnitMode.JUnit5,
+        javaLauncher = JdkMajorVersion.JDK_1_8,
         defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_1_8, JdkMajorVersion.JDK_11_0, JdkMajorVersion.JDK_17_0)
     ) {
-        dependsOn(":dist")
-        useJsIrBoxTests(version = version, buildDir = layout.buildDirectory)
-
         filter {
             excludeTestsMatching("org.jetbrains.kotlin.jvm.compiler.io.FastJarFSLongTest*")
         }
 
-        workingDir = rootDir
-        systemProperty("kotlin.test.script.classpath", testSourceSet.output.classesDirs.joinToString(File.pathSeparator))
+        addClasspathProperty(testSourceSet.output.classesDirs, "kotlin.test.script.classpath")
     }
 
-    testTask("fastJarFSLongTests", jUnitMode = JUnitMode.JUnit4, skipInLocalBuild = true) {
+    testTask("fastJarFSLongTests", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
         include("**/FastJarFSLongTest*")
     }
 
     testGenerator("org.jetbrains.kotlin.generators.tests.TestGeneratorForCompilerTestsKt")
 
+    testData(isolated, "testData/checkLocalVariablesTable")
+    testData(isolated, "testData/codegen")
+    testData(isolated, "testData/compileJavaAgainstKotlin")
+    testData(isolated, "testData/kotlinClassFinder")
+    testData(isolated, "testData/moduleProtoBuf")
+    testData(isolated, "testData/modules.xml")
+    testData(isolated, "testData/serialization")
+    testData(isolated, "testData/versionRequirement")
+    testData(isolated, "testData/writeFlags")
+    testData(isolated, "testData/writeSignature")
     withJvmStdlibAndReflect()
+    withScriptRuntime()
+    withTestJar()
+    withStdlibCommon()
+    withMockJdkRuntime()
+    withMockJdkAnnotationsJar()
 }
 
-val generateTestData by generator("org.jetbrains.kotlin.generators.tests.GenerateCompilerTestDataKt")
+val generateTestData by generator("org.jetbrains.kotlin.generators.tests.GenerateCompilerTestDataKt", testSourceSet)
 
 testsJar()

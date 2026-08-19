@@ -8,11 +8,11 @@ package org.jetbrains.kotlin.scripting.ide_common.idea.util
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.render
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFunctionLiteral
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.psiUtil.findLabelAndCall
-import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.DslMarkerUtils
@@ -33,7 +33,7 @@ interface ReceiverExpressionFactory {
 }
 
 fun LexicalScope.getFactoryForImplicitReceiverWithSubtypeOf(receiverType: KotlinType): ReceiverExpressionFactory? =
-    getImplicitReceiversWithInstanceToExpression().entries.firstOrNull { (receiverDescriptor, _) ->
+    getImplicitReceiversWithInstanceToExpression().entries.firstOrNull { [receiverDescriptor, _] ->
         receiverDescriptor.type.isSubtypeOf(receiverType)
     }?.value
 
@@ -65,14 +65,14 @@ fun LexicalScope.getImplicitReceiversWithInstanceToExpression(
     }
 
     val result = LinkedHashMap<ReceiverParameterDescriptor, ReceiverExpressionFactory?>()
-    for ((index, receiver) in receivers.withIndex()) {
+    for ([index, receiver] in receivers.withIndex()) {
         val owner = receiver.containingDeclaration
         if (owner is ScriptDescriptor) {
             result[receiver] = null
             outerDeclarationsWithInstance.addAll(owner.implicitReceivers)
             continue
         }
-        val (expressionText, isImmediateThis) = if (owner in outerDeclarationsWithInstance) {
+        val [expressionText, isImmediateThis] = if (owner in outerDeclarationsWithInstance) {
             val thisWithLabel = thisQualifierName(receiver)?.let { "this@${it.render()}" }
             if (index == 0)
                 (thisWithLabel ?: "this") to true

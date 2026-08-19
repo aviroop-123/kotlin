@@ -6,18 +6,20 @@
 package org.jetbrains.kotlin.test.util
 
 import org.jetbrains.kotlin.test.Assertions
-import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.TestDataAssertions
 import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase
 import org.junit.Assert
+import org.junit.Assume
 import java.io.File
+import kotlin.time.Duration
 
 object JUnit4Assertions : Assertions() {
     override fun doesEqualToFile(expectedFile: File, actual: String, sanitizer: (String) -> String): Boolean {
-        return KotlinTestUtils.compareExpectFileWithActualText(expectedFile, actual, sanitizer).doesEqual;
+        return TestDataAssertions.compareExpectFileWithActualText(expectedFile, actual, sanitizer).doesEqual
     }
 
     override fun assertEqualsToFile(expectedFile: File, actual: String, sanitizer: (String) -> String, message: () -> String) {
-        KotlinTestUtils.assertEqualsToFile(expectedFile, actual, sanitizer)
+        TestDataAssertions.assertEqualsToFile(expectedFile, actual, sanitizer)
     }
 
     override fun assertEquals(expected: Any?, actual: Any?, message: (() -> String)?) {
@@ -54,5 +56,13 @@ object JUnit4Assertions : Assertions() {
 
     override fun fail(message: () -> String): Nothing {
         throw AssertionError(message.invoke())
+    }
+
+    override fun assumeFalse(value: Boolean, message: () -> String) {
+        Assume.assumeFalse(message.invoke(), value)
+    }
+
+    override fun assertTimeoutPreemptively(timeout: Duration, message: () -> String, action: () -> Unit) {
+        throw UnsupportedOperationException("JUnit 4 does not support timeout assertions.")
     }
 }

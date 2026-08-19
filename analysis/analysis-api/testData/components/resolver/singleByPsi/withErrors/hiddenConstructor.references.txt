@@ -1,3 +1,0 @@
-KtNameReferenceExpression(17,20): 'Obj'
-  KtSimpleNameReference:
-    Nothing (Unresolved reference)

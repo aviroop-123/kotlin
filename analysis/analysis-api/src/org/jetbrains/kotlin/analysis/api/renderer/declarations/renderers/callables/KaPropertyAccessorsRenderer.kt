@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callab
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.KaSpi
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaPropertyGetterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySetterSymbol
@@ -14,6 +15,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 
+@KaSpi
 @KaExperimentalApi
 public interface KaPropertyAccessorsRenderer {
     public fun renderAccessors(

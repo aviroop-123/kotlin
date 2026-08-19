@@ -6,9 +6,7 @@
 package org.jetbrains.kotlin.fir.resolve.transformers.mpp
 
 import org.jetbrains.kotlin.fir.FirElement
-import org.jetbrains.kotlin.fir.FirEvaluatorResult
 import org.jetbrains.kotlin.fir.FirExpectActualMatchingContext
-import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.resolved
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
@@ -24,7 +22,6 @@ internal fun FirExpectActualMatchingContext.areFirAnnotationsEqual(
     annotation1: FirAnnotation,
     annotation2: FirAnnotation,
     collectionArgumentsCompatibilityCheckStrategy: ExpectActualCollectionArgumentsCompatibilityCheckStrategy,
-    actualSession: FirSession,
 ): Boolean {
     fun FirAnnotation.hasResolvedArguments(): Boolean {
         return resolved || (this is FirAnnotationCall && arguments.isEmpty())
@@ -39,15 +36,14 @@ internal fun FirExpectActualMatchingContext.areFirAnnotationsEqual(
     ) {
         return false
     }
-    val args1 = FirExpressionEvaluator.evaluateAnnotationArguments(annotation1, actualSession) ?: return false
-    val args2 = FirExpressionEvaluator.evaluateAnnotationArguments(annotation2, actualSession) ?: return false
+    val args1 = annotation1.argumentMapping.mapping
+    val args2 = annotation2.argumentMapping.mapping
     if (args1.size != args2.size) {
         return false
     }
-    return args1.all { (key, value1) ->
+    return args1.all { [key, value1] ->
         val value2 = args2[key]
-        value1 is FirEvaluatorResult.Evaluated && value2 is FirEvaluatorResult.Evaluated &&
-                areAnnotationArgumentsEqual(value1.result, value2.result, collectionArgumentsCompatibilityCheckStrategy)
+        areAnnotationArgumentsEqual(value1, value2, collectionArgumentsCompatibilityCheckStrategy)
     }
 }
 
@@ -72,8 +68,8 @@ private fun FirExpectActualMatchingContext.areAnnotationArgumentsEqual(
 ): Boolean {
     fun List<FirExpression>.unwrapSpreadOperator(): List<FirExpression> {
         return this.flatMap {
-            if (it is FirSpreadArgumentExpression && it.expression is FirArrayLiteral) {
-                (it.expression as FirArrayLiteral).argumentList.arguments
+            if (it is FirSpreadArgumentExpression && it.expression is FirCollectionLiteral) {
+                (it.expression as FirCollectionLiteral).argumentList.arguments
             } else {
                 listOf(it)
             }
@@ -91,15 +87,15 @@ private fun FirExpectActualMatchingContext.areAnnotationArgumentsEqual(
     fun FirVarargArgumentsExpression.isEqualTo(other: FirElement): Boolean {
         return when (other) {
             is FirVarargArgumentsExpression -> argumentsOfArrayAreEqual(this.arguments, other.arguments)
-            is FirArrayLiteral -> argumentsOfArrayAreEqual(this.arguments, other.arguments)
+            is FirCollectionLiteral -> argumentsOfArrayAreEqual(this.arguments, other.arguments)
             else -> false
         }
     }
 
-    fun FirArrayLiteral.isEqualTo(other: FirElement): Boolean {
+    fun FirCollectionLiteral.isEqualTo(other: FirElement): Boolean {
         return when (other) {
             is FirVarargArgumentsExpression -> other.isEqualTo(this)
-            is FirArrayLiteral -> argumentsOfArrayAreEqual(this.arguments, other.arguments)
+            is FirCollectionLiteral -> argumentsOfArrayAreEqual(this.arguments, other.arguments)
             else -> false
         }
     }
@@ -134,7 +130,7 @@ private fun FirExpectActualMatchingContext.areAnnotationArgumentsEqual(
             }
             is FirAnnotation -> {
                 when (this.toResolvedCallableSymbol()) {
-                    !is FirConstructorSymbol -> return false
+                    !is FirConstructorSymbol -> false
                     else -> {
                         val constructorCall1 = this as FirFunctionCall
                         val annotationMapping1 = (constructorCall1.argumentList as FirResolvedArgumentList).toAnnotationArgumentMapping()
@@ -190,8 +186,8 @@ private fun FirExpectActualMatchingContext.areAnnotationArgumentsEqual(
         expression1 is FirEnumEntryDeserializedAccessExpression -> expression1.isEqualTo(expression2)
         expression2 is FirEnumEntryDeserializedAccessExpression -> expression2.isEqualTo(expression1)
 
-        expression1 is FirArrayLiteral -> expression1.isEqualTo(expression2)
-        expression2 is FirArrayLiteral -> expression2.isEqualTo(expression1)
+        expression1 is FirCollectionLiteral -> expression1.isEqualTo(expression2)
+        expression2 is FirCollectionLiteral -> expression2.isEqualTo(expression1)
 
         expression1 is FirVarargArgumentsExpression -> expression1.isEqualTo(expression2)
         expression2 is FirVarargArgumentsExpression -> expression2.isEqualTo(expression1)

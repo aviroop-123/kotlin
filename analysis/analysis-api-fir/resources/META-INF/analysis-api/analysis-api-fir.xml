@@ -15,18 +15,8 @@
     />
 
     <projectService
-        serviceInterface="org.jetbrains.kotlin.idea.references.KotlinReferenceProviderContributor"
-        serviceImplementation="org.jetbrains.kotlin.analysis.api.fir.references.KotlinFirReferenceContributor"
-    />
-
-    <projectService
-        serviceInterface="org.jetbrains.kotlin.idea.references.ReadWriteAccessChecker"
-        serviceImplementation="org.jetbrains.kotlin.analysis.api.fir.references.ReadWriteAccessCheckerFirImpl"
-    />
-
-    <projectService
         serviceInterface="org.jetbrains.kotlin.analysis.api.imports.KaDefaultImportsProvider"
-        serviceImplementation="org.jetbrains.kotlin.analysis.api.fir.KaFirDefaultImportsProvider"
+        serviceImplementation="org.jetbrains.kotlin.analysis.api.fir.imports.KaFirDefaultImportsProvider"
     />
 
     <projectService
@@ -49,6 +39,30 @@
         serviceImplementation="org.jetbrains.kotlin.analysis.decompiler.psi.K2KotlinBuiltInStubVersionOffsetProvider"
     />
 
+    <applicationService
+        serviceInterface="org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionModeProvider"
+        serviceImplementation="org.jetbrains.kotlin.analysis.api.fir.projectStructure.KaFirDanglingFileResolutionModeProvider"
+    />
+
+    <projectService
+        serviceInterface="org.jetbrains.kotlin.references.utils.KotlinKDocResolutionStrategyProviderService"
+        serviceImplementation="org.jetbrains.kotlin.analysis.api.fir.references.KotlinFirKDocResolutionStrategyProviderService"
+    />
+
+    <registryKey
+        defaultValue="true"
+        description="Enable experimental KDoc resolution strategy"
+        key="kotlin.analysis.experimentalKDocResolution"
+        restartRequired="false"
+    />
+
+    <registryKey
+        defaultValue="true"
+        description="Enable automatic dangling file resolution mode calculation"
+        key="kotlin.analysis.autoDanglingResolutionMode"
+        restartRequired="true"
+    />
+
     <registryKey
         defaultValue="true"
         description="Perform cache clean-up when running out of RAM"
@@ -58,8 +72,8 @@
 
     <registryKey
         defaultValue="false"
-        description="Enables post-compute-based Java Functions Cache (should be used only when data race is detected with less strict version)"
-        key="kotlin.analysis.postComputeEnhancedJavaFunctionsCache"
+        description="Log a GraphML file representing the current LL FIR session structure on low-memory events. Should only be used for development purposes."
+        key="kotlin.analysis.sessionStructureLogging"
         restartRequired="true"
     />
 
@@ -73,12 +87,20 @@
 
   <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <kotlinContentScopeRefiner implementation="org.jetbrains.kotlin.analysis.api.fir.projectStructure.KaFirLibraryTargetPlatformContentScopeRefiner"/>
+
+    <kaAdditionalKDocResolutionProvider implementation="org.jetbrains.kotlin.analysis.api.fir.references.KaAdditionalKDocResolutionProviderAdapter"/>
   </extensions>
 
   <projectListeners>
     <listener
         class="org.jetbrains.kotlin.analysis.api.fir.KaFirSessionProvider$SessionInvalidationListener"
-        topic="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationListener"
+        topic="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationListener"
     />
   </projectListeners>
+
+  <extensionPoints>
+    <extensionPoint qualifiedName="org.jetbrains.kotlin.fir.extensions.firExtensionRegistrar"
+                    interface="org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter"
+                    area="IDEA_PROJECT"/>
+  </extensionPoints>
 </idea-plugin>

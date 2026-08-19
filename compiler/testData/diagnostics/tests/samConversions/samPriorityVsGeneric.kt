@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// SKIP_TXT
 // FULL_JDK
 
 fun <T> bar(action: () -> T): T = action()

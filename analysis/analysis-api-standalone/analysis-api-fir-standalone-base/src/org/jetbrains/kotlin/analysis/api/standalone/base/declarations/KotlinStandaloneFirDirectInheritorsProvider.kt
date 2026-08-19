@@ -10,7 +10,7 @@ import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.api.fir.utils.isSubclassOf
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirInternals
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionCache
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionCache
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinDeclarationProviderFactory
@@ -90,6 +90,7 @@ internal class KotlinStandaloneFirDirectInheritorsProvider(private val project: 
         return isSubclassOf(candidateFirClass, baseFirClass, candidateFirClass.moduleData.session, allowIndirectSubtyping = false)
     }
 
+    @OptIn(KaImplementationDetail::class)
     private fun ClassId.toFirSymbol(module: KaModule): FirClassLikeSymbol<*>? {
         // Using a resolve session/source-preferred session will cause class stubs from binary libraries to be AST-loaded in IDE mode tests,
         // which results in an exception since we don't have a decompiler for them. See KT-64898, KT-64899, and KT-64900. If not for these

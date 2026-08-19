@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +UnrestrictedBuilderInference
 // DIAGNOSTICS: -DEPRECATION -UNCHECKED_CAST -OPT_IN_IS_NOT_ENABLED
 // WITH_STDLIB
 // ISSUE: KT-63996
@@ -23,7 +22,7 @@ fun main() {
     build {
         emit("")
         // K is fixed into CapturedType(out NotFixed: TypeVariable(R)
-        capture(id(<!TYPE_MISMATCH, TYPE_MISMATCH!>getOut()<!>)) // unexpected TYPE_MISMATCH (KT-63996)
+        <!CANNOT_INFER_PARAMETER_TYPE!>capture<!>(<!ARGUMENT_TYPE_MISMATCH!>id(getOut())<!>) // unexpected TYPE_MISMATCH (KT-63996)
         // capture(getOut()) // OK!!!
         Unit
     }

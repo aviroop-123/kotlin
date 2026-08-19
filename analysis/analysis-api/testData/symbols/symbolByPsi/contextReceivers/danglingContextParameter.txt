@@ -6,8 +6,10 @@ KaConstructorSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isPrimary: true
   location: CLASS
   modality: FINAL
@@ -32,8 +34,12 @@ KaConstructorSymbol:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -54,6 +60,7 @@ KaConstructorSymbol:
           getContainingJvmClassName: Anno
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         callableId: /Anno.position
         compilerVisibility: Public
         contextParameters: []
@@ -65,8 +72,10 @@ KaConstructorSymbol:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -88,13 +97,15 @@ KaConstructorSymbol:
           getContainingJvmClassName: Anno
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
         hasBackingField: true
         hasGetter: true
         hasSetter: false
         initializer: KaNonConstantInitializerValue(val position: String)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -123,16 +134,19 @@ KaConstructorSymbol:
         getContainingJvmClassName: Anno
         getContainingModule: KaSourceModule "Sources of main"
         deprecationStatus: null
-        getterDeprecationStatus: null
         javaGetterName: getPosition
         javaSetterName: null
-        setterDeprecationStatus: null
         isInline: false
+        importableFqName: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -151,12 +165,14 @@ KaConstructorSymbol:
       getContainingJvmClassName: Anno
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(danglingContextParameter.kt)
   getContainingJvmClassName: Anno
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: Anno
 
 KaNamedClassSymbol:
   annotations: [
@@ -191,6 +207,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: [TYPE, VALUE_PARAMETER]
   deprecationStatus: null
+  importableFqName: Anno
 
 KaContextParameterSymbol:
   annotations: [
@@ -201,8 +218,11 @@ KaContextParameterSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: LOCAL
   modality: FINAL
@@ -220,6 +240,7 @@ KaContextParameterSymbol:
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaContextParameterSymbol:
   annotations: []
@@ -227,8 +248,11 @@ KaContextParameterSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: LOCAL
   modality: FINAL
@@ -245,12 +269,13 @@ KaContextParameterSymbol:
         ]
         type: ERROR_TYPE
     ]
-    type: kotlin/collections/List<@R|Anno|(position = String(str))  ERROR CLASS: Symbol not found for Unresolved>
+    type: kotlin/collections/List<@R|Anno|(position = String(str) [evaluated = String(str)])  ERROR CLASS: Symbol not found for Unresolved>
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(danglingContextParameter.kt)
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -282,6 +307,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: Foo
 
 KaContextParameterSymbol:
   annotations: [
@@ -292,8 +318,11 @@ KaContextParameterSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: LOCAL
   modality: FINAL
@@ -311,6 +340,7 @@ KaContextParameterSymbol:
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaContextParameterSymbol:
   annotations: []
@@ -318,8 +348,11 @@ KaContextParameterSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: LOCAL
   modality: FINAL
@@ -336,12 +369,13 @@ KaContextParameterSymbol:
         ]
         type: ERROR_TYPE
     ]
-    type: kotlin/collections/List<@R|Anno|(position = String(str))  ERROR CLASS: Symbol not found for Unresolved>
+    type: kotlin/collections/List<@R|Anno|(position = String(str) [evaluated = String(str)])  ERROR CLASS: Symbol not found for Unresolved>
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(danglingContextParameter.kt)
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -373,6 +407,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -384,6 +419,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -411,6 +447,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: foo
 
 KaContextParameterSymbol:
   annotations: [
@@ -421,8 +459,11 @@ KaContextParameterSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: LOCAL
   modality: FINAL
@@ -440,6 +481,7 @@ KaContextParameterSymbol:
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null
 
 KaContextParameterSymbol:
   annotations: []
@@ -447,8 +489,11 @@ KaContextParameterSymbol:
   compilerVisibility: Public
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: LOCAL
   modality: FINAL
@@ -465,9 +510,10 @@ KaContextParameterSymbol:
         ]
         type: ERROR_TYPE
     ]
-    type: kotlin/collections/List<@R|Anno|(position = String(str))  ERROR CLASS: Symbol not found for Unresolved>
+    type: kotlin/collections/List<@R|Anno|(position = String(str) [evaluated = String(str)])  ERROR CLASS: Symbol not found for Unresolved>
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(danglingContextParameter.kt)
   getContainingJvmClassName: null
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

@@ -6,9 +6,10 @@
 package org.jetbrains.kotlin.gradle.android
 
 import org.gradle.api.logging.LogLevel
-import org.gradle.api.logging.configuration.WarningMode
+import org.gradle.kotlin.dsl.kotlin
 import org.gradle.testkit.runner.BuildResult
 import org.gradle.util.GradleVersion
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinToolingDiagnostics
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.junit.jupiter.api.DisplayName
 import java.nio.file.Files
@@ -180,9 +181,7 @@ class KotlinAndroidIT : KGPBaseTest() {
         project(
             "AndroidProject",
             gradleVersion,
-            buildOptions = defaultBuildOptions
-                .copy(androidVersion = agpVersion)
-                .suppressAgpWarningSinceGradle814(gradleVersion, WarningMode.None),
+            buildOptions = defaultBuildOptions.copy(androidVersion = agpVersion),
             buildJdk = jdkVersion.location
         ) {
             buildGradle.modify {
@@ -299,6 +298,8 @@ class KotlinAndroidIT : KGPBaseTest() {
 
     @DisplayName("KT-77288: android.kotlinOptions should not cause generated accessors compilation error")
     @GradleAndroidTest
+    // Precompiled plugin in buildSrc; AGP 9+ stub compilation refuses kotlin-android + com.android.library.
+    @AndroidTestVersions(maxVersion = TestVersions.AGP.AGP_813)
     fun testKotlinOptionsDeprecation(
         gradleVersion: GradleVersion,
         agpVersion: String,
@@ -350,6 +351,239 @@ class KotlinAndroidIT : KGPBaseTest() {
             }
 
             build("help")
+        }
+    }
+
+    @DisplayName("KT-80785: AGP 9.0 with disabled built-in Kotlin fails with actionable diagnostic because of the new AGP DSL")
+    @GradleAndroidTest
+    @AndroidTestVersions(minVersion = TestVersions.AGP.AGP_90)
+    fun testNewAgpDslDiagnostic(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        jdkVersion: JdkVersions.ProvidedJdk,
+    ) {
+        project(
+            "empty",
+            gradleVersion,
+            buildJdk = jdkVersion.location,
+            buildOptions = defaultBuildOptions.copy(
+                androidVersion = agpVersion,
+                enableLegacyAgpDsl = false,
+            ),
+        ) {
+            plugins {
+                kotlin("android")
+                id("com.android.library")
+            }
+            gradleProperties.appendText(
+                //language=properties
+                """
+                |
+                |android.builtInKotlin=false
+                """.trimMargin()
+            )
+            buildAndFail("help") {
+                assertHasDiagnostic(KotlinToolingDiagnostics.KotlinAndroidIsIncompatibleWithTheNewAgpDsl)
+                assertNoDiagnostic(KotlinToolingDiagnostics.KMPIsIncompatibleWithTheNewAgpDsl)
+                assertNoDiagnostic(KotlinToolingDiagnostics.DeprecatedKotlinAndroidPlugin)
+            }
+        }
+    }
+
+    @DisplayName("AGP 9.0 with disabled built-in Kotlin and enabled Variants API produces deprecation warnings for 'org.jetbrains.kotlin.android' plugin")
+    @GradleAndroidTest
+    @AndroidTestVersions(minVersion = TestVersions.AGP.AGP_90)
+    fun testKotlinAndroidDeprecationDiagnostic(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        jdkVersion: JdkVersions.ProvidedJdk,
+    ) {
+        project(
+            "empty",
+            gradleVersion,
+            buildJdk = jdkVersion.location,
+            buildOptions = defaultBuildOptions.copy(androidVersion = agpVersion),
+        ) {
+            plugins {
+                kotlin("android")
+                id("com.android.library")
+            }
+
+            buildScriptInjection {
+                with(androidLibrary) {
+                    compileSdk = 36
+                    namespace = "com.example"
+                }
+            }
+            build("help") {
+                assertNoDiagnostic(KotlinToolingDiagnostics.KotlinAndroidIsIncompatibleWithTheNewAgpDsl)
+                assertNoDiagnostic(KotlinToolingDiagnostics.KMPIsIncompatibleWithTheNewAgpDsl)
+                assertHasDiagnostic(KotlinToolingDiagnostics.DeprecatedKotlinAndroidPlugin)
+            }
+        }
+    }
+
+    @DisplayName("No 'org.jetbrains.kotlin.android' plugin deprecation with AGP <9.0")
+    @GradleAndroidTest
+    @AndroidTestVersions(
+        minVersion = TestVersions.AGP.AGP_811,
+        maxVersion = TestVersions.AGP.AGP_811,
+    )
+    fun testKotlinAndroidNoDeprecationDiagnostic(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        jdkVersion: JdkVersions.ProvidedJdk,
+    ) {
+        project(
+            "empty",
+            gradleVersion,
+            buildJdk = jdkVersion.location,
+            buildOptions = defaultBuildOptions.copy(androidVersion = agpVersion),
+        ) {
+            plugins {
+                kotlin("android")
+                id("com.android.library")
+            }
+
+            buildScriptInjection {
+                with(androidLibrary) {
+                    compileSdk = 36
+                    namespace = "com.example"
+                }
+            }
+            build("help") {
+                assertNoDiagnostic(KotlinToolingDiagnostics.KotlinAndroidIsIncompatibleWithTheNewAgpDsl)
+                assertNoDiagnostic(KotlinToolingDiagnostics.DeprecatedKotlinAndroidPlugin)
+                assertNoDiagnostic(KotlinToolingDiagnostics.KMPIsIncompatibleWithTheNewAgpDsl)
+            }
+        }
+    }
+
+    @DisplayName("KT-81601: KMP plus AGP 9.0 with disabled built-in Kotlin fails with actionable diagnostic because of the new AGP DSL ")
+    @GradleAndroidTest
+    @AndroidTestVersions(minVersion = TestVersions.AGP.AGP_90)
+    fun testNewAgpDslDiagnosticInKmp(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        jdkVersion: JdkVersions.ProvidedJdk,
+    ) {
+        project(
+            "empty",
+            gradleVersion,
+            buildJdk = jdkVersion.location,
+            buildOptions = defaultBuildOptions.copy(
+                androidVersion = agpVersion,
+                enableLegacyAgpDsl = false,
+            ),
+        ) {
+            plugins {
+                kotlin("multiplatform")
+                id("com.android.library")
+            }
+
+            buildScriptInjection {
+                @Suppress("DEPRECATION")
+                kotlinMultiplatform.androidTarget()
+
+                with(androidLibrary) {
+                    compileSdk = 36
+                    namespace = "com.example"
+                }
+            }
+
+            gradleProperties.appendText(
+                //language=properties
+                """
+                |
+                |android.builtInKotlin=false
+                """.trimMargin()
+            )
+            buildAndFail("help") {
+                assertHasDiagnostic(KotlinToolingDiagnostics.KMPIsIncompatibleWithTheNewAgpDsl)
+                assertNoDiagnostic(KotlinToolingDiagnostics.KotlinAndroidIsIncompatibleWithTheNewAgpDsl)
+                assertNoDiagnostic(KotlinToolingDiagnostics.DeprecatedKotlinAndroidPlugin)
+            }
+        }
+    }
+
+    @DisplayName("KT-81117: Diagnostic is triggerred when AGP 9+ plugin is applied before KMP plugin")
+    @GradleAndroidTest
+    @AndroidTestVersions(
+        minVersion = TestVersions.AGP.AGP_813,
+        maxVersion = TestVersions.AGP.AGP_90,
+    )
+    fun testKmpWithBuiltInKotlinDiagnostic(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        jdkVersion: JdkVersions.ProvidedJdk,
+    ) {
+        project(
+            "empty",
+            gradleVersion,
+            buildJdk = jdkVersion.location,
+            buildOptions = defaultBuildOptions.copy(
+                androidVersion = agpVersion,
+                enableLegacyAgpDsl = false,
+            ),
+        ) {
+            plugins {
+                /*
+                 * Plugin ordering matters: AGP applied first triggers the builtInKotlin conflict.
+                 * If reversed, AGP itself gives its own error.
+                 */
+                id("com.android.library")
+                kotlin("multiplatform")
+            }
+
+            buildScriptInjection {
+                with(androidLibrary) {
+                    compileSdk = 36
+                    namespace = "com.example"
+                }
+
+                kotlinMultiplatform.androidTarget()
+            }
+
+            if (TestVersions.AgpCompatibilityMatrix.fromVersion(agpVersion) >= TestVersions.AgpCompatibilityMatrix.AGP_90) {
+                buildAndFail("help") {
+                    assertHasDiagnostic(KotlinToolingDiagnostics.KMPIsIncompatibleWithTheNewAgpDsl)
+                }
+            } else {
+                build("help") {
+                    assertNoDiagnostic(KotlinToolingDiagnostics.KMPIsIncompatibleWithTheNewAgpDsl)
+                }
+            }
+        }
+    }
+
+    @DisplayName("KT-80785: usage of new AGP DSL does not hide AgpWithBuiltInKotlinIsAlreadyApplied")
+    @GradleAndroidTest
+    @AndroidTestVersions(minVersion = TestVersions.AGP.AGP_90)
+    fun testNewAgpDslDiagnosticWithBuiltInKotlin(
+        gradleVersion: GradleVersion,
+        agpVersion: String,
+        jdkVersion: JdkVersions.ProvidedJdk,
+    ) {
+        project(
+            "empty",
+            gradleVersion,
+            buildJdk = jdkVersion.location,
+            buildOptions = defaultBuildOptions.copy(
+                androidVersion = agpVersion,
+                enableLegacyAgpDsl = false,
+            ),
+        ) {
+            plugins {
+                /*
+                 * The plugin ordering matters here.
+                 * If the order is reversed, a similar diagnostic is reported by AGP failing the build.
+                 */
+                id("com.android.library")
+                kotlin("android")
+            }
+            buildAndFail("help") {
+                assertHasDiagnostic(KotlinToolingDiagnostics.AgpWithBuiltInKotlinIsAlreadyApplied)
+            }
         }
     }
 }

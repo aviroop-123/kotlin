@@ -259,9 +259,9 @@ internal class KaSymbolByFirBuilder(
     inner class VariableSymbolBuilder {
         fun buildVariableSymbol(firSymbol: FirVariableSymbol<*>): KaVariableSymbol = when (firSymbol) {
             is FirErrorPropertySymbol -> buildErrorVariableSymbol(firSymbol)
-            is FirPropertySymbol -> when {
-                firSymbol.isLocal -> buildLocalVariableSymbol(firSymbol)
-                firSymbol is FirSyntheticPropertySymbol -> buildSyntheticJavaPropertySymbol(firSymbol)
+            is FirPropertySymbol -> when (firSymbol) {
+                is FirLocalPropertySymbol -> buildLocalVariableSymbol(firSymbol)
+                is FirSyntheticPropertySymbol -> buildSyntheticJavaPropertySymbol(firSymbol)
                 else -> buildPropertySymbol(firSymbol)
             }
             is FirValueParameterSymbol -> buildParameterSymbol(firSymbol)
@@ -272,7 +272,7 @@ internal class KaSymbolByFirBuilder(
         }
 
         fun buildVariableLikeSignature(firSymbol: FirVariableSymbol<*>): KaVariableSignature<KaVariableSymbol> {
-            if (firSymbol is FirPropertySymbol && !firSymbol.isLocal && firSymbol !is FirSyntheticPropertySymbol) {
+            if (firSymbol is FirRegularPropertySymbol && firSymbol !is FirSyntheticPropertySymbol) {
                 return buildPropertySignature(firSymbol)
             }
 
@@ -280,7 +280,7 @@ internal class KaSymbolByFirBuilder(
         }
 
         fun buildPropertySymbol(firSymbol: FirPropertySymbol): KaVariableSymbol {
-            checkRequirementForBuildingSymbol<KaKotlinPropertySymbol>(firSymbol, !firSymbol.isLocal)
+            checkRequirementForBuildingSymbol<KaKotlinPropertySymbol>(firSymbol, firSymbol is FirRegularPropertySymbol)
             checkRequirementForBuildingSymbol<KaKotlinPropertySymbol>(firSymbol, firSymbol !is FirSyntheticPropertySymbol)
 
             firSymbol.fir.unwrapSubstitutionOverrideIfNeeded()?.let {
@@ -659,12 +659,12 @@ private fun collectReferencedTypeParameters(declaration: FirCallableDeclaration)
             element.acceptChildren(this)
         }
 
-        override fun visitSimpleFunction(simpleFunction: FirSimpleFunction) {
-            simpleFunction.typeParameters.forEach { it.accept(this) }
+        override fun visitNamedFunction(namedFunction: FirNamedFunction) {
+            namedFunction.typeParameters.forEach { it.accept(this) }
 
-            simpleFunction.receiverParameter?.accept(this)
-            simpleFunction.valueParameters.forEach { it.returnTypeRef.accept(this) }
-            simpleFunction.returnTypeRef.accept(this)
+            namedFunction.receiverParameter?.accept(this)
+            namedFunction.valueParameters.forEach { it.returnTypeRef.accept(this) }
+            namedFunction.returnTypeRef.accept(this)
         }
 
         override fun visitProperty(property: FirProperty) {

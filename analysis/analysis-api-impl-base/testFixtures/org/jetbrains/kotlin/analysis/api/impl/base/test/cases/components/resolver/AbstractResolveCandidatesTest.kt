@@ -1,51 +1,53 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.api.impl.base.test.cases.components.resolver
 
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.components.collectCallCandidates
 import org.jetbrains.kotlin.analysis.api.components.resolveToCallCandidates
+import org.jetbrains.kotlin.analysis.api.impl.base.components.asKaCallCandidate
 import org.jetbrains.kotlin.analysis.api.impl.base.test.cases.components.assertStableSymbolResult
 import org.jetbrains.kotlin.analysis.api.impl.base.test.cases.components.compareCalls
 import org.jetbrains.kotlin.analysis.api.impl.base.test.cases.components.stringRepresentation
-import org.jetbrains.kotlin.analysis.api.resolution.KaCallCandidateInfo
-import org.jetbrains.kotlin.analysis.api.resolution.KaCallInfo
-import org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
-import org.jetbrains.kotlin.analysis.api.resolution.successfulCallOrNull
-import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.analysis.api.resolution.*
+import org.jetbrains.kotlin.psi.KtElement
+import org.jetbrains.kotlin.psi.KtExperimentalApi
+import org.jetbrains.kotlin.resolution.KtResolvableCall
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.assertions
 
 abstract class AbstractResolveCandidatesTest : AbstractResolveByElementTest() {
     override val resolveKind: String get() = "candidates"
 
+    @OptIn(KtExperimentalApi::class)
     override fun generateResolveOutput(mainElement: KtElement, testServices: TestServices): String = analyzeForTest(mainElement) {
         val candidates = collectCallCandidates(mainElement)
         val candidatesAgain = collectCallCandidates(mainElement)
-        val callInfo = mainElement.resolveToCall()
+        val callAttempt = (mainElement as? KtResolvableCall)?.tryResolveCall()
 
         ignoreStabilityIfNeeded {
-            assertStableSymbolResult(testServices, candidates, candidatesAgain)
-            checkConsistencyWithResolveCall(callInfo, candidates, testServices)
+            assertStableSymbolResult(testServices, candidates.asKaCallCandidates(), candidatesAgain.asKaCallCandidates())
+            checkConsistencyWithResolveCall(callAttempt, candidates.asKaCallCandidates(), testServices)
         }
 
-        if (candidates.isEmpty()) {
+        val sortedCandidates = sortCandidates(candidates)
+        if (sortedCandidates.isEmpty()) {
             "NO_CANDIDATES"
         } else {
-            candidates.joinToString("\n\n") { stringRepresentation(it) }
+            sortedCandidates.joinToString("\n\n") { stringRepresentation(it) }
         }
     }
 
     context(_: KaSession)
     private fun checkConsistencyWithResolveCall(
-        callInfo: KaCallInfo?,
-        candidates: List<KaCallCandidateInfo>,
+        callAttempt: KaCallResolutionAttempt?,
+        candidates: List<KaCallCandidate>,
         testServices: TestServices,
     ) {
-        val resolvedCall = callInfo?.successfulCallOrNull<KaCallableMemberCall<*, *>>()
+        val resolvedCall = callAttempt?.successfulCall
         if (candidates.isEmpty()) {
             testServices.assertions.assertEquals(null, resolvedCall) {
                 "Inconsistency between candidates and resolved call. " +
@@ -54,26 +56,56 @@ abstract class AbstractResolveCandidatesTest : AbstractResolveByElementTest() {
             }
         } else {
             if (resolvedCall == null) return
-            val resolvedSymbol = stringRepresentation(resolvedCall.symbol)
-            val candidatesRepresentation = candidates.mapNotNull {
-                if (it.isInBestCandidates) {
-                    stringRepresentation((it.candidate as KaCallableMemberCall<*, *>).symbol)
-                } else {
-                    null
-                }
-            }
+            val resolvedSymbols = resolvedCall.symbols.map { stringRepresentation(it) }.toSet()
+            val candidateSymbols = candidates
+                .filter { it.isInBestCandidates }
+                .flatMap { it.candidate.symbols.map { symbol -> stringRepresentation(symbol) } }
+                .toSet()
 
-            testServices.assertions.assertTrue(resolvedSymbol in candidatesRepresentation) {
-                "'$resolvedSymbol' is not found in:\n" + candidatesRepresentation.joinToString("\n")
+            testServices.assertions.assertTrue(resolvedSymbols.all { it in candidateSymbols }) {
+                "Resolved symbols not found in candidates:\n" +
+                        "resolved: $resolvedSymbols\n" +
+                        "candidates: $candidateSymbols"
             }
         }
     }
 
+    /**
+     * Returns either [List]<[KaCallCandidate]> (new API) or [List]<[KaCallCandidateInfo]> (old API).
+     */
+    @OptIn(KtExperimentalApi::class)
     context(_: KaSession)
-    private fun collectCallCandidates(element: KtElement): List<KaCallCandidateInfo> {
-        val candidates = element.resolveToCallCandidates()
-        return candidates.sortedWith { candidate1, candidate2 ->
-            compareCalls(candidate1.candidate, candidate2.candidate)
+    private fun collectCallCandidates(element: KtElement): List<*> = if (element is KtResolvableCall) {
+        element.collectCallCandidates()
+    } else {
+        element.resolveToCallCandidates()
+    }
+
+    /**
+     * Converts to [List]<[KaCallCandidate]> for consistency checking.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun List<*>.asKaCallCandidates(): List<KaCallCandidate> = when (val first = firstOrNull()) {
+        null -> emptyList()
+        is KaCallCandidate -> this as List<KaCallCandidate>
+        is KaCallCandidateInfo -> (this as List<KaCallCandidateInfo>).map(KaCallCandidateInfo::asKaCallCandidate)
+        else -> error("Unknown type: ${first::class.simpleName}")
+    }
+
+    context(_: KaSession)
+    private fun sortCandidates(candidates: List<*>): List<*> = candidates.sortedWith { a, b ->
+        val call1 = when (a) {
+            is KaCallCandidate -> a.candidate
+            is KaCallCandidateInfo -> a.candidate as KaSingleOrMultiCall
+            else -> return@sortedWith 0
         }
+
+        val call2 = when (b) {
+            is KaCallCandidate -> b.candidate
+            is KaCallCandidateInfo -> b.candidate as KaSingleOrMultiCall
+            else -> return@sortedWith 0
+        }
+
+        compareCalls(call1, call2)
     }
 }

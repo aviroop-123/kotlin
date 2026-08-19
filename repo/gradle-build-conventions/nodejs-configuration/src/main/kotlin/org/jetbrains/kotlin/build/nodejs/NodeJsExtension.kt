@@ -5,20 +5,40 @@
 
 package org.jetbrains.kotlin.build.nodejs
 
+import org.gradle.api.Project
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.testing.Test
-import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension
+import org.gradle.kotlin.dsl.extra
+import org.jetbrains.kotlin.gradle.targets.web.nodejs.BaseNodeJsEnvSpec
 
 abstract class NodeJsExtension(
-    private val nodeJsRoot: NodeJsRootExtension
+    private val project: Project,
+    private val nodeJsEnvSpec: BaseNodeJsEnvSpec,
+    private val nodejsPropertyName: String,
+    private val nodejsVersionName: String,
 ) {
-    @Suppress("DEPRECATION", "DEPRECATION_ERROR")
-    fun Test.setupNodeJs() {
-        dependsOn(nodeJsRoot.nodeJsSetupTaskProvider)
-        val nodeJsExecutablePath = project.provider {
-            nodeJsRoot.requireConfigured().nodeExecutable
+    val nodeJsVersion: String
+        get() = project.property(nodejsVersionName) as String
+
+    val nodeJsExecutablePath: Provider<String> = nodeJsEnvSpec.executable.also {
+        project.extra[nodejsPropertyName] = it
+    }
+
+    fun Test.setupNodeJs(version: String) {
+        with(nodeJsEnvSpec) {
+            dependsOn(project.nodeJsSetupTaskProvider)
         }
+
+        nodeJsEnvSpec.version.set(version)
+
+        val nodejsPropertyName = nodejsPropertyName
+        val nodeJsExecutablePath = nodeJsExecutablePath
+
+        inputs.property("propertyName", nodejsPropertyName)
+        inputs.property("destinationPath", nodeJsExecutablePath)
+
         doFirst {
-            systemProperty("javascript.engine.path.NodeJs", nodeJsExecutablePath.get())
+            systemProperty(nodejsPropertyName, nodeJsExecutablePath.get())
         }
     }
 }

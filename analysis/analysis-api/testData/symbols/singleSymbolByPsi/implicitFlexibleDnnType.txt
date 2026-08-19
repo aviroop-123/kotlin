@@ -6,8 +6,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -17,7 +21,7 @@ KaKotlinPropertySymbol:
     receiverParameter: null
     returnType: KaFlexibleType:
       annotations: []
-      type: ft<java/util/function/Function<kotlin/String!, ft<T & Any, T?>>, java/util/function/Function<kotlin/String!, ft<T & Any, T?>>?>
+      type: java/util/function/Function<kotlin/String!, ft<T & Any, T?>>!
     visibility: PRIVATE
     getDispatchReceiver(): KaUsualClassType:
       annotations: []
@@ -31,6 +35,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: KotlinClass
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: /KotlinClass.propertyWithFlexibleDnnImplicitType
   compilerVisibility: Public
   contextParameters: []
@@ -42,8 +47,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -53,7 +60,7 @@ KaKotlinPropertySymbol:
     receiverParameter: null
     returnType: KaFlexibleType:
       annotations: []
-      type: ft<java/util/function/Function<kotlin/String!, ft<T & Any, T?>>, java/util/function/Function<kotlin/String!, ft<T & Any, T?>>?>
+      type: java/util/function/Function<kotlin/String!, ft<T & Any, T?>>!
     valueParameters: []
     visibility: PUBLIC
     getDispatchReceiver(): KaUsualClassType:
@@ -68,13 +75,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: KotlinClass
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaNonConstantInitializerValue(JavaClass.wrap(JavaClass.wrap<String, T> { _ -> block.invoke() }))
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -90,7 +99,7 @@ KaKotlinPropertySymbol:
   receiverParameter: null
   returnType: KaFlexibleType:
     annotations: []
-    type: ft<java/util/function/Function<kotlin/String!, ft<T & Any, T?>>, java/util/function/Function<kotlin/String!, ft<T & Any, T?>>?>
+    type: java/util/function/Function<kotlin/String!, ft<T & Any, T?>>!
   setter: null
   typeParameters: []
   visibility: PUBLIC
@@ -106,8 +115,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: KotlinClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getPropertyWithFlexibleDnnImplicitType
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: null

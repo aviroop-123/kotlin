@@ -18,7 +18,7 @@ import org.jetbrains.kotlin.gradle.util.buildProject
 import org.jetbrains.kotlin.gradle.util.buildProjectWithMPP
 import org.jetbrains.kotlin.gradle.util.kotlin
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.capitalizeAsciiOnly
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.*
 
 internal class CompilationSpecificPluginPath {
@@ -95,7 +95,7 @@ internal class CompilationSpecificPluginPath {
 
             kotlin {
                 jvm("desktop")
-                js("web", IR) {
+                js("web") {
                     browser()
                 }
             }
@@ -183,6 +183,7 @@ internal class CompilationSpecificPluginPath {
             kotlin {
                 jvm()
                 linuxX64("linux")
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 macosX64("mac")
             }
         }

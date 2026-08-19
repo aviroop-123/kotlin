@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2023 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -16,15 +16,11 @@ import org.jetbrains.kotlin.fir.caches.FirCache
 import org.jetbrains.kotlin.fir.caches.FirCachesFactory
 import org.jetbrains.kotlin.fir.caches.createCache
 import org.jetbrains.kotlin.fir.caches.firCachesFactory
-import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
-import org.jetbrains.kotlin.fir.declarations.FirRegularClass
-import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
-import org.jetbrains.kotlin.fir.declarations.builder.FirSimpleFunctionBuilder
-import org.jetbrains.kotlin.fir.declarations.builder.buildSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.builder.FirNamedFunctionBuilder
+import org.jetbrains.kotlin.fir.declarations.builder.buildNamedFunction
 import org.jetbrains.kotlin.fir.declarations.builder.buildValueParameter
 import org.jetbrains.kotlin.fir.declarations.impl.FirResolvedDeclarationStatusImpl
-import org.jetbrains.kotlin.fir.declarations.isEquals
 import org.jetbrains.kotlin.fir.declarations.utils.isData
 import org.jetbrains.kotlin.fir.declarations.utils.isExtension
 import org.jetbrains.kotlin.fir.declarations.utils.isInlineOrValue
@@ -60,7 +56,8 @@ class FirClassAnySynthesizedMemberScope(
 ) : FirContainingNamesAwareScope() {
     private val originForFunctions = when {
         klass.isData -> FirDeclarationOrigin.Synthetic.DataClassMember
-        klass.isInlineOrValue -> FirDeclarationOrigin.Synthetic.ValueClassMember
+        klass.isFullValueClass -> FirDeclarationOrigin.Synthetic.FullValueClassMember
+        klass.isInlineOrValue -> FirDeclarationOrigin.Synthetic.BasicValueClassMember
         else -> error("This scope should not be created for non-data and non-value class. ${klass.render()}")
     }
     private val lookupTag = klass.symbol.toLookupTag()
@@ -70,8 +67,6 @@ class FirClassAnySynthesizedMemberScope(
     private val dispatchReceiverType = klass.defaultType()
 
     private val synthesizedCache = session.synthesizedStorage.synthesizedCacheByScope.getValue(lookupTag, null)
-
-    private val synthesizedSource = klass.source?.fakeElement(KtFakeSourceElementKind.DataClassGeneratedMembers)
 
     private val superKlassScope = lookupSuperTypes(
         klass, lookupInterfaces = false, deep = false, useSiteSession = session, substituteTypes = true
@@ -143,18 +138,27 @@ class FirClassAnySynthesizedMemberScope(
             else -> shouldNotBeCalled()
         }.symbol
 
-    private fun generateEqualsFunction(): FirSimpleFunction =
-        buildSimpleFunction {
-            generateSyntheticFunction(OperatorNameConventions.EQUALS, isOperator = true)
+    private fun generateEqualsFunction(): FirNamedFunction =
+        buildNamedFunction {
+            generateSyntheticFunction(
+                OperatorNameConventions.EQUALS,
+                KtFakeSourceElementKind.DataClassGeneratedMembers.EqualsFunction,
+                isOperator = true,
+            )
+
             returnTypeRef = FirImplicitBooleanTypeRef(source)
             this.valueParameters.add(
                 buildValueParameter {
+                    val valueParameterSourceElement = klass.source
+                        ?.fakeElement(KtFakeSourceElementKind.DataClassGeneratedMembers.EqualsFunction.Parameter)
+
+                    source = valueParameterSourceElement
                     this.name = Name.identifier("other")
                     origin = originForFunctions
                     moduleData = baseModuleData
                     this.returnTypeRef = FirImplicitNullableAnyTypeRef(null)
                     this.symbol = FirValueParameterSymbol()
-                    containingDeclarationSymbol = this@buildSimpleFunction.symbol
+                    containingDeclarationSymbol = this@buildNamedFunction.symbol
                     isCrossinline = false
                     isNoinline = false
                     isVararg = false
@@ -162,32 +166,43 @@ class FirClassAnySynthesizedMemberScope(
             )
         }
 
-    private fun generateHashCodeFunction(): FirSimpleFunction =
-        buildSimpleFunction {
-            generateSyntheticFunction(OperatorNameConventions.HASH_CODE)
+    private fun generateHashCodeFunction(): FirNamedFunction =
+        buildNamedFunction {
+            generateSyntheticFunction(
+                OperatorNameConventions.HASH_CODE,
+                KtFakeSourceElementKind.DataClassGeneratedMembers.HashCodeFunction,
+            )
             returnTypeRef = FirImplicitIntTypeRef(source)
         }
 
-    private fun generateToStringFunction(): FirSimpleFunction =
-        buildSimpleFunction {
-            generateSyntheticFunction(OperatorNameConventions.TO_STRING)
+    private fun generateToStringFunction(): FirNamedFunction =
+        buildNamedFunction {
+            generateSyntheticFunction(
+                OperatorNameConventions.TO_STRING,
+                KtFakeSourceElementKind.DataClassGeneratedMembers.ToStringFunction,
+            )
             returnTypeRef = FirImplicitStringTypeRef(source)
         }
 
-    private fun FirSimpleFunctionBuilder.generateSyntheticFunction(
+    private fun FirNamedFunctionBuilder.generateSyntheticFunction(
         name: Name,
+        sourceKind: KtFakeSourceElementKind,
         isOperator: Boolean = false,
     ) {
-        this.source = synthesizedSource
+        this.source = klass.source?.fakeElement(sourceKind)
         moduleData = baseModuleData
         origin = originForFunctions
         this.name = name
         status = FirResolvedDeclarationStatusImpl(Visibilities.Public, Modality.OPEN, EffectiveVisibility.Public).apply {
             this.isOperator = isOperator
-            this.returnValueStatus = ReturnValueStatus.MustUse // kotlin.Any is compiled in FULL mode, so overrides of Any functions have to be must-use
+
+            // kotlin.Any is compiled in FULL mode, so overrides of Any functions have to be must-use
+            this.returnValueStatus = ReturnValueStatus.MustUse
         }
+        isLocal = klass.isLocal
         symbol = FirNamedFunctionSymbol(CallableId(lookupTag.classId, name))
         dispatchReceiverType = this@FirClassAnySynthesizedMemberScope.dispatchReceiverType
+        resolvePhase = FirResolvePhase.BODY_RESOLVE
     }
 
     @DelicateScopeAPI

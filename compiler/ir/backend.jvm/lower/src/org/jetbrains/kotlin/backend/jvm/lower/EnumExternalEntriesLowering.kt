@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.backend.jvm.lower
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.backend.jvm.ir.findEnumValuesFunction
@@ -60,7 +59,6 @@ import org.jetbrains.kotlin.name.SpecialNames
  *
  * There's similar code which handles the `enumEntries<Enum>()` intrinsic code generation in `EnumEntriesIntrinsicMappingsCacheImpl`.
  */
-@PhaseDescription(name = "EnumExternalEntries")
 internal class EnumExternalEntriesLowering(private val context: JvmBackendContext) :
     FileLoweringPass, IrElementTransformerVoidWithContext() {
     override fun lower(irFile: IrFile) {
@@ -111,7 +109,7 @@ internal class EnumExternalEntriesLowering(private val context: JvmBackendContex
         state = mappingState
         super.visitClassNew(declaration)
 
-        for ((enum, field) in mappingState.mappings) {
+        for ([enum, field] in mappingState.mappings) {
             val enumValues = enum.findEnumValuesFunction(context)
             field.initializer =
                 context.createIrBuilder(field.symbol).run {

@@ -9,6 +9,7 @@ scopes:
         compilerVisibility: Local
         isActual: false
         isExpect: false
+        isExternal: false
         isReified: false
         location: LOCAL
         modality: FINAL
@@ -22,6 +23,7 @@ scopes:
         compilerVisibility: Local
         isActual: false
         isExpect: false
+        isExternal: false
         isReified: false
         location: LOCAL
         modality: FINAL
@@ -127,8 +129,12 @@ scopes:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -150,8 +156,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -179,8 +188,10 @@ scopes:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: true
           isOverride: false
@@ -193,8 +204,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -218,8 +232,9 @@ scopes:
         hasSetter: false
         initializer: null
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: true
         isExternal: false
@@ -238,8 +253,11 @@ scopes:
           compilerVisibility: Public
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isVal: true
           location: LOCAL
           modality: FINAL
@@ -263,6 +281,7 @@ scopes:
             compilerVisibility: Local
             isActual: false
             isExpect: false
+            isExternal: false
             isReified: false
             location: LOCAL
             modality: FINAL
@@ -276,6 +295,7 @@ scopes:
             compilerVisibility: Local
             isActual: false
             isExpect: false
+            isExternal: false
             isReified: false
             location: LOCAL
             modality: FINAL
@@ -299,4 +319,3 @@ scopes:
     constructors: 0
 
   DefaultStarImportingScope, index = 6
-

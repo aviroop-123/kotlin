@@ -12,7 +12,7 @@ class MarkdownRendererTests {
     @Test
     fun testModulesModeRendering() {
         assertEquals(
-            """# Stats for 2025-06-22T22:30:56
+            """# Stats for 2025-06-22T20:30:56
 
 * Platform: JVM
 * Has errors: true
@@ -33,7 +33,8 @@ class MarkdownRendererTests {
 | ↳ IrPreLoweringDynamicStat3   |     0.25% (15 ms) |     0.25% (11 ms) |     0.25% (18 ms) |
 | IR SERIALIZATION              |     1.00% (60 ms) |     1.00% (45 ms) |     1.00% (75 ms) |
 | KLIB WRITING                  |     1.00% (60 ms) |     1.00% (45 ms) |     1.00% (75 ms) |
-| IR LOWERING                   |     1.00% (60 ms) |     1.00% (45 ms) |     1.00% (75 ms) |
+| IR LINKING                    |     0.50% (30 ms) |     0.50% (22 ms) |     0.50% (37 ms) |
+| IR LOWERING                   |     0.50% (30 ms) |     0.50% (22 ms) |     0.50% (37 ms) |
 | BACKEND                       |   16.00% (960 ms) |   16.00% (720 ms) |  16.00% (1200 ms) |
 |                               |                   |                   |                   |
 | Find Java class               |    4.00% (240 ms) |    4.00% (180 ms) |    4.00% (300 ms) |
@@ -83,7 +84,7 @@ class MarkdownRendererTests {
     @Test
     fun testTimeStampModeRendering() {
         assertEquals(
-            """# Stats for Aggregate
+            """# Stats for time_stamp
 
 * Platform: JVM
 * Has errors: false
@@ -104,7 +105,8 @@ class MarkdownRendererTests {
 | ↳ IrPreLoweringDynamicStat3   |      0.25% (5 ms) |      0.25% (3 ms) |      0.25% (6 ms) |
 | IR SERIALIZATION              |     1.00% (20 ms) |     1.00% (15 ms) |     1.00% (25 ms) |
 | KLIB WRITING                  |     1.00% (20 ms) |     1.00% (15 ms) |     1.00% (25 ms) |
-| IR LOWERING                   |     1.00% (20 ms) |     1.00% (15 ms) |     1.00% (25 ms) |
+| IR LINKING                    |     0.50% (10 ms) |      0.50% (7 ms) |     0.50% (12 ms) |
+| IR LOWERING                   |     0.50% (10 ms) |      0.50% (7 ms) |     0.50% (12 ms) |
 | BACKEND                       |   16.00% (320 ms) |   16.00% (240 ms) |   16.00% (400 ms) |
 |                               |                   |                   |                   |
 | Find Java class               |     4.00% (80 ms) |     4.00% (60 ms) |    4.00% (100 ms) |
@@ -126,25 +128,25 @@ class MarkdownRendererTests {
 
 | Time Stamp          |            Value |
 | ------------------- | ---------------: |
-| 2025-06-22T22:30:56 | 50.00% (3000 ms) |
-| 2025-06-21T22:30:56 | 33.33% (2000 ms) |
-| 2025-06-20T22:30:56 | 16.67% (1000 ms) |
+| 2025-06-22T20:30:56 | 50.00% (3000 ms) |
+| 2025-06-21T20:30:56 | 33.33% (2000 ms) |
+| 2025-06-20T20:30:56 | 16.67% (1000 ms) |
 
 ## By analysis time
 
 | Time Stamp          |            Value |
 | ------------------- | ---------------: |
-| 2025-06-22T22:30:56 | 50.00% (1200 ms) |
-| 2025-06-21T22:30:56 |  33.33% (800 ms) |
-| 2025-06-20T22:30:56 |  16.67% (400 ms) |
+| 2025-06-22T20:30:56 | 50.00% (1200 ms) |
+| 2025-06-21T20:30:56 |  33.33% (800 ms) |
+| 2025-06-20T20:30:56 |  16.67% (400 ms) |
 
 ## By LPS (lines per second)
 
 | Time Stamp          |      Value |
 | ------------------- | ---------: |
-| 2025-06-22T22:30:56 | 106.67 LPS |
-| 2025-06-21T22:30:56 | 128.00 LPS |
-| 2025-06-20T22:30:56 | 192.00 LPS |
+| 2025-06-22T20:30:56 | 106.67 LPS |
+| 2025-06-21T20:30:56 | 128.00 LPS |
+| 2025-06-20T20:30:56 | 192.00 LPS |
 
 """,
             MarkdownReportRenderer(StatsCalculator(TestData.timeStampStats)).render()

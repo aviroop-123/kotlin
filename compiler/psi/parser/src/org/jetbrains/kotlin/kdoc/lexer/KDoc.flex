@@ -21,6 +21,16 @@ import org.jetbrains.kotlin.kdoc.parser.KDocKnownTag;
    */
   private int consecutiveLineBreakCount;
 
+  /**
+    * Stores the symbol that started the current code block (tilda or backtick).
+    */
+  private char codeFenceChar = '\0';
+
+  /**
+    * Counts the length of the [codeFenceChar] string that started the current code block.
+    */
+  private int codeFenceLength = -1;
+
   private BlockType lastBlockType;
 
   private enum BlockType {
@@ -45,6 +55,48 @@ import org.jetbrains.kotlin.kdoc.parser.KDocKnownTag;
   private boolean isLastToken() {
     return zzMarkedPos == zzBuffer.length();
   }
+
+  private int countRepeating(char c) {
+      int current = zzStartRead;
+      while (zzBuffer.charAt(current) == c && current < zzMarkedPos) {
+          ++current;
+      }
+      return current - zzStartRead;
+  }
+
+  private enum LinePos {
+      AFTER_NEWLINE,
+      AFTER_LEADING_ASTERISK,
+      IN_CONTENT,
+  }
+
+  private boolean hasMatchingCloseFence(char c, int length) {
+      int pos = zzMarkedPos;
+      LinePos linePos = LinePos.IN_CONTENT;
+      while (pos < zzEndRead) {
+          char ch = zzBuffer.charAt(pos);
+          if (ch == '\n') {
+              if (linePos != LinePos.IN_CONTENT) return false;
+              linePos = LinePos.AFTER_NEWLINE;
+              pos++;
+          } else if (Character.isWhitespace(ch)) {
+              pos++;
+          } else if (linePos == LinePos.AFTER_NEWLINE && ch == '*') {
+              do { pos++; } while (pos < zzEndRead && zzBuffer.charAt(pos) == '*');
+              if (pos < zzEndRead && zzBuffer.charAt(pos) == '/') return false;
+              linePos = LinePos.AFTER_LEADING_ASTERISK;
+          } else if (ch == c) {
+              int fenceStart = pos;
+              do { pos++; } while (pos < zzEndRead && zzBuffer.charAt(pos) == ch);
+              if (pos - fenceStart == length) return true;
+              linePos = LinePos.IN_CONTENT;
+          } else {
+              linePos = LinePos.IN_CONTENT;
+              pos++;
+          }
+      }
+      return false;
+  }
 %}
 
 %function advance
@@ -62,9 +114,13 @@ import org.jetbrains.kotlin.kdoc.parser.KDocKnownTag;
 %state CODE_BLOCK_LINE_BEGINNING
 %state CODE_BLOCK_CONTENTS_BEGINNING
 %state INDENTED_CODE_BLOCK
+%state CODE_SPAN_CONTENTS
+%state CODE_SPAN_LINE_BEGINNING
 
 WHITE_SPACE_CHAR    = [\ \t\f]
 LINE_BREAK_CHAR     = [\r\n]
+
+ESCAPED_CHARS = "\\"[!#$%&'()*+,-./:;<=>?@_`{|}~\"\^\[\\\]]
 
 DIGIT=[0-9]
 LETTER = [:jletter:]
@@ -72,8 +128,16 @@ PLAIN_IDENTIFIER = {LETTER} ({LETTER} | {DIGIT})*
 IDENTIFIER = {PLAIN_IDENTIFIER} | `[^`\n]+`
 QUALIFIED_NAME = {IDENTIFIER} ([\.] {IDENTIFIER}?)* // Handle incorrect/incomplete qualifiers for correct resolving
 CODE_LINK=\[{QUALIFIED_NAME}\]
-CODE_FENCE_START=("```" | "~~~").*
-CODE_FENCE_END=("```" | "~~~")
+BACKTICK_STRING="`"+
+TILDA_STRING="~"+
+// Fenced code blocks only start at the beginning of a new line and don't contain any backtick
+// characters after the initial fence.
+// `org.jetbrains.kotlin.kdoc.lexer.KDocLexer` relies on these two types of ending fences.
+// If this set is changed, please, update `KDocLexer` accordingly
+BACKTICK_CODE_FENCE_START = "``" {BACKTICK_STRING} [^`{LINE_BREAK_CHAR}]*
+TILDA_CODE_FENCE_START = "~~" {TILDA_STRING} [^{LINE_BREAK_CHAR}]*
+CODE_FENCE_START={BACKTICK_CODE_FENCE_START} | {TILDA_CODE_FENCE_START}
+CODE_FENCE_END={BACKTICK_STRING} | {TILDA_STRING}
 
 %%
 
@@ -154,10 +218,77 @@ CODE_FENCE_END=("```" | "~~~")
               return KDocTokens.MARKDOWN_LINK;
     }
 
+    {BACKTICK_STRING} {
+              codeFenceChar = zzBuffer.charAt(zzStartRead);
+              codeFenceLength = countRepeating(codeFenceChar);
+              if (hasMatchingCloseFence(codeFenceChar, codeFenceLength)) {
+                  yybeginAndUpdate(CODE_SPAN_CONTENTS);
+              }
+              return KDocTokens.TEXT;
+    }
+
     [^] {
               yybeginAndUpdate(CONTENTS);
               return KDocTokens.TEXT;
     }
+}
+
+<CONTENTS_BEGINNING> {
+    {CODE_FENCE_START} / {LINE_BREAK_CHAR} {
+              lastBlockType = BlockType.Code;
+              codeFenceChar = zzBuffer.charAt(zzStartRead);
+              codeFenceLength = countRepeating(codeFenceChar);
+              yybeginAndUpdate(CODE_BLOCK_LINE_BEGINNING);
+              return KDocTokens.TEXT;
+    }
+}
+
+<CONTENTS_BEGINNING, CONTENTS> {
+    {BACKTICK_STRING} {
+              codeFenceChar = zzBuffer.charAt(zzStartRead);
+              codeFenceLength = countRepeating(codeFenceChar);
+              if (hasMatchingCloseFence(codeFenceChar, codeFenceLength)) {
+                  yybeginAndUpdate(CODE_SPAN_CONTENTS);
+              }
+              return KDocTokens.TEXT;
+      }
+}
+
+<CODE_SPAN_CONTENTS> {
+    {LINE_BREAK_CHAR} {
+              yybeginAndUpdate(CODE_SPAN_LINE_BEGINNING);
+              return TokenType.WHITE_SPACE;
+      }
+
+    {BACKTICK_STRING} {
+              char ch = zzBuffer.charAt(zzStartRead);
+              int length = countRepeating(ch);
+              if (length == codeFenceLength && ch == codeFenceChar) {
+                  // Code span end
+                  codeFenceLength = -1;
+                  codeFenceChar = '\0';
+                  yybeginAndUpdate(CONTENTS);
+                  return KDocTokens.TEXT;
+              } else {
+                  return KDocTokens.CODE_SPAN_TEXT;
+              }
+      }
+
+    [^] {
+              return KDocTokens.CODE_SPAN_TEXT;
+      }
+}
+
+<CODE_SPAN_LINE_BEGINNING> {
+    {WHITE_SPACE_CHAR}+ {
+              return TokenType.WHITE_SPACE;
+    }
+
+    "*"+ {
+              yybeginAndUpdate(CODE_SPAN_CONTENTS);
+              return KDocTokens.LEADING_ASTERISK;
+    }
+
 }
 
 <LINE_BEGINNING, CONTENTS_BEGINNING, CONTENTS> {
@@ -189,7 +320,7 @@ CODE_FENCE_END=("```" | "~~~")
               return KDocTokens.TEXT;  // internal white space
     }
 
-    "\\"[\[\]] {
+    {ESCAPED_CHARS} {
               lastBlockType = BlockType.Paragraph;
               yybeginAndUpdate(CONTENTS);
               return KDocTokens.MARKDOWN_ESCAPED_CHAR;
@@ -205,12 +336,6 @@ CODE_FENCE_END=("```" | "~~~")
               lastBlockType = BlockType.Paragraph;
               yybeginAndUpdate(CONTENTS);
               return KDocTokens.KDOC_RPAR;
-    }
-
-    {CODE_FENCE_START} {
-              lastBlockType = BlockType.Code;
-              yybeginAndUpdate(CODE_BLOCK_LINE_BEGINNING);
-              return KDocTokens.TEXT;
     }
 
     /* We're only interested in parsing links that can become code references,
@@ -244,9 +369,17 @@ CODE_FENCE_END=("```" | "~~~")
 
 <CODE_BLOCK_LINE_BEGINNING, CODE_BLOCK_CONTENTS_BEGINNING> {
     {CODE_FENCE_END} / [ \t\f]* [\n] {
-              // Code fence end
-              yybeginAndUpdate(CONTENTS);
-              return KDocTokens.TEXT;
+              char ch =  zzBuffer.charAt(zzStartRead);
+              int length = countRepeating(ch);
+              if (length == codeFenceLength && ch == codeFenceChar) {
+                  // Code fence end
+                  codeFenceChar = '\0';
+                  codeFenceLength = -1;
+                  yybeginAndUpdate(CONTENTS);
+                  return KDocTokens.TEXT;
+              } else {
+                  return KDocTokens.CODE_BLOCK_TEXT;
+              }
     }
 }
 

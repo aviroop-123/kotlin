@@ -1,3 +1,0 @@
-KtNameReferenceExpression(62,65): 'bar'
-  KtSimpleNameReference:
-    bar: kotlin.Int [fake.kt]

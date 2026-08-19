@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// LANGUAGE: -ProhibitIntersectionReifiedTypeParameter
 class In<in I>
 
 fun <S> select(x: S, y: S): S = x

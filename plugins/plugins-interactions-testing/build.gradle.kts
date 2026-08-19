@@ -1,8 +1,8 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 val beforePluginClasspath: Configuration by configurations.creating
@@ -15,7 +15,9 @@ dependencies {
     testFixturesApi(testFixtures(project(":kotlinx-serialization-compiler-plugin")))
     testFixturesApi(testFixtures(project(":kotlin-lombok-compiler-plugin")))
     testFixturesApi(testFixtures(project(":kotlin-noarg-compiler-plugin")))
+    testFixturesApi(testFixtures(project(":kotlin-power-assert-compiler-plugin")))
     testFixturesApi(testFixtures(project(":plugins:parcelize:parcelize-compiler")))
+    testFixturesApi(testFixtures(project(":plugins:plugin-sandbox")))
 
     testFixturesApi(testFixtures(project(":compiler:tests-integration")))
 
@@ -23,9 +25,6 @@ dependencies {
     testFixturesApi(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
-
-    testRuntimeOnly(project(":core:descriptors.runtime"))
-    testRuntimeOnly(project(":compiler:fir:fir-serialization"))
 
     testRuntimeOnly(commonDependency("org.codehaus.woodstox:stax2-api"))
     testRuntimeOnly(commonDependency("com.fasterxml:aalto-xml"))
@@ -51,10 +50,13 @@ testsJar()
 projectTests {
     testTask(
         jUnitMode = JUnitMode.JUnit5,
-        defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_1_8, JdkMajorVersion.JDK_11_0, JdkMajorVersion.JDK_17_0, JdkMajorVersion.JDK_21_0)
+        defineJDKEnvVariables = listOf(
+            JdkMajorVersion.JDK_1_8,
+            JdkMajorVersion.JDK_11_0,
+            JdkMajorVersion.JDK_17_0,
+            JdkMajorVersion.JDK_21_0
+        )
     ) {
-        dependsOn(":dist")
-        workingDir = rootDir
         useJUnitPlatform()
 
         addClasspathProperty(beforePluginClasspath, "plugin.classpath.before")
@@ -64,5 +66,19 @@ projectTests {
 
     testGenerator("org.jetbrains.kotlin.compiler.plugins.TestGeneratorKt")
 
+    testData(isolated, "testData")
+
     withJvmStdlibAndReflect()
+    withPluginSandboxAnnotations()
+    withScriptRuntime()
+    withTestJar()
+    withMockJdkAnnotationsJar()
+    withMockJdkRuntime()
+    withStdlibCommon()
+    withThirdPartyAnnotations()
+    withThirdPartyJsr305()
+    withThirdPartyJava8Annotations()
+    withStdlibCommon()
+    withJsRuntime()
+    withWasmRuntime()
 }

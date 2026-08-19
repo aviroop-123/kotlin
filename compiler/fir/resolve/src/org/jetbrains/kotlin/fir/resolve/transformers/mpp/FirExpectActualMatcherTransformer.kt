@@ -33,7 +33,7 @@ class FirExpectActualMatcherProcessor(
 
 /**
  * This transformer populates [expectForActual] mapping for actual declarations.
- * Also, populates it [memberExpectForActual] mapping
+ * Also, populates it memberExpectForActual mapping in [FirExpectActualMappingStorage]
  *
  * Should run before any kind of body resolution, since [expectForActual] is used there.
  *
@@ -80,9 +80,9 @@ open class FirExpectActualMatcherTransformer(
     override fun transformErrorPrimaryConstructor(errorPrimaryConstructor: FirErrorPrimaryConstructor, data: Nothing?): FirStatement =
         transformConstructor(errorPrimaryConstructor, data)
 
-    override fun transformSimpleFunction(simpleFunction: FirSimpleFunction, data: Nothing?): FirStatement {
-        transformMemberDeclaration(simpleFunction)
-        return simpleFunction
+    override fun transformNamedFunction(namedFunction: FirNamedFunction, data: Nothing?): FirStatement {
+        transformMemberDeclaration(namedFunction)
+        return namedFunction
     }
 
     // --------------------------- other ---------------------------

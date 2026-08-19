@@ -13,10 +13,10 @@ import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirProperty
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
-import org.jetbrains.kotlin.fir.declarations.isLocal
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.utils.isOverride
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
 import org.jetbrains.kotlin.fir.types.abbreviatedTypeOrSelf
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.fir.types.isNothing
@@ -25,8 +25,8 @@ object FirImplicitNothingReturnTypeChecker : FirCallableDeclarationChecker(MppCh
 
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirCallableDeclaration) {
-        if (declaration !is FirSimpleFunction && declaration !is FirProperty) return
-        if (declaration is FirProperty && declaration.isLocal) return
+        if (declaration !is FirNamedFunction && declaration !is FirProperty) return
+        if (declaration is FirProperty && declaration.symbol is FirLocalPropertySymbol) return
         if (declaration.isOverride) return
         if (declaration.origin == FirDeclarationOrigin.ScriptCustomization.ResultProperty) return
         if (declaration.symbol.hasExplicitReturnType) {
@@ -35,7 +35,7 @@ object FirImplicitNothingReturnTypeChecker : FirCallableDeclarationChecker(MppCh
             if (notDeclaredAsNothing && expandedNothing) {
                 @Suppress("REDUNDANT_ELSE_IN_WHEN")
                 val factory = when (declaration) {
-                    is FirSimpleFunction -> FirErrors.ABBREVIATED_NOTHING_RETURN_TYPE
+                    is FirNamedFunction -> FirErrors.ABBREVIATED_NOTHING_RETURN_TYPE
                     is FirProperty -> FirErrors.ABBREVIATED_NOTHING_PROPERTY_TYPE
                     else -> error("Should not be here")
                 }
@@ -46,7 +46,7 @@ object FirImplicitNothingReturnTypeChecker : FirCallableDeclarationChecker(MppCh
         if (declaration.returnTypeRef.coneType.isNothing) {
             @Suppress("REDUNDANT_ELSE_IN_WHEN")
             val factory = when (declaration) {
-                is FirSimpleFunction -> FirErrors.IMPLICIT_NOTHING_RETURN_TYPE
+                is FirNamedFunction -> FirErrors.IMPLICIT_NOTHING_RETURN_TYPE
                 is FirProperty -> FirErrors.IMPLICIT_NOTHING_PROPERTY_TYPE
                 else -> error("Should not be here")
             }

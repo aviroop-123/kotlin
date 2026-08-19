@@ -5,8 +5,10 @@
 
 package org.jetbrains.kotlin.resolve.calls.mpp
 
+import org.jetbrains.kotlin.config.AnalysisFlags
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.config.ReturnValueCheckerMode
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.mpp.*
 import org.jetbrains.kotlin.name.Name
@@ -163,7 +165,7 @@ object AbstractExpectActualChecker {
             add(ExpectActualIncompatibility.Supertypes)
         }
 
-        if (isIllegalRequiresOptInAnnotation(on = actualClass, expectClassSymbol, languageVersionSettings)) {
+        if (isIllegalRequiresOptInAnnotation(on = actualClass, expectClassSymbol)) {
             add(ExpectActualIncompatibility.IllegalRequiresOpt)
         }
 
@@ -402,6 +404,12 @@ object AbstractExpectActualChecker {
             add(ExpectActualIncompatibility.ContextParameterNames)
         }
 
+        if (languageVersionSettings.getFlag(AnalysisFlags.returnValueCheckerMode) != ReturnValueCheckerMode.DISABLED) {
+            if (mustUseMatcher?.matches(expectDeclaration, actualDeclaration, expectContainingClass) == false) {
+                add(ExpectActualIncompatibility.IgnorabilityIsDifferent)
+            }
+        }
+
         if (sizesAreEqualAndElementsNotEqualBy(expectedTypeParameters, actualTypeParameters) { nameOf(it) }) {
             add(ExpectActualIncompatibility.TypeParameterNames)
         }
@@ -587,7 +595,7 @@ object AbstractExpectActualChecker {
         }
 
         // Removing "reified" from an expected function's type parameter is fine
-        if ((expectTypeParameterSymbols zipIfSizesAreEqual actualTypeParameterSymbols)?.any { (e, a) -> !e.isReified && a.isReified } == true) {
+        if ((expectTypeParameterSymbols zipIfSizesAreEqual actualTypeParameterSymbols)?.any { [e, a] -> !e.isReified && a.isReified } == true) {
             return ExpectActualIncompatibility.TypeParameterReified
         }
 
@@ -648,7 +656,7 @@ object AbstractExpectActualChecker {
 
     // ---------------------------------------- Utils ----------------------------------------
 
-    private inline fun <T, K> sizesAreEqualAndElementsNotEqualBy(first: List<T>, second: List<T>, selector: (T) -> K): Boolean {
+    internal inline fun <T, K> sizesAreEqualAndElementsNotEqualBy(first: List<T>, second: List<T>, selector: (T) -> K): Boolean {
         if (first.size != second.size) return false
         for (i in first.indices) {
             if (selector(first[i]) != selector(second[i])) return true
@@ -671,10 +679,8 @@ object AbstractExpectActualChecker {
 fun ExpectActualMatchingContext<*>.isIllegalRequiresOptInAnnotation(
     on: RegularClassSymbolMarker, // actual or expect
     expect: RegularClassSymbolMarker,
-    languageVersionSettings: LanguageVersionSettings,
 ): Boolean {
-    return languageVersionSettings.supportsFeature(LanguageFeature.MultiplatformRestrictions) &&
-            on.classKind.isAnnotationClass &&
+    return on.classKind.isAnnotationClass &&
             expect.annotations.none { it.classId == StandardClassIds.Annotations.OptionalExpectation } &&
             on.annotations.any { it.classId == OptInNames.REQUIRES_OPT_IN_CLASS_ID }
 }

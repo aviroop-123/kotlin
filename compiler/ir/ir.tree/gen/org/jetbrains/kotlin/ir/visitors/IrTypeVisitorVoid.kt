@@ -50,12 +50,12 @@ abstract class IrTypeVisitorVoid : IrTypeVisitor<Unit, Nothing?>() {
         visitTypeRecursively(container, type)
     }
 
-    open fun visitAnnotationUsage(annotationUsage: IrConstructorCall) {
+    open fun visitAnnotationUsage(annotationUsage: IrAnnotation) {
         visitElement(annotationUsage)
         visitTypeRecursively(annotationUsage, annotationUsage.type)
     }
 
-    final override fun visitAnnotationUsage(annotationUsage: IrConstructorCall, data: Nothing?) {
+    final override fun visitAnnotationUsage(annotationUsage: IrAnnotation, data: Nothing?) {
         visitAnnotationUsage(annotationUsage)
     }
 
@@ -189,7 +189,6 @@ abstract class IrTypeVisitorVoid : IrTypeVisitor<Unit, Nothing?>() {
     }
 
     open fun visitReplSnippet(declaration: IrReplSnippet) {
-        declaration.returnType?.let { visitTypeRecursively(declaration, it) }
         visitDeclaration(declaration)
     }
 
@@ -312,6 +311,14 @@ abstract class IrTypeVisitorVoid : IrTypeVisitor<Unit, Nothing?>() {
 
     open fun visitConstructorCall(expression: IrConstructorCall) {
         visitFunctionAccess(expression)
+    }
+
+    final override fun visitAnnotation(expression: IrAnnotation, data: Nothing?) {
+        visitAnnotation(expression)
+    }
+
+    open fun visitAnnotation(expression: IrAnnotation) {
+        visitConstructorCall(expression)
     }
 
     final override fun visitSingletonReference(expression: IrGetSingletonValue, data: Nothing?) {

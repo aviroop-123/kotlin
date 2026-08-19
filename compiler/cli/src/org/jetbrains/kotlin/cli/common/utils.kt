@@ -22,20 +22,28 @@ import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.KtSourceFileLinesMapping
+import org.jetbrains.kotlin.backend.common.CompilationException
+import org.jetbrains.kotlin.cli.CliDiagnostics
+import org.jetbrains.kotlin.cli.CliDiagnostics.KOTLIN_PACKAGE_USAGE
+import org.jetbrains.kotlin.cli.CliDiagnostics.ROOTS_RESOLUTION_WARNING
 import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
-import org.jetbrains.kotlin.cli.common.messages.*
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocationWithRange
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
+import org.jetbrains.kotlin.cli.common.messages.MessageUtil
+import org.jetbrains.kotlin.cli.report
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.IncrementalCompilation
-import org.jetbrains.kotlin.config.messageCollector
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.packageFqName
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.isSubpackageOf
+import org.jetbrains.kotlin.platform.TargetPlatform
+import org.jetbrains.kotlin.platform.isCommon
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.text
-import org.jetbrains.kotlin.util.Logger
+import org.jetbrains.kotlin.util.PerformanceManagerImpl
 import java.io.File
-import org.jetbrains.kotlin.cli.common.messages.toLogger as toLoggerNew
 
 fun incrementalCompilationIsEnabled(arguments: CommonCompilerArguments): Boolean {
     return arguments.incrementalCompilation ?: IncrementalCompilation.isEnabledForJvm()
@@ -48,7 +56,6 @@ fun incrementalCompilationIsEnabledForJs(arguments: CommonCompilerArguments): Bo
 fun <F> checkKotlinPackageUsage(
     configuration: CompilerConfiguration,
     files: Collection<F>,
-    messageCollector: MessageCollector,
     getPackage: (F) -> FqName,
     getMessageLocation: (F) -> CompilerMessageSourceLocation?,
 ): Boolean {
@@ -58,8 +65,8 @@ fun <F> checkKotlinPackageUsage(
     val kotlinPackage = FqName("kotlin")
     for (file in files) {
         if (getPackage(file).isSubpackageOf(kotlinPackage)) {
-            messageCollector.report(
-                CompilerMessageSeverity.ERROR,
+            configuration.report(
+                KOTLIN_PACKAGE_USAGE,
                 "Only the Kotlin standard library is allowed to use the 'kotlin' package",
                 getMessageLocation(file),
             )
@@ -72,29 +79,29 @@ fun <F> checkKotlinPackageUsage(
 fun checkKotlinPackageUsageForPsi(
     configuration: CompilerConfiguration,
     files: Collection<KtFile>,
-    messageCollector: MessageCollector = configuration.messageCollector,
-) =
-    checkKotlinPackageUsage(
-        configuration, files, messageCollector,
+): Boolean {
+    return checkKotlinPackageUsage(
+        configuration, files,
         getPackage = { it.packageFqName },
         getMessageLocation = { MessageUtil.psiElementToMessageLocation(it.packageDirective!!) },
     )
+}
 
 fun checkKotlinPackageUsageForLightTree(
     configuration: CompilerConfiguration,
     files: Collection<FirFile>,
-    messageCollector: MessageCollector = configuration.messageCollector,
-) =
-    checkKotlinPackageUsage(
-        configuration, files, messageCollector,
+): Boolean {
+    return checkKotlinPackageUsage(
+        configuration, files,
         getPackage = { it.packageFqName },
         getMessageLocation = { it.packageDirective.source?.getLocationWithin(it) },
     )
+}
 
 private fun KtSourceElement.getLocationWithin(file: FirFile): CompilerMessageLocationWithRange? {
     val sourceFile = file.sourceFile ?: return null
-    val (startLine, startColumn) = file.getLineAndColumnStartingWithOnesAt(startOffset) ?: return null
-    val (endLine, endColumn) = file.getLineAndColumnStartingWithOnesAt(endOffset) ?: return null
+    val [startLine, startColumn] = file.getLineAndColumnStartingWithOnesAt(startOffset) ?: return null
+    val [endLine, endColumn] = file.getLineAndColumnStartingWithOnesAt(endOffset) ?: return null
     return CompilerMessageLocationWithRange.create(sourceFile.path, startLine, startColumn, endLine, endColumn, text?.toString())
 }
 
@@ -103,7 +110,7 @@ private fun FirFile.getLineAndColumnStartingWithOnesAt(offset: Int?): Pair<Int, 
 }
 
 private fun KtSourceFileLinesMapping.getLineAndColumnByOffsetStartingWithOnes(startOffset: Int): Pair<Int, Int> {
-    val (line, column) = getLineAndColumnByOffset(startOffset)
+    val [line, column] = getLineAndColumnByOffset(startOffset)
     return line + 1 to column + 1
 }
 
@@ -111,7 +118,7 @@ fun <PathProvider : Any> getLibraryFromHome(
     paths: PathProvider?,
     getLibrary: (PathProvider) -> File,
     libraryName: String,
-    messageCollector: MessageCollector,
+    configuration: CompilerConfiguration,
     noLibraryArgument: String
 ): File? {
     if (paths != null) {
@@ -121,20 +128,17 @@ fun <PathProvider : Any> getLibraryFromHome(
         }
     }
 
-    messageCollector.report(
-        CompilerMessageSeverity.STRONG_WARNING, "Unable to find " + libraryName + " in the Kotlin home directory. " +
+    configuration.report(
+        ROOTS_RESOLUTION_WARNING,
+        "Unable to find " + libraryName + " in the Kotlin home directory. " +
                 "Pass either " + noLibraryArgument + " to prevent adding it to the classpath, " +
                 "or the correct '-kotlin-home'", null
     )
     return null
 }
 
-@Deprecated(
-    "Use org.jetbrains.kotlin.cli.common.messages.toLogger() instead",
-    ReplaceWith("toLogger()", "org.jetbrains.kotlin.cli.common.messages.toLogger"),
-    DeprecationLevel.ERROR
-)
-fun MessageCollector.toLogger(): Logger = toLoggerNew()
+fun createPerformanceManagerFor(platform: TargetPlatform) =
+    PerformanceManagerImpl(platform, "Kotlin to ${if (platform.isCommon()) "Metadata" else platform.first().platformName} compiler")
 
 fun disposeRootInWriteAction(disposable: Disposable) {
     if (ApplicationManager.getApplication() != null) {
@@ -144,4 +148,17 @@ fun disposeRootInWriteAction(disposable: Disposable) {
     } else {
         Disposer.dispose(disposable)
     }
+}
+
+fun CompilerConfiguration.reportCompilationException(e: CompilationException) {
+    report(
+        CliDiagnostics.COMPILER_EXCEPTION,
+        e.stackTraceToString(),
+        CompilerMessageLocation.create(
+            path = e.path,
+            line = e.line,
+            column = e.column,
+            lineContent = e.content
+        )
+    )
 }

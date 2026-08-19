@@ -1,3 +1,6 @@
+// WASM_IGNORE_FOR: mode=multi-module os=windows
+// ISSUE: KT-84107
+
 fun box(): String {
     testMaterialize()
     return "OK"

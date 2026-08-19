@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// LANGUAGE: +UnrestrictedBuilderInference
 // DIAGNOSTICS: -UNUSED_PARAMETER
 
 class Builder<T> {

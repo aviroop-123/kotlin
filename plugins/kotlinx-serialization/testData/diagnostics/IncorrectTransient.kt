@@ -1,6 +1,4 @@
-// FIR_IDENTICAL
 // WITH_STDLIB
-// SKIP_TXT
 
 import kotlinx.serialization.Serializable
 import java.io.Serializable as JavaSerializable

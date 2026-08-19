@@ -6,18 +6,27 @@
 package org.jetbrains.kotlin.backend.konan
 
 import org.jetbrains.kotlin.backend.common.CommonBackendContext
+import org.jetbrains.kotlin.backend.common.InlineClassesUtils
 import org.jetbrains.kotlin.backend.common.ir.KlibSharedVariablesManager
-import org.jetbrains.kotlin.backend.konan.driver.BasicPhaseContext
-import org.jetbrains.kotlin.backend.konan.ir.KonanSymbols
+import org.jetbrains.kotlin.backend.konan.driver.BasicNativeBackendPhaseContext
+import org.jetbrains.kotlin.backend.konan.ir.BackendNativeSymbols
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.descriptors.ValueClassBackendAgnosticApi
+import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFactory
 import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
+import org.jetbrains.kotlin.ir.declarations.isSingleFieldValueClass
 
-internal abstract class KonanBackendContext(config: KonanConfig) : BasicPhaseContext(config), CommonBackendContext {
+internal abstract class KonanBackendContext(config: NativeSecondStageCompilationConfig) : BasicNativeBackendPhaseContext(config), CommonBackendContext {
+    @OptIn(ValueClassBackendAgnosticApi::class)
+    override val inlineClassesUtils: InlineClassesUtils = object : InlineClassesUtils {
+        override fun isClassInlineLike(klass: IrClass): Boolean =
+                klass.isSingleFieldValueClass(treatFullValueClassesWithOneFieldAsBasic = true)
+    }
+
     abstract val builtIns: KonanBuiltIns
 
-    abstract override val symbols: KonanSymbols
+    abstract override val symbols: BackendNativeSymbols
 
     override val sharedVariablesManager by lazy {
         // Creating lazily because builtIns module seems to be incomplete during `link` test;
@@ -27,6 +36,7 @@ internal abstract class KonanBackendContext(config: KonanConfig) : BasicPhaseCon
 
     override val irFactory: IrFactory = IrFactoryImpl
 
-    override val messageCollector: MessageCollector
-        get() = super<BasicPhaseContext>.messageCollector
+    override fun log(message: String) {
+        super<BasicNativeBackendPhaseContext>.log(message)
+    }
 }

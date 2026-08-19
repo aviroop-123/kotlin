@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 @file:OptIn(ObsoleteWorkersApi::class)
 import kotlin.native.concurrent.*
 

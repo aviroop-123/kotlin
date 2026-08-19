@@ -1,12 +1,12 @@
 // RUN_PIPELINE_TILL: BACKEND
 // FIR_DUMP
 // FULL_JDK
-// LANGUAGE: -DontMakeExplicitJavaTypeArgumentsFlexible
+// LANGUAGE: -DontMakeExplicitNullableJavaTypeArgumentsFlexible
 
 import java.util.Comparator;
 
 fun foo() {
-    Comparator.comparing<String?, Boolean?> {
+    Comparator.comparing<String?, <!UPPER_BOUND_VIOLATED_BASED_ON_JAVA_ANNOTATIONS("Comparable<in Boolean!>!; Boolean?; U (of fun <T : Any!, U : Comparable<in U!>!> comparing)")!>Boolean?<!>> {
         it != ""
     }
 }

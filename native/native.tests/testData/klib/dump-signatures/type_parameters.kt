@@ -1,5 +1,3 @@
-// FIR_IDENTICAL
-
 package type_parameters
 
 private fun consume(anything: Any?) {

@@ -5,8 +5,11 @@ KaEnumEntrySymbol:
   contextReceivers: []
   enumEntryInitializer: null
   isActual: false
+  isCompanion: true
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isVal: true
   location: CLASS
   modality: FINAL
@@ -22,3 +25,4 @@ KaEnumEntrySymbol:
   getContainingJvmClassName: kotlin.LazyThreadSafetyMode
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  importableFqName: kotlin.LazyThreadSafetyMode.SYNCHRONIZED

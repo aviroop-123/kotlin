@@ -28,18 +28,21 @@ import org.jetbrains.kotlin.gradle.plugin.ide.ideaImportDependsOn
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.FrameworkCopy.Companion.dsymFile
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.swiftimport.CheckCocoaPodsHasNoSwiftPMDependencies
 import org.jetbrains.kotlin.gradle.targets.native.cocoapods.CocoapodsPluginDiagnostics
-import org.jetbrains.kotlin.gradle.targets.native.cocoapods.KotlinArtifactsPodspecExtension
-import org.jetbrains.kotlin.gradle.targets.native.cocoapods.kotlinArtifactsPodspecExtension
 import org.jetbrains.kotlin.gradle.targets.native.tasks.*
-import org.jetbrains.kotlin.gradle.targets.native.tasks.artifact.kotlinArtifactsExtension
 import org.jetbrains.kotlin.gradle.tasks.*
+import org.jetbrains.kotlin.gradle.tasks.dependsOn
 import org.jetbrains.kotlin.gradle.utils.*
 import org.jetbrains.kotlin.konan.target.Family
 import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.capitalizeAsciiOnly
-import org.jetbrains.kotlin.utils.addToStdlib.cast
+
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.swiftimport.locateOrRegisterSwiftPMDependenciesExtension
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.swiftimport.transitiveSwiftPMDependenciesProvider
+import org.jetbrains.kotlin.statistics.metrics.BooleanMetrics
+import org.jetbrains.kotlin.statistics.metrics.NumericalMetrics
 import java.io.File
 
 
@@ -71,8 +74,6 @@ internal class CocoapodsBuildDirs(private val layout: ProjectLayout) {
 
     private fun dir(pathFromRoot: String): Provider<Directory> = root.map { it.dir(pathFromRoot) }
 }
-
-internal fun String.asValidFrameworkName() = replace('-', '_')
 
 internal val Family.platformLiteral: String
     get() = when (this) {
@@ -144,7 +145,7 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
     private fun createDefaultFrameworks(kotlinExtension: KotlinMultiplatformExtension) {
         kotlinExtension.supportedAppleTargets().all { target ->
             target.binaries.framework(POD_FRAMEWORK_PREFIX) {
-                baseName = project.name.asValidFrameworkName()
+                baseName = project.name.asValidFrameworkName
             }
         }
     }
@@ -152,14 +153,42 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
     private fun Project.createCopyFrameworkTask(
         frameworkFile: Provider<File>,
         buildingTask: TaskProvider<*>,
-    ) = registerTask<FrameworkCopy>(SYNC_TASK_NAME) { task ->
-        task.group = TASK_GROUP
-        task.description = "Copies a framework for given platform and build type into the CocoaPods build directory"
+    ): TaskProvider<FrameworkCopy> {
+        val syncFrameworkTask = registerTask<FrameworkCopy>(SYNC_TASK_NAME) { task ->
+            task.group = TASK_GROUP
+            task.description = "Copies a framework for given platform and build type into the CocoaPods build directory"
 
-        task.sourceFramework.fileProvider(frameworkFile)
-        task.sourceDsym.fileProvider(dsymFile(frameworkFile))
-        task.dependsOn(buildingTask)
-        task.destinationDirectory.set(layout.cocoapodsBuildDirs.framework)
+            task.sourceFramework.fileProvider(frameworkFile)
+            task.sourceDsym.fileProvider(dsymFile(frameworkFile))
+            task.dependsOn(buildingTask)
+            task.destinationDirectory.set(layout.cocoapodsBuildDirs.framework)
+        }
+        if (!kotlinPropertiesProvider.disableSwiftPMImport) {
+            val checkHasNoSwiftPMDependencies = checkHasNoSwiftPMDependencies()
+            syncFrameworkTask.configure {
+                it.dependsOn(checkHasNoSwiftPMDependencies)
+            }
+        }
+        return syncFrameworkTask
+    }
+
+    private fun Project.checkHasNoSwiftPMDependencies(): TaskProvider<*> {
+        val existingTask = locateTask<DefaultTask>(CHECK_SWIFT_PM_DEPENDENCIES_TASK_NAME)
+        if (existingTask != null) return existingTask
+        val swiftPMImportExtension = locateOrRegisterSwiftPMDependenciesExtension()
+        val directSwiftPMDependencies = provider { swiftPMImportExtension.swiftPMDependencies }
+        val transitiveSwiftPMDependencies = transitiveSwiftPMDependenciesProvider()
+
+        return registerTask<CheckCocoaPodsHasNoSwiftPMDependencies>(CHECK_SWIFT_PM_DEPENDENCIES_TASK_NAME) { task ->
+            task.group = TASK_GROUP
+            task.description = "Check for SwiftPM dependencies and fail the build if these are present during syncFramework integration"
+            task.directSwiftPMDependencies.set(directSwiftPMDependencies)
+            task.transitiveSwiftPMDependencies.set(transitiveSwiftPMDependencies)
+            task.workspacePath.set(project.providers.environmentVariable("WORKSPACE_DIR"))
+            task.gradleProjectPath.set(project.path)
+            task.projectPath.set(project.projectDir)
+            task.rootProjectDir.set(rootProject.projectDir)
+        }
     }
 
     private fun createSyncForFatFramework(
@@ -411,62 +440,6 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
             if (generateWrapper.get()) {
                 task.dependsOn(":wrapper")
             }
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun registerPodspecTask(
-        project: Project,
-        artifact: KotlinNativeArtifact,
-        podspecExtension: KotlinArtifactsPodspecExtension,
-        cocoapodsExtension: CocoapodsExtension,
-    ) {
-        val artifactName = artifact.artifactName
-        val podspecTaskName = lowerCamelCaseName("generate", artifact.name, "podspec")
-
-        val artifactType = when (artifact) {
-            is KotlinNativeLibrary -> when {
-                artifact.isStatic -> GenerateArtifactPodspecTask.ArtifactType.StaticLibrary
-                else -> GenerateArtifactPodspecTask.ArtifactType.DynamicLibrary
-            }
-            is KotlinNativeFramework -> GenerateArtifactPodspecTask.ArtifactType.Framework
-            is KotlinNativeFatFramework -> GenerateArtifactPodspecTask.ArtifactType.FatFramework
-            is KotlinNativeXCFramework -> GenerateArtifactPodspecTask.ArtifactType.XCFramework
-            else -> error("Podspec can only be generated for Library, Framework, FatFramework or XCFramework")
-        }
-
-        val podspecTask = project.registerTask<GenerateArtifactPodspecTask>(podspecTaskName) { task ->
-            task.group = TASK_GROUP
-            task.description = "Generates a podspec file for '$artifactName' artifact"
-            task.specName.set(artifactName)
-            task.specVersion.set(project.version.takeIf { it != Project.DEFAULT_VERSION }.toString())
-            task.destinationDir.set(project.layout.buildDirectory.dir(artifact.outDir))
-            task.attributes.set(podspecExtension.attributes)
-            task.rawStatements.set(podspecExtension.rawStatements)
-            task.dependencies.set(cocoapodsExtension.pods)
-            task.artifactType.set(artifactType)
-        }
-
-        project.tasks.configureByName<Task>(artifact.taskName) {
-            it.dependsOn(podspecTask)
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun injectPodspecExtensionToArtifacts(
-        project: Project,
-        artifactsExtension: KotlinArtifactsExtension,
-        cocoapodsExtension: CocoapodsExtension,
-    ) {
-        artifactsExtension.artifactConfigs.withType(KotlinNativeArtifactConfig::class.java) { artifactConfig ->
-            val podspecExtension = project.objects.newInstance<KotlinArtifactsPodspecExtension>()
-            artifactConfig.addExtension(ARTIFACTS_PODSPEC_EXTENSION_NAME, podspecExtension)
-        }
-
-        artifactsExtension.artifacts.withType(KotlinNativeArtifact::class.java) { artifact ->
-            val podspecExtension = requireNotNull(artifact.kotlinArtifactsPodspecExtension)
-
-            registerPodspecTask(project, artifact, podspecExtension, cocoapodsExtension)
         }
     }
 
@@ -789,6 +762,17 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
         }
     }
 
+    private fun reportCocoaPodsFUS(project: Project, cocoapodsExtension: CocoapodsExtension) {
+        cocoapodsExtension.pods.all {
+            project.addConfigurationMetrics {
+                it.put(BooleanMetrics.KMP_COCOAPODS_HAS_DIRECT_DEPENDENCIES, true)
+            }
+            project.addConfigurationMetrics {
+                it.put(NumericalMetrics.KMP_COCOAPODS_NUMBER_OF_DIRECT_DEPENDENCIES, 1)
+            }
+        }
+    }
+
     private fun Project.taskProjectPath(): String {
         return if (project.depth != 0) project.path else ""
     }
@@ -810,20 +794,23 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
         pluginManager.withPlugin("kotlin-multiplatform") {
             enableCInteropCommonizationSetByExternalPlugin()
             val kotlinExtension = project.multiplatformExtension
-            val kotlinArtifactsExtension = project.kotlinArtifactsExtension
             val cocoapodsExtension = project.objects.newInstance(CocoapodsExtension::class.java, this)
 
             kotlinExtension.addExtension(COCOAPODS_EXTENSION_NAME, cocoapodsExtension)
 
+            reportCocoaPodsFUS(project, cocoapodsExtension)
             createDefaultFrameworks(kotlinExtension)
             val dummyFrameworkTaskProvider = registerDummyFrameworkTask(project, cocoapodsExtension)
             createSyncTask(project, kotlinExtension, cocoapodsExtension)
-            injectPodspecExtensionToArtifacts(project, kotlinArtifactsExtension, cocoapodsExtension)
 
             val podInstallTaskProvider = registerPodInstallTask(project, cocoapodsExtension, dummyFrameworkTaskProvider)
             registerPodBuildTasks(project, kotlinExtension, cocoapodsExtension)
             registerPodImportTask(project, kotlinExtension, podInstallTaskProvider)
             registerPodPublishTasks(project, cocoapodsExtension)
+
+            if (!kotlinPropertiesProvider.cocoapodsSwiftPMMigrationNowarn) {
+                reportDiagnosticOncePerProject(CocoapodsPluginDiagnostics.SwiftPMMigrationSuggested())
+            }
 
             if (!HostManager.hostIsMac) {
                 reportDiagnostic(CocoapodsPluginDiagnostics.UnsupportedOs())
@@ -843,6 +830,7 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
         const val TASK_GROUP = "CocoaPods"
         const val POD_FRAMEWORK_PREFIX = "pod"
         const val SYNC_TASK_NAME = "syncFramework"
+        internal const val CHECK_SWIFT_PM_DEPENDENCIES_TASK_NAME = "checkSwiftPMDependencies"
         const val POD_SPEC_TASK_NAME = "podspec"
         const val DUMMY_FRAMEWORK_TASK_NAME = "generateDummyFramework"
         const val POD_INSTALL_TASK_NAME = "podInstall"
@@ -850,7 +838,6 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
         const val POD_SETUP_BUILD_TASK_NAME = "podSetupBuild"
         const val POD_BUILD_TASK_NAME = "podBuild"
         const val POD_IMPORT_TASK_NAME = "podImport"
-        const val ARTIFACTS_PODSPEC_EXTENSION_NAME = "withPodspec"
 
         // We don't move these properties in PropertiesProvider because
         // they are not intended to be overridden in local.properties.
@@ -867,17 +854,4 @@ open class KotlinCocoapodsPlugin : Plugin<Project> {
     }
 }
 
-/**
- * Extends a KotlinArtifact with a corresponding Podspec
- *
- * Only needed in *.kts build files. In Groovy you can use the same syntax but without explicit extension import
- */
-@Suppress("DEPRECATION")
-@Deprecated(KotlinArtifactsExtension.KOTLIN_NATIVE_ARTIFACTS_DEPRECATION)
-fun KotlinNativeArtifactConfig.withPodspec(configure: KotlinArtifactsPodspecExtension.() -> Unit) {
-    val extension = cast<ExtensionAware>().kotlinArtifactsPodspecExtension
 
-    checkNotNull(extension) { "CocoaPods plugin should be applied before using `${KotlinCocoapodsPlugin.ARTIFACTS_PODSPEC_EXTENSION_NAME}` extension" }
-
-    extension.configure()
-}

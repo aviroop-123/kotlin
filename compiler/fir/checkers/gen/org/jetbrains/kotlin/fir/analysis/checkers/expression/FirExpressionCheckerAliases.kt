@@ -12,13 +12,13 @@ package org.jetbrains.kotlin.fir.analysis.checkers.expression
 
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
-import org.jetbrains.kotlin.fir.expressions.FirArrayLiteral
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirBooleanOperatorExpression
 import org.jetbrains.kotlin.fir.expressions.FirCall
 import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess
 import org.jetbrains.kotlin.fir.expressions.FirCheckNotNullCall
 import org.jetbrains.kotlin.fir.expressions.FirClassReferenceExpression
+import org.jetbrains.kotlin.fir.expressions.FirCollectionLiteral
 import org.jetbrains.kotlin.fir.expressions.FirDoWhileLoop
 import org.jetbrains.kotlin.fir.expressions.FirElvisExpression
 import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall
@@ -31,6 +31,10 @@ import org.jetbrains.kotlin.fir.expressions.FirLoop
 import org.jetbrains.kotlin.fir.expressions.FirLoopJump
 import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
+import org.jetbrains.kotlin.fir.expressions.FirReplDeclarationReference
+import org.jetbrains.kotlin.fir.expressions.FirReplExpressionReference
+import org.jetbrains.kotlin.fir.expressions.FirReplPropertyDelegate
+import org.jetbrains.kotlin.fir.expressions.FirReplPropertyInitializer
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
 import org.jetbrains.kotlin.fir.expressions.FirSafeCallExpression
@@ -61,6 +65,10 @@ typealias FirLoopJumpChecker = FirExpressionChecker<FirLoopJump>
 typealias FirBooleanOperatorExpressionChecker = FirExpressionChecker<FirBooleanOperatorExpression>
 typealias FirReturnExpressionChecker = FirExpressionChecker<FirReturnExpression>
 typealias FirBlockChecker = FirExpressionChecker<FirBlock>
+typealias FirReplDeclarationReferenceChecker = FirExpressionChecker<FirReplDeclarationReference>
+typealias FirReplPropertyInitializerChecker = FirExpressionChecker<FirReplPropertyInitializer>
+typealias FirReplPropertyDelegateChecker = FirExpressionChecker<FirReplPropertyDelegate>
+typealias FirReplExpressionReferenceChecker = FirExpressionChecker<FirReplExpressionReference>
 typealias FirAnnotationChecker = FirExpressionChecker<FirAnnotation>
 typealias FirAnnotationCallChecker = FirExpressionChecker<FirAnnotationCall>
 typealias FirCheckNotNullCallChecker = FirExpressionChecker<FirCheckNotNullCall>
@@ -78,6 +86,6 @@ typealias FirThisReceiverExpressionChecker = FirExpressionChecker<FirThisReceive
 typealias FirWhileLoopChecker = FirExpressionChecker<FirWhileLoop>
 typealias FirThrowExpressionChecker = FirExpressionChecker<FirThrowExpression>
 typealias FirDoWhileLoopChecker = FirExpressionChecker<FirDoWhileLoop>
-typealias FirArrayLiteralChecker = FirExpressionChecker<FirArrayLiteral>
+typealias FirCollectionLiteralChecker = FirExpressionChecker<FirCollectionLiteral>
 typealias FirClassReferenceExpressionChecker = FirExpressionChecker<FirClassReferenceExpression>
 typealias FirInaccessibleReceiverChecker = FirExpressionChecker<FirInaccessibleReceiverExpression>

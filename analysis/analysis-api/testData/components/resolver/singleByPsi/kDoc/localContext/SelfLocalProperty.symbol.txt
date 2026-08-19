@@ -1,0 +1,5 @@
+KDocName(48,50): 'aa'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val aa: kotlin.Int
+    ]

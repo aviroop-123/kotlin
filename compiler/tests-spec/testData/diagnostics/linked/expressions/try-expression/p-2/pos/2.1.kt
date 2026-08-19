@@ -1,4 +1,3 @@
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -17,7 +16,7 @@ fun case1() {
     var flag = false
     try {
         throw Exception()
-        <!UNREACHABLE_CODE!>flag = true<!>
+        flag = true
     } catch (e: Exception) {
         assert(!flag)
     }

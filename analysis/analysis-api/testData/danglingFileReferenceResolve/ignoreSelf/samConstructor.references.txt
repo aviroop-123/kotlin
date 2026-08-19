@@ -1,3 +1,0 @@
-KtNameReferenceExpression(69,79): 'MyRunnable'
-  KtSimpleNameReference:
-    (in ROOT) private MyRunnable(function: () -> kotlin.Unit): MyRunnable [samConstructor.kt]

@@ -5,8 +5,8 @@
 
 package org.jetbrains.kotlin.gradle.targets.native.internal
 
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.Test
 
 class KotlinNativeStackTraceParserKtTest {
     @Test
@@ -84,6 +84,34 @@ KotlinNativeStackTraceElement(bin=program.kexe, address=0x000000010d6bc5e9, clas
                 """
 Uncaught Kotlin exception: kotlin.Exception: Foo!
         at 0   program.kexe                        0x000000010d6ad726 kfun:kotlin.Exception.<init>(kotlin.String?)kotlin.Exception + 70
+        at 1   program.kexe                        0x000000010d6bc7a9 kfun:org.test.A.<get-qux>()ValueType + 89
+        at 2   program.kexe                        0x000000010d6bc712 kfun:org.test.A.baz()ValueType + 50
+        at 3   program.kexe                        0x000000010d6bc633 kfun:org.test.bar()ValueType + 67
+        at 4   program.kexe                        0x000000010d6bc5e9 kfun:org.test.foo()ValueType + 9
+               """.trim()
+            ).toString()
+        )
+    }
+
+    @Test
+    fun testSymbolicationErrorNote() {
+        // see KT-85077
+        assertEquals(
+            """
+KotlinNativeStackTrace(
+message="Uncaught Kotlin exception: kotlin.Exception: Foo!",
+stacktrace=[
+KotlinNativeStackTraceElement(bin=program.kexe, address=0x000000010d6ad726, className=kotlin.Exception, methodName=<init>, signature=(kotlin.String?)kotlin.Exception, offset=70, fileName=null, lineNumber=-1, columnNumber=-1)
+KotlinNativeStackTraceElement(bin=program.kexe, address=0x000000010d6bc7a9, className=org.test.A, methodName=<get-qux>, signature=()ValueType, offset=89, fileName=null, lineNumber=-1, columnNumber=-1)
+KotlinNativeStackTraceElement(bin=program.kexe, address=0x000000010d6bc712, className=org.test.A, methodName=baz, signature=()ValueType, offset=50, fileName=null, lineNumber=-1, columnNumber=-1)
+KotlinNativeStackTraceElement(bin=program.kexe, address=0x000000010d6bc633, className=org.test, methodName=bar, signature=()ValueType, offset=67, fileName=null, lineNumber=-1, columnNumber=-1)
+KotlinNativeStackTraceElement(bin=program.kexe, address=0x000000010d6bc5e9, className=org.test, methodName=foo, signature=()ValueType, offset=9, fileName=null, lineNumber=-1, columnNumber=-1)
+])
+            """.trim(),
+            parseKotlinNativeStackTrace(
+                """
+Uncaught Kotlin exception: kotlin.Exception: Foo!
+        at 0   program.kexe                        0x000000010d6ad726 kfun:kotlin.Exception.<init>(kotlin.String?)kotlin.Exception + 70 <NOTE: unable to find file names and line numbers, see https://youtrack.jetbrains.com/issue/KT-85559>
         at 1   program.kexe                        0x000000010d6bc7a9 kfun:org.test.A.<get-qux>()ValueType + 89
         at 2   program.kexe                        0x000000010d6bc712 kfun:org.test.A.baz()ValueType + 50
         at 3   program.kexe                        0x000000010d6bc633 kfun:org.test.bar()ValueType + 67

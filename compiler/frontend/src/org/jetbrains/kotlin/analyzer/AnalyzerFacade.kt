@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.analyzer
 
 import com.intellij.psi.search.GlobalSearchScope
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.container.ComponentProvider
 import org.jetbrains.kotlin.context.ModuleContext
@@ -20,11 +21,13 @@ import org.jetbrains.kotlin.resolve.scopes.optimization.OptimizingOptions
 import org.jetbrains.kotlin.storage.StorageManager
 import org.jetbrains.kotlin.storage.getValue
 
+@K1Deprecation
 class ResolverForModule(
     val packageFragmentProvider: PackageFragmentProvider,
     val componentProvider: ComponentProvider
 )
 
+@K1Deprecation
 abstract class ResolverForProject<M : ModuleInfo> {
     fun resolverForModule(moduleInfo: M): ResolverForModule = resolverForModuleDescriptor(descriptorForModule(moduleInfo))
     abstract fun tryGetResolverForModule(moduleInfo: M): ResolverForModule?
@@ -48,6 +51,7 @@ abstract class ResolverForProject<M : ModuleInfo> {
     }
 }
 
+@K1Deprecation
 class EmptyResolverForProject<M : ModuleInfo> : ResolverForProject<M>() {
     override val name: String
         get() = "Empty resolver"
@@ -65,14 +69,16 @@ class EmptyResolverForProject<M : ModuleInfo> : ResolverForProject<M>() {
     }
 }
 
+@K1Deprecation
 data class ModuleContent<out M : ModuleInfo>(
     val moduleInfo: M,
     val syntheticFiles: Collection<KtFile>,
     val moduleContentScope: GlobalSearchScope
 )
 
+@K1Deprecation
 abstract class ResolverForModuleFactory {
-    open fun <M : ModuleInfo> createResolverForModule(
+    abstract fun <M : ModuleInfo> createResolverForModule(
         moduleDescriptor: ModuleDescriptorImpl,
         moduleContext: ModuleContext,
         moduleContent: ModuleContent<M>,
@@ -81,68 +87,10 @@ abstract class ResolverForModuleFactory {
         sealedInheritorsProvider: SealedClassInheritorsProvider,
         resolveOptimizingOptions: OptimizingOptions?,
         absentDescriptorHandlerClass: Class<out AbsentDescriptorHandler>?
-    ): ResolverForModule {
-        @Suppress("DEPRECATION")
-        return createResolverForModule(
-            moduleDescriptor,
-            moduleContext,
-            moduleContent,
-            resolverForProject,
-            languageVersionSettings,
-            sealedInheritorsProvider,
-            resolveOptimizingOptions
-        )
-    }
-
-    @Deprecated(
-        "Left only for compatibility, please use full version",
-        ReplaceWith("createResolverForModule(moduleDescriptor, moduleContext, moduleContent, resolverForProject, languageVersionSettings, sealedInheritorsProvider, null, null)")
-    )
-    open fun <M : ModuleInfo> createResolverForModule(
-        moduleDescriptor: ModuleDescriptorImpl,
-        moduleContext: ModuleContext,
-        moduleContent: ModuleContent<M>,
-        resolverForProject: ResolverForProject<M>,
-        languageVersionSettings: LanguageVersionSettings,
-        sealedInheritorsProvider: SealedClassInheritorsProvider,
-        resolveOptimizingOptions: OptimizingOptions?,
-    ): ResolverForModule {
-        @Suppress("DEPRECATION")
-        return createResolverForModule(
-            moduleDescriptor,
-            moduleContext,
-            moduleContent,
-            resolverForProject,
-            languageVersionSettings,
-            sealedInheritorsProvider
-        )
-    }
-
-    @Deprecated(
-        "Left only for compatibility, please use full version",
-        ReplaceWith("createResolverForModule(moduleDescriptor, moduleContext, moduleContent, resolverForProject, languageVersionSettings, sealedInheritorsProvider, null, null)")
-    )
-    open fun <M : ModuleInfo> createResolverForModule(
-        moduleDescriptor: ModuleDescriptorImpl,
-        moduleContext: ModuleContext,
-        moduleContent: ModuleContent<M>,
-        resolverForProject: ResolverForProject<M>,
-        languageVersionSettings: LanguageVersionSettings,
-        sealedInheritorsProvider: SealedClassInheritorsProvider
-    ): ResolverForModule {
-        return createResolverForModule(
-            moduleDescriptor,
-            moduleContext,
-            moduleContent,
-            resolverForProject,
-            languageVersionSettings,
-            sealedInheritorsProvider,
-            resolveOptimizingOptions = null,
-            absentDescriptorHandlerClass = null
-        )
-    }
+    ): ResolverForModule
 }
 
+@K1Deprecation
 class LazyModuleDependencies<M : ModuleInfo>(
     storageManager: StorageManager,
     private val module: M,

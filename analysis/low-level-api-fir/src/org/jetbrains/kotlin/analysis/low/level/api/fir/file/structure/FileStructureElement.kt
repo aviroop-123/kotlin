@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.util.isPartialAnalyzable
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.isPartialBodyResolvable
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.contracts.FirContractDescription
 import org.jetbrains.kotlin.fir.correspondingProperty
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
@@ -30,12 +31,18 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.builder.buildResolvedNamedReference
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.builder.buildTypeProjectionWithVariance
 import org.jetbrains.kotlin.fir.types.coneType
+import org.jetbrains.kotlin.fir.types.resolvedType
+import org.jetbrains.kotlin.fir.types.toRegularClassSymbol
+import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.unwrapParenthesesLabelsAndAnnotations
 import org.jetbrains.kotlin.toKtPsiSourceElement
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.util.OperatorNameConventions
@@ -59,6 +66,7 @@ internal sealed class FileStructureElement(
         fun recorderFor(fir: FirDeclaration): FirElementsRecorder = when (fir) {
             is FirFile -> RootStructureElement.Recorder(fir)
             is FirScript -> RootScriptStructureElement.Recorder(fir)
+            is FirReplSnippet -> RootReplSnippetStructureElement.Recorder(fir)
             is FirRegularClass -> ClassDeclarationStructureElement.Recorder(fir)
             else -> DeclarationStructureElement.Recorder
         }
@@ -71,6 +79,49 @@ internal class KtToFirMapping(private val elementMapper: LLElementMapper) {
     }
 
     companion object {
+        context(session: FirSession)
+        private fun findIntMember(name: Name): FirNamedFunctionSymbol? {
+            return session.builtinTypes.intType.toRegularClassSymbol(session)?.fir?.declarations?.singleOrNull {
+                it is FirNamedFunction && it.name == name
+            }?.symbol as? FirNamedFunctionSymbol
+        }
+
+        /**
+         * Int literals desugars their unary operators right away, so the mapper has to restore them manually.
+         *
+         * Details: [FirElementsRecorder.visitLiteralExpression], KT-70774.
+         */
+        context(session: FirSession)
+        private fun fakeCallForIntLiteralWithUnaryExpression(
+            expression: KtPrefixExpression,
+            mapping: Map<KtElement, FirElement>,
+        ): FirElement? {
+            val operatorExpression = expression.operationReference
+            val operatorName = when (operatorExpression.getReferencedNameElementType()) {
+                KtTokens.PLUS -> OperatorNameConventions.UNARY_PLUS
+                KtTokens.MINUS -> OperatorNameConventions.UNARY_MINUS
+                else -> null
+            } ?: return null
+
+            val baseExpression = expression.baseExpression?.unwrapParenthesesLabelsAndAnnotations() as? KtElement ?: return null
+            val firReceiver = getFir(baseExpression, session, mapping) as? FirExpression ?: return null
+            val operatorSymbol = findIntMember(operatorName) ?: return null
+            return buildFunctionCall {
+                source = expression.toKtPsiSourceElement()
+                origin = FirFunctionCallOrigin.Operator
+                calleeReference = buildResolvedNamedReference {
+                    source = operatorExpression.toKtPsiSourceElement()
+                    name = operatorName
+                    resolvedSymbol = operatorSymbol
+                }
+
+                dispatchReceiver = firReceiver
+                explicitReceiver = firReceiver
+
+                coneTypeOrNull = firReceiver.resolvedType
+            }
+        }
+
         private fun checkStringLiteralFolderExpression(
             element: KtElement,
             session: FirSession,
@@ -155,6 +206,7 @@ internal class KtToFirMapping(private val elementMapper: LLElementMapper) {
                     }
                     variance = Variance.INVARIANT
                 }
+                coneTypeOrNull = argument.resolvedType
             }
         }
 
@@ -170,17 +222,37 @@ internal class KtToFirMapping(private val elementMapper: LLElementMapper) {
                 // We are still referring to the same element with possible type parameter/name qualification/nullability,
                 // hence it is always correct to return a corresponding element if present
                 if (current is KtElement) mapping[current]?.let { return it }
-                if (current is KtCallExpression) fakeCallToBuiltInSuspendOrNull(current, mapping, session)?.let {
-                    return it
+                when (current) {
+                    is KtCallExpression -> {
+                        fakeCallToBuiltInSuspendOrNull(current, mapping, session)?.let {
+                            return it
+                        }
+                    }
+
+                    is KtPrefixExpression -> {
+                        context(session) {
+                            fakeCallForIntLiteralWithUnaryExpression(
+                                expression = current,
+                                mapping = mapping,
+                            )?.let { return it }
+                        }
+                    }
                 }
+
                 current = current.parent
             }
 
             // Here current is the lowest ancestor that has different corresponding text
             return when (current) {
-                // Constants with unary operation (i.e., +1 or -1) are saved as a leaf element of FIR tree
-                is KtPrefixExpression,
-                    // There is no separate element for annotation construction call
+                // Fake literals where applicable
+                is KtPrefixExpression -> context(session) {
+                    fakeCallForIntLiteralWithUnaryExpression(
+                        expression = current,
+                        mapping = mapping,
+                    )
+                }
+
+                // There is no separate element for annotation construction call
                 is KtAnnotationEntry,
                     // We replace a source for selector with the whole expression
                 is KtSafeQualifiedExpression,
@@ -268,6 +340,37 @@ internal class RootScriptStructureElement(
 internal val FirScript.declarationsToIgnore: Set<FirDeclaration>
     get() = parameters.plus(declarations).toSet()
 
+/**
+ * The [FirReplSnippet] itself and the generated [FirReplSnippet.snippetClass]
+ * with its generated members is a part of this [FileStructureElement].
+ *
+ * **Note**: moved initializers and delegates are not part of it.
+ * They are treated as a part of the original property.
+ */
+internal class RootReplSnippetStructureElement(
+    file: FirFile,
+    replSnippet: FirReplSnippet,
+    moduleComponents: LLFirModuleResolveComponents,
+) : FileStructureElement(
+    declaration = replSnippet,
+    diagnostics = FileStructureElementDiagnostics(
+        ReplSnippetDiagnosticRetriever(
+            declaration = replSnippet,
+            file = file,
+            moduleComponents = moduleComponents,
+        )
+    ),
+) {
+    class Recorder(replSnippet: FirReplSnippet) : FirElementContainerRecorder(
+        container = replSnippet,
+        declarationsToIgnore = replSnippet.declarationsToIgnore,
+    )
+}
+
+/** @see RootReplSnippetStructureElement */
+internal val FirReplSnippet.declarationsToIgnore: Set<FirDeclaration>
+    get() = snippetClass.declarationsToIgnore
+
 internal class ClassDeclarationStructureElement(
     file: FirFile,
     clazz: FirRegularClass,
@@ -313,9 +416,18 @@ internal abstract class FirElementContainerRecorder(
             true
         }
 
-        if (recordElement) {
+        if (!recordElement) {
+            return
+        }
+
+        if (element is FirRegularClass) {
+            // Classes might have ignored elements somewhere inside
+            // The only known use case is REPL snippets: it starts from the snippet, not from the snippet's class
+            super.visitElement(element, data)
+        } else {
             // A separate recorder is called here as we don't have to check
-            // conditions for nested elements – they should be recorded deeply
+            // conditions for nested elements – they should be recorded deeply.
+            // Technically, this is just an optimization
             element.accept(DeclarationStructureElement.Recorder, data)
         }
     }
@@ -334,9 +446,10 @@ internal abstract class FirElementContainerRecorder(
 internal val FirDeclaration.isPartOfClassStructureElement: Boolean
     get() = when (source?.kind) {
         KtFakeSourceElementKind.ImplicitConstructor,
-        KtFakeSourceElementKind.DataClassGeneratedMembers,
-        KtFakeSourceElementKind.EnumGeneratedDeclaration,
+        is KtFakeSourceElementKind.DataClassGeneratedMembers,
+        is KtFakeSourceElementKind.EnumGeneratedDeclaration,
         KtFakeSourceElementKind.ClassDelegationField,
+        KtFakeSourceElementKind.ReplEvalFunction,
             -> true
 
         else -> false
@@ -439,6 +552,11 @@ internal class DeclarationStructureElement(
 
             if (element is FirDelegatedConstructorCall && currentParent is FirConstructor && currentParent == declaration) {
                 // Skip delegated constructors
+                return
+            }
+
+            if (element is FirContractDescription) {
+                // Skip contract description
                 return
             }
 

@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// NI_EXPECTED_FILE
 
 interface Base {
     fun base() {}
@@ -17,11 +16,11 @@ fun <S> intersect(vararg elements: S): S = TODO()
 fun intersectAfterSmartCast(arg: Base, arg2: Base) = intersect(
     run {
         if (arg !is One) throw Exception()
-        <!DEBUG_INFO_SMARTCAST!>arg<!>
+        arg
     },
     run {
         if (arg2 !is Two) throw Exception()
-        <!DEBUG_INFO_SMARTCAST!>arg2<!>
+        arg2
     }
 )
 

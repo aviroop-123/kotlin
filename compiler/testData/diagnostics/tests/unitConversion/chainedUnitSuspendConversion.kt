@@ -1,5 +1,6 @@
-// RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +UnitConversionsOnArbitraryExpressions +SuspendConversion
+// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
+// LANGUAGE: +UnitConversionsOnArbitraryExpressions
 // DIAGNOSTICS: -UNUSED_PARAMETER -UNUSED_EXPRESSION
 
 fun foo(f: suspend () -> Unit) {}

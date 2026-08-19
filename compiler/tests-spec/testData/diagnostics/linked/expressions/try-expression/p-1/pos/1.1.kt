@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -28,7 +27,7 @@ fun case1() {
 
 fun case2() {
     try {
-        <!UNREACHABLE_CODE!>val a =<!> throwException()
+        val a = throwException()
     }catch (e: Exception) {
         "a"
     }

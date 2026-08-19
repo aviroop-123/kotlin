@@ -1,11 +1,11 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 // ISSUE: KT-71708
+// LANGUAGE: -CollectionLiterals -CollectionLiteralsBasedAnnotationResolution
 
 inline fun build(action: () -> Unit) {}
 
 fun foo(x: Int) = build {
-    if (x == 1) <!UNSUPPORTED!>[1]<!>
+    if (x == 1) <!UNSUPPORTED_ARRAY_LITERAL_OUTSIDE_OF_ANNOTATION_ERROR, UNSUPPORTED_FEATURE!>[1]<!>
 }
 
 /* GENERATED_FIR_TAGS: collectionLiteral, equalityExpression, functionDeclaration, functionalType, ifExpression, inline,

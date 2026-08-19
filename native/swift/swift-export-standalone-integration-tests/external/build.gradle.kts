@@ -1,7 +1,8 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
+    id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 description = "A set of integration tests for Swift Export Standalone based on external projects"
@@ -9,17 +10,19 @@ description = "A set of integration tests for Swift Export Standalone based on e
 dependencies {
     compileOnly(kotlinStdlib())
 
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testRuntimeOnly(libs.junit.jupiter.engine)
-    testImplementation(libs.junit.jupiter.api)
+    testFixturesApi(libs.junit.jupiter.api)
 
-    testImplementation(project(":native:swift:swift-export-standalone-integration-tests"))
-    testImplementation(project(":native:external-projects-test-utils"))
+    testFixturesApi(testFixtures(project(":native:swift:swift-export-standalone-integration-tests")))
+    testFixturesImplementation(project(":native:external-projects-test-utils"))
+    testFixturesImplementation(project(":kotlin-util-klib-metadata"))
+    testImplementation(project(":kotlin-util-klib-metadata"))
     testRuntimeOnly(testFixtures(project(":analysis:low-level-api-fir")))
     testRuntimeOnly(testFixtures(project(":analysis:analysis-api-impl-base")))
     testImplementation(testFixtures(project(":analysis:analysis-api-fir")))
     testImplementation(testFixtures(project(":analysis:analysis-test-framework")))
-    testImplementation(testFixtures(project(":compiler:tests-common")))
+    testFixturesApi(testFixtures(project(":compiler:tests-common")))
     testImplementation(testFixtures(project(":compiler:tests-common-new")))
 }
 
@@ -28,12 +31,23 @@ sourceSets {
         projectDefault()
         generatedTestDir()
     }
+    "testFixtures" { projectDefault() }
 }
+
+optInToK1Deprecation()
 
 projectTests {
-    nativeTestTaskWithExternalDependencies("test", requirePlatformLibs = true) {
+    testData(isolated, "testData")
+    testData(rootProject.isolated, "native/native.tests/testData/framework")
+
+    nativeTestTaskWithExternalDependencies(
+        "test",
+        requirePlatformLibs = true,
+        allowUnsafe = true, // KT-85212
+    ) {
         dependsOn(":kotlin-native:distInvalidateStaleCaches")
+        extensions.configure<TestInputsCheckExtension>("testInputsCheck") {
+            allowFlightRecorder.set(true)
+        }
     }
 }
-
-testsJar()

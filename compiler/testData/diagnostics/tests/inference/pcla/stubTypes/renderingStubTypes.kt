@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// LANGUAGE: +UnrestrictedBuilderInference
 // DIAGNOSTICS: -UNUSED_PARAMETER -DEPRECATION -OPT_IN_IS_NOT_ENABLED -UNUSED_VARIABLE
 // WITH_STDLIB
 
@@ -23,8 +22,8 @@ fun <U> id(x: U) = x
 fun test() {
     val ret = build {
         emit("1")
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>get()<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("Inv<kotlin.String>")!>getInv()<!>
+        get()
+        getInv()
         ""
     }
 }

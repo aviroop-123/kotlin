@@ -27,9 +27,9 @@ object FirAmbiguousAnonymousTypeChecker : FirBasicDeclarationChecker(MppCheckerK
         // if source is not null then this type was declared in source
         // so it can not be inferred to anonymous type
         if (declaration.symbol.hasExplicitReturnType) return
-        if (context.containingDeclarations.any { it.isLocalMember || it is FirAnonymousObjectSymbol }) return
+        if (declaration.isLocal) return
 
-        if (!shouldApproximateAnonymousTypesOfNonLocalDeclaration(
+        if (!shouldApproximateLocalTypesOfNonLocalDeclaration(
                 declaration.visibilityForApproximation(context.containingDeclarations.lastOrNull()),
                 declaration.isInline
             )
@@ -42,7 +42,7 @@ object FirAmbiguousAnonymousTypeChecker : FirBasicDeclarationChecker(MppCheckerK
          * 2. `val x = ...`
          * 3. `val x get() = ...`
          */
-        val (type, source) = when (declaration) {
+        val [type, source] = when (declaration) {
             is FirProperty -> {
                 declaration.initializer?.resolvedType?.let { it to declaration.source } ?: run {
                     val getter = declaration.getter

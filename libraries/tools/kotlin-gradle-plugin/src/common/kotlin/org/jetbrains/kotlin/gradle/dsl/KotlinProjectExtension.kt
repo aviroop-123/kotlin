@@ -16,19 +16,21 @@ import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainSpec
 import org.jetbrains.kotlin.buildtools.api.ExperimentalBuildToolsApi
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.abi.AbiValidationExtension
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.KotlinPluginLifecycle.CoroutineStart.Undispatched
+import org.jetbrains.kotlin.gradle.plugin.abi.internal.AbiValidationExtensionImpl
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinToolingDiagnostics
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.isCalledOutsideKotlinOrAndroidPlugins
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.reportDiagnosticOncePerProject
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinWithJavaTarget
 import org.jetbrains.kotlin.gradle.plugin.sources.DefaultKotlinSourceSetFactory
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
-import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrSingleTargetPreset
 import org.jetbrains.kotlin.gradle.tasks.CompileUsingKotlinDaemon
 import org.jetbrains.kotlin.gradle.tasks.withType
 import org.jetbrains.kotlin.gradle.utils.*
-import org.jetbrains.kotlin.gradle.utils.CompletableFuture
-import org.jetbrains.kotlin.gradle.utils.Future
-import org.jetbrains.kotlin.gradle.utils.castIsolatedKotlinPluginClassLoaderAware
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.tooling.core.HasMutableExtras
 import org.jetbrains.kotlin.tooling.core.MutableExtras
@@ -40,7 +42,7 @@ internal const val KOTLIN_PROJECT_EXTENSION_NAME = "kotlin"
 
 internal fun Project.createKotlinExtension(extensionClass: KClass<out KotlinBaseExtension>): KotlinBaseExtension {
     return when (extensionClass) {
-        KotlinMultiplatformExtension::class -> extensions.KotlinMultiplatformExtension(objects)
+        KotlinMultiplatformExtension::class -> extensions.KotlinMultiplatformExtension(objects, this)
         else -> extensions.create(KOTLIN_PROJECT_EXTENSION_NAME, extensionClass.java, this)
     }
 }
@@ -106,6 +108,7 @@ abstract class KotlinProjectExtension @Inject constructor(
         // Required for Gradle to generate accessors to source sets or 'sourceSets {}' DSL
         extensions.add("sourceSets", kotlinSourceSets)
     }
+
     override var sourceSets: NamedDomainObjectContainer<KotlinSourceSet>
         get() = sourceSetsContainer
         @Deprecated("Assigning new value to 'sourceSets' is deprecated", level = DeprecationLevel.ERROR)
@@ -168,6 +171,26 @@ abstract class KotlinProjectExtension @Inject constructor(
     @ExperimentalBuildToolsApi
     override val compilerVersion: Property<String> =
         project.objects.propertyWithConvention(project.getKotlinPluginVersion()).chainedFinalizeValueOnRead()
+
+    internal val abiValidationInternal: AbiValidationExtensionImpl = project.AbiValidationExtensionImpl()
+
+    @ExperimentalAbiValidation
+    override val abiValidation: AbiValidationExtension
+        get() {
+            abiValidationInternal.activate(compilerVersion)
+            return abiValidationInternal
+        }
+
+    @ExperimentalAbiValidation
+    override fun abiValidation(action: Action<AbiValidationExtension>) {
+        abiValidationInternal.activate(compilerVersion)
+        action.execute(abiValidationInternal)
+    }
+
+    @ExperimentalAbiValidation
+    override fun abiValidation() {
+        abiValidationInternal.activate(compilerVersion)
+    }
 }
 
 abstract class KotlinSingleTargetExtension<TARGET : KotlinTarget>(project: Project) : KotlinProjectExtension(project) {
@@ -213,53 +236,46 @@ private class KotlinJvmPublishingDsl(private val project: Project) : KotlinPubli
         get() = project.components.getByName("java") as AdhocComponentWithVariants
 }
 
+@Suppress("unused")
+@Deprecated("KotlinJsProjectExtension is deprecated and will be removed in the future: https://kotl.in/t6m3vu", level = DeprecationLevel.ERROR)
 abstract class KotlinJsProjectExtension(project: Project) :
     KotlinSingleTargetExtension<KotlinJsTargetDsl>(project),
     KotlinJsCompilerTypeHolder {
-    internal lateinit var irPreset: KotlinJsIrSingleTargetPreset
-
     @Deprecated("Use js() instead. Scheduled for removal in Kotlin 2.3.", ReplaceWith("js()"), level = DeprecationLevel.ERROR)
     override val target: KotlinJsTargetDsl
         get() = targetFuture.lenient.getOrNull() ?: js()
 
-    @Deprecated(
-        "Because only the IR compiler is left, it's no longer necessary to know about the compiler type in properties. Scheduled for removal in Kotlin 2.3.",
-        level = DeprecationLevel.ERROR
-    )
-    override val compilerTypeFromProperties: KotlinJsCompilerType? = null
-
     override val targetFuture = CompletableFuture<KotlinJsTargetDsl>()
 
-    fun registerTargetObserver(observer: (KotlinJsTargetDsl?) -> Unit) {
-        project.launch(Undispatched) {
-            observer(targetFuture.await())
-        }
-    }
+    fun registerTargetObserver(
+        @Suppress("UNUSED_PARAMETER")
+        observer: (KotlinJsTargetDsl?) -> Unit
+    ) {}
 
     @Suppress("DEPRECATION_ERROR")
     private fun jsInternal(
+        @Suppress("UNUSED_PARAMETER")
         body: KotlinJsTargetDsl.() -> Unit,
-    ): KotlinJsTargetDsl {
-        if (!targetFuture.isCompleted) {
-            val target: KotlinJsTargetDsl = irPreset
-                .createTargetInternal("js")
+    ): KotlinJsTargetDsl = error("...")
 
-            this.targetFuture.complete(target)
-
-            target.project.components.addAll(target.components)
-        }
-
-        target.run(body)
-
-        return target
-    }
-
+    @Suppress("DEPRECATION")
+    @Deprecated(
+        "Kotlin/JS IR is the only supported compiler type. Use js(body) instead. Scheduled for removal in Kotlin 2.6.",
+        replaceWith = ReplaceWith("js(body)"),
+        level = DeprecationLevel.WARNING,
+    )
     fun js(
         @Suppress("UNUSED_PARAMETER") // KT-64275
         compiler: KotlinJsCompilerType = defaultJsCompilerType,
         body: KotlinJsTargetDsl.() -> Unit = { },
     ): KotlinJsTargetDsl = jsInternal(body)
 
+    @Suppress("DEPRECATION")
+    @Deprecated(
+        "Kotlin/JS IR is the only supported compiler type. Use js(body) instead. Scheduled for removal in Kotlin 2.6.",
+        replaceWith = ReplaceWith("js(body)"),
+        level = DeprecationLevel.WARNING,
+    )
     fun js(
         compiler: String,
         body: KotlinJsTargetDsl.() -> Unit = { },
@@ -274,11 +290,23 @@ abstract class KotlinJsProjectExtension(project: Project) :
 
     fun js() = js { }
 
+    @Suppress("DEPRECATION")
+    @Deprecated(
+        "Kotlin/JS IR is the only supported compiler type. Use js(configure) instead. Scheduled for removal in Kotlin 2.6.",
+        replaceWith = ReplaceWith("js(configure)"),
+        level = DeprecationLevel.WARNING,
+    )
     fun js(compiler: KotlinJsCompilerType, configure: Action<KotlinJsTargetDsl>) =
         js(compiler = compiler) {
             configure.execute(this)
         }
 
+    @Suppress("DEPRECATION")
+    @Deprecated(
+        "Kotlin/JS IR is the only supported compiler type. Use js(configure) instead. Scheduled for removal in Kotlin 2.6.",
+        replaceWith = ReplaceWith("js(configure)"),
+        level = DeprecationLevel.WARNING,
+    )
     fun js(compiler: String, configure: Action<KotlinJsTargetDsl>) =
         js(compiler = compiler) {
             configure.execute(this)
@@ -288,18 +316,11 @@ abstract class KotlinJsProjectExtension(project: Project) :
         configure.execute(this)
     }
 
-    @Deprecated("Use js instead. Scheduled for removal in Kotlin 2.3.", ReplaceWith("js(body)"), level = DeprecationLevel.ERROR)
-    open fun target(body: KotlinJsTargetDsl.() -> Unit) = js(body)
-
     @Deprecated(
         "Needed for IDE import using the MPP import mechanism",
         level = DeprecationLevel.HIDDEN
     )
-    fun getTargets(): NamedDomainObjectContainer<KotlinTarget>? =
-        targetFuture.lenient.getOrNull()?.let { target ->
-            target.project.container(KotlinTarget::class.java)
-                .apply { add(target) }
-        }
+    fun getTargets(): NamedDomainObjectContainer<KotlinTarget>? = null
 }
 
 abstract class KotlinAndroidProjectExtension @Inject constructor(
@@ -322,6 +343,23 @@ abstract class KotlinAndroidProjectExtension @Inject constructor(
     override fun compilerOptions(configure: KotlinJvmCompilerOptions.() -> Unit) {
         configure(compilerOptions)
     }
+
+    override var sourceSets: NamedDomainObjectContainer<KotlinSourceSet>
+        @Deprecated("Use source sets provided by Android Gradle Plugin instead.")
+        get() {
+            /**
+             * Android Gradle Plugin calls it for configuration purposes
+             * Also, this method can be called in KGP code where generic "KotlinExtension" is expected.
+             */
+            if (isCalledOutsideKotlinOrAndroidPlugins) {
+                project.reportDiagnosticOncePerProject(
+                    KotlinToolingDiagnostics.SourceSetsAccessInAndroidExtension(Throwable())
+                )
+            }
+            return super.sourceSets
+        }
+        @Deprecated("Assigning new value to 'sourceSets' is deprecated", level = DeprecationLevel.ERROR)
+        set(_) {}
 }
 
 enum class NativeCacheKind(val produce: String?, val outputKind: CompilerOutputKind?) {
@@ -333,16 +371,5 @@ enum class NativeCacheKind(val produce: String?, val outputKind: CompilerOutputK
     companion object {
         fun byCompilerArgument(argument: String): NativeCacheKind? =
             NativeCacheKind.values().firstOrNull { it.name.equals(argument, ignoreCase = true) }
-    }
-}
-
-// This is a temporary parameter for the translation period.
-enum class NativeCacheOrchestration {
-    Gradle,
-    Compiler;
-
-    companion object {
-        fun byCompilerArgument(argument: String): NativeCacheOrchestration? =
-            NativeCacheOrchestration.values().firstOrNull { it.name.equals(argument, ignoreCase = true) }
     }
 }

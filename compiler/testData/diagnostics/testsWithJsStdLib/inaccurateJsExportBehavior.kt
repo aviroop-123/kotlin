@@ -1,4 +1,4 @@
-// RUN_PIPELINE_TILL: KLIB
+// RUN_PIPELINE_TILL: BACKEND
 // ISSUE: KT-74389
 // WITH_STDLIB
 
@@ -9,15 +9,15 @@ import kotlin.js.Promise
 @JsExport
 fun foo(): Promise<*> = null!!
 
-<!NON_EXPORTABLE_TYPE!>@JsExport
-fun bar(): Promise<Unit><!> = null!!
+@JsExport
+fun bar(): Promise<Unit> = null!!
 
 @JsExport
 class Box<T>
 
-@JsExport
-fun box(): Box<*> = null!!
+<!NON_EXPORTABLE_TYPE!>@JsExport
+fun box(): Box<*><!> = null!!
 
 @JsExport
-fun <T> promisify(<!UNUSED_PARAMETER!>x<!>: T): Box<out T> =
+fun <T> promisify(x: T): Box<out T> =
     null!!

@@ -70,6 +70,16 @@ class Strings {
     }
 
     @Sample
+    fun chunkedSequence() {
+        val dnaFragment = "ATTCGCCAAXXX"
+        val knownAcids = setOf("ATT", "CGC", "CAA") // XXX would cause error if processed
+        val codons = dnaFragment.chunkedSequence(3).onEach { check(it in knownAcids) }
+        val firstTwo = codons.take(2).toList()
+
+        assertPrints(firstTwo, "[ATT, CGC]")
+    }
+
+    @Sample
     fun chunkedTransform() {
         val codonTable = mapOf("ATT" to "Isoleucine", "CAA" to "Glutamine", "CGC" to "Arginine", "GGC" to "Glycine")
         val dnaFragment = "ATTCGCGGCCGCCAA"
@@ -88,6 +98,18 @@ class Strings {
 
         // sequence is evaluated lazily, so that unknown codon is not reached
         assertPrints(proteins.take(5).toList(), "[Isoleucine, Arginine, Glycine, Arginine, Glutamine]")
+    }
+
+    @Sample
+    fun elementAt() {
+        val string = "kotlin"
+        assertPrints(string.elementAt(0), "k")
+        assertPrints(string.elementAt(5), "n")
+        assertFailsWith<IndexOutOfBoundsException> { string.elementAt(-1) }
+        assertFailsWith<IndexOutOfBoundsException> { string.elementAt(6) }
+
+        val empty = ""
+        assertFailsWith<IndexOutOfBoundsException> { empty.elementAt(0) }
     }
 
     @Sample
@@ -414,6 +436,65 @@ class Strings {
     }
 
     @Sample
+    fun allWithPredicate() {
+        val string = "Kotlin"
+        // All characters are letters
+        assertTrue(string.all { it.isLetter() })
+        // Not all of them are lowercase, though
+        assertFalse(string.all { it.isLowerCase() })
+        // And there are definitely no digits
+        assertFalse(string.all { it.isDigit() })
+
+        // For an empty string `all` always return `true`
+        assertTrue("".all { true })
+        assertTrue("".all { false })
+    }
+
+    @Sample
+    fun anyWithPredicate() {
+        val string = "Kotlin"
+        // All characters are letters
+        assertTrue(string.any { it.isLetter() })
+        // Some of them are lowercase letters
+        assertTrue(string.any { it.isLowerCase() })
+        // But there are no digits among them
+        assertFalse(string.any { it.isDigit() })
+
+        // For an empty string `any` always return `false`
+        assertFalse("".any { true })
+        assertFalse("".any { false })
+    }
+
+    @Sample
+    fun noneWithPredicate() {
+        val string = "Kotlin"
+        // All characters are letters
+        assertFalse(string.none { it.isLetter() })
+        // Some of them are lowercase letters
+        assertFalse(string.none { it.isLowerCase() })
+        // But there are no digits among them, thus none returns true only for this predicate
+        assertTrue(string.none { it.isDigit() })
+
+        // For an empty string `none` always return `true`
+        assertTrue("".none { true })
+        assertTrue("".none { false })
+    }
+
+    @Sample
+    fun any() {
+        // any is synonymous to !isEmpty()
+        assertTrue("str".any())
+        assertFalse("".any())
+    }
+
+    @Sample
+    fun none() {
+        // none is synonymous to isEmpty()
+        assertFalse("str".none())
+        assertTrue("".none())
+    }
+
+    @Sample
     fun indexOf() {
         fun matchDetails(inputString: String, whatToFind: String, startIndex: Int = 0): String {
             val matchIndex = inputString.indexOf(whatToFind, startIndex)
@@ -466,6 +547,23 @@ class Strings {
         assertFalse(string in "Kotlin")
     }
 
+    @Sample
+    fun containsChar() {
+        val text = "kotlin"
+
+        // The string contains lowercase 'k'
+        assertTrue('k' in text)
+
+        // The string does not contain uppercase 'K' (case-sensitive check)
+        assertFalse('K' in text)
+
+        // However, it will be located if the case is ignored
+        assertTrue(text.contains('K', ignoreCase = true))
+
+        // The string does not contain 'z'
+        assertFalse('z' in text)
+    }
+    
     @Sample
     fun last() {
         val string = "Kotlin 1.4.0"
@@ -885,15 +983,15 @@ class Strings {
 
     @Sample
     fun stringPlus() {
-        assertEquals("Kodee", "Ko" + "dee")
+        assertPrints("Ko" + "dee", "Kodee")
         // 2 is not a string, but plus concatenates its string representation with the "Kotlin " string
-        assertEquals("Kotlin 2", "Kotlin " + 2)
+        assertPrints("Kotlin " + 2, "Kotlin 2")
         // list is converted to a String first and then concatenated with the "Numbers: " string
-        assertEquals("Numbers: [1, 2, 3]", "Numbers: " + listOf(1, 2, 3))
+        assertPrints("Numbers: " + listOf(1, 2, 3), "Numbers: [1, 2, 3]")
     }
 
     @Sample
-    fun replaceRangeString() {
+    fun replaceRange() {
         val text = "Hello, world!"
 
         // Replacing the range that corresponds to the "world" substring with "Kotlin"
@@ -918,4 +1016,69 @@ class Strings {
         // For ranges, the end is inclusive, so it has to be lower than the length of a char sequence
         assertFails { text.replaceRange(7..text.length, replacement = "Kotlin") }
     }
+
+    @Sample
+    fun removeSurroundingPrefixSuffixString() {
+        val textString = "[content]"
+        assertPrints(textString.removeSurrounding("[", "]"), "content")
+        // Does not start with prefix
+        assertPrints("content]".removeSurrounding("[", "]"), "content]")
+        // Does not end with suffix
+        assertPrints("[content".removeSurrounding("[", "]"), "[content")
+        // Does not start or end with prefix/suffix
+        assertPrints("content".removeSurrounding("[", "]"), "content")
+        // Empty content
+        assertPrints("[]".removeSurrounding("[", "]"), "")
+        // Different delimiters
+        assertPrints("<content>".removeSurrounding("[", "]"), "<content>")
+    }
+
+    @Sample
+    fun removeSurroundingPrefixSuffixCharSequence() {
+        val textCharSequence: CharSequence = StringBuilder("[content]")
+        assertPrints(textCharSequence.removeSurrounding("[", "]"), "content")
+        // Does not start with prefix
+        assertPrints(StringBuilder("content]").removeSurrounding("[", "]"), "content]")
+        // Does not end with suffix
+        assertPrints(StringBuilder("[content").removeSurrounding("[", "]"), "[content")
+        // Does not start or end with prefix/suffix
+        assertPrints(StringBuilder("content").removeSurrounding("[", "]"), "content")
+        // Empty content
+        assertPrints(StringBuilder("[]").removeSurrounding("[", "]"), "")
+        // Different delimiters
+        assertPrints(StringBuilder("<content>").removeSurrounding("[", "]"), "<content>")
+    }
+
+    @Sample
+    fun removeSurroundingDelimiterString() {
+        val textString = "***content***"
+        assertPrints(textString.removeSurrounding("***"), "content")
+        // Does not end with delimiter
+        assertPrints("##content".removeSurrounding("##"), "##content")
+        // Does not start with delimiter
+        assertPrints("content##".removeSurrounding("##"), "content##")
+        // No delimiters
+        assertPrints("content".removeSurrounding("##"), "content")
+        // Empty content
+        assertPrints("****".removeSurrounding("**"), "")
+        // Delimiter is single char, removes only one pair
+        assertPrints("!!!content!!!".removeSurrounding("!"), "!!content!!")
+    }
+
+    @Sample
+    fun removeSurroundingDelimiterCharSequence() {
+        val textCharSequence: CharSequence = StringBuilder("***content***")
+        assertPrints(textCharSequence.removeSurrounding("***"), "content")
+        // Does not end with delimiter
+        assertPrints(StringBuilder("##content").removeSurrounding("##"), "##content")
+        // Does not start with delimiter
+        assertPrints(StringBuilder("content##").removeSurrounding("##"), "content##")
+        // No delimiters
+        assertPrints(StringBuilder("content").removeSurrounding("##"), "content")
+        // Empty content
+        assertPrints(StringBuilder("****").removeSurrounding("**"), "")
+        // Delimiter is single char, removes only one pair
+        assertPrints(StringBuilder("!!!content!!!").removeSurrounding("!"), "!!content!!")
+    }
+
 }

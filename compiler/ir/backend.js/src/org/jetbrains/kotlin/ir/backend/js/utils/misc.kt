@@ -6,13 +6,9 @@
 package org.jetbrains.kotlin.ir.backend.js.utils
 
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.backend.js.JsCommonBackendContext
-import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
-import org.jetbrains.kotlin.ir.backend.js.JsLoweredDeclarationOrigin
-import org.jetbrains.kotlin.ir.backend.js.tsexport.isExported
+import org.jetbrains.kotlin.ir.backend.js.*
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
-import org.jetbrains.kotlin.ir.backend.js.objectGetInstanceFunction
-import org.jetbrains.kotlin.ir.backend.js.objectInstanceField
+import org.jetbrains.kotlin.ir.backend.js.ir.isExported
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.types.getClass
@@ -54,7 +50,7 @@ fun IrFunction.hasStableJsName(context: JsIrBackendContext): Boolean {
         is IrConstructor -> true
     }
 
-    return (isEffectivelyExternal() || getJsName() != null || isExported(context)) && namedOrMissingGetter
+    return (isEffectivelyExternal() || getJsName() != null || getJsSymbol() != null || isExported(context)) && namedOrMissingGetter
 }
 
 fun IrFunction.isEqualsInheritedFromAny(): Boolean =

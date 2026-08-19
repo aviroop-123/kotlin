@@ -32,7 +32,7 @@ internal class DeepCopyIrTreeWithSymbolsPrinter(
     override val visitorSuperTypes: List<ClassRef<PositionTypeParameterRef>>
         get() = listOf(irDeepCopyBaseType)
 
-    override val optIns: List<ClassRef<*>> = listOf(irImplementationDetailType)
+    override val optIns: List<PrintableAnnotation> = listOf(irImplementationDetailType, deprecatedCompilerApi)
 
     override val implementationKind: ImplementationKind
         get() = ImplementationKind.OpenClass
@@ -217,15 +217,8 @@ internal class DeepCopyIrTreeWithSymbolsPrinter(
                     }
                 }
             }
-            if (element.isSubclassOf(IrTree.memberAccessExpression) && !element.isSubclassOf(IrTree.localDelegatedPropertyReference)) {
-                println("copyRemappedTypeArgumentsFrom(", element.visitorParameterName, ")")
-                println("transformValueArguments(", element.visitorParameterName, ")")
-            }
             if (element.isSubclassOf(IrTree.function)) {
                 println("parameters = ${element.visitorParameterName}.parameters.memoryOptimizedMap { it.transform() }")
-            }
-            if (element.isSubclassOf(IrTree.valueParameter)) {
-                println("kind = ${element.visitorParameterName}.kind")
             }
             if (element.isSubclassOf(IrTree.file)) {
                 println("module = transformedModule ?: ${element.visitorParameterName}.module")

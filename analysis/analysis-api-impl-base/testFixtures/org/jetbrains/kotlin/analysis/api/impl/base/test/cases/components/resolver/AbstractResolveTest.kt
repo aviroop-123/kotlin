@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -143,7 +143,7 @@ abstract class AbstractResolveTest<T> : AbstractAnalysisApiBasedTest() {
     ) {
         val entries = map.entries
         val renderKeyClass = entries.size > 1 || !omitSingleKey
-        printCollection(entries, separator = "\n\n") { (key, value) ->
+        printCollection(entries, separator = "\n\n") { [key, value] ->
             if (renderKeyClass && key != null) {
                 renderKey(key, value)
                 appendLine()
@@ -180,23 +180,11 @@ abstract class AbstractResolveTest<T> : AbstractAnalysisApiBasedTest() {
             description = "Symbol restoring for some symbols in current test is not supported yet",
             applicability = DirectiveApplicability.Any,
         )
-
-        val IGNORE_STABILITY_K1 by stringDirective(
-            description = "Symbol restoring for some symbols in current test is not supported yet in K1",
-            applicability = DirectiveApplicability.Any,
-        )
-
-        val IGNORE_STABILITY_K2 by stringDirective(
-            description = "Symbol restoring for some symbols in current test is not supported yet in K2",
-            applicability = DirectiveApplicability.Any,
-        )
     }
 
-    protected fun RegisteredDirectives.doNotCheckSymbolRestoreDirective(): StringDirective? = findSpecificDirective(
-        commonDirective = Directives.IGNORE_STABILITY,
-        k1Directive = Directives.IGNORE_STABILITY_K1,
-        k2Directive = Directives.IGNORE_STABILITY_K2,
-    )
+    protected fun RegisteredDirectives.doNotCheckSymbolRestoreDirective(): StringDirective? {
+        return Directives.IGNORE_STABILITY.takeIf { it in this }
+    }
 
     private val suppressedStabilityExceptions: MutableList<Throwable> = mutableListOf()
 

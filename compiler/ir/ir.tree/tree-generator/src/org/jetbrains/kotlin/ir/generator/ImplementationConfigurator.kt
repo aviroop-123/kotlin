@@ -12,8 +12,10 @@ import org.jetbrains.kotlin.generators.tree.printer.FunctionParameter
 import org.jetbrains.kotlin.generators.tree.printer.VariableKind
 import org.jetbrains.kotlin.generators.tree.printer.printFunctionWithBlockBody
 import org.jetbrains.kotlin.generators.tree.printer.printPropertyDeclaration
+import org.jetbrains.kotlin.ir.generator.IrSymbolTree.constructorSymbol
 import org.jetbrains.kotlin.ir.generator.IrSymbolTree.propertySymbol
 import org.jetbrains.kotlin.ir.generator.IrSymbolTree.simpleFunctionSymbol
+import org.jetbrains.kotlin.ir.generator.IrTree.propertyWithLateBinding
 import org.jetbrains.kotlin.ir.generator.config.AbstractIrTreeImplementationConfigurator
 import org.jetbrains.kotlin.ir.generator.model.Element
 import org.jetbrains.kotlin.ir.generator.model.ListField
@@ -67,6 +69,12 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
 
         impl(functionWithLateBinding) {
             configureDeclarationWithLateBindinig(simpleFunctionSymbol)
+        }
+
+        impl(constructor)
+
+        impl(constructorWithLateBinding) {
+            configureDeclarationWithLateBindinig(constructorSymbol)
         }
 
         impl(field) {
@@ -137,10 +145,11 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
 
         impl(replSnippet) {
             implementation.putImplementationOptInInConstructor = false
-            defaultNull("returnType", "stateObject", "targetClass")
-            isLateinit("receiverParameters", "body")
+            defaultNull("stateObject", "targetClass")
+            isLateinit("receiverParameters")
             default("origin", "REPL_SNIPPET_ORIGIN")
             default("declarationsFromOtherSnippets", "ArrayList()")
+            default("variablesFromOtherSnippets", "ArrayList()")
         }
 
         impl(moduleFragment) {
@@ -179,7 +188,7 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
             implementation.putImplementationOptInInConstructor = false
             implementation.constructorParameterOrderOverride = listOf("fileEntry", "symbol", "packageFqName")
             defaultWithErrorOnSet("startOffset", "0")
-            defaultWithErrorOnSet("endOffset", "fileEntry.maxOffset")
+            defaultWithErrorOnSet("endOffset", "maxOf(fileEntry.maxOffset, 0)")
             isMutable("module")
             isLateinit("module")
         }
@@ -356,8 +365,6 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                 println()
                 println("companion object")
             }
-
-            recordTargetShapeOnSymbolChange()
         }
 
         impl(constructorCall) {
@@ -367,8 +374,6 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                 println()
                 println("companion object")
             }
-
-            recordTargetShapeOnSymbolChange()
         }
 
         impl(delegatingConstructorCall) {
@@ -376,8 +381,6 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                 println()
                 println("companion object")
             }
-
-            recordTargetShapeOnSymbolChange()
         }
 
         impl(enumConstructorCall) {
@@ -385,8 +388,17 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                 println()
                 println("companion object")
             }
+        }
 
-            recordTargetShapeOnSymbolChange()
+        impl(annotation) {
+            default("classSymbol", "symbol.owner.parentAsClass.symbol", withGetter = true)
+
+            implementation.additionalImports.add(ArbitraryImportable("org.jetbrains.kotlin.ir.util", "parentAsClass"))
+
+            implementation.generationCallback = {
+                println()
+                println("companion object")
+            }
         }
 
         impl(functionReference) {
@@ -394,31 +406,10 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                 println()
                 println("companion object")
             }
-
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(propertyReference) {
-            recordTargetShapeOnSymbolChange()
-        }
-
-        impl(localDelegatedPropertyReference) {
-            recordTargetShapeOnSymbolChange()
         }
 
         allImplOf(richCallableReference) {
             default("boundValues", "ArrayList(0)")
-        }
-    }
-
-    private fun ImplementationContext.recordTargetShapeOnSymbolChange() {
-        default("symbol") {
-            customSetter = """
-                if (field !== value) {
-                    field = value
-                    updateTargetSymbol()
-                }
-            """.trimIndent()
         }
     }
 
@@ -458,6 +449,13 @@ object ImplementationConfigurator : AbstractIrTreeImplementationConfigurator() {
                 println("assert(_symbol == null) { \"\$this already has symbol _symbol\" }")
                 println("_symbol = symbol")
                 println("symbol.bind(this)")
+
+                if (implementation.element == propertyWithLateBinding) {
+                    println("backingField?.correspondingPropertySymbol = symbol")
+                    println("getter?.correspondingPropertySymbol = symbol")
+                    println("setter?.correspondingPropertySymbol = symbol")
+                }
+
                 println("return this")
             }
         }

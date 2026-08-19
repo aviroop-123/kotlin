@@ -16,21 +16,49 @@
 
 package org.jetbrains.kotlin.library.metadata.resolver.impl
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.config.DuplicatedUniqueNameStrategy
 import org.jetbrains.kotlin.library.*
-import org.jetbrains.kotlin.library.metadata.PackageAccessHandler
 import org.jetbrains.kotlin.library.metadata.resolver.KotlinLibraryResolveResult
 import org.jetbrains.kotlin.library.metadata.resolver.KotlinLibraryResolver
 import org.jetbrains.kotlin.library.metadata.resolver.KotlinResolvedLibrary
-import org.jetbrains.kotlin.library.metadata.resolver.LibraryOrder
 import org.jetbrains.kotlin.util.WithLogger
+import org.jetbrains.kotlin.utils.addToStdlib.runIf
 
+@Deprecated(
+    "Preserved for binary compatibility with existing versions of the kotlinx-benchmarks Gradle plugin. See KT-82882." +
+            "\nPlease use KlibLoader.load() instead.",
+    replaceWith = ReplaceWith("KlibLoader.load()", imports = ["org.jetbrains.kotlin.library.loader.KlibLoader"]),
+    level = DeprecationLevel.ERROR
+)
+@JvmName("libraryResolver")
+@K1Deprecation
+fun <L : KotlinLibrary> SearchPathResolver<L>.libraryResolverLegacy(resolveManifestDependenciesLenient: Boolean = false) =
+    KotlinLibraryResolverImpl(
+        this,
+        resolveManifestDependenciesLenient,
+        legacyExternalToolResolveMode = true
+    )
+
+@JvmName("libraryResolverNew")
+@K1Deprecation
 fun <L : KotlinLibrary> SearchPathResolver<L>.libraryResolver(resolveManifestDependenciesLenient: Boolean = false) =
-    KotlinLibraryResolverImpl<L>(this, resolveManifestDependenciesLenient)
+    KotlinLibraryResolverImpl(
+        this,
+        resolveManifestDependenciesLenient,
+        legacyExternalToolResolveMode = false
+    )
 
+/**
+ * @property searchPathResolver The resolver that looks up libraries by their paths.
+ * @property resolveManifestDependenciesLenient Whether to resolve manifest dependencies leniently.
+ * @property legacyExternalToolResolveMode Whether to use legacy external tool resolution mode. See KT-82882.
+ */
+@K1Deprecation
 class KotlinLibraryResolverImpl<L : KotlinLibrary> internal constructor(
     override val searchPathResolver: SearchPathResolver<L>,
     val resolveManifestDependenciesLenient: Boolean,
+    private val legacyExternalToolResolveMode: Boolean,
 ) : KotlinLibraryResolver<L>, WithLogger by searchPathResolver {
     override fun resolveWithoutDependencies(
         unresolvedLibraries: List<UnresolvedLibrary>,
@@ -59,11 +87,19 @@ class KotlinLibraryResolverImpl<L : KotlinLibrary> internal constructor(
             .mapNotNull { searchPathResolver.resolve(it) }
             .toList()
 
+        val legacyExternalToolResolveModeLibraries = runIf(legacyExternalToolResolveMode) {
+            (searchPathResolver as? KotlinLibraryProperResolverWithAttributes)
+                ?.directLibs
+                ?.mapNotNull { libraryPath ->
+                    searchPathResolver.resolve(LenientUnresolvedLibrary(libraryPath))
+                }
+        }.orEmpty()
+
         val defaultLibraries = searchPathResolver.defaultLinks(noStdLib, noDefaultLibs, noEndorsedLibs)
 
         // Make sure the user provided ones appear first, so that
         // they have precedence over defaults when duplicates are eliminated.
-        return userProvidedLibraries + defaultLibraries
+        return userProvidedLibraries + legacyExternalToolResolveModeLibraries + defaultLibraries
     }
 
     /**
@@ -88,7 +124,7 @@ class KotlinLibraryResolverImpl<L : KotlinLibrary> internal constructor(
     private fun List<KotlinLibrary>.omitDuplicateNames(duplicatedUniqueNameStrategy: DuplicatedUniqueNameStrategy) : List<KotlinLibrary> {
         val deduplicatedLibs = groupBy { it.uniqueName }.let { groupedByUniqName ->
             val librariesWithDuplicatedUniqueNames = groupedByUniqName.filterValues { it.size > 1 }
-            librariesWithDuplicatedUniqueNames.entries.sortedBy { it.key }.forEach { (uniqueName, libraries) ->
+            librariesWithDuplicatedUniqueNames.entries.sortedBy { it.key }.forEach { [uniqueName, libraries] ->
                 val libraryPaths = libraries.map { it.libraryFile.absolutePath }.sorted().joinToString()
                 val message = "KLIB resolver: The same 'unique_name=$uniqueName' found in more than one library: $libraryPaths"
                 if (duplicatedUniqueNameStrategy == DuplicatedUniqueNameStrategy.ALLOW_ALL_WITH_WARNING ||
@@ -129,58 +165,62 @@ class KotlinLibraryResolverImpl<L : KotlinLibrary> internal constructor(
         val cache = mutableMapOf<Any, KotlinResolvedLibrary>()
         cache.putAll(rootLibraries.map { it.library.libraryFile.fileKey to it })
 
-        var newDependencies = rootLibraries
-        do {
-            newDependencies = newDependencies.map { library: KotlinResolvedLibraryImpl ->
-                library.library.unresolvedDependencies(resolveManifestDependenciesLenient).asSequence()
-
-                    .filterNot { searchPathResolver.isProvidedByDefault(it) }
-                    .mapNotNull { searchPathResolver.resolve(it)?.let(::KotlinResolvedLibraryImpl) }
-                    .map { resolved ->
-                        val fileKey = resolved.library.libraryFile.fileKey
-                        if (fileKey in cache) {
-                            library.addDependency(cache[fileKey]!!)
-                            null
-                        } else {
-                            cache.put(fileKey, resolved)
-                            library.addDependency(resolved)
-                            resolved
+        val processingQueue = ArrayDeque(rootLibraries)
+        while(processingQueue.isNotEmpty()) {
+            val currentLibrary = processingQueue.removeFirst()
+            currentLibrary.library.unresolvedDependencies(resolveManifestDependenciesLenient)
+                .forEach { unresolvedDependency ->
+                    if (!searchPathResolver.isProvidedByDefault(unresolvedDependency)) {
+                        searchPathResolver.resolve(unresolvedDependency)?.let { resolvedDependencyLibrary ->
+                            val fileKey = resolvedDependencyLibrary.libraryFile.fileKey
+                            if (fileKey in cache) {
+                                currentLibrary.addDependency(cache[fileKey]!!)
+                            } else {
+                                val newlyResolved = KotlinResolvedLibraryImpl(resolvedDependencyLibrary)
+                                cache[fileKey] = newlyResolved
+                                currentLibrary.addDependency(newlyResolved)
+                                processingQueue.add(newlyResolved)
+                            }
                         }
-
-                    }.filterNotNull()
-                    .toList()
-            }.flatten()
-        } while (newDependencies.isNotEmpty())
+                    }
+                }
+        }
         return result
     }
 }
 
+@K1Deprecation
 class KotlinLibraryResolverResultImpl(
     private val roots: List<KotlinResolvedLibrary>,
 ) : KotlinLibraryResolveResult {
 
     private val all: List<KotlinResolvedLibrary>
             by lazy {
-                val result = mutableSetOf<KotlinResolvedLibrary>().also { it.addAll(roots) }
-
-                var newDependencies = result.toList()
-                do {
-                    newDependencies = newDependencies
-                        .map { it.resolvedDependencies }.flatten()
-                        .filter { it !in result }
-                    result.addAll(newDependencies)
-                } while (newDependencies.isNotEmpty())
-
-                result.toList()
+                buildList {
+                    val visiting = mutableSetOf<KotlinResolvedLibrary>()
+                    val visited = mutableSetOf<KotlinResolvedLibrary>()
+                    fun dfs(current: KotlinResolvedLibrary) {
+                        if (current in visited) return
+                        if (current in visiting) error("Cyclic dependency in library graph for: ${current.library.location}")
+                        visiting.add(current)
+                        current.resolvedDependencies.forEach(::dfs)
+                        add(current)
+                        visited.add(current)
+                    }
+                    roots.forEach(::dfs)
+                }
             }
 
     override fun filterRoots(predicate: (KotlinResolvedLibrary) -> Boolean) =
         KotlinLibraryResolverResultImpl(roots.filter(predicate))
 
-    override fun getFullResolvedList(order: LibraryOrder?) = (order?.invoke(all) ?: all)
+    /**
+     * Returns the list of libraries in reverse topological order.
+     */
+    override fun getFullList(): List<KotlinLibrary> = all.map { it.library }
 
-    override fun forEach(action: (KotlinLibrary, PackageAccessHandler) -> Unit) {
-        all.forEach { action(it.library, it) }
+    override fun forEach(action: (KotlinLibrary) -> Unit) {
+        all.forEach { action(it.library) }
     }
 
     override fun toString() = "roots=$roots, all=$all"

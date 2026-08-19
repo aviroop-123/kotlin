@@ -148,6 +148,7 @@ object JvmStandardClassIds {
         val JvmDefault = "JvmDefault".jvmId()
         val JvmRepeatable = "JvmRepeatable".jvmId()
         val JvmRecord = "JvmRecord".jvmId()
+        val JvmInline = "JvmInline".jvmId()
         val JvmSuppressWildcards = "JvmSuppressWildcards".jvmId()
         val JvmWildcard = "JvmWildcard".jvmId()
         val JvmVolatile = "Volatile".jvmId()
@@ -162,6 +163,7 @@ object JvmStandardClassIds {
             val Target = "Target".javaAnnotationId()
             val ElementType = "ElementType".javaAnnotationId()
             val RetentionPolicy = "RetentionPolicy".javaAnnotationId()
+            val Inherited = "Inherited".javaAnnotationId()
         }
 
         object ParameterNames {

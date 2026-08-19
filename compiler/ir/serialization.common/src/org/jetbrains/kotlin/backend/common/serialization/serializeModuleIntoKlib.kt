@@ -13,15 +13,11 @@ import org.jetbrains.kotlin.KtVirtualFileSourceFile
 import org.jetbrains.kotlin.backend.common.serialization.metadata.KlibSingleFileMetadataSerializer
 import org.jetbrains.kotlin.backend.common.serialization.metadata.serializeKlibHeader
 import org.jetbrains.kotlin.config.*
-import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
-import org.jetbrains.kotlin.diagnostics.impl.deduplicating
 import org.jetbrains.kotlin.ir.IrDiagnosticReporter
-import org.jetbrains.kotlin.ir.KtDiagnosticReporterWithImplicitIrBasedContext
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
-import org.jetbrains.kotlin.ir.validation.checkers.IrInlineDeclarationChecker
-import org.jetbrains.kotlin.ir.visitors.IrVisitor
 import org.jetbrains.kotlin.konan.properties.Properties
 import org.jetbrains.kotlin.library.*
+import org.jetbrains.kotlin.util.toMetadataVersion
 import java.io.File
 
 /**
@@ -57,10 +53,10 @@ class KotlinFileSerializedData private constructor(
     constructor(metadata: ByteArray, path: String?, fqName: String) : this(metadata, irData = null, path, fqName)
 }
 
-class SerializerOutput<Dependency : KotlinLibrary>(
+class SerializerOutput(
     val serializedMetadata: SerializedMetadata?,
     val serializedIr: SerializedIrModule?,
-    val neededLibraries: List<Dependency>,
+    val neededLibraries: Collection<KotlinLibrary>,
 )
 
 fun KtSourceFile.toIoFileOrNull(): File? = when (this) {
@@ -86,50 +82,24 @@ fun KtSourceFile.toIoFileOrNull(): File? = when (this) {
  * @param dependencies The list of KLIBs that the KLIB being produced depends on.
  * @param createModuleSerializer Used for creating a backend-specific instance of [IrModuleSerializer].
  * @param metadataSerializer Something capable of serializing the metadata of the source files. See the corresponding interface KDoc.
- * @param platformKlibCheckers Additional checks to be run before serializing [irModuleFragment].
- *     Can be used to report serialization-time diagnostics.
  * @param processCompiledFileData Called for each newly serialized file. Useful for incremental compilation.
  * @param processKlibHeader Called after serializing the KLIB header. Useful for incremental compilation.
  */
-fun <Dependency : KotlinLibrary, SourceFile> serializeModuleIntoKlib(
+fun <SourceFile> serializeModuleIntoKlib(
     moduleName: String,
     irModuleFragment: IrModuleFragment?,
     configuration: CompilerConfiguration,
-    diagnosticReporter: DiagnosticReporter,
+    diagnosticReporter: IrDiagnosticReporter,
     cleanFiles: List<KotlinFileSerializedData>,
-    dependencies: List<Dependency>,
+    dependencies: List<KotlinLibrary>,
     createModuleSerializer: (irDiagnosticReporter: IrDiagnosticReporter) -> IrModuleSerializer<*>,
     metadataSerializer: KlibSingleFileMetadataSerializer<SourceFile>,
-    platformKlibCheckers: List<(IrDiagnosticReporter) -> IrVisitor<*, Nothing?>> = emptyList(),
     processCompiledFileData: ((File, KotlinFileSerializedData) -> Unit)? = null,
     processKlibHeader: (ByteArray) -> Unit = {},
-): SerializerOutput<Dependency> {
-    if (irModuleFragment != null) {
-        assert(metadataSerializer.numberOfSourceFiles == irModuleFragment.files.size) {
-            "The number of source files (${metadataSerializer.numberOfSourceFiles}) does not match the number of IrFiles (${irModuleFragment.files.size})"
-        }
-    }
-
+): SerializerOutput {
     val serializedIr = irModuleFragment?.let {
-        val irDiagnosticReporter =
-            KtDiagnosticReporterWithImplicitIrBasedContext(diagnosticReporter.deduplicating(), configuration.languageVersionSettings)
-
-        it.runIrLevelCheckers(
-            irDiagnosticReporter,
-            *platformKlibCheckers.toTypedArray(),
-        )
-
-        if (!configuration.languageVersionSettings.supportsFeature(LanguageFeature.IrIntraModuleInlinerBeforeKlibSerialization)) {
-            // With IrIntraModuleInlinerBeforeKlibSerialization feature, this check happens after the first phase of KLIB inlining.
-            // Without it, the check should happen here instead.
-            it.runIrLevelCheckers(
-                irDiagnosticReporter,
-                ::IrInlineDeclarationChecker,
-            )
-        }
-
         createModuleSerializer(
-            irDiagnosticReporter,
+            diagnosticReporter,
         ).serializedIrModule(it)
     }
 
@@ -137,11 +107,11 @@ fun <Dependency : KotlinLibrary, SourceFile> serializeModuleIntoKlib(
 
     val compiledKotlinFiles = buildList {
         addAll(cleanFiles)
-        metadataSerializer.forEachFile { i, sourceFile, ktSourceFile, packageFqName ->
+        metadataSerializer.forEachFile { i, ioFile, sourceFile, ktSourceFile, packageFqName ->
             val binaryFile = serializedFiles?.get(i)?.also {
-                assert(ktSourceFile.path == it.path) {
+                assert(ktSourceFile == null || ktSourceFile.path == it.path) {
                     """The Kt and Ir files are put in different order
-                    Kt: ${ktSourceFile.path}
+                    Kt: ${ktSourceFile?.path}
                     Ir: ${it.path}
                     """.trimMargin()
                 }
@@ -149,12 +119,11 @@ fun <Dependency : KotlinLibrary, SourceFile> serializeModuleIntoKlib(
             val protoBuf = metadataSerializer.serializeSingleFileMetadata(sourceFile)
             val metadata = protoBuf.toByteArray()
             val compiledKotlinFile = if (binaryFile == null)
-                KotlinFileSerializedData(metadata, ktSourceFile.path, packageFqName.asString())
+                KotlinFileSerializedData(metadata, ktSourceFile?.path, packageFqName.asString())
             else
                 KotlinFileSerializedData(metadata, binaryFile)
 
             if (processCompiledFileData != null) {
-                val ioFile = ktSourceFile.toIoFileOrNull() ?: error("No file found for source ${ktSourceFile.path}")
                 processCompiledFileData(ioFile, compiledKotlinFile)
             }
 
@@ -171,18 +140,21 @@ fun <Dependency : KotlinLibrary, SourceFile> serializeModuleIntoKlib(
 
     processKlibHeader(header)
 
-    val (fragmentNames, fragmentParts) = compiledKotlinFiles
+    val [fragmentNames, fragmentParts] = compiledKotlinFiles
         .groupBy { it.fqName }
-        .map { (fqn, data) ->
+        .map { [fqn, data] ->
             fqn to data.sortedBy { it.path }.map { it.metadata }
         }
         .sortedBy { it.first }
         .unzip()
 
+    val metadataVersion = configuration.languageVersionSettings.languageVersion.toMetadataVersion().toArray()
+
     val serializedMetadata = SerializedMetadata(
         module = header,
         fragments = fragmentParts,
-        fragmentNames = fragmentNames
+        fragmentNames = fragmentNames,
+        metadataVersion = metadataVersion,
     )
 
     return SerializerOutput(
@@ -209,17 +181,13 @@ fun addLanguageFeaturesToManifest(manifestProperties: Properties, languageVersio
     }
 
     val presentablePoisoningFeatures =
-        enabledFeatures.filter { it.forcesPreReleaseBinariesIfEnabled() }.sortedBy(LanguageFeature::name).joinToString(" ") { "+$it" }
+        enabledFeatures.filter { it.forcesPreReleaseBinariesIfEnabled(languageVersionSettings.languageVersion) }.sortedBy(LanguageFeature::name).joinToString(" ") { "+$it" }
     if (presentablePoisoningFeatures.isNotBlank()) {
         manifestProperties.setProperty(KLIB_PROPERTY_MANUALLY_ENABLED_POISONING_LANGUAGE_FEATURES, presentablePoisoningFeatures)
     }
-}
 
-private fun IrModuleFragment.runIrLevelCheckers(
-    diagnosticReporter: IrDiagnosticReporter,
-    vararg checkers: (IrDiagnosticReporter) -> IrVisitor<*, Nothing?>,
-) {
-    for (checker in checkers) {
-        accept(checker(diagnosticReporter), null)
+    if (languageVersionSettings.supportsFeature(LanguageFeature.CompanionBlocksAndExtensions)) {
+        manifestProperties.setProperty(KLIB_PROPERTY_NEW_COMPANION_INITIALIZATION, true.toString())
     }
 }
+

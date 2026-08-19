@@ -41,6 +41,18 @@ sealed class ConeKotlinType : ConeKotlinTypeProjection(), KotlinTypeMarker, Type
 }
 
 /**
+ * Make a transformation from marker interface to cone-based type
+ *
+ * In K2 frontend context such a transformation is normally safe,
+ * as K1-based types and IR-based types cannot occur here.
+ */
+@Suppress("NOTHING_TO_INLINE")
+inline fun KotlinTypeMarker.asCone(): ConeKotlinType = this as ConeKotlinType
+
+@Deprecated(message = "This call is redundant, please just drop it", level = DeprecationLevel.ERROR)
+fun ConeKotlinType.asCone(): ConeKotlinType = this
+
+/**
  * Normally should represent a type with one related constructor, see [getConstructor],
  * but still can require unwrapping, as [ConeDefinitelyNotNullType].
  *
@@ -51,6 +63,15 @@ sealed class ConeKotlinType : ConeKotlinTypeProjection(), KotlinTypeMarker, Type
  *
  */
 sealed class ConeRigidType : ConeKotlinType(), RigidTypeMarker
+
+/**
+ * Make a transformation from marker interface to cone-based type
+ *
+ * In K2 frontend context such a transformation is normally safe,
+ * as K1-based types and IR-based types cannot occur here.
+ */
+@Suppress("NOTHING_TO_INLINE")
+inline fun RigidTypeMarker.asCone(): ConeRigidType = this as ConeRigidType
 
 /**
  * Normally should represent a type with one related constructor that does not require unwrapping.
@@ -227,6 +248,7 @@ data class ConeCapturedType(
  * Types of this kind are represented as (Type & Any).
  *
  * @param original the base type for being DNN. It can be [ConeTypeVariableType], ConeTypeParameterType or [ConeCapturedType].
+ * It can be also [ConeErrorType] in a situation with uninferred parameter type diagnostic.
  */
 data class ConeDefinitelyNotNullType(
     val original: ConeSimpleKotlinType
@@ -267,6 +289,9 @@ class ConeRawType private constructor(
     }
 }
 
+@RequiresOptIn("When modifying an existing intersection type, consider using the `mapTypes` extension. Otherwise, make sure to not forget about upperBoundForApproximation.")
+annotation class DelicateIntersectionConstructor
+
 /**
  * This class represents so-called intersection type like T1&T2&T3 [intersectedTypes] = listOf(T1, T2, T3).
  *
@@ -285,9 +310,9 @@ class ConeRawType private constructor(
  * @param intersectedTypes collection of types to be intersected. None of them is allowed to be another intersection type.
  * @param upperBoundForApproximation a super-type (upper bound), if it's known, to be used as an approximation.
  */
-class ConeIntersectionType(
+class ConeIntersectionType @DelicateIntersectionConstructor constructor(
     val intersectedTypes: Collection<ConeKotlinType>,
-    val upperBoundForApproximation: ConeKotlinType? = null,
+    val upperBoundForApproximation: ConeKotlinType?,
 ) : ConeSimpleKotlinType(), IntersectionTypeConstructorMarker, ConeTypeConstructorMarker {
     // TODO: consider inheriting directly from ConeKotlinType (KT-70049)
     override val typeArguments: Array<out ConeTypeProjection>

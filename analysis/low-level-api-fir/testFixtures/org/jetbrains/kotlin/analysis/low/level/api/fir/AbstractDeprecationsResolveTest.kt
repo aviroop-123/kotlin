@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -10,8 +10,8 @@ import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationService
-import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.AnalysisApiFirSourceTestConfigurator
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.LLFirSessionInvalidationService
+import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.LLSourceLikeTestConfigurator
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
 import org.jetbrains.kotlin.analysis.test.framework.services.expressionMarkerProvider
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
@@ -65,7 +65,7 @@ abstract class AbstractDeprecationsResolveTest : AbstractFirLazyDeclarationResol
             else -> error("Unexpected element: $declaration")
         }
 
-        for ((symbolGetter, name) in symbolSuppliers) {
+        for ([symbolGetter, name] in symbolSuppliers) {
             analyze(mainModule.ktModule) {
                 val symbol = when (declaration) {
                     is KtDeclaration -> declaration.symbol
@@ -98,7 +98,7 @@ abstract class AbstractDeprecationsResolveTest : AbstractFirLazyDeclarationResol
             renderFirElement(rootSymbolFir.fir),
             extension = ".${name}.after.txt"
         )
-        testServices.assertions.assertEqualsToTestOutputFile(deprecationStatus.toString(), extension = ".${name}.out.txt")
+        testServices.assertions.assertEqualsToTestOutputFile(deprecationStatus, extension = ".${name}.out.txt")
     }
 
     private fun getFirSymbol(kaSymbol: KaSymbol): FirBasedSymbol<*> {
@@ -119,5 +119,5 @@ abstract class AbstractDeprecationsResolveTest : AbstractFirLazyDeclarationResol
 }
 
 abstract class AbstractSourceDeprecationsResolveTest : AbstractDeprecationsResolveTest() {
-    override val configurator = AnalysisApiFirSourceTestConfigurator(analyseInDependentSession = false)
+    override val configurator = LLSourceLikeTestConfigurator()
 }

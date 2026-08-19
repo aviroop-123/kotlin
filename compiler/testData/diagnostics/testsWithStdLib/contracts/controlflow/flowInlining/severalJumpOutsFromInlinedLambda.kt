@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseCallsInPlaceEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -39,14 +38,14 @@ fun exitOnlyThroughLocalReturns(b: Boolean) {
 
 fun exitOnlyThroughNonLocalReturns(b: Boolean?) {
     var x: Int
-    var <!ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE!>s<!>: String
+    var s: String
     myRun {
         if (b == null) {
             x = 42
             return
         }
 
-        if (<!DEBUG_INFO_SMARTCAST!>b<!>.not()) {
+        if (b.not()) {
             x = 54
         }
 
@@ -60,8 +59,8 @@ fun exitOnlyThroughNonLocalReturns(b: Boolean?) {
         }
     }
 
-    <!UNREACHABLE_CODE!>x.inc()<!>
-    <!UNREACHABLE_CODE!>s.length<!>
+    <!UNINITIALIZED_VARIABLE!>x<!>.inc()
+    <!UNINITIALIZED_VARIABLE!>s<!>.length
 }
 
 fun nonLocalReturnAndOrdinaryExit(b: Boolean) {

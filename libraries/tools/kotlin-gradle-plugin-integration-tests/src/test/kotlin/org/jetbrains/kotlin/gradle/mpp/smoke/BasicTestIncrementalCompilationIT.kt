@@ -6,10 +6,12 @@
 package org.jetbrains.kotlin.gradle.mpp.smoke
 
 import org.gradle.api.logging.LogLevel
+import org.gradle.testkit.runner.BuildResult
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.mpp.KmpIncrementalITBase
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.test.TestMetadata
+import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.DisplayName
 
 @DisplayName("Basic incremental scenarios with tests in KMP - K2")
@@ -17,7 +19,10 @@ import org.junit.jupiter.api.DisplayName
 open class BasicTestIncrementalCompilationIT : KmpIncrementalITBase() {
 
     override val defaultBuildOptions: BuildOptions
-        get() = super.defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)
+        get() = super.defaultBuildOptions.copy(
+            logLevel = LogLevel.DEBUG,
+            nativeOptions = super.defaultBuildOptions.nativeOptions.copy(incremental = false),
+        )
 
     override val mainCompileTasks: Set<String>
         get() = setOf(
@@ -39,17 +44,24 @@ open class BasicTestIncrementalCompilationIT : KmpIncrementalITBase() {
             ":app:jvmTest",
             ":lib:jvmTest",
 
-            ":app:nativeTest",
-            ":lib:nativeTest",
+            // for native, we check only recompilation, but not test run, as sometimes after recompilation exactly same binary is produced.
+            ":app:linkDebugTestNative",
+            ":lib:linkDebugTestNative",
         )
     override val gradleTask: String
         get() = "build"
 
     @DisplayName("KMP tests are rebuilt when affected")
     @GradleTest
+    @OsCondition(supportedOn = [OS.LINUX, OS.MAC])
     @TestMetadata("generic-kmp-app-plus-lib-with-tests")
     fun testAffectingTestDependencies(gradleVersion: GradleVersion): Unit = withProject(gradleVersion) {
         build("build")
+
+        // Unused code shouldn't change native binary and trigger test execution
+        fun BuildResult.assertNativeTestIsUpToDateAfterChanginUnusedCode() {
+            assertTasksUpToDate(":app:nativeTest")
+        }
 
         /**
          * Step 1 - touch lib/common, affect all tests in app and lib
@@ -59,6 +71,8 @@ open class BasicTestIncrementalCompilationIT : KmpIncrementalITBase() {
         checkIncrementalBuild(
             tasksExpectedToExecute = mainCompileTasks,
         ) {
+            assertNativeTestIsUpToDateAfterChanginUnusedCode()
+
             assertIncrementalCompilation(listOf(changedInLibCommon).relativizeTo(projectPath))
         }
 
@@ -75,9 +89,11 @@ open class BasicTestIncrementalCompilationIT : KmpIncrementalITBase() {
                 ":app:compileTestKotlinJs",
                 ":app:jsTest",
                 ":app:jvmTest",
-                ":app:nativeTest",
+                ":app:linkDebugTestNative",
             ),
         ) {
+            assertNativeTestIsUpToDateAfterChanginUnusedCode()
+
             assertIncrementalCompilation(listOf(changedInAppCommon).relativizeTo(projectPath))
         }
 
@@ -117,14 +133,10 @@ open class BasicTestIncrementalCompilationIT : KmpIncrementalITBase() {
         checkIncrementalBuild(
             tasksExpectedToExecute = setOf(
                 ":app:compileTestKotlinNative",
-                ":app:nativeTest",
+                ":app:linkDebugTestNative",
             ),
-        )
+        ) {
+            assertNativeTestIsUpToDateAfterChanginUnusedCode()
+        }
     }
-}
-
-@DisplayName("Basic incremental scenarios with tests in KMP - K1")
-class BasicTestIncrementalCompilationK1IT : BasicTestIncrementalCompilationIT() {
-    override val defaultBuildOptions: BuildOptions
-        get() = super.defaultBuildOptions.copyEnsuringK1()
 }

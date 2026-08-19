@@ -145,7 +145,12 @@ class StubIrTextEmitter(
             stubLines.forEach(out)
             nativeBridges.kotlinLines.forEach(out)
             if (context.platform == KotlinPlatform.JVM)
-                out("private val loadLibrary = loadKonanLibrary(\"${context.libName}\")")
+                when(context.libName) {
+                    // libllvmstubs.{so|dylib} is LLVM-version-specific, so it's different among compiler versions,
+                    // It must be loaded from konan home specified by compiler configuration, not by system property, etc
+                    "llvmstubs" -> out("""fun loadLLVMStubs(konanHome: String?) = loadKonanLibrary("llvmstubs", konanHome)""")
+                    else -> out("private val loadLibrary = loadKonanLibrary(\"${context.libName}\")")
+                }
         }
     }
     private val printer = object : StubIrVisitor<StubContainer?, Unit> {
@@ -483,6 +488,7 @@ class StubIrTextEmitter(
                 else -> "($protocolGetter, $binaryName)"
             }
         }
+        AnnotationStub.ObjC.Unavailable -> "@ObjCUnavailable"
         AnnotationStub.CCall.CString ->
             "@CCall.CString"
         AnnotationStub.CCall.WCString ->
@@ -491,6 +497,10 @@ class StubIrTextEmitter(
             "@CCall(${annotationStub.symbolName.quoteAsKotlinLiteral()})"
         is AnnotationStub.CCall.Direct ->
             "@CCall.Direct(${annotationStub.name.quoteAsKotlinLiteral()})"
+        is AnnotationStub.CGlobalAccess.Symbol ->
+            "@CGlobalAccess(${annotationStub.name.quoteAsKotlinLiteral()})"
+        AnnotationStub.CGlobalAccess.Pointer ->
+            "@CGlobalAccess.Pointer"
         is AnnotationStub.CStruct ->
             "@CStruct(${annotationStub.struct.quoteAsKotlinLiteral()})"
         is AnnotationStub.CNaturalStruct ->

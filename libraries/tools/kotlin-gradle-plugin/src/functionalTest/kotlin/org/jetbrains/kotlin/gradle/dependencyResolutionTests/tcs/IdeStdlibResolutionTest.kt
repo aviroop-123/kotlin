@@ -17,16 +17,11 @@ import org.jetbrains.kotlin.gradle.idea.testFixtures.tcs.binaryCoordinates
 import org.jetbrains.kotlin.gradle.internal.dsl.KotlinMultiplatformSourceSetConventionsImpl.commonMain
 import org.jetbrains.kotlin.gradle.internal.dsl.KotlinMultiplatformSourceSetConventionsImpl.dependencies
 import org.jetbrains.kotlin.gradle.internal.properties.nativeProperties
-import org.jetbrains.kotlin.gradle.plugin.KotlinJsCompilerType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.ide.kotlinIdeMultiplatformImport
-import org.jetbrains.kotlin.gradle.util.applyMultiplatformPlugin
-import org.jetbrains.kotlin.gradle.util.buildProject
-import org.jetbrains.kotlin.gradle.util.configureDefaults
-import org.jetbrains.kotlin.gradle.util.enableDefaultStdlibDependency
-import org.jetbrains.kotlin.gradle.util.enableDependencyVerification
+import org.jetbrains.kotlin.gradle.util.*
 import org.jetbrains.kotlin.gradle.utils.androidExtension
-import org.junit.Test
+import kotlin.test.Test
 
 class IdeStdlibResolutionTest {
 
@@ -80,7 +75,7 @@ class IdeStdlibResolutionTest {
         val project = createProjectWithDefaultStdlibEnabled()
 
         val kotlin = project.multiplatformExtension
-        kotlin.js(KotlinJsCompilerType.IR)
+        kotlin.js()
 
         project.evaluate()
 
@@ -221,6 +216,7 @@ class IdeStdlibResolutionTest {
         val project = createProjectWithAndroidAndDefaultStdlibEnabled()
 
         val kotlin = project.multiplatformExtension
+        @Suppress("DEPRECATION")
         kotlin.androidTarget()
         kotlin.jvm()
 
@@ -251,6 +247,25 @@ class IdeStdlibResolutionTest {
         )
     }
 
+    @Test
+    fun `test stdlib native + js target set`() {
+        val project = createProjectWithDefaultStdlibEnabled()
+        val kotlin = project.multiplatformExtension
+        kotlin.js()
+        kotlin.linuxX64()
+        kotlin.linuxArm64()
+
+        project.evaluate()
+
+        project.assertStdlibDependencies(
+            kotlin.sourceSets.commonMain.get(),
+            listOf(
+                project.stdlibSourceSetDependency("commonMain"),
+                project.stdlibSourceSetDependency("commonNonJvmMain"),
+            )
+        )
+    }
+
     private fun Project.assertStdlibDependencies(sourceSet: KotlinSourceSet, dependencies: Any) {
         project.kotlinIdeMultiplatformImport.resolveDependencies(sourceSet)
             .filterIsInstance<IdeaKotlinResolvedBinaryDependency>()
@@ -259,6 +274,7 @@ class IdeStdlibResolutionTest {
     }
 
     private fun createProjectWithDefaultStdlibEnabled() = buildProject {
+        withTemporaryKotlinNativeHome()
         enableDependencyVerification(false)
         enableDefaultStdlibDependency(true)
         applyMultiplatformPlugin()
@@ -280,8 +296,12 @@ class IdeStdlibResolutionTest {
     /**
      * Refers to the 'commonMain' source set of the kotlin stdlib
      */
-    private fun stdlibCommonMainDependency(kotlin: KotlinMultiplatformExtension) =
-        binaryCoordinates("org.jetbrains.kotlin:kotlin-stdlib:commonMain:${kotlin.coreLibrariesVersion}")
+    private fun stdlibCommonMainDependency(kotlin: KotlinMultiplatformExtension) = kotlin.stdlibSourceSetDependency("commonMain")
+
+    private fun Project.stdlibSourceSetDependency(stdlibSourceSetName: String) = multiplatformExtension.stdlibSourceSetDependency(stdlibSourceSetName)
+
+    private fun KotlinMultiplatformExtension.stdlibSourceSetDependency(stdlibSourceSetName: String) =
+        binaryCoordinates("org.jetbrains.kotlin:kotlin-stdlib:$stdlibSourceSetName:${coreLibrariesVersion}")
 
     private fun jvmStdlibDependencies(kotlin: KotlinMultiplatformExtension) = listOf(
         binaryCoordinates("org.jetbrains.kotlin:kotlin-stdlib:${kotlin.coreLibrariesVersion}"),

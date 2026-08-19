@@ -5,8 +5,8 @@
 
 package org.jetbrains.kotlin.jps
 
-import org.jetbrains.kotlin.generators.TestGroup
-import org.jetbrains.kotlin.generators.impl.generateTestGroupSuite
+import org.jetbrains.kotlin.generators.dsl.TestGroup
+import org.jetbrains.kotlin.generators.dsl.junit4.generateTestGroupSuiteWithJUnit4
 import org.jetbrains.kotlin.jps.build.*
 import org.jetbrains.kotlin.jps.incremental.AbstractJvmProtoComparisonTest
 import org.jetbrains.kotlin.test.TargetBackend
@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.test.TargetBackend
 fun main(args: Array<String>) {
     System.setProperty("java.awt.headless", "true")
 
-    generateTestGroupSuite(args) {
+    generateTestGroupSuiteWithJUnit4(args) {
         testGroup("jps/jps-plugin/jps-tests/tests-gen", "jps/jps-plugin/testData") {
             fun incrementalJvmTestData(): TestGroup.TestClass.() -> Unit = {
                 val targetBackend = TargetBackend.JVM_IR
@@ -52,24 +52,6 @@ fun main(args: Array<String>) {
                 )
             }
 
-            // IR
-            testClass<AbstractIncrementalK1JvmJpsTest> {
-                modelForDirectoryBasedTest("incremental/multiModule", "common", extension = null, excludeParentDirs = true, targetBackend = TargetBackend.JVM_IR)
-                modelForDirectoryBasedTest("incremental/multiModule", "jvm", extension = null, excludeParentDirs = true, targetBackend = TargetBackend.JVM_IR)
-                modelForDirectoryBasedTest(
-                    "incremental", "pureKotlin",
-                    extension = null,
-                    recursive = false,
-                    targetBackend = TargetBackend.JVM_IR,
-                    excludedPattern = ".*SinceK2"
-                )
-                modelForDirectoryBasedTest("incremental", "withJava", extension = null, excludeParentDirs = true, targetBackend = TargetBackend.JVM_IR)
-                modelForDirectoryBasedTest("incremental", "inlineFunCallSite", extension = null, excludeParentDirs = true, targetBackend = TargetBackend.JVM_IR)
-                modelForDirectoryBasedTest(
-                    "incremental", "classHierarchyAffected", extension = null, excludeParentDirs = true, targetBackend = TargetBackend.JVM_IR
-                )
-            }
-
             // K2
             testClass<AbstractIncrementalK2JvmJpsTest>(
                 init = incrementalJvmTestData()
@@ -82,9 +64,6 @@ fun main(args: Array<String>) {
             )
 
             testClass<AbstractJvmLookupTrackerTest> {
-                modelForDirectoryBasedTest("incremental/lookupTracker", "jvm", extension = null, recursive = false)
-            }
-            testClass<AbstractK1JvmLookupTrackerTest> {
                 modelForDirectoryBasedTest("incremental/lookupTracker", "jvm", extension = null, recursive = false)
             }
 

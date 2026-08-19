@@ -137,7 +137,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
             private fun processBinaryExpression(expression: JsBinaryOperation, synthetic: Boolean, orElse: () -> Unit) {
                 val assignment = JsAstUtils.decomposeAssignmentToVariable(expression)
                 if (assignment != null) {
-                    val (name, value) = assignment
+                    val [name, value] = assignment
                     if (name in localVariables) {
                         assignVariable(name, value)
                         addVar(name)
@@ -155,7 +155,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                 for (v in x.vars) {
                     val name = v.name
                     val value = v.initExpression
-                    if (name in localVariables) {
+                    if (name != null && name in localVariables) {
                         if (x.synthetic) {
                             temporary += name
                         }
@@ -185,10 +185,12 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
 
             override fun visitContinue(x: JsContinue) { }
 
-            override fun visitObjectLiteral(x: JsObjectLiteral) {
-                for (initializer in x.propertyInitializers) {
-                    accept(initializer.valueExpr)
-                }
+            override fun visitKeyValuePropertyInitializer(x: JsPropertyInitializer.KeyValue) {
+                accept(x.valueExpr)
+            }
+
+            override fun visitSpreadPropertyInitializer(x: JsPropertyInitializer.Spread) {
+                accept(x.expression)
             }
 
             override fun visitLoop(x: JsLoop) = withNewScope { super.visitLoop(x) }
@@ -239,7 +241,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                 val expression = x.expression
                 val assignment = JsAstUtils.decomposeAssignmentToVariable(expression)
                 if (assignment != null) {
-                    val (name, value) = assignment
+                    val [name, value] = assignment
                     handleDefinition(name, value, x)
                 } else {
                     if (handleExpression(expression)) {
@@ -250,9 +252,10 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
 
             override fun visitVars(x: JsVars) {
                 for (v in x.vars) {
+                    val name = v.name
                     val initializer = v.initExpression
-                    if (initializer != null) {
-                        handleDefinition(v.name, initializer, v)
+                    if (name != null && initializer != null) {
+                        handleDefinition(name, initializer, v)
                     }
                 }
             }
@@ -303,10 +306,12 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                 x.cases.forEach { accept(it); invalidateTemporaries() }
             }
 
-            override fun visitObjectLiteral(x: JsObjectLiteral) {
-                for (initializer in x.propertyInitializers) {
-                    accept(initializer.valueExpr)
-                }
+            override fun visitKeyValuePropertyInitializer(x: JsPropertyInitializer.KeyValue) {
+                accept(x.valueExpr)
+            }
+
+            override fun visitSpreadPropertyInitializer(x: JsPropertyInitializer.Spread) {
+                accept(x.expression)
             }
 
             override fun visitWhile(x: JsWhile) {
@@ -321,8 +326,8 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                 invalidateTemporaries()
             }
 
-            override fun visitForIn(x: JsForIn) {
-                handleExpression(x.objectExpression)
+            override fun visitIterableLoop(x: JsIterableLoop) {
+                handleExpression(x.iterableExpression)
                 invalidateTemporaries()
                 accept(x.body)
                 invalidateTemporaries()
@@ -373,7 +378,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
             }
 
             private fun invalidateTemporariesUsingName(name: JsName) {
-                lastAssignedVars.removeAll { (_, expr) ->
+                lastAssignedVars.removeAll { [_, expr] ->
                     var nameUsed = false
                     object : RecursiveJsVisitor() {
                         override fun visitNameRef(nameRef: JsNameRef) {
@@ -393,7 +398,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
 
                 var candidates = candidateFinder.substitutableVariableReferences
                 while (lastAssignedVars.isNotEmpty()) {
-                    val (assignedVar, assignedStatement) = lastAssignedVars.last()
+                    val [assignedVar, assignedStatement] = lastAssignedVars.last()
                     val candidateIndex = candidates.lastIndexOf(assignedVar)
                     if (candidateIndex < 0) break
 
@@ -425,10 +430,16 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
         }
 
         override fun visitObjectLiteral(x: JsObjectLiteral) {
-            for (initializer in x.propertyInitializers) {
-                accept(initializer.valueExpr)
-            }
+            super.visitObjectLiteral(x)
             sideEffectOccurred = true
+        }
+
+        override fun visitKeyValuePropertyInitializer(x: JsPropertyInitializer.KeyValue) {
+            accept(x.valueExpr)
+        }
+
+        override fun visitSpreadPropertyInitializer(x: JsPropertyInitializer.Spread) {
+            accept(x.expression)
         }
 
         override fun visitNew(x: JsNew) {
@@ -528,11 +539,13 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                     hasChanges = true
                 }
 
-                val ranges = x.vars.splitToRanges { shouldConsiderUnused(it.name) }
+                val ranges = x.vars.splitToRanges {
+                    it.name?.let { name -> shouldConsiderUnused(name) } ?: false
+                }
                 if (ranges.size == 1 && !ranges[0].second) return super.visit(x, ctx)
 
                 hasChanges = true
-                for ((subList, isRemoved) in ranges) {
+                for ([subList, isRemoved] in ranges) {
                     val initializers = subList.mapNotNull { it.initExpression }
                     initializers.forEach { accept(it) }
                     if (isRemoved) {
@@ -540,7 +553,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                             ctx.addPrevious(JsExpressionStatement(accept(initializer)).apply { synthetic = true })
                         }
                     } else {
-                        ctx.addPrevious(JsVars(*subList.toTypedArray()).apply { synthetic = true })
+                        ctx.addPrevious(JsVars(JsVars.Variant.Var, *subList.toTypedArray()).apply { synthetic = true })
                     }
                 }
                 ctx.removeMe()
@@ -561,7 +574,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
 
                 val assignment = JsAstUtils.decomposeAssignmentToVariable(expression)
                 if (assignment != null) {
-                    val (name, value) = assignment
+                    val [name, value] = assignment
                     if (shouldConsiderUnused(name)) {
                         hasChanges = true
                         ctx.replaceMe(accept(JsExpressionStatement(value)).apply { synthetic = true })
@@ -574,8 +587,18 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
 
             override fun visit(x: JsObjectLiteral, ctx: JsContext<*>): Boolean {
                 for (initializer in x.propertyInitializers) {
-                    accept(initializer.valueExpr)
+                    accept(initializer)
                 }
+                return super.visit(x, ctx)
+            }
+
+            override fun visit(x: JsPropertyInitializer.KeyValue, ctx: JsContext<*>): Boolean {
+                accept(x.valueExpr)
+                return super.visit(x, ctx)
+            }
+
+            override fun visit(x: JsPropertyInitializer.Spread, ctx: JsContext<*>): Boolean {
+                accept(x.expression)
                 return super.visit(x, ctx)
             }
 

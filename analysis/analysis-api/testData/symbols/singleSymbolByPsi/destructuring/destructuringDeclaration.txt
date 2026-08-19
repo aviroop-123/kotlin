@@ -10,6 +10,7 @@ KaDestructuringDeclarationSymbol:
   ]
   isActual: false
   isExpect: false
+  isExternal: false
   location: LOCAL
   modality: FINAL
   origin: SOURCE
@@ -17,3 +18,4 @@ KaDestructuringDeclarationSymbol:
   getContainingFileSymbol: KaFileSymbol(destructuringDeclaration.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

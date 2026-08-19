@@ -5,11 +5,12 @@
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("d8-configuration")
     id("share-foreign-java-nullability-annotations")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
+    id("require-explicit-types")
 }
 
 dependencies {
@@ -28,6 +29,8 @@ dependencies {
     testFixturesApi(project(":compiler:fir:fir-serialization"))
     testFixturesApi(project(":compiler:fir:entrypoint"))
     testFixturesApi(project(":compiler:frontend"))
+    testFixturesImplementation(project(":js:js.frontend"))
+    testFixturesImplementation(project(":wasm:wasm.frontend"))
     testFixturesImplementation(testFixtures(project(":generators:test-generator")))
     testFixturesImplementation(testFixtures(project(":compiler:tests-spec")))
 
@@ -35,7 +38,6 @@ dependencies {
     testFixturesApi(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 
-    testRuntimeOnly(project(":core:descriptors.runtime"))
     testRuntimeOnly(project(":compiler:fir:fir2ir:jvm-backend"))
 
     testFixturesApi(intellijCore())
@@ -48,21 +50,20 @@ dependencies {
     testRuntimeOnly("com.jetbrains.intellij.platform:util-xml-dom:$intellijVersion") { isTransitive = false }
     testRuntimeOnly(toolsJar())
 
-    jakartaAnnotationsClasspath(commonDependency("jakarta.annotation", "jakarta.annotation-api"))
+    thirdPartyAnnotationsClasspath(commonDependency("jakarta.annotation", "jakarta.annotation-api"))
+    thirdPartyAnnotationsClasspath(commonDependency("io.vertx", "vertx-codegen"))
 }
 
 sourceSets {
     "main" { none() }
-    "test" {
-        projectDefault()
-        generatedTestDir()
-    }
+    "test" { projectDefault() }
     "testFixtures" { projectDefault() }
 }
 
 projectTests {
     testTask(
         jUnitMode = JUnitMode.JUnit5,
+        javaLauncher = JdkMajorVersion.JDK_1_8,
         defineJDKEnvVariables = listOf(
             JdkMajorVersion.JDK_1_8,
             JdkMajorVersion.JDK_11_0,
@@ -70,15 +71,29 @@ projectTests {
             JdkMajorVersion.JDK_21_0
         )
     ) {
-        dependsOn(":dist")
-        workingDir = rootDir
         useJUnitPlatform()
-        useJsIrBoxTests(version = version, buildDir = layout.buildDirectory)
     }
 
-    testGenerator("org.jetbrains.kotlin.test.TestGeneratorForFirAnalysisTestsKt")
+    testGenerator("org.jetbrains.kotlin.test.TestGeneratorForFirAnalysisTestsKt", generateTestsInBuildDirectory = true)
+
+    testData(project(":compiler").isolated, "testData/diagnostics")
+    testData(project(":compiler").isolated, "testData/loadJava")
+    testData(project(":compiler:tests-spec").isolated, "testData/diagnostics")
 
     withJvmStdlibAndReflect()
+    withScriptRuntime()
+    withMockJdkAnnotationsJar()
+    withMockJDKModifiedRuntime()
+    withTestJar()
+    withScriptingPlugin()
+    withMockJdkRuntime()
+    withStdlibCommon()
+    withStdlibWeb()
+    withAnnotations()
+    withThirdPartyJsr305()
+    withThirdPartyAnnotations()
+    withThirdPartyJava8Annotations()
+    withThirdPartyJava9Annotations()
 }
 
 testsJar()

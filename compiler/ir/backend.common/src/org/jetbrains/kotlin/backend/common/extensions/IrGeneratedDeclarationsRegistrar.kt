@@ -5,23 +5,26 @@
 
 package org.jetbrains.kotlin.backend.common.extensions
 
+import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 
 abstract class IrGeneratedDeclarationsRegistrar {
-    abstract fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, annotations: List<IrConstructorCall>)
+    abstract fun getMetadataVisibleAnnotationsForElement(declaration: IrDeclaration): MutableList<IrAnnotation>
 
-    fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, vararg annotations: IrConstructorCall) {
+    abstract fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, annotations: List<IrAnnotation>)
+
+    fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, vararg annotations: IrAnnotation) {
         addMetadataVisibleAnnotationsToElement(declaration, annotations.toList())
     }
 
     abstract fun registerFunctionAsMetadataVisible(irFunction: IrSimpleFunction)
     abstract fun registerConstructorAsMetadataVisible(irConstructor: IrConstructor)
-
-    // TODO: KT-63881
-    // abstract fun registerPropertyAsMetadataVisible(irProperty: IrProperty)
+    abstract fun registerPropertyAsMetadataVisible(irProperty: IrProperty)
+    abstract fun registerClassAsMetadataVisible(irClass: IrClass)
 
     abstract fun addCustomMetadataExtension(
         irDeclaration: IrDeclaration,

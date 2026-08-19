@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNREACHABLE_CODE -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -63,7 +62,7 @@ fun case4() {
 
 // TESTCASE NUMBER: 5
 fun case5(nothing: Nothing?) {
-    <!DEBUG_INFO_CONSTANT, DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing?")!>nothing<!>
-    val y = <!ALWAYS_NULL!>nothing<!>!!
+    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing?")!>nothing<!>
+    val y = nothing!!
     <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Nothing")!>y<!>
 }

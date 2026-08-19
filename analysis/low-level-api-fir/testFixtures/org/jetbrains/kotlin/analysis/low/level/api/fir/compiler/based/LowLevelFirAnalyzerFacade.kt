@@ -7,12 +7,12 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.compiler.based
 
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.DiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLResolutionFacade
-import org.jetbrains.kotlin.analysis.low.level.api.fir.api.collectDiagnosticsForFile
+import org.jetbrains.kotlin.analysis.low.level.api.fir.api.diagnostics
 import org.jetbrains.kotlin.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.fir.AbstractFirAnalyzerFacade
 import org.jetbrains.kotlin.fir.declarations.FirFile
-import org.jetbrains.kotlin.fir.pipeline.FirResult
-import org.jetbrains.kotlin.fir.pipeline.ModuleCompilerAnalyzedOutput
+import org.jetbrains.kotlin.fir.pipeline.AllModulesFrontendOutput
+import org.jetbrains.kotlin.fir.pipeline.SingleModuleFrontendOutput
 import org.jetbrains.kotlin.fir.psi
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.util.listMultimapOf
@@ -35,10 +35,10 @@ open class LowLevelFirAnalyzerFacade(
     override val scopeSession: ScopeSession
         get() = ScopeSession()
 
-    override val result: FirResult
+    override val frontendOutput: AllModulesFrontendOutput
         get() {
-            val output = ModuleCompilerAnalyzedOutput(resolutionFacade.useSiteFirSession, scopeSession, allFirFiles.values.toList())
-            return FirResult(listOf(output))
+            val output = SingleModuleFrontendOutput(resolutionFacade.useSiteFirSession, scopeSession, allFirFiles.values.toList())
+            return AllModulesFrontendOutput(listOf(output))
         }
 
     private var resolved: Boolean = false
@@ -51,7 +51,7 @@ open class LowLevelFirAnalyzerFacade(
 
         return allFirFiles.values.associateWith { firFile ->
             val ktFile = firFile.psi as KtFile
-            val diagnostics = ktFile.collectDiagnosticsForFile(resolutionFacade, diagnosticCheckerFilter)
+            val diagnostics = ktFile.diagnostics(resolutionFacade, diagnosticCheckerFilter)
             @Suppress("UNCHECKED_CAST")
             diagnostics.toList() as List<KtDiagnostic>
         }

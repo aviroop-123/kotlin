@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.resolve.jvm.checkers
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
@@ -21,6 +22,7 @@ import org.jetbrains.kotlin.types.checker.KotlinTypePreparator
 import org.jetbrains.kotlin.types.model.KotlinTypeMarker
 import org.jetbrains.kotlin.utils.addIfNotNull
 
+@K1Deprecation
 object JavaOverrideWithWrongNullabilityOverrideChecker : DeclarationChecker {
     private val typePreparatorUnwrappingEnhancement: KotlinTypePreparator = object : KotlinTypePreparator() {
         override fun prepareType(type: KotlinTypeMarker): UnwrappedType =
@@ -44,9 +46,12 @@ object JavaOverrideWithWrongNullabilityOverrideChecker : DeclarationChecker {
             val overridingUtilWithEnhancementUnwrapped =
                 OverridingUtil
                     .createWithTypePreparatorAndCustomSubtype(typePreparatorUnwrappingEnhancement) { subtype, supertype ->
-                        !JavaNullabilityChecker.isNullableTypeAgainstNotNullTypeParameter(subtype, supertype).also {
-                            if (it) {
+                        JavaNullabilityChecker.isNullableTypeAgainstNotNullTypeParameter(subtype, supertype).let { isNullabilityViolation ->
+                            if (isNullabilityViolation) {
                                 relatedTypeParameters.addIfNotNull(subtype.constructor.declarationDescriptor as? TypeParameterDescriptor)
+                                false
+                            } else {
+                                null // returning null means that we should proceed with the usual subtyping
                             }
                         }
                     }

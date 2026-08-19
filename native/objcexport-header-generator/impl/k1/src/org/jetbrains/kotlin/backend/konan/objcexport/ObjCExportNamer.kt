@@ -98,6 +98,17 @@ interface ObjCExportNamer {
     fun getCompanionObjectPropertySelector(descriptor: ClassDescriptor): String
     fun needsExplicitMethodFamily(name: String): Boolean
 
+    // Null means no NSEnum property.
+    fun getNSEnumTypeName(descriptor: ClassDescriptor): ObjCExportNSEnumTypeName? =
+        descriptor.annotations.findAnnotation(KonanFqNames.objCEnum)?.let {
+            val name = ((it.argumentValue("name")?.value as String?)?.ifEmpty { null })
+                ?: "${getClassOrProtocolName(descriptor).objCName}NSEnum"
+            val swiftName = ((it.argumentValue("swiftName")?.value as String?)?.ifEmpty { null })
+                ?: ((it.argumentValue("name")?.value as String?)?.ifEmpty { null })
+                ?: "${getClassOrProtocolName(descriptor).swiftName}NSEnum"
+            ObjCExportNSEnumTypeName(swiftName = swiftName, objCName = name)
+        }
+
     companion object {
         @InternalKotlinNativeApi
         const val kotlinThrowableAsErrorMethodName: String = "asError"
@@ -107,6 +118,9 @@ interface ObjCExportNamer {
 
         @InternalKotlinNativeApi
         const val companionObjectPropertyName: String = "companion"
+
+        @InternalKotlinNativeApi
+        const val nsEnumPropertyName: String = "nsEnum"
     }
 }
 
@@ -553,7 +567,7 @@ class ObjCExportNamerImpl(
         StringBuilder().apply {
             append(method.getMangledName(forSwift = false))
 
-            parameters.forEachIndexed { index, (bridge, it) ->
+            parameters.forEachIndexed { index, [bridge, it] ->
                 val name = when (bridge) {
                     is MethodBridgeValueParameter.Mapped -> when {
                         it is ReceiverParameterDescriptor -> it.getObjCName().asIdentifier(false) { "" }
@@ -605,7 +619,7 @@ class ObjCExportNamerImpl(
             append(method.getMangledName(forSwift = true))
             append("(")
 
-            parameters@ for ((bridge, it) in parameters) {
+            parameters@ for ([bridge, it] in parameters) {
                 val label = when (bridge) {
                     is MethodBridgeValueParameter.Mapped -> when {
                         it is ReceiverParameterDescriptor -> it.getObjCName().asIdentifier(true) { "_" }
@@ -743,7 +757,7 @@ class ObjCExportNamerImpl(
             builtIns.mutableMap to mutableMapName
         )
 
-        predefinedClassNames.forEach { (descriptor, name) ->
+        predefinedClassNames.forEach { [descriptor, name] ->
             objCClassNames.forceAssign(descriptor, name.objCName)
             swiftClassAndProtocolNames.forceAssign(descriptor, name.swiftName)
         }
@@ -754,11 +768,11 @@ class ObjCExportNamerImpl(
                 NoLookupLocation.FROM_BACKEND
             ).single()
 
-        Predefined.anyMethodSelectors.forEach { (name, selector) ->
+        Predefined.anyMethodSelectors.forEach { [name, selector] ->
             methodSelectors.forceAssign(any.method(name), selector)
         }
 
-        Predefined.anyMethodSwiftNames.forEach { (name, swiftName) ->
+        Predefined.anyMethodSwiftNames.forEach { [name, swiftName] ->
             methodSwiftNames.forceAssign(any.method(name), swiftName)
         }
     }
@@ -1070,6 +1084,22 @@ private class ObjCName(
 
     fun asIdentifier(forSwift: Boolean, default: (String) -> String = { it.toIdentifier() }): String =
         swiftName.takeIf { forSwift } ?: objCName ?: default(kotlinName)
+}
+
+class ObjCEnumEntryName(
+    private val objCName: String?,
+    private val swiftName: String?,
+) {
+    /// Implements empty/null normalization and the swift/objc fallback
+    fun getName(forSwift: Boolean) = (if (forSwift) swiftName?.ifEmpty { null } else null) ?: objCName?.ifEmpty { null }
+}
+
+fun DeclarationDescriptor.getObjCEnumEntryName(): ObjCEnumEntryName {
+    val annotation = annotations.findAnnotation(KonanFqNames.objCEnumEntryName)
+    return ObjCEnumEntryName(
+        objCName = annotation?.argumentValue("name")?.value as String?,
+        swiftName = annotation?.argumentValue("swiftName")?.value as String?
+    )
 }
 
 private fun DeclarationDescriptor.getObjCName(): ObjCName {

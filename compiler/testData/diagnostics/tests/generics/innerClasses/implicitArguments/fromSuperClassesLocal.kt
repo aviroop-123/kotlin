@@ -1,4 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
+// LANGUAGE: +NestedTypeAliases +LocalTypeAliases
 // CHECK_TYPE
 // DIAGNOSTICS: -UNUSED_VALUE -VARIABLE_WITH_REDUNDANT_INITIALIZER -TOPLEVEL_TYPEALIASES_ONLY
 
@@ -45,7 +46,7 @@ fun test() {
     x().foo().a() checkType { _<A<String, Double, Short, Long>>() }
     x().bar() checkType { _<A<String, Double, Short, Char>>() }
 
-    x = <!TYPE_MISMATCH, TYPE_MISMATCH, TYPE_MISMATCH!>foobar<Int>()<!>
+    x <!ASSIGNMENT_TYPE_MISMATCH!>=<!> foobar<Int>()
 
     var y = noParameters()
     y = noParameters()

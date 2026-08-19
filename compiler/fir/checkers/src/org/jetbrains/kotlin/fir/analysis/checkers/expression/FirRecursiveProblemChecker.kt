@@ -1,11 +1,12 @@
 /*
- * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.fir.analysis.checkers.expression
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
+import org.jetbrains.kotlin.KtSourceElementKind
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
@@ -21,11 +22,18 @@ import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.types.type
 
 object FirRecursiveProblemChecker : FirBasicExpressionChecker(MppCheckerKind.Common) {
+
+    private val KtSourceElementKind?.shouldBeReported: Boolean
+        get() = when (this) {
+            !is KtFakeSourceElementKind -> true
+            else -> false
+        }
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(expression: FirStatement) {
         if (
             expression !is FirExpression ||
-            expression.source?.kind is KtFakeSourceElementKind
+            !expression.source?.kind.shouldBeReported
         ) {
             return
         }

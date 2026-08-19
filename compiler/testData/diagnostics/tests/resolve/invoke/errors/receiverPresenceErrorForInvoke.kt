@@ -2,15 +2,15 @@
 // FIR_DUMP
 
 fun test1(f: String.() -> Unit) {
-    (f)<!NO_VALUE_FOR_PARAMETER!>()<!>
+    (<!NO_VALUE_FOR_PARAMETER!>f<!>)()
 
-    f<!NO_VALUE_FOR_PARAMETER!>()<!>
+    <!NO_VALUE_FOR_PARAMETER!>f<!>()
 }
 
 fun test2(f: (Int) -> Int) {
     1.<!UNRESOLVED_REFERENCE!>f<!>(2)
 
-    2.<!NO_RECEIVER_ALLOWED!>(f)<!>(2)
+    <!NO_RECEIVER_ALLOWED!>2.(f)(<!TOO_MANY_ARGUMENTS!>2<!>)<!>
 }
 
 /* GENERATED_FIR_TAGS: functionDeclaration, functionalType, integerLiteral, typeWithExtension */

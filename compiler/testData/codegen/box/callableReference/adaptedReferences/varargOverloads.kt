@@ -1,5 +1,3 @@
-// IGNORE_BACKEND_K1: ANY
-
 fun foo(vararg ii: Int) = 1
 fun foo(vararg ss: String) = 2
 fun foo(i: Int) = 3

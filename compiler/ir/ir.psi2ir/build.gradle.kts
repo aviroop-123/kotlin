@@ -1,12 +1,15 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
     api(project(":compiler:util"))
-    api(project(":compiler:frontend"))
-    api(project(":compiler:backend-common"))
+    implementation(project(":compiler:frontend"))
+    implementation(project(":compiler:resolution"))
+    implementation(project(":compiler:resolution.common"))
+    implementation(project(":core:descriptors"))
+    implementation(project(":core:deserialization"))
+    api(project(":compiler:ir.backend.common"))
     api(project(":compiler:ir.tree"))
     implementation(project(":compiler:ir.serialization.common"))
     compileOnly(intellijCore())
@@ -20,3 +23,5 @@ sourceSets {
     "main" { projectDefault() }
     "test" {}
 }
+
+optInToK1Deprecation()

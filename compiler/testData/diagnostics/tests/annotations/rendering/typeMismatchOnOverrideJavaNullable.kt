@@ -1,5 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// RENDER_DIAGNOSTICS_MESSAGES
+// RENDER_DIAGNOSTIC_ARGUMENTS
 // SKIP_JAVAC
 
 // FILE: MyTypeQualifier.java
@@ -31,7 +31,7 @@ import org.jetbrains.annotations.NotNull;
 annotation class An
 
 class B : A {
-    override fun foo(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE("foo; @NotNull @MyTypeQualifier public abstract fun foo(): String defined in A")!>String?<!> = null
+    override fun foo(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE("fun foo(): String?; 'fun foo(): String' defined in 'A'")!>String?<!> = null
 }
 
 @An
@@ -42,7 +42,7 @@ public interface C {
 }
 
 class D : C {
-    override fun foo(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE("foo; public abstract fun foo(): String defined in C")!>String?<!> = null
+    override fun foo(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE("fun foo(): String?; 'fun foo(): String' defined in 'C'")!>String?<!> = null
 }
 
 /* GENERATED_FIR_TAGS: annotationDeclaration, classDeclaration, functionDeclaration, interfaceDeclaration, javaType,

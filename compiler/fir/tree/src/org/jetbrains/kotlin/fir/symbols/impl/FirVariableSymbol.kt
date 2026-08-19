@@ -56,8 +56,6 @@ sealed class FirVariableSymbol<out E : FirVariable> : FirCallableSymbol<E>() {
 }
 
 sealed class FirPropertySymbol : FirVariableSymbol<FirProperty>(), PropertySymbolMarker {
-    abstract val isLocal: Boolean
-
     open val getterSymbol: FirPropertyAccessorSymbol?
         get() = fir.getter?.symbol
 
@@ -101,23 +99,12 @@ sealed class FirPropertySymbol : FirVariableSymbol<FirProperty>(), PropertySymbo
 class FirLocalPropertySymbol() : FirPropertySymbol() {
     override val callableId: CallableId?
         get() = null
-
-    override val isLocal: Boolean
-        get() = true
-}
-
-class FirLocalPropertySymbolWithCallableId(override val callableId: CallableId) : FirPropertySymbol() {
-    override val isLocal: Boolean
-        get() = true
 }
 
 /**
  * Used for top-level and member properties, including member properties of local classes / anonymous objects
  */
-open class FirRegularPropertySymbol(override val callableId: CallableId) : FirPropertySymbol() {
-    override val isLocal: Boolean
-        get() = false
-}
+open class FirRegularPropertySymbol(override val callableId: CallableId) : FirPropertySymbol()
 
 class FirIntersectionOverridePropertySymbol(
     callableId: CallableId,
@@ -165,10 +152,7 @@ class FirEnumEntrySymbol(override val callableId: CallableId) : FirVariableSymbo
         get() = (fir.initializer as? FirAnonymousObjectExpression)?.anonymousObject?.symbol
 }
 
-class FirValueParameterSymbol() : FirVariableSymbol<FirValueParameter>(),
-    ValueParameterSymbolMarker,
-    // TODO(KT-72994) stop extending FirThisOwnerSymbol when context receivers are removed
-    FirThisOwnerSymbol<FirValueParameter> {
+class FirValueParameterSymbol() : FirVariableSymbol<FirValueParameter>(), ValueParameterSymbolMarker {
     override val callableId: CallableId
         get() = CallableId(name)
 
@@ -191,13 +175,9 @@ class FirValueParameterSymbol() : FirVariableSymbol<FirValueParameter>(),
         get() = fir.containingDeclarationSymbol
 }
 
-// TODO(KT-72994) convert to class extending FirBasedSymbol when context receivers are removed
-sealed interface FirThisOwnerSymbol<out E : FirDeclaration> {
-    val fir: E
-    val source: KtSourceElement?
-}
+sealed class FirThisOwnerSymbol<out E : FirDeclaration> : FirBasedSymbol<E>()
 
-class FirReceiverParameterSymbol : FirBasedSymbol<FirReceiverParameter>(), FirThisOwnerSymbol<FirReceiverParameter> {
+class FirReceiverParameterSymbol : FirThisOwnerSymbol<FirReceiverParameter>() {
     val containingDeclarationSymbol: FirBasedSymbol<*>
         get() = fir.containingDeclarationSymbol
 
@@ -226,13 +206,7 @@ class FirReceiverParameterSymbol : FirBasedSymbol<FirReceiverParameter>(), FirTh
 
 class FirErrorPropertySymbol(
     val diagnostic: ConeDiagnostic
-) : FirPropertySymbol(), FirErrorCallableSymbol<FirProperty> {
-    override val callableId: CallableId
-        get() = CALLABLE_ID
-
-    override val isLocal: Boolean
-        get() = false
-
+) : FirRegularPropertySymbol(CALLABLE_ID), FirErrorCallableSymbol<FirProperty> {
     companion object {
         val NAME: Name = Name.special("<error property>")
         val CALLABLE_ID: CallableId = CallableId(FqName.ROOT, NAME)

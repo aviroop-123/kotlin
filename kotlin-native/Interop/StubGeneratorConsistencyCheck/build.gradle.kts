@@ -1,18 +1,17 @@
 plugins {
     kotlin("jvm")
+    `java-test-fixtures`
 }
 
 dependencies {
-    testApi(testFixtures(project(":compiler:tests-common-new")))
-    testApi(libs.junit.jupiter.api)
-    testApi(libs.junit.jupiter.engine)
+    testFixturesImplementation(testFixtures(project(":compiler:tests-common-new")))
+    testFixturesImplementation(libs.junit.jupiter.api)
+    testFixturesImplementation(libs.junit.jupiter.engine)
 }
 
 sourceSets {
-    "main" { none() }
-    "test" {
+    main { none() }
+    testFixtures {
         projectDefault()
     }
 }
-
-testsJar {}

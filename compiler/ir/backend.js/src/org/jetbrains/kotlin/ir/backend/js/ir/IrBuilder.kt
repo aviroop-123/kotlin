@@ -19,7 +19,7 @@ import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.name.Name
 
 object JsIrBuilder {
-    val SYNTHESIZED_DECLARATION by IrDeclarationOriginImpl
+    val SYNTHESIZED_DECLARATION by IrDeclarationOriginImpl.Regular
 
     fun buildCall(
         target: IrSimpleFunctionSymbol,
@@ -42,7 +42,7 @@ object JsIrBuilder {
         ).apply {
             typeArguments?.let {
                 assert(typeArguments.size == this.typeArguments.size)
-                it.withIndex().forEach { (i, t) ->
+                for ([i, t] in it.withIndex()) {
                     this.typeArguments[i] = t
                 }
             }
@@ -77,7 +77,43 @@ object JsIrBuilder {
         ).apply {
             typeArguments?.let {
                 assert(it.size == this.typeArguments.size)
-                it.withIndex().forEach { (i, t) ->
+                for ([i, t] in it.withIndex()) {
+                    this.typeArguments[i] = t
+                }
+            }
+        }
+    }
+
+    fun buildAnnotation(
+        target: IrConstructorSymbol,
+        typeArguments: List<IrType?>? = null,
+        constructorTypeArguments: List<IrType?>? = null,
+        origin: IrStatementOrigin = JsStatementOrigins.SYNTHESIZED_STATEMENT,
+        startOffset: Int = UNDEFINED_OFFSET,
+        endOffset: Int = UNDEFINED_OFFSET,
+    ): IrAnnotation {
+        val owner = target.owner
+        val irClass = owner.parentAsClass
+
+        return IrAnnotationImpl(
+            startOffset,
+            endOffset,
+            owner.returnType,
+            target,
+            typeArgumentsCount = irClass.typeParameters.size,
+            constructorTypeArgumentsCount = owner.typeParameters.size,
+            origin = origin
+        ).apply {
+            typeArguments?.let {
+                assert(it.size == this.typeArguments.size)
+                for ([i, t] in it.withIndex()) {
+                    this.typeArguments[i] = t
+                }
+            }
+
+            constructorTypeArguments?.let {
+                assert(it.size == this.typeArguments.size)
+                for ([i, t] in it.withIndex()) {
                     this.typeArguments[i] = t
                 }
             }
@@ -106,14 +142,14 @@ object JsIrBuilder {
         ).apply {
             typeArguments?.let {
                 assert(it.size == this.typeArguments.size)
-                it.withIndex().forEach { (i, t) ->
+                for ([i, t] in it.withIndex()) {
                     this.typeArguments[i] = t
                 }
             }
 
             constructorTypeArguments?.let {
                 assert(it.size == this.typeArguments.size)
-                it.withIndex().forEach { (i, t) ->
+                for ([i, t] in it.withIndex()) {
                     this.typeArguments[i] = t
                 }
             }
@@ -245,9 +281,9 @@ object JsIrBuilder {
         cond: IrExpression,
         thenBranch: IrExpression,
         elseBranch: IrExpression? = null,
-        thenBranchStartOffset: Int = cond.startOffset,
+        thenBranchStartOffset: Int = thenBranch.startOffset,
         thenBranchEndOffset: Int = thenBranch.endOffset,
-        elseBranchStartOffset: Int = UNDEFINED_OFFSET,
+        elseBranchStartOffset: Int = elseBranch?.startOffset ?: UNDEFINED_OFFSET,
         elseBranchEndOffset: Int = elseBranch?.endOffset ?: UNDEFINED_OFFSET,
     ): IrWhen =
         buildIfElse(
@@ -272,9 +308,9 @@ object JsIrBuilder {
         thenBranch: IrExpression,
         elseBranch: IrExpression? = null,
         origin: IrStatementOrigin? = null,
-        thenBranchStartOffset: Int = cond.startOffset,
+        thenBranchStartOffset: Int = thenBranch.startOffset,
         thenBranchEndOffset: Int = thenBranch.endOffset,
-        elseBranchStartOffset: Int = UNDEFINED_OFFSET,
+        elseBranchStartOffset: Int = elseBranch?.startOffset ?: UNDEFINED_OFFSET,
         elseBranchEndOffset: Int = elseBranch?.endOffset ?: UNDEFINED_OFFSET,
     ): IrWhen {
         val element = IrWhenImpl(startOffset, endOffset, type, origin)

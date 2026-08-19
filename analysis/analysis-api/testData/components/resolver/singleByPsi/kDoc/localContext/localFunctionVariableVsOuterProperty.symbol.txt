@@ -1,0 +1,5 @@
+KDocName(80,82): 'pp'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val pp: kotlin.Int
+    ]

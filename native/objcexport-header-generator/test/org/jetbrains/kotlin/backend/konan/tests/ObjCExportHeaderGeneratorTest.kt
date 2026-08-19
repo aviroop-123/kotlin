@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.backend.konan.testUtils.HeaderGenerator
 import org.jetbrains.kotlin.backend.konan.testUtils.HeaderGenerator.Configuration
 import org.jetbrains.kotlin.backend.konan.testUtils.TodoAnalysisApi
 import org.jetbrains.kotlin.backend.konan.testUtils.headersTestDataDir
-import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.TestDataAssertions
 import org.junit.jupiter.api.Test
 import java.io.File
 import kotlin.test.fail
@@ -46,6 +46,22 @@ class ObjCExportHeaderGeneratorTest(private val generator: HeaderGenerator) {
     @Test
     fun `test - simpleEnumClass`() {
         doTest(headersTestDataDir.resolve("simpleEnumClass"))
+    }
+
+    @Test
+    fun `test - enumClassWithNamedObjCEnum`() {
+        doTest(headersTestDataDir.resolve("enumClassWithNamedObjCEnum"))
+    }
+
+    @Test
+    fun `test - enumClassWithObjCEnum`() {
+        doTest(headersTestDataDir.resolve("enumClassWithObjCEnum"))
+    }
+
+    @Test
+    @TodoAnalysisApi
+    fun `test - enumClassWithObjCEnumAndRenamedLiterals`() {
+        doTest(headersTestDataDir.resolve("enumClassWithObjCEnumAndRenamedLiterals"))
     }
 
     @Test
@@ -650,9 +666,13 @@ class ObjCExportHeaderGeneratorTest(private val generator: HeaderGenerator) {
     }
 
     @Test
-    @TodoAnalysisApi
     fun `test - block with explicit parameter names`() {
         doTest(headersTestDataDir.resolve("blockWithExplicitParameterNames"), Configuration(objcExportBlockExplicitParameterNames = true))
+    }
+
+    @Test
+    fun `test - block with no parameter names`() {
+        doTest(headersTestDataDir.resolve("blockWithNoParameterNames"), Configuration(objcExportBlockExplicitParameterNames = false))
     }
 
     @Test
@@ -683,6 +703,6 @@ class ObjCExportHeaderGeneratorTest(private val generator: HeaderGenerator) {
     private fun doTest(root: File, configuration: Configuration = Configuration()) {
         if (!root.isDirectory) fail("Expected ${root.absolutePath} to be directory")
         val generatedHeaders = generator.generateHeaders(root, configuration).toString()
-        KotlinTestUtils.assertEqualsToFile(root.resolve("!${root.nameWithoutExtension}.h"), generatedHeaders)
+        TestDataAssertions.assertEqualsToFile(root.resolve("!${root.nameWithoutExtension}.h"), generatedHeaders)
     }
 }

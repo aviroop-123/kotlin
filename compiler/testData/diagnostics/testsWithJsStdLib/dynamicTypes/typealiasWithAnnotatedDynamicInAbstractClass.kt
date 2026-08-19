@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 @Target(AnnotationTarget.TYPE)
 annotation class Ann1
 

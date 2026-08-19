@@ -15,11 +15,9 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilat
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.KotlinNativeClassLoader
-import org.jetbrains.kotlin.konan.test.blackbox.support.settings.PipelineType
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Timeouts
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.dumpIr
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.getAbsoluteFile
-import org.jetbrains.kotlin.konan.test.firIdentical
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.assertEqualsToFile
 import org.junit.jupiter.api.Tag
 import java.io.File
@@ -38,12 +36,7 @@ abstract class AbstractNativeKlibDumpIrTest : AbstractNativeSimpleTest() {
 
         val testPathNoExtension = testPathFull.canonicalPath.substringBeforeLast(".")
 
-        val firSpecificExt =
-            if (testRunSettings.get<PipelineType>() == PipelineType.K2 && !firIdentical(testPathFull))
-                ".fir"
-            else ""
-
-        val expectedContentsNoSig = File("$testPathNoExtension.ir$firSpecificExt.txt")
+        val expectedContentsNoSig = File("$testPathNoExtension.ir.txt")
         assertIrMatchesExpected(testCompilationResult, expectedContentsNoSig)
     }
 

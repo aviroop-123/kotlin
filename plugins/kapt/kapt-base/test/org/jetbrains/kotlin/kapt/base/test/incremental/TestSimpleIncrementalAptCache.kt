@@ -25,7 +25,7 @@ class TestSimpleIncrementalAptCache {
 
     @BeforeEach
     fun setUp(@TempDir tmp: File) {
-        cache = JavaClassCacheManager(tmp.newCacheFolder())
+        cache = JavaClassCacheManager(tmp.newCacheFolder(), null)
         generatedSources = tmp.newGeneratedSourcesFolder()
         compiledSources = listOf(tmp.newCompiledSourcesFolder().also { it.resolve(TEST_PACKAGE_NAME).mkdir() })
         cache.close()
@@ -68,7 +68,8 @@ class TestSimpleIncrementalAptCache {
     fun testNonIncremental() {
         runProcessor(SimpleProcessor().toNonIncremental())
 
-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java").absoluteFile), emptyList(), compiledSources)
+        val dirtyFiles =
+            cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java").absoluteFile), emptyList(), compiledSources)
         assertTrue(dirtyFiles is SourcesToReprocess.FullRebuild)
     }
 

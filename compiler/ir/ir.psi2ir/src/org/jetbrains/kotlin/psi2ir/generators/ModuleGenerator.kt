@@ -16,7 +16,7 @@
 
 package org.jetbrains.kotlin.psi2ir.generators
 
-import org.jetbrains.kotlin.backend.common.CodegenUtil
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor
 import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.declarations.DescriptorMetadataSource
@@ -30,11 +30,13 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi2ir.transformations.insertImplicitCasts
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.codegen.CodegenUtil
 import org.jetbrains.kotlin.resolve.lazy.descriptors.findPackageFragmentForFile
 import org.jetbrains.kotlin.types.error.ErrorModuleDescriptor
 import org.jetbrains.kotlin.types.error.ErrorUtils
 import org.jetbrains.kotlin.utils.addIfNotNull
 
+@K1Deprecation
 open class ModuleGenerator(override val context: GeneratorContext) : Generator {
 
     open fun generateModuleFragment(ktFiles: Collection<KtFile>): IrModuleFragment =
@@ -56,7 +58,7 @@ open class ModuleGenerator(override val context: GeneratorContext) : Generator {
         val constantValueGenerator = irDeclarationGenerator.context.constantValueGenerator
         for (ktAnnotationEntry in ktFile.annotationEntries) {
             val annotationDescriptor = getOrFail(BindingContext.ANNOTATION, ktAnnotationEntry)
-            constantValueGenerator.generateAnnotationConstructorCall(annotationDescriptor)?.let {
+            constantValueGenerator.generateAnnotationCall(annotationDescriptor)?.let {
                 irFile.annotations += it
             }
         }

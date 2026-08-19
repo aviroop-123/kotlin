@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.api.withFirDesignationEnt
 import org.jetbrains.kotlin.analysis.low.level.api.fir.file.builder.LLFirLockProvider
 import org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve.LLFirPhaseUpdater
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
+import org.jetbrains.kotlin.analysis.low.level.api.fir.util.LLFlightRecorder
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.checkPhase
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
@@ -22,9 +23,12 @@ import org.jetbrains.kotlin.fir.correspondingProperty
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.componentFunctionSymbol
 import org.jetbrains.kotlin.fir.declarations.utils.correspondingValueParameterFromPrimaryConstructor
+import org.jetbrains.kotlin.fir.declarations.utils.replExpressionReference
+import org.jetbrains.kotlin.fir.expressions.FirLazyExpression
 import org.jetbrains.kotlin.fir.originalIfFakeOverrideOrDelegated
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
+import org.jetbrains.kotlin.fir.types.hasResolvedType
 import org.jetbrains.kotlin.fir.utils.exceptions.withFirEntry
 import org.jetbrains.kotlin.resolve.DataClassResolver
 import org.jetbrains.kotlin.utils.exceptions.checkWithAttachment
@@ -75,9 +79,8 @@ internal sealed class LLFirTargetResolver(
     private val lockProvider: LLFirLockProvider get() = LLFirGlobalResolveComponents.getInstance(resolveTargetSession).lockProvider
     private val requiresJumpingLock: Boolean get() = resolverPhase.isItAllowedToCallLazyResolveToTheSamePhase
 
-    private val _containingDeclarations = mutableListOf<FirDeclaration>()
-
-    val containingDeclarations: List<FirDeclaration> get() = _containingDeclarations
+    val containingDeclarations: List<FirDeclaration>
+        field = mutableListOf()
 
     /**
      * @param context used as a context in the case of exception
@@ -104,12 +107,29 @@ internal sealed class LLFirTargetResolver(
         return containingDeclaration
     }
 
+    fun containingReplSnippet(context: FirDeclaration): FirReplSnippet {
+        val replSnippet = containingDeclarations.getOrNull(1) as? FirReplSnippet
+            ?: containingDeclarations.firstOrNull() as? FirReplSnippet
+            ?: errorWithAttachment("Containing ${FirReplSnippet::class.simpleName} is not found") {
+                withFirEntry("context", context)
+                withFirDesignationEntry("designation", resolveTarget.designation)
+                context.tryCollectDesignation()?.let { withFirDesignationEntry("calculatedDesignation", it) }
+                withEntryGroup("containingDeclarations") {
+                    containingDeclarations.forEachIndexed { index, declaration ->
+                        withFirEntry("declaration$index", declaration)
+                    }
+                }
+            }
+
+        return replSnippet
+    }
+
     protected inline fun withContainingDeclaration(declaration: FirDeclaration, action: () -> Unit) {
-        _containingDeclarations += declaration
+        containingDeclarations += declaration
         try {
             action()
         } finally {
-            val removed = _containingDeclarations.removeLast()
+            val removed = containingDeclarations.removeLast()
             checkWithAttachment(removed === declaration, { "Unexpected state" }) {
                 withFirEntry("expected", declaration)
                 withFirEntry("actual", removed)
@@ -151,9 +171,20 @@ internal sealed class LLFirTargetResolver(
 
                 // Destructuring declaration entries depends on the container property
                 target.destructuringDeclarationContainerVariable?.lazyResolveToPhase(resolverPhase)
+
+                // Initializers and delegates inside repl snippets are moved to the eval function
+                val replReferenceExpression = target.replExpressionReference
+                if (replReferenceExpression != null) {
+                    val expression = replReferenceExpression.expressionRef.value
+                    // TODO(KT-85631): Ideally, lazy resolve has to be called if FirReplExpressionReference is present,
+                    // but with the current compiler implementation it leads to a cyclic dependency
+                    if (expression is FirLazyExpression || !expression.hasResolvedType) {
+                        containingReplSnippet(target).evalFunctionSymbol.lazyResolveToPhase(resolverPhase)
+                    }
+                }
             }
 
-            target is FirSimpleFunction && target.origin == FirDeclarationOrigin.Synthetic.DataClassMember -> {
+            target is FirNamedFunction && target.origin == FirDeclarationOrigin.Synthetic.DataClassMember -> {
                 resolveDataClassMemberDependencies(target)
             }
 
@@ -168,7 +199,7 @@ internal sealed class LLFirTargetResolver(
         }
     }
 
-    private fun resolveDataClassMemberDependencies(function: FirSimpleFunction) {
+    private fun resolveDataClassMemberDependencies(function: FirNamedFunction) {
         when {
             /**
              * componentN method shares the return type with the corresponding property
@@ -215,6 +246,18 @@ internal sealed class LLFirTargetResolver(
             @Suppress("DEPRECATION_ERROR")
             withContainingScript(firScript, action)
         }
+    }
+
+    final override fun withReplSnippet(firReplSnippet: FirReplSnippet, action: () -> Unit) {
+        withContainingDeclaration(firReplSnippet) {
+            @Suppress("DEPRECATION_ERROR")
+            withContainingReplSnippet(firReplSnippet, action)
+        }
+    }
+
+    @Deprecated("Should never be called directly, only for override purposes, please use withScript", level = DeprecationLevel.ERROR)
+    protected open fun withContainingReplSnippet(firReplSnippet: FirReplSnippet, action: () -> Unit) {
+        action()
     }
 
     @Deprecated("Should never be called directly, only for override purposes, please use withScript", level = DeprecationLevel.ERROR)
@@ -280,27 +323,39 @@ internal sealed class LLFirTargetResolver(
      * @see doLazyResolveUnderLock
      */
     protected fun performResolve(target: FirElementWithResolveState) {
-        resolveDependencies(target)
+        val event = LLFlightRecorder.phase(target, containingDeclarations, resolverPhase)
 
-        if (doResolveWithoutLock(target)) return
+        try {
+            resolveDependencies(target)
 
-        if (requiresJumpingLock) {
-            checkThatResolvedAtLeastToPreviousPhase(target)
-            lockProvider.withJumpingLock(
-                target,
-                resolverPhase,
-                actionUnderLock = {
-                    doLazyResolveUnderLock(target)
-                    updatePhaseForDeclarationInternals(target)
-                },
-                actionOnCycle = {
-                    handleCycleInResolution(target)
-                }
-            )
-        } else {
-            performCustomResolveUnderLock(target) {
-                doLazyResolveUnderLock(target)
+            if (doResolveWithoutLock(target)) {
+                event?.notifyCompleted()
+                return
             }
+
+            if (requiresJumpingLock) {
+                checkThatResolvedAtLeastToPreviousPhase(target)
+                lockProvider.withJumpingLock(
+                    target,
+                    resolverPhase,
+                    actionUnderLock = {
+                        doLazyResolveUnderLock(target)
+                        updatePhaseForDeclarationInternals(target)
+                    },
+                    actionOnCycle = {
+                        handleCycleInResolution(target)
+                    }
+                )
+            } else {
+                performCustomResolveUnderLock(target) {
+                    doLazyResolveUnderLock(target)
+                }
+            }
+
+            event?.notifyCompleted()
+        } catch (throwable: Throwable) {
+            event?.notifyCompletedWithFailure(throwable)
+            throw throwable
         }
     }
 

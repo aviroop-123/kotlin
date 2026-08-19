@@ -19,7 +19,6 @@
 package androidx.compose.compiler.plugins.kotlin.lower
 
 import androidx.compose.compiler.plugins.kotlin.*
-import androidx.compose.compiler.plugins.kotlin.analysis.ComposeWritableSlices
 import androidx.compose.compiler.plugins.kotlin.analysis.StabilityInferencer
 import androidx.compose.compiler.plugins.kotlin.analysis.knownStable
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -127,11 +126,21 @@ private class SymbolOwnerContext(override val declaration: IrSymbolOwner) : Decl
 private class FunctionContext(
     override val declaration: IrFunction,
     override val composable: Boolean,
+    /**
+     * The number of `IrTry` elements that are descendants of _d_ and ancestors of the current
+     * scope, where _d_ is [declaration] if [declaration] is not an inline lambda or the closest
+     * ancestor of [declaration] that is not an inline lambda, otherwise.
+     */
+    var enclosingTryCount: Int = 0,
 ) : DeclarationContext() {
     val locals = mutableSetOf<IrValueDeclaration>()
     override val captures: MutableSet<IrValueDeclaration> = mutableSetOf()
     var collectors = mutableListOf<CaptureCollector>()
-    val canRemember: Boolean get() = composable
+
+
+    // Composable function invocations are not allowed in `try` expressions, so memoization is not
+    // allowed in them.
+    val canRemember: Boolean get() = composable && enclosingTryCount == 0
 
     init {
         declaration.parameters.forEach {
@@ -414,7 +423,14 @@ class ComposerLambdaMemoization(
 
     override fun visitFunction(declaration: IrFunction): IrStatement {
         val composable = declaration.allowsComposableCalls
-        val context = FunctionContext(declaration, composable)
+        val context = FunctionContext(
+            declaration,
+            composable,
+            // When creating a [FunctionContext] for an inline lambda, we must carry
+            // `enclosingTryCount` over, because the counted `try` expressions effectively enclose
+            // the contents of the inline lambda.
+            if (!inlineLambdaInfo.isInlineLambda(declaration)) 0 else currentFunctionContext?.enclosingTryCount ?: 0
+        )
         if (declaration.isLocal) {
             declarationContextStack.recordLocalDeclaration(context)
         }
@@ -451,6 +467,14 @@ class ComposerLambdaMemoization(
         declarationContextStack.push(context)
         val result = super.visitAnonymousInitializer(declaration)
         declarationContextStack.pop()
+        return result
+    }
+
+    override fun visitTry(aTry: IrTry): IrExpression {
+        currentFunctionContext?.enclosingTryCount++
+        val result = super.visitExpression(aTry)
+        currentFunctionContext?.enclosingTryCount--
+
         return result
     }
 
@@ -529,7 +553,8 @@ class ComposerLambdaMemoization(
         if (functionContext.canRemember) {
             // Memoize the reference for <expr>::<method>
             val argumentsAreNull = reference.arguments.all { it == null }
-            val argumentsAreNullOrStable = reference.arguments.all { it.isNullOrStable() }
+            val argumentsAreNullOrStable =
+                reference.arguments.all { it.isNullOrStable(fileContainingDependent = functionContext.declaration.fileOrNull) }
 
             val captures = mutableListOf<IrValueDeclaration>()
             if (localCaptures != null) {
@@ -1003,7 +1028,7 @@ class ComposerLambdaMemoization(
         return if (!FeatureFlag.IntrinsicRemember.enabled) {
             // generate cache directly only if strong skipping is enabled without intrinsic remember
             // otherwise, generated memoization won't benefit from capturing changed values
-            irCache(captureExpressions, expression)
+            irCache(captureExpressions, expression, fileContainingExpression = functionContext.declaration.fileOrNull)
         } else {
             irRemember(captureExpressions, expression)
         }.patchDeclarationParents(functionContext.declaration)
@@ -1012,9 +1037,10 @@ class ComposerLambdaMemoization(
     private fun irCache(
         captures: List<IrExpression>,
         expression: IrExpression,
+        fileContainingExpression: IrFile?,
     ): IrExpression {
         val invalidExpr = captures
-            .map(::irChanged)
+            .map { irChanged(it, fileContainingValue = fileContainingExpression) }
             .reduceOrNull { acc, changed -> irBooleanOr(acc, changed) }
             ?: irConst(false)
 
@@ -1121,9 +1147,10 @@ class ComposerLambdaMemoization(
         }
     }
 
-    private fun irChanged(value: IrExpression): IrExpression = irChanged(
+    private fun irChanged(value: IrExpression, fileContainingValue: IrFile?): IrExpression = irChanged(
         irCurrentComposer(),
         value,
+        fileContainingValue,
         inferredStable = false,
         compareInstanceForFunctionTypes = false,
         compareInstanceForUnstableValues = FeatureFlag.StrongSkipping.enabled
@@ -1133,7 +1160,7 @@ class ComposerLambdaMemoization(
         (this as? IrVariable)?.isVar == true
 
     private fun IrValueDeclaration.isStable(): Boolean =
-        stabilityInferencer.stabilityOf(type).knownStable()
+        stabilityInferencer.stabilityOf(type, fileContainingDependent = file).knownStable()
 
     private fun IrValueDeclaration.isInlinedLambda(): Boolean =
         isInlineableFunction() &&
@@ -1150,11 +1177,7 @@ class ComposerLambdaMemoization(
         if (mark) {
             // Mark it so the ComposableCallTransformer will insert the correct code around this
             // call
-            context.irTrace.record(
-                ComposeWritableSlices.IS_STATIC_FUNCTION_EXPRESSION,
-                this,
-                true
-            )
+            this.isStaticFunctionExpression = true
         }
         return this
     }
@@ -1162,41 +1185,25 @@ class ComposerLambdaMemoization(
     private fun <T : IrElement> T.markAsComposableSingleton(): T {
         // Mark it so the ComposableCallTransformer can insert the correct source information
         // around this call
-        context.irTrace.record(
-            ComposeWritableSlices.IS_COMPOSABLE_SINGLETON,
-            this,
-            true
-        )
+        this.isComposableSingleton = true
         return this
     }
 
     private fun <T : IrElement> T.markAsComposableSingletonClass(): T {
         // Mark it so the ComposableCallTransformer can insert the correct source information
         // around this call
-        context.irTrace.record(
-            ComposeWritableSlices.IS_COMPOSABLE_SINGLETON_CLASS,
-            this,
-            true
-        )
+        isComposableSingletonClass = true
         return this
     }
 
     private fun <T : IrElement> T.markHasTransformedLambda(): T {
         // Mark so that the target annotation transformer can find the original lambda
-        context.irTrace.record(
-            ComposeWritableSlices.HAS_TRANSFORMED_LAMBDA,
-            this,
-            true
-        )
+        this.hasTransformedLambda = true
         return this
     }
 
     private fun <T : IrElement> T.markIsTransformedLambda(): T {
-        context.irTrace.record(
-            ComposeWritableSlices.IS_TRANSFORMED_LAMBDA,
-            this,
-            true
-        )
+        this.isTransformedLambda = true
         return this
     }
 
@@ -1204,9 +1211,15 @@ class ComposerLambdaMemoization(
         get() = (this as? IrFunctionExpression)?.function?.hasAnnotation(ComposeFqNames.DontMemoize)
             ?: false
 
-    private fun IrExpression?.isNullOrStable() =
+    /**
+     * Returns whether this expression is null or stable.
+     *
+     * @param fileContainingDependent The file containing the element that depends on the returned
+     * result.
+     */
+    private fun IrExpression?.isNullOrStable(fileContainingDependent: IrFile?) =
         this == null ||
-                stabilityInferencer.stabilityOf(this).knownStable()
+                stabilityInferencer.stabilityOf(this, fileContainingDependent = fileContainingDependent).knownStable()
 
     // TODO(b/315869143): consider hoisting property reference receivers into a variable and memoizing based on them.
     private fun IrValueDeclaration.isPropertyReferenceDelegate() =

@@ -1,12 +1,11 @@
 /*
- * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi.stubs.elements;
 
 import com.intellij.lang.ASTNode;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.stubs.IStubElementType;
 import com.intellij.psi.stubs.IndexSink;
 import com.intellij.psi.stubs.StubElement;
@@ -17,10 +16,8 @@ import com.intellij.util.ReflectionUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
-import org.jetbrains.kotlin.psi.KtClassOrObject;
 import org.jetbrains.kotlin.psi.KtElementImplStub;
-import org.jetbrains.kotlin.psi.KtFunction;
-import org.jetbrains.kotlin.psi.KtProperty;
+import org.jetbrains.kotlin.psi.KtExpression;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
@@ -35,6 +32,7 @@ public abstract class KtStubElementType<StubT extends StubElement<?>, PsiT exten
     private final PsiT[] emptyArray;
     @NotNull
     private final ArrayFactory<PsiT> arrayFactory;
+    private final boolean isExpression;
 
     @SuppressWarnings("unchecked")
     public KtStubElementType(@NotNull @NonNls String debugName, @NotNull Class<PsiT> psiClass, @NotNull Class<?> stubClass) {
@@ -53,6 +51,7 @@ public abstract class KtStubElementType<StubT extends StubElement<?>, PsiT exten
             }
             return (PsiT[]) Array.newInstance(psiClass, count);
         };
+        isExpression = KtExpression.class.isAssignableFrom(psiClass);
     }
 
     @NotNull
@@ -74,13 +73,6 @@ public abstract class KtStubElementType<StubT extends StubElement<?>, PsiT exten
 
     @Override
     public boolean shouldCreateStub(ASTNode node) {
-        PsiElement psi = node.getPsi();
-        if (psi instanceof KtClassOrObject || psi instanceof KtFunction) {
-            return true;
-        }
-        if (psi instanceof KtProperty) {
-            return !((KtProperty) psi).isLocal();
-        }
         return createStubDependingOnParent(node);
     }
 
@@ -104,5 +96,12 @@ public abstract class KtStubElementType<StubT extends StubElement<?>, PsiT exten
     @NotNull
     public ArrayFactory<PsiT> getArrayFactory() {
         return arrayFactory;
+    }
+
+    /**
+     * @return true when the {@link PsiT} implements {@link KtExpression}.
+     */
+    public boolean isExpression() {
+        return isExpression;
     }
 }

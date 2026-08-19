@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -14,8 +14,57 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.lexer.KtTokens.*
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.stubs.KotlinNameReferenceExpressionStub
+import org.jetbrains.kotlin.resolution.KtResolvableCall
 
-class KtNameReferenceExpression : KtExpressionImplStub<KotlinNameReferenceExpressionStub>, KtSimpleNameExpression {
+/**
+ * Represents a simple name reference to a variable, function, or type.
+ *
+ * ### Example:
+ *
+ * ```kotlin
+ * val x = foo
+ * //      ^_^
+ * ```
+ *
+ * ### Analysis API Resolver Notes:
+ *
+ * Resolves the declaration symbol referenced by the given [KtNameReferenceExpression].
+ *
+ * **Note:** Unlike other `KtResolvableCall` entry points that provide both `resolveCall`
+ * and `resolveSymbol` specializations, `KtNameReferenceExpression.resolveCall` may return a different `KaSymbol`.
+ *
+ * For instance, this happens for constructor references. While `resolveCall` returns a
+ * `KaConstructorSymbol`, this method returns the corresponding `KaClassLikeSymbol`.
+ *
+ * #### Example #1
+ *
+ * ```kotlin
+ * fun foo() {}
+ *
+ * val x = foo
+ * //      ^^^
+ * ```
+ *
+ * Calling `resolveSymbol()` on the `KtNameReferenceExpression` (`foo`) returns the `KaDeclarationSymbol` of `foo`
+ * if resolution succeeds; otherwise, it returns `null` (e.g., when unresolved or ambiguous).
+ *
+ * [KtNameReferenceExpression] might be resolved not only to callables but also to types.
+ *
+ * #### Example #2
+ *
+ * ```kotlin
+ * class MyClass
+ * object MyObject
+ *
+ * val c = MyClass()
+ * //      ^^^^^^^  resolves to the class `MyClass`
+ *
+ * val o = MyObject
+ * //      ^^^^^^^^  resolves to the object `MyObject`
+ * ```
+ */
+@OptIn(KtExperimentalApi::class)
+class KtNameReferenceExpression : KtExpressionImplStub<KotlinNameReferenceExpressionStub>, KtSimpleNameExpression, KtResolvableCall {
     constructor(node: ASTNode) : super(node)
 
     constructor(stub: KotlinNameReferenceExpressionStub) : super(stub, KtStubBasedElementTypes.REFERENCE_EXPRESSION)

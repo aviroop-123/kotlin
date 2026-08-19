@@ -9,14 +9,11 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fakeElement
-import org.jetbrains.kotlin.fir.DelegatedWrapperData
-import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.FirSessionComponent
+import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.classId
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
-import org.jetbrains.kotlin.fir.delegatedWrapperData
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.scope
@@ -33,12 +30,12 @@ import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
 
 class FirDelegatedMemberScope(
-    private val session: FirSession,
-    private val scopeSession: ScopeSession,
+    override val session: FirSession,
+    override val scopeSession: ScopeSession,
     private val containingClass: FirClass,
     private val declaredMemberScope: FirContainingNamesAwareScope,
     private val delegateFields: List<FirField>,
-) : FirContainingNamesAwareScope() {
+) : FirContainingNamesAwareScope(), SessionAndScopeSessionHolder {
     private val dispatchReceiverType = containingClass.defaultType()
     private val overrideChecker = session.firOverrideChecker
     private val delegatedMembersFilter = session.delegatedMembersFilter
@@ -55,8 +52,6 @@ class FirDelegatedMemberScope(
     }
 
     private fun buildScope(delegateField: FirField): FirTypeScope? = delegateField.symbol.resolvedReturnType.scope(
-        session,
-        scopeSession,
         CallableCopyTypeCalculator.CalculateDeferredWhenPossible,
         requiredMembersPhase = null,
     )
@@ -246,7 +241,7 @@ val FirCallableSymbol<*>.multipleDelegatesWithTheSameSignature: Boolean?
 // "methods that are members of I that do not have the same signature as any public instance method of the class Object"
 // It means that if an interface declares `int hashCode()` then the method won't be taken into account when
 // checking if the interface is SAM.
-fun FirSimpleFunction.isPublicInAny(): Boolean {
+fun FirNamedFunction.isPublicInAny(): Boolean {
     if (name.asString() !in PUBLIC_METHOD_NAMES_IN_ANY) return false
 
     return when (name.asString()) {
@@ -271,7 +266,7 @@ fun FirValueParameter.hasTypeOf(classId: ClassId, allowNullable: Boolean): Boole
 
 private val PUBLIC_METHOD_NAMES_IN_ANY = setOf("equals", "hashCode", "toString")
 
-abstract class FirDelegatedMembersFilter : FirSessionComponent {
+abstract class FirDelegatedMembersFilter : FirComposableSessionComponent<FirDelegatedMembersFilter> {
     abstract fun shouldNotGenerateDelegatedMember(memberSymbolFromSuperInterface: FirCallableSymbol<*>): Boolean
 
     object Default : FirDelegatedMembersFilter() {
@@ -279,6 +274,20 @@ abstract class FirDelegatedMembersFilter : FirSessionComponent {
             return false
         }
     }
+
+    class Composed(
+        override val components: List<FirDelegatedMembersFilter>
+    ) : FirDelegatedMembersFilter(), FirComposableSessionComponent.Composed<FirDelegatedMembersFilter> {
+        override fun shouldNotGenerateDelegatedMember(memberSymbolFromSuperInterface: FirCallableSymbol<*>): Boolean {
+            return components.any { it.shouldNotGenerateDelegatedMember(memberSymbolFromSuperInterface) }
+        }
+    }
+
+    @SessionConfiguration
+    override fun createComposed(components: List<FirDelegatedMembersFilter>): Composed {
+        return Composed(components)
+    }
 }
 
-private val FirSession.delegatedMembersFilter: FirDelegatedMembersFilter by FirSession.sessionComponentAccessor()
+private val FirSession.delegatedMembersFilter: FirDelegatedMembersFilter
+        by FirSession.sessionComponentAccessorWithDefault(FirDelegatedMembersFilter.Default)

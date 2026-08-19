@@ -5,12 +5,16 @@
 
 package org.jetbrains.kotlin.gradle.plugin.diagnostics
 
+import org.gradle.StartParameter
 import org.gradle.api.Project
 import org.gradle.api.logging.configuration.ConsoleOutput
 import org.gradle.api.logging.configuration.ShowStacktrace
 import org.gradle.api.logging.configuration.WarningMode
+import org.gradle.api.provider.Provider
+import org.gradle.api.provider.ProviderFactory
 import org.jetbrains.kotlin.gradle.internal.isInIdeaEnvironment
 import org.jetbrains.kotlin.gradle.internal.isInIdeaSync
+import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.ToolingDiagnostic.Severity.ERROR
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.ToolingDiagnostic.Severity.STRONG_WARNING
@@ -31,31 +35,41 @@ internal class ToolingDiagnosticRenderingOptions(
     val displayDiagnosticsInIdeBuildLog: Boolean,
 ) : Serializable {
     companion object {
-        fun forProject(project: Project): ToolingDiagnosticRenderingOptions {
-            return with(project.kotlinPropertiesProvider) {
-                val showStacktrace = when {
-                    // if the internal property is specified, it takes the highest priority
-                    internalDiagnosticsShowStacktrace != null -> internalDiagnosticsShowStacktrace!!
+        const val serialVersionUID: Long = 1L
 
-                    // IDEA launches sync with `--stacktrace` option, but we don't want to
-                    // spam stacktraces in build toolwindow
-                    project.isInIdeaSync.get() -> false
+        fun create(
+            providerFactory: ProviderFactory,
+            startParameter: StartParameter,
+            propertiesProvider: PropertiesProvider,
+        ): ToolingDiagnosticRenderingOptions {
+            val isInIdeaSync = providerFactory.isInIdeaSync().get()
+            val isInIdeaEnvironment = providerFactory.isInIdeaEnvironment().get()
+            val showStacktrace = when {
+                // if the internal property is specified, it takes the highest priority
+                propertiesProvider.internalDiagnosticsShowStacktrace != null -> propertiesProvider.internalDiagnosticsShowStacktrace!!
 
-                    else -> project.gradle.startParameter.showStacktrace > ShowStacktrace.INTERNAL_EXCEPTIONS
-                }
+                // IDEA launches sync with `--stacktrace` option, but we don't want to
+                // spam stacktraces in build toolwindow
+                isInIdeaSync -> false
 
-                ToolingDiagnosticRenderingOptions(
-                    useParsableFormat = internalDiagnosticsUseParsableFormat,
-                    suppressedWarningIds = suppressedGradlePluginWarnings,
-                    suppressedErrorIds = suppressedGradlePluginErrors,
-                    showStacktrace = showStacktrace,
-                    showSeverityEmoji = !project.isInIdeaEnvironment.get() && !HostManager.hostIsMingw,
-                    coloredOutput = project.showColoredDiagnostics(),
-                    ignoreWarningMode = internalDiagnosticsIgnoreWarningMode == true,
-                    warningMode = project.gradle.startParameter.warningMode,
-                    displayDiagnosticsInIdeBuildLog = project.kotlinPropertiesProvider.displayDiagnosticsInIdeBuildLog && project.isInIdeaEnvironment.get(),
-                )
+                else -> startParameter.showStacktrace > ShowStacktrace.INTERNAL_EXCEPTIONS
             }
+
+            return ToolingDiagnosticRenderingOptions(
+                useParsableFormat = propertiesProvider.internalDiagnosticsUseParsableFormat,
+                suppressedWarningIds = propertiesProvider.suppressedGradlePluginWarnings,
+                suppressedErrorIds = propertiesProvider.suppressedGradlePluginErrors,
+                showStacktrace = showStacktrace,
+                showSeverityEmoji = !isInIdeaEnvironment && !HostManager.hostIsMingw,
+                coloredOutput = showColoredDiagnostics(startParameter.consoleOutput, providerFactory.isAttachedToTerminal().get()),
+                ignoreWarningMode = propertiesProvider.internalDiagnosticsIgnoreWarningMode == true,
+                warningMode = startParameter.warningMode,
+                displayDiagnosticsInIdeBuildLog = propertiesProvider.displayDiagnosticsInIdeBuildLog && isInIdeaEnvironment,
+            )
+        }
+
+        fun forProject(project: Project): ToolingDiagnosticRenderingOptions {
+            return create(project.providers, project.gradle.startParameter, project.kotlinPropertiesProvider)
         }
     }
 
@@ -78,22 +92,25 @@ internal class ToolingDiagnosticRenderingOptions(
     }
 }
 
-private fun Project.showColoredDiagnostics(): Boolean {
+private fun showColoredDiagnostics(consoleOutput: ConsoleOutput, isAttachedToTerminal: Boolean): Boolean {
     // Based on Gradle's console output mode, determine if we should use colors
-    return when (gradle.startParameter.consoleOutput) {
+    return when (consoleOutput) {
         // In Auto mode, check if we're in a terminal that supports colors
-        ConsoleOutput.Auto -> isAttachedToTerminal.get()
+        ConsoleOutput.Auto -> isAttachedToTerminal
         // Plain mode explicitly disables colors
         ConsoleOutput.Plain -> false
-        // Rich and Verbose modes force colors on regardless of terminal
-        ConsoleOutput.Rich, ConsoleOutput.Verbose -> true
+        // Colored, Rich and Verbose modes force colors on regardless of terminal
+        ConsoleOutput.Colored, ConsoleOutput.Rich, ConsoleOutput.Verbose -> true
         // Enum argument can be null in Java
         else -> false
     }
 }
 
-private val Project.isAttachedToTerminal
-    get() = providers.of(IsAttachedToTerminalValueSource::class.java) {}.map { it.value }
+/**
+ * Returns `true` when current Gradle build is attached to a terminal.
+ */
+internal fun ProviderFactory.isAttachedToTerminal(): Provider<Boolean> =
+    of(IsAttachedToTerminalValueSource::class.java) {}.map { it.value }
 
 /**
  * Configuration cache value source that determines if the application is running in an
@@ -103,8 +120,8 @@ private abstract class IsAttachedToTerminalValueSource : ConfigurationCacheOpaqu
     override fun obtainValue(): Boolean {
         // Unix/Linux/macOS terminal detection
         val term = System.getenv("TERM")              // Standard UNIX environment variable
-        val colorTerm = System.getenv("COLORTERM")    // Explicit color support flag
-        val termProgram = System.getenv("TERM_PROGRAM") // Terminal emulator program
+        val colorTerm = System.getenv("COLORTERM")    // Explicit color support flag, e.g., "truecolor"
+        val termProgram = System.getenv("TERM_PROGRAM") // Terminal emulator program, e.g., "vscode", "iTerm.app"
 
         // Common terminal types:
         // - "dumb": Basic terminal with minimal features (often in CI environments or redirected output)
@@ -114,18 +131,22 @@ private abstract class IsAttachedToTerminalValueSource : ConfigurationCacheOpaqu
         // Windows-specific terminal detection
         val ansicon = System.getenv("ANSICON")        // Set by ANSICON and similar Windows terminal enhancers
         val conEmuANSI = System.getenv("ConEmuANSI")  // Set by ConEmu terminal
-        val wtSession = System.getenv("WT_SESSION")    // Set by Windows Terminal
+        val wtSession = System.getenv("WT_SESSION")   // Set by Windows Terminal
 
-        // Check for PowerShell
-        val psVersion = System.getenv("PSModulePath") // Typically set in PowerShell environment
+        // Check for modern terminals that explicitly support color
+        if (colorTerm != null || termProgram != null || wtSession != null || conEmuANSI == "ON" || ansicon != null) {
+            return true
+        }
 
-        return (term != null && term != "dumb") ||    // Unix terminal check
-                colorTerm != null ||                  // Color support check
-                termProgram != null ||                // Modern terminal emulator check
-                ansicon != null ||                    // Windows ANSI support
-                "ON" == conEmuANSI ||                 // ConEmu with ANSI
-                wtSession != null ||                  // Windows Terminal
-                (psVersion != null && System.console() != null) // Interactive PowerShell session
+        // Fallback for standard UNIX terminals
+        // This should be last, as TERM on Windows is not reliable.
+        if (term != null && term != "dumb") {
+            return true
+        }
+
+        // If none of the above, we are likely in an unsupported terminal
+        // (like plain conhost.exe), so we must return false.
+        return false
     }
 }
 

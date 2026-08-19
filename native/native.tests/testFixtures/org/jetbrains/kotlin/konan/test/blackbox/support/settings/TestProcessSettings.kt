@@ -15,7 +15,6 @@ import org.jetbrains.kotlin.konan.properties.resolvablePropertyList
 import org.jetbrains.kotlin.konan.target.Distribution
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.konan.test.blackbox.support.ClassLevelProperty
-import org.jetbrains.kotlin.konan.test.blackbox.support.MutedOption
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.RunnerWithExecutor
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.NoopTestRunner
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.Runner
@@ -102,7 +101,7 @@ value class CompilerPlugins(val compilerPluginJars: Set<File>) {
  * The set of custom (external) klibs that should be passed to the Kotlin/Native compiler.
  */
 @JvmInline
-internal value class CustomKlibs(val klibs: Set<File>) {
+value class CustomKlibs(val klibs: Set<File>) {
     init {
         val invalidKlibs = klibs.filterNot { it.isDirectory || (it.isFile && it.extension == "klib") }
         assertTrue(invalidKlibs.isEmpty()) {
@@ -183,12 +182,17 @@ class ExplicitBinaryOptions(private val rawOptions: List<String>) {
         parseBinaryOptions(rawOptions.toTypedArray(), { println(it) }, { error(it) })
     }
 
-    inline fun <reified T> getOrNull(key: CompilerConfigurationKey<T>): T? =
+    inline fun <reified T : Any> getOrNull(key: CompilerConfigurationKey<T>): T? =
         options.singleOrNull { it.compilerConfigurationKey == key }?.value as? T
 }
 
 enum class Allocator(val compilerFlag: String?) {
     UNSPECIFIED(null),
+
+    NOT_PAGED("-Xbinary=pagedAllocator=false"),
+    PAGED("-Xbinary=pagedAllocator=true"),
+
+    // TODO remove (KT-75914)
     STD("-Xallocator=std"),
     CUSTOM("-Xallocator=custom");
 
@@ -269,27 +273,9 @@ sealed class CacheMode {
             testTarget: KonanTarget,
             cacheKind: String,
             debuggable: Boolean,
-            partialLinkageEnabled: Boolean,
             checkStateAtExternalCalls: Boolean,
-        ) = "$testTarget${if (debuggable) "-g" else ""}${cacheKind}${if (checkStateAtExternalCalls) "-check_state_at_external_calls" else ""}-user${if (partialLinkageEnabled) "-pl" else ""}"
+        ) = "$testTarget${if (debuggable) "-g" else ""}${cacheKind}${if (checkStateAtExternalCalls) "-check_state_at_external_calls" else ""}-user-pl"
     }
-}
-
-enum class PipelineType(val mutedOption: MutedOption, val compilerFlags: List<String>) {
-    DEFAULT(
-        MutedOption.DEFAULT,
-        emptyList()
-    ),
-    K1(
-        MutedOption.K1,
-        listOf("-language-version", "1.9")
-    ),
-    K2(
-        MutedOption.K2,
-        listOf("-language-version", if (LanguageVersion.LATEST_STABLE.major < 2) "2.0" else LanguageVersion.LATEST_STABLE.toString())
-    );
-
-    override fun toString() = if (compilerFlags.isEmpty()) "" else compilerFlags.joinToString(prefix = "(", postfix = ")", separator = " ")
 }
 
 enum class CompilerOutputInterceptor {

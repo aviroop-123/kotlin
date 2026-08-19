@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -26,16 +26,18 @@ class ProjectStructureInitialisationPreAnalysisHandler(
     override fun preprocessModuleStructure(moduleStructure: TestModuleStructure) {
         checkAllModulesHaveTheSameProject(moduleStructure)
 
-        testServices.environmentManager.initializeEnvironment()
+        val environmentManager = testServices.environmentManager
+        environmentManager.initializeEnvironment()
 
-        val project = testServices.environmentManager.getProject() as MockProject
-        val application = testServices.environmentManager.getApplication() as MockApplication
+        val project = environmentManager.getProject() as MockProject
+        val application = environmentManager.getApplication() as MockApplication
+        val applicationParentDisposable = environmentManager.getApplicationEnvironment().parentDisposable
 
-        configurator.serviceRegistrars.registerApplicationServices(application, testServices)
+        configurator.serviceRegistrars.registerApplicationServices(application, applicationParentDisposable, testServices)
         createAndRegisterKtModules(moduleStructure, project)
         configurator.serviceRegistrars.registerProjectExtensionPoints(project, testServices)
         configurator.serviceRegistrars.registerProjectServices(project, testServices)
-        testServices.environmentManager.initializeProjectStructure()
+        environmentManager.initializeProjectStructure()
         configurator.serviceRegistrars.registerProjectModelServices(project, testServices)
     }
 

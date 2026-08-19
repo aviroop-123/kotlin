@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// SKIP_TXT
 
 // FILE: MyJClass.java
 
@@ -20,11 +19,11 @@ public class MyJClass2 {
 // FILE: test.kt
 
 fun test1(myJClass: MyJClass) {
-    myJClass.meth(<!TYPE_MISMATCH!>""<!>)
+    myJClass.meth(<!ARGUMENT_TYPE_MISMATCH!>""<!>)
 }
 
 fun test2(myJClass: MyJClass2) {
-    myJClass.meth(<!TYPE_MISMATCH!>""<!>)
+    myJClass.meth(<!ARGUMENT_TYPE_MISMATCH!>""<!>)
 }
 
 /* GENERATED_FIR_TAGS: functionDeclaration, javaFunction, javaType, stringLiteral */

@@ -51,6 +51,11 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationArguments.kt");
     }
 
+    @TestMetadata("annotationArgumentsRepl.repl.kts")
+    public void testAnnotationArgumentsRepl_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationArgumentsRepl.repl.kts");
+    }
+
     @TestMetadata("annotationOnContextParameters.kt")
     public void testAnnotationOnContextParameters() {
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationOnContextParameters.kt");
@@ -64,6 +69,16 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
     @TestMetadata("annotationOnField.kt")
     public void testAnnotationOnField() {
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationOnField.kt");
+    }
+
+    @TestMetadata("annotationOnFullNameBasedDestructuring.kt")
+    public void testAnnotationOnFullNameBasedDestructuring() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationOnFullNameBasedDestructuring.kt");
+    }
+
+    @TestMetadata("annotationOnFullNameBasedDestructuringScript.kts")
+    public void testAnnotationOnFullNameBasedDestructuringScript() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationOnFullNameBasedDestructuringScript.kts");
     }
 
     @TestMetadata("annotationOnProperty.kt")
@@ -91,6 +106,11 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationOnTypeParameterInWhereClause.kt");
     }
 
+    @TestMetadata("annotationRepl.repl.kts")
+    public void testAnnotationRepl_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationRepl.repl.kts");
+    }
+
     @TestMetadata("annotationsOnNullableParenthesizedTypes.kt")
     public void testAnnotationsOnNullableParenthesizedTypes() {
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/annotationsOnNullableParenthesizedTypes.kt");
@@ -116,9 +136,24 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/classWithWrongSuperCall.kt");
     }
 
+    @TestMetadata("companionBlocks.kt")
+    public void testCompanionBlocks() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/companionBlocks.kt");
+    }
+
+    @TestMetadata("companionExtensions.kt")
+    public void testCompanionExtensions() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/companionExtensions.kt");
+    }
+
     @TestMetadata("complexTypes.kt")
     public void testComplexTypes() {
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/complexTypes.kt");
+    }
+
+    @TestMetadata("constantInRepl.repl.kts")
+    public void testConstantInRepl_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/constantInRepl.repl.kts");
     }
 
     @TestMetadata("constructorInObject.kt")
@@ -199,6 +234,11 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
     @TestMetadata("danglingConstrants.kt")
     public void testDanglingConstrants() {
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/danglingConstrants.kt");
+    }
+
+    @TestMetadata("danglingModifierInsideCompanionBlock.kt")
+    public void testDanglingModifierInsideCompanionBlock() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/danglingModifierInsideCompanionBlock.kt");
     }
 
     @TestMetadata("danglingModifierInsideEnumEntry.kt")
@@ -416,6 +456,41 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/propertyWithBackingFieldDifferentTypes.kt");
     }
 
+    @TestMetadata("replLevelDestructuringWithAnnotation.repl.kts")
+    public void testReplLevelDestructuringWithAnnotation_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/replLevelDestructuringWithAnnotation.repl.kts");
+    }
+
+    @TestMetadata("replNestedClass.repl.kts")
+    public void testReplNestedClass_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/replNestedClass.repl.kts");
+    }
+
+    @TestMetadata("replPropertyDelegated.repl.kts")
+    public void testReplPropertyDelegated_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/replPropertyDelegated.repl.kts");
+    }
+
+    @TestMetadata("replSealedClass.repl.kts")
+    public void testReplSealedClass_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/replSealedClass.repl.kts");
+    }
+
+    @TestMetadata("replSimple.repl.kts")
+    public void testReplSimple_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/replSimple.repl.kts");
+    }
+
+    @TestMetadata("replSmartcastImplDelegate.repl.kts")
+    public void testReplSmartcastImplDelegate_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/replSmartcastImplDelegate.repl.kts");
+    }
+
+    @TestMetadata("replWithPackage.repl.kts")
+    public void testReplWithPackage_repl() {
+      runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/replWithPackage.repl.kts");
+    }
+
     @TestMetadata("script.kts")
     public void testScript() {
       runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/script.kts");
@@ -625,6 +700,21 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
         KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/invalidCode"), Pattern.compile("^(.+)\\.(kt|kts)$"), null, true);
       }
 
+      @TestMetadata("annotatedClassAsFunctionBody.kt")
+      public void testAnnotatedClassAsFunctionBody() {
+        runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/invalidCode/annotatedClassAsFunctionBody.kt");
+      }
+
+      @TestMetadata("annotatedObjectAsFunctionBody.kt")
+      public void testAnnotatedObjectAsFunctionBody() {
+        runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/invalidCode/annotatedObjectAsFunctionBody.kt");
+      }
+
+      @TestMetadata("annotatedTypealiasAsFunctionBody.kt")
+      public void testAnnotatedTypealiasAsFunctionBody() {
+        runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/invalidCode/annotatedTypealiasAsFunctionBody.kt");
+      }
+
       @TestMetadata("annotationArgumentLocalDeclarations.kt")
       public void testAnnotationArgumentLocalDeclarations() {
         runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/invalidCode/annotationArgumentLocalDeclarations.kt");
@@ -633,6 +723,11 @@ public class RawFirBuilderTestCaseGenerated extends AbstractRawFirBuilderTestCas
       @TestMetadata("contextParameterOnErrorPrimaryConstructor.kt")
       public void testContextParameterOnErrorPrimaryConstructor() {
         runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/invalidCode/contextParameterOnErrorPrimaryConstructor.kt");
+      }
+
+      @TestMetadata("danglingAnnotationAsFunctionBody.kt")
+      public void testDanglingAnnotationAsFunctionBody() {
+        runTest("compiler/fir/raw-fir/psi2fir/testData/rawBuilder/declarations/invalidCode/danglingAnnotationAsFunctionBody.kt");
       }
 
       @TestMetadata("danglingContextParameter.kt")

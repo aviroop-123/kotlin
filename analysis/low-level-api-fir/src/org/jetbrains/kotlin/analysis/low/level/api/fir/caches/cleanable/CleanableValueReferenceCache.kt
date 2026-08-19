@@ -14,9 +14,12 @@ import java.util.concurrent.ConcurrentHashMap
  * and garbage collection. **The cache should only be used in read/write actions, as specified by the individual functions.**
  *
  * Each value of the cache has a [ValueReferenceCleaner] associated with it. The cache ensures that this cleaner is invoked when the value
- * is removed from or replaced in the cache, or when the value has been garbage-collected. Already collected values from the cache's
+ * is removed from or replaced in the cache or when the value has been garbage-collected. Already collected values from the cache's
  * reference queue are guaranteed to be processed on mutating operations (such as `put`, `remove`, and so on). The [ValueReferenceCleaner]
  * will be strongly referenced from the cache until collected values have been processed.
+ *
+ * To ensure exception resilience, as exceptions can happen during value cleanup with [ValueReferenceCleaner], the cache has the following
+ * contract: Removing one or more entries from the cache must succeed even when value cleanup throws an exception.
  *
  * `null` keys or values are not allowed.
  */
@@ -25,7 +28,6 @@ abstract class CleanableValueReferenceCache<K : Any, V : Any>(
     protected val backingMap: ConcurrentHashMap<K, ReferenceWithCleanup<K, V>>,
     protected val referenceQueue: ReferenceQueue<V>,
 ) {
-
     /**
      * Creates a copy of the cache with copies of [backingMap] and [referenceQueue]
      */
@@ -33,7 +35,7 @@ abstract class CleanableValueReferenceCache<K : Any, V : Any>(
         val mapCopy = ConcurrentHashMap<K, ReferenceWithCleanup<K, V>>(backingMap.size)
         val queueCopy = ReferenceQueue<V>()
 
-        for ((key, reference) in backingMap) {
+        for ([key, reference] in backingMap) {
             val value = reference.get() ?: continue
             mapCopy[key] = createReference(key, value, queueCopy)
         }
@@ -44,7 +46,6 @@ abstract class CleanableValueReferenceCache<K : Any, V : Any>(
         mapCopy: ConcurrentHashMap<K, ReferenceWithCleanup<K, V>>,
         queueCopy: ReferenceQueue<V>,
     ): CleanableValueReferenceCache<K, V>
-
 
     internal fun createReference(key: K, value: V): ReferenceWithCleanup<K, V> {
         return createReference(key, value, referenceQueue)
@@ -185,6 +186,21 @@ abstract class CleanableValueReferenceCache<K : Any, V : Any>(
     }
 
     /**
+     * Returns the value associated with [key] if it exists, or computes a new value with [computeValue] **outside the cache's lock** and
+     * adds it to the cache.
+     *
+     * [computeValue] might be called even if the key is already in the cache, but the cache guarantees that a single, consistent value is
+     * observed as a result.
+     *
+     * **Must be called in a read action.**
+     */
+    fun getOrPut(key: K, computeValue: (K) -> V): V =
+        get(key) ?: run {
+            val newValue = computeValue(key) // Do not inline!
+            computeIfAbsent(key) { newValue }
+        }
+
+    /**
      * Removes the value associated with [key] from the cache, performs cleanup on it, and returns it if it exists. **Must be called in a
      * read action.**
      */
@@ -211,8 +227,16 @@ abstract class CleanableValueReferenceCache<K : Any, V : Any>(
             diagnosticInformation?.let { "CleanableValueReferenceCache.clear ($it)" } ?: "CleanableValueReferenceCache.clear"
 
         // The backing map will not be modified by other threads during `clean` because it is executed in a write action.
-        backingMap.values.forEach { it.performCleanup(fullDiagnosticInformation) }
-        backingMap.clear()
+        try {
+            backingMap.values.forEach { it.performCleanup(fullDiagnosticInformation) }
+        } finally {
+            // In case an unexpected exception happens during cleanup, we need to make sure that all values are still removed from the
+            // cache. Otherwise, the cache might be left in an inconsistent state where some cleaned-up values remain.
+            //
+            // This is the only place in the implementation where we perform the cleanup *first* and then remove the entries from the
+            // backing map.
+            backingMap.clear()
+        }
 
         processQueue()
     }
@@ -250,6 +274,16 @@ abstract class CleanableValueReferenceCache<K : Any, V : Any>(
             // not fully guaranteed, as additional garbage collection may occur between `processQueue` and the end of the function.
             processQueue()
             return backingMap.keys.toSet()
+        }
+
+    /**
+     * Returns a snapshot of all values in the cache. Changes to the cache do not reflect in the resulting collection. **Must be called in a
+     * read action.**
+     */
+    val values: Collection<V>
+        get() {
+            processQueue()
+            return backingMap.values.mapNotNull { it.get() }
         }
 
     override fun toString(): String = "${this::class.simpleName} size:$size"

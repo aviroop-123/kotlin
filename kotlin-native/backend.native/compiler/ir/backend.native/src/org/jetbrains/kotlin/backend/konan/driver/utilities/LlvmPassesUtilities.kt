@@ -8,13 +8,15 @@ package org.jetbrains.kotlin.backend.konan.driver.utilities
 import kotlinx.cinterop.*
 import llvm.LLVMModuleRef
 import llvm.LLVMPrintModuleToFile
+import org.jetbrains.kotlin.backend.konan.NativeBackendDiagnostics
 import org.jetbrains.kotlin.config.phaser.Action
 import org.jetbrains.kotlin.config.phaser.ActionState
-import org.jetbrains.kotlin.backend.konan.KonanConfigKeys
-import org.jetbrains.kotlin.backend.konan.driver.PhaseContext
+import org.jetbrains.kotlin.backend.konan.driver.NativeBackendPhaseContext
 import org.jetbrains.kotlin.backend.konan.llvm.getName
 import org.jetbrains.kotlin.backend.konan.llvm.verifyModule
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.konan.config.saveLlvmIr
+import org.jetbrains.kotlin.konan.config.verifyBitcode
 import java.io.File
 
 /**
@@ -28,21 +30,21 @@ interface LlvmIrHolder {
 /**
  * Create action that searches context and data for LLVM IR and dumps it.
  */
-private fun <Data, Context : PhaseContext> createLlvmDumperAction(): Action<Data, Context> =
+private fun <Data, Context : NativeBackendPhaseContext> createLlvmDumperAction(): Action<Data, Context> =
         fun(state: ActionState, data: Data, context: Context) {
-            if (state.phase.name in context.config.configuration.getList(KonanConfigKeys.SAVE_LLVM_IR)) {
+            if (state.phase.name in context.config.configuration.saveLlvmIr) {
                 val llvmModule = findLlvmModule(data, context)
                 if (llvmModule == null) {
-                    context.messageCollector.report(
-                            CompilerMessageSeverity.WARNING,
+                    context.diagnosticReporter.report(
+                            NativeBackendDiagnostics.LLVM_WARNING,
                             "Cannot dump LLVM IR ${state.beforeOrAfter.name.lowercase()} ${state.phase.name}")
                     return
                 }
                 val moduleName: String = llvmModule.getName()
                 val parentDirectory = context.config.saveLlvmIrDirectory
                 if (!parentDirectory.exists()) {
-                    context.messageCollector.report(
-                            CompilerMessageSeverity.WARNING,
+                    context.diagnosticReporter.report(
+                            NativeBackendDiagnostics.LLVM_WARNING,
                             "Cannot dump LLVM IR to non-existent location: ${parentDirectory.absolutePath}")
                     return
                 }
@@ -56,15 +58,15 @@ private fun <Data, Context : PhaseContext> createLlvmDumperAction(): Action<Data
 /**
  *
  */
-private fun <Data, Context : PhaseContext> createLlvmVerifierAction(): Action<Data, Context> =
+private fun <Data, Context : NativeBackendPhaseContext> createLlvmVerifierAction(): Action<Data, Context> =
         fun(actionState: ActionState, data: Data, context: Context) {
-            if (!context.config.configuration.getBoolean(KonanConfigKeys.VERIFY_BITCODE)) {
+            if (!context.config.configuration.verifyBitcode) {
                 return
             }
             val llvmModule = findLlvmModule(data, context)
             if (llvmModule == null) {
-                context.messageCollector.report(
-                        CompilerMessageSeverity.WARNING,
+                context.diagnosticReporter.report(
+                        NativeBackendDiagnostics.LLVM_WARNING,
                         "Cannot verify LLVM IR ${actionState.beforeOrAfter.name.lowercase()} ${actionState.phase.name}")
                 return
             }
@@ -76,7 +78,7 @@ private fun <Data, Context : PhaseContext> createLlvmVerifierAction(): Action<Da
  *
  */
 @Suppress("UNCHECKED_CAST")
-private fun <Data, Context : PhaseContext> findLlvmModule(data: Data, context: Context): LLVMModuleRef? = when {
+private fun <Data, Context : NativeBackendPhaseContext> findLlvmModule(data: Data, context: Context): LLVMModuleRef? = when {
     // TODO: Not safe at all
     data is CPointer<*> -> data as LLVMModuleRef
     data is LlvmIrHolder -> data.llvmModule
@@ -87,5 +89,5 @@ private fun <Data, Context : PhaseContext> findLlvmModule(data: Data, context: C
 /**
  * Default set of dump and validate actions for LLVM phases.
  */
-internal fun <Data, Context : PhaseContext> getDefaultLlvmModuleActions(): Set<Action<Data, Context>> =
+internal fun <Data, Context : NativeBackendPhaseContext> getDefaultLlvmModuleActions(): Set<Action<Data, Context>> =
         setOf(createLlvmDumperAction(), createLlvmVerifierAction())

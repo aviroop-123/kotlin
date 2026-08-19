@@ -18,74 +18,144 @@ import java.util.regex.Pattern;
 @TestMetadata("plugins/scripting/scripting-tests/testData/diagnostics/repl")
 @TestDataPath("$PROJECT_ROOT")
 public class ReplViaApiDiagnosticsTestGenerated extends AbstractReplViaApiDiagnosticsTest {
-  @Test
-  public void testAllFilesPresentInRepl() {
-    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/scripting/scripting-tests/testData/diagnostics/repl"), Pattern.compile("^(.+)\\.kts$"), null, true);
+  private void run(String fileName) {
+    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/" + fileName);
   }
 
   @Test
-  @TestMetadata("class_references_top_level_mutating_properties.repl.kts")
-  public void testClass_references_top_level_mutating_properties_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/class_references_top_level_mutating_properties.repl.kts");
+  public void testAllFilesPresentInRepl() {
+    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/scripting/scripting-tests/testData/diagnostics/repl"), Pattern.compile("^(.+)\\.kts$"), Pattern.compile("^(.+)\\.(reversed|partialBody|fir|ll|latestLV|disabled)(\\.repl)?\\.kts?$"), true);
+  }
+
+  @Test
+  @TestMetadata("cast_assignment.repl.kts")
+  public void testCast_assignment_repl() {
+    run("cast_assignment.repl.kts");
   }
 
   @Test
   @TestMetadata("delegated_extension_property.repl.kts")
   public void testDelegated_extension_property_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/delegated_extension_property.repl.kts");
+    run("delegated_extension_property.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("delegated_self_reference.repl.kts")
+  public void testDelegated_self_reference_repl() {
+    run("delegated_self_reference.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("delegated_with_type_parameters.repl.kts")
+  public void testDelegated_with_type_parameters_repl() {
+    run("delegated_with_type_parameters.repl.kts");
   }
 
   @Test
   @TestMetadata("function_returns_anonymous_object.repl.kts")
   public void testFunction_returns_anonymous_object_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/function_returns_anonymous_object.repl.kts");
+    run("function_returns_anonymous_object.repl.kts");
   }
 
   @Test
   @TestMetadata("import_visible_in_next_snippet.repl.kts")
   public void testImport_visible_in_next_snippet_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/import_visible_in_next_snippet.repl.kts");
+    run("import_visible_in_next_snippet.repl.kts");
   }
 
   @Test
   @TestMetadata("mixed1.repl.kts")
   public void testMixed1_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/mixed1.repl.kts");
+    run("mixed1.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("package_declaration.repl.kts")
+  public void testPackage_declaration_repl() {
+    run("package_declaration.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("property_constant_initializer.repl.kts")
+  public void testProperty_constant_initializer_repl() {
+    run("property_constant_initializer.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("property_type_anonymous_object.repl.kts")
+  public void testProperty_type_anonymous_object_repl() {
+    run("property_type_anonymous_object.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("property_visibility.repl.kts")
+  public void testProperty_visibility_repl() {
+    run("property_visibility.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("sealed_hierarchies.repl.kts")
+  public void testSealed_hierarchies_repl() {
+    run("sealed_hierarchies.repl.kts");
   }
 
   @Test
   @TestMetadata("separate_snippets_use_before_define.repl.kts")
   public void testSeparate_snippets_use_before_define_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/separate_snippets_use_before_define.repl.kts");
+    run("separate_snippets_use_before_define.repl.kts");
   }
 
   @Test
   @TestMetadata("simple_class.repl.kts")
   public void testSimple_class_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/simple_class.repl.kts");
+    run("simple_class.repl.kts");
   }
 
   @Test
   @TestMetadata("simple_property.repl.kts")
   public void testSimple_property_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/simple_property.repl.kts");
+    run("simple_property.repl.kts");
   }
 
   @Test
   @TestMetadata("single_snippet.repl.kts")
   public void testSingle_snippet_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/single_snippet.repl.kts");
+    run("single_snippet.repl.kts");
   }
 
   @Test
   @TestMetadata("single_snippet_use_before_define.repl.kts")
   public void testSingle_snippet_use_before_define_repl() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/single_snippet_use_before_define.repl.kts");
+    run("single_snippet_use_before_define.repl.kts");
   }
 
   @Test
-  @TestMetadata("unsafe_cast_in_loop.kts")
-  public void testUnsafe_cast_in_loop() {
-    runTest("plugins/scripting/scripting-tests/testData/diagnostics/repl/unsafe_cast_in_loop.kts");
+  @TestMetadata("unsafe_cast_assignment_within_class.repl.kts")
+  public void testUnsafe_cast_assignment_within_class_repl() {
+    run("unsafe_cast_assignment_within_class.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("unsafe_cast_assignment_within_function.repl.kts")
+  public void testUnsafe_cast_assignment_within_function_repl() {
+    run("unsafe_cast_assignment_within_function.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("unsafe_cast_assignment_within_property_getter.repl.kts")
+  public void testUnsafe_cast_assignment_within_property_getter_repl() {
+    run("unsafe_cast_assignment_within_property_getter.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("unsafe_cast_assignment_within_property_setter.repl.kts")
+  public void testUnsafe_cast_assignment_within_property_setter_repl() {
+    run("unsafe_cast_assignment_within_property_setter.repl.kts");
+  }
+
+  @Test
+  @TestMetadata("unsafe_cast_in_loop.repl.kts")
+  public void testUnsafe_cast_in_loop_repl() {
+    run("unsafe_cast_in_loop.repl.kts");
   }
 }

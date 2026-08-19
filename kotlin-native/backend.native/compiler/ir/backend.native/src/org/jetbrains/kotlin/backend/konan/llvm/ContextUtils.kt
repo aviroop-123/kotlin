@@ -13,7 +13,6 @@ import org.jetbrains.kotlin.backend.konan.Context
 import org.jetbrains.kotlin.backend.konan.lower.originalConstructor
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.library.KotlinLibrary
 
@@ -211,9 +210,7 @@ internal interface ContextUtils : RuntimeAware {
      * Address of entry point of [llvmFunction].
      */
     val IrSimpleFunction.entryPointAddress: ConstPointer
-        get() {
-            return llvmFunction.toConstPointer().bitcast(llvm.int8PtrType)
-        }
+        get() = llvmFunction.toConstPointer()
 
     val IrClass.typeInfoPtr: ConstPointer
         get() {
@@ -245,16 +242,14 @@ internal interface ContextUtils : RuntimeAware {
 internal fun stringAsBytes(str: String) = str.toByteArray(Charsets.UTF_8)
 
 internal class ScopeInitializersGenerationState {
-    val topLevelFields = mutableListOf<IrField>()
-    var globalInitFunction: IrSimpleFunction? = null
     var globalInitState: LLVMValueRef? = null
-    var threadLocalInitFunction: IrSimpleFunction? = null
     var threadLocalInitState: AddressAccess? = null
-    val globalSharedObjects = mutableSetOf<LLVMValueRef>()
-    fun isEmpty() = topLevelFields.isEmpty() &&
+    var globalEagerInitFunction: LlvmCallable? = null
+    var threadLocalEagerInitFunction: LlvmCallable? = null
+    fun isEmpty() = globalEagerInitFunction == null &&
+            threadLocalEagerInitFunction == null &&
             globalInitState == null &&
-            threadLocalInitState == null &&
-            globalSharedObjects.isEmpty()
+            threadLocalInitState == null
 }
 
 internal class InitializersGenerationState {
@@ -356,7 +351,7 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
     }
 
     private fun importMemset(): LlvmCallable {
-        val functionType = functionType(voidType, false, int8PtrType, int8Type, int32Type, int1Type)
+        val functionType = functionType(voidType, false, pointerType, int8Type, int32Type, int1Type)
         return llvmIntrinsic(
                 if (context.config.useLlvmOpaquePointers) "llvm.memset.p0.i32"
                 else "llvm.memset.p0i8.i32",
@@ -426,7 +421,7 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
 
     val allocInstanceFunction = importRtFunction("AllocInstance", true)
     val allocArrayFunction = importRtFunction("AllocArrayInstance", true)
-    val initAndRegisterGlobalFunction = importRtFunction("InitAndRegisterGlobal", false)
+    val registerGlobalFunction = importRtFunction("RegisterGlobal", false)
     val updateHeapRefFunction = importRtFunction("UpdateHeapRef", false)
     val updateStackRefFunction = importRtFunction("UpdateStackRef", false)
     val updateReturnRefFunction = importRtFunction("UpdateReturnRef", false)
@@ -439,6 +434,7 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
     val lookupInterfaceTableRecord = importRtFunction("LookupInterfaceTableRecord", false)
     val isSubtypeFunction = importRtFunction("IsSubtype", false)
     val isSubclassFastFunction = importRtFunction("IsSubclassFast", false)
+    val getTypeInfo = importRtFunction("Kotlin_Any_getTypeInfo", false)
     val throwExceptionFunction = importRtFunction("ThrowException", false)
     val appendToInitalizersTail = importRtFunction("AppendToInitializersTail", false)
     val callInitGlobalPossiblyLock = importRtFunction("CallInitGlobalPossiblyLock", false)
@@ -472,6 +468,7 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
     }
 
     val Kotlin_Interop_DoesObjectConformToProtocol by lazy { importRtFunction("Kotlin_Interop_DoesObjectConformToProtocol", false) }
+    val Kotlin_Interop_DoesObjectConformToProtocolByName by lazy { importRtFunction("Kotlin_Interop_DoesObjectConformToProtocolByName", false) }
     val Kotlin_Interop_IsObjectKindOfClass by lazy { importRtFunction("Kotlin_Interop_IsObjectKindOfClass", false) }
 
     val Kotlin_ObjCExport_refToLocalObjC by lazy { importRtFunction("Kotlin_ObjCExport_refToLocalObjC", false) }
@@ -528,12 +525,7 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
     val doubleType = LLVMDoubleTypeInContext(llvmContext)!!
     val vector128Type = LLVMVectorType(floatType, 4)!!
     val voidType = LLVMVoidTypeInContext(llvmContext)!!
-    val int8PtrType = pointerType(int8Type)
-    val int8PtrPtrType = pointerType(int8PtrType)
-    val int32PtrType = pointerType(int32Type)
-    val int32PtrPtrType = pointerType(int32PtrType)
-    val voidPtrType = pointerType(voidType)
-    val voidPtrPtrType = pointerType(voidPtrType)
+    val pointerType = runtime.pointerType
 
     fun structType(vararg types: LLVMTypeRef): LLVMTypeRef = structType(types.toList())
 
@@ -572,11 +564,15 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
     fun float32(value: Float): LLVMValueRef = constFloat32(value).llvm
     fun float64(value: Double): LLVMValueRef = constFloat64(value).llvm
 
-    val kNullInt8Ptr by lazy { LLVMConstNull(int8PtrType)!! }
-    val kNullInt32Ptr by lazy { LLVMConstNull(pointerType(int32Type))!! }
-    val kNullIntptrPtr by lazy { LLVMConstNull(pointerType(intptrType))!! }
+    val kNull = LLVMConstNull(pointerType)!!
     val kImmInt32Zero by lazy { int32(0) }
     val kImmInt32One by lazy { int32(1) }
+    val kTrue by lazy { int1(true) }
+    val kFalse by lazy { int1(false) }
+
+    val nullPointer = object : ConstPointer {
+        override val llvm = kNull
+    }
 
     val memsetFunction = importMemset()
 
@@ -588,7 +584,7 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
 
     val llvmEhTypeidFor = llvmIntrinsic(
             "llvm.eh.typeid.for.p0",
-            functionType(int32Type, false, int8PtrType),
+            functionType(int32Type, false, pointerType),
             *listOfNotNull(
                     "nounwind",
             ).toTypedArray()
@@ -597,9 +593,9 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
     var tlsCount = 0
 
     val tlsKey by lazy {
-        val global = LLVMAddGlobal(module, int8PtrType, "__KonanTlsKey")!!
+        val global = LLVMAddGlobal(module, pointerType, "__KonanTlsKey")!!
         LLVMSetLinkage(global, LLVMLinkage.LLVMInternalLinkage)
-        LLVMSetInitializer(global, LLVMConstNull(int8PtrType))
+        LLVMSetInitializer(global, kNull)
         global
     }
 
@@ -623,9 +619,9 @@ internal class CodegenLlvmHelpers(private val generationState: NativeGenerationS
 
     val cxaBeginCatchFunction = externalNativeRuntimeFunction(
             "__cxa_begin_catch",
-            returnType = LlvmRetType(int8PtrType, isObjectType = false),
+            returnType = LlvmRetType(pointerType, isObjectType = false),
             functionAttributes = listOf(LlvmFunctionAttribute.NoUnwind),
-            parameterTypes = listOf(LlvmParamType(int8PtrType))
+            parameterTypes = listOf(LlvmParamType(pointerType))
     )
 
     val cxaEndCatchFunction = externalNativeRuntimeFunction(
@@ -660,3 +656,19 @@ class IrStaticInitializer(val konanLibrary: KotlinLibrary?, val runtimeInitializ
  */
 @JvmInline
 value class RuntimeInitializer(val llvmCallable: LlvmCallable)
+
+context(llvm: CodegenLlvmHelpers)
+internal fun Boolean.toLlvmConstInt32(): ConstInt32 =
+        llvm.constInt32(if (this) 1 else 0)
+
+context(llvm: CodegenLlvmHelpers)
+internal fun Int.toLlvmConstInt32(): ConstInt32 =
+        llvm.constInt32(this)
+
+context(llvm: CodegenLlvmHelpers)
+internal fun UByte.toLlvmConstUInt8(): ConstUInt8 =
+        llvm.constUInt8(this)
+
+context(llvm: CodegenLlvmHelpers)
+internal fun String?.toCStringLiteral(): ConstPointer =
+        if (this != null) llvm.staticData.cStringLiteral(this) else llvm.nullPointer

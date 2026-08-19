@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.fir.visitors.FirVisitor
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
 
 class FirSyntheticPropertyAccessor @FirImplementationDetail internal constructor(
-    val delegate: FirSimpleFunction,
+    val delegate: FirNamedFunction,
     override val isGetter: Boolean,
     override val propertySymbol: FirPropertySymbol,
 ) : FirPropertyAccessor() {
@@ -82,6 +82,9 @@ class FirSyntheticPropertyAccessor @FirImplementationDetail internal constructor
     override val contractDescription: FirContractDescription? = null
 
     override val containerSource: DeserializedContainerSource? get() = null
+
+    override val isLocal: Boolean
+        get() = false
 
     override fun <R, D> acceptChildren(visitor: FirVisitor<R, D>, data: D) {
         delegate.accept(visitor, data)

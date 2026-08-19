@@ -1,16 +1,55 @@
 import org.jetbrains.kotlin.build.androidsdkprovisioner.ProvisioningType
+import java.util.zip.ZipFile
 
 description = "Parcelize compiler plugin"
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("android-sdk-provisioner")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
-val robolectricClasspath by configurations.creating
+repositories {
+    google()
+}
+
+/**
+ * Used to unpack the `classes.jar` from `.aar` artifacts.
+ *
+ * See `androidx.test:monitor` package below.
+ */
+@CacheableTransform
+abstract class AarToJarTransform : TransformAction<TransformParameters.None> {
+    @get:InputArtifact
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val inputAar: Provider<FileSystemLocation>
+
+    override fun transform(outputs: TransformOutputs) {
+        val aarFile = inputAar.get().asFile
+        ZipFile(aarFile).use { zip ->
+            val classesJarEntry = zip.getEntry("classes.jar")
+            if (classesJarEntry != null) {
+                val outputJar = outputs.file("${aarFile.nameWithoutExtension}-classes.jar")
+                zip.getInputStream(classesJarEntry).use { inputStream ->
+                    outputJar.outputStream().use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+            }
+        }
+    }
+}
+
+val robolectricClasspath by configurations.creating {
+    attributes {
+        attribute(Attribute.of("artifactType", String::class.java), "jar")
+    }
+    resolutionStrategy.eachDependency {
+        checkAndOverrideBouncyCastleVersion(project)
+    }
+}
 val robolectricDependency by configurations.creating
 
 val parcelizeRuntimeForTests by configurations.creating
@@ -18,6 +57,10 @@ val layoutLib by configurations.creating
 val layoutLibApi by configurations.creating
 
 dependencies {
+    registerTransform(AarToJarTransform::class.java) {
+        from.attribute(Attribute.of("artifactType", String::class.java), "aar")
+        to.attribute(Attribute.of("artifactType", String::class.java), "jar")
+    }
     embedded(project(":plugins:parcelize:parcelize-compiler:parcelize.common")) { isTransitive = false }
     embedded(project(":plugins:parcelize:parcelize-compiler:parcelize.k1")) { isTransitive = false }
     embedded(project(":plugins:parcelize:parcelize-compiler:parcelize.k2")) { isTransitive = false }
@@ -32,30 +75,12 @@ dependencies {
 
     testFixturesApi(project(":plugins:parcelize:parcelize-compiler:parcelize.cli"))
 
-    testFixturesApi(project(":compiler:util"))
-    testFixturesApi(project(":compiler:backend"))
-    testFixturesApi(project(":compiler:ir.backend.common"))
-    testFixturesApi(project(":compiler:backend.jvm"))
-    testFixturesApi(project(":compiler:cli"))
+    testFixturesApi(project(":compiler:frontend"))
+    testFixturesApi(project(":compiler:fir:plugin-utils"))
     testFixturesApi(project(":plugins:parcelize:parcelize-runtime"))
-    testFixturesApi(kotlinTest())
 
     testFixturesApi(testFixtures(project(":compiler:tests-common-new")))
-    testFixturesApi(testFixtures(project(":compiler:test-infrastructure")))
-    testFixturesApi(testFixtures(project(":compiler:test-infrastructure-utils")))
-
     testFixturesImplementation(testFixtures(project(":generators:test-generator")))
-
-    // FIR dependencies
-    testFixturesApi(project(":compiler:fir:plugin-utils"))
-    testFixturesApi(project(":compiler:fir:entrypoint"))
-    testFixturesApi(project(":compiler:fir:checkers"))
-    testFixturesApi(project(":compiler:fir:checkers:checkers.jvm"))
-    testFixturesApi(project(":compiler:fir:checkers:checkers.js"))
-    testFixturesApi(project(":compiler:fir:checkers:checkers.native"))
-    testRuntimeOnly(project(":compiler:fir:fir-serialization"))
-
-    testRuntimeOnly(project(":core:descriptors.runtime"))
 
     testRuntimeOnly(commonDependency("org.codehaus.woodstox:stax2-api"))
     testRuntimeOnly(commonDependency("com.fasterxml:aalto-xml"))
@@ -63,9 +88,14 @@ dependencies {
     testRuntimeOnly(toolsJar())
     testFixturesApi(libs.junit4)
 
-    robolectricDependency("org.robolectric:android-all:5.0.2_r3-robolectric-r0")
+    // Must be kept in sync with ANDROID_API_VERSION in ParcelizeRuntimeClasspathProvider.
+    // The dependency version defined here determines the Android API version.
+    robolectricDependency("org.robolectric:android-all-instrumented:16-robolectric-13921718-i7")
 
     robolectricClasspath(commonDependency("org.robolectric", "robolectric"))
+
+    // This dependency is an `.aar` file.
+    robolectricClasspath("androidx.test:monitor:1.8.0")
     robolectricClasspath(project(":plugins:parcelize:parcelize-runtime")) { isTransitive = false }
 
     parcelizeRuntimeForTests(project(":plugins:parcelize:parcelize-runtime")) { isTransitive = false }
@@ -80,18 +110,18 @@ optInToUnsafeDuringIrConstructionAPI()
 
 sourceSets {
     "main" { none() }
-    "test" {
-        projectDefault()
-        generatedTestDir()
-    }
+    "test" { projectDefault() }
     "testFixtures" { projectDefault() }
 }
+
+optInToK1Deprecation()
 
 runtimeJar()
 sourcesJar()
 javadocJar()
 testsJar()
 
+val projectDir = layout.projectDirectory
 val robolectricDependencyDir = layout.buildDirectory.dir("robolectricDependencies")
 val prepareRobolectricDependencies by tasks.registering(Copy::class) {
     from(robolectricDependency)
@@ -99,36 +129,34 @@ val prepareRobolectricDependencies by tasks.registering(Copy::class) {
 }
 
 projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5) {
-        dependsOn(parcelizeRuntimeForTests)
-        dependsOn(robolectricClasspath)
-        dependsOn(robolectricDependency)
+    testTask(jUnitMode = JUnitMode.JUnit5, defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_21_0)) {
+        inputs.files(prepareRobolectricDependencies.map { it.outputs })
+            .withNormalizer(ClasspathNormalizer::class)
+            .withPropertyName("prepareRobolectricDependenciesOutput")
 
-        dependsOn(prepareRobolectricDependencies)
-        dependsOn(":dist")
-        workingDir = rootDir
         androidSdkProvisioner {
             provideToThisTaskAsSystemProperty(ProvisioningType.PLATFORM_JAR)
         }
 
-        val parcelizeRuntimeForTestsConf: FileCollection = parcelizeRuntimeForTests
-        val robolectricClasspathConf: FileCollection = robolectricClasspath
+        addClasspathProperty(parcelizeRuntimeForTests, "parcelizeRuntime.classpath")
+        addClasspathProperty(robolectricClasspath, "robolectric.classpath")
+        addClasspathProperty(layoutLib, "layoutLib.path")
+        addClasspathProperty(layoutLibApi, "layoutLibApi.path")
+
         val robolectricDependencyDir: Provider<Directory> = robolectricDependencyDir
-        val layoutLibConf: FileCollection = layoutLib
-        val layoutLibApiConf: FileCollection = layoutLibApi
+        val projectDir = projectDir
         doFirst {
-            systemProperty("parcelizeRuntime.classpath", parcelizeRuntimeForTestsConf.asPath)
-            systemProperty("robolectric.classpath", robolectricClasspathConf.asPath)
-
             systemProperty("robolectric.offline", "true")
-            systemProperty("robolectric.dependency.dir", robolectricDependencyDir.get().asFile)
-
-            systemProperty("layoutLib.path", layoutLibConf.singleFile.canonicalPath)
-            systemProperty("layoutLibApi.path", layoutLibApiConf.singleFile.canonicalPath)
+            systemProperty("robolectric.dependency.dir", robolectricDependencyDir.get().asFile.relativeTo(projectDir.asFile))
         }
     }
 
-    testGenerator("org.jetbrains.kotlin.parcelize.test.TestGeneratorKt")
+    testGenerator("org.jetbrains.kotlin.parcelize.test.TestGeneratorKt", generateTestsInBuildDirectory = true)
+
+    testData(isolated, "testData")
 
     withJvmStdlibAndReflect()
+    withTestJar()
+    withMockJdkAnnotationsJar()
+    withScriptRuntime()
 }

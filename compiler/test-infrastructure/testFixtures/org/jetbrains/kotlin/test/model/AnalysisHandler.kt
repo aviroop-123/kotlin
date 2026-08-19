@@ -7,10 +7,12 @@ package org.jetbrains.kotlin.test.model
 
 import org.jetbrains.kotlin.test.Assertions
 import org.jetbrains.kotlin.test.Constructor
+import org.jetbrains.kotlin.test.TestInfrastructureInternals
+import org.jetbrains.kotlin.test.services.CompilationStage
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.assertions
 
-abstract class AnalysisHandler<A : ResultingArtifact<A>>(
+abstract class AnalysisHandlerBase<A : ResultingArtifact<A>>(
     val testServices: TestServices,
     val failureDisablesNextSteps: Boolean,
     val doNotRunIfThereWerePreviousFailures: Boolean
@@ -23,8 +25,29 @@ abstract class AnalysisHandler<A : ResultingArtifact<A>>(
 
     abstract val artifactKind: TestArtifactKind<A>
 
-    abstract fun processModule(module: TestModule, info: A)
+    /**
+     * The compilation stage this handler is being executed in.
+     */
+    lateinit var compilationStage: CompilationStage
+        private set
 
+    @TestInfrastructureInternals
+    internal fun setCompilationStage(stage: CompilationStage) {
+        if (this::compilationStage.isInitialized) {
+            error("Compilation stage already initialized for $this")
+        }
+        compilationStage = stage
+    }
+}
+
+// ----------------------------- non-grouping handlers -----------------------------
+
+abstract class AnalysisHandler<A : ResultingArtifact<A>>(
+    testServices: TestServices,
+    failureDisablesNextSteps: Boolean,
+    doNotRunIfThereWerePreviousFailures: Boolean
+) : AnalysisHandlerBase<A>(testServices, failureDisablesNextSteps, doNotRunIfThereWerePreviousFailures) {
+    abstract fun processModule(module: TestModule, info: A)
     abstract fun processAfterAllModules(someAssertionWasFailed: Boolean)
 }
 
@@ -48,3 +71,13 @@ abstract class BinaryArtifactHandler<A : ResultingArtifact.Binary<A>>(
     failureDisablesNextSteps: Boolean,
     doNotRunIfThereWerePreviousFailures: Boolean
 ) : AnalysisHandler<A>(testServices, failureDisablesNextSteps, doNotRunIfThereWerePreviousFailures)
+
+// ----------------------------- grouping handlers -----------------------------
+
+abstract class GroupingStageHandler<A : ResultingArtifact<A>>(
+    testServices: TestServices,
+    failureDisablesNextSteps: Boolean,
+    doNotRunIfThereWerePreviousFailures: Boolean
+) : AnalysisHandlerBase<A>(testServices, failureDisablesNextSteps, doNotRunIfThereWerePreviousFailures) {
+    abstract fun processArtifact(artifact: A)
+}

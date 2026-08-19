@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -105,8 +104,8 @@ fun case4(case: Case4) {
         //(1.1) return type is String
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>get(1)<!>
         //to (1.1)
-        <!DEBUG_INFO_CALL("fqName: Case4.get; typeCall: operator function")!>this [1]<!>
+        this [1]
         //(1.1) return type is String
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>this [1]<!>
+        this [1]
     }
 }

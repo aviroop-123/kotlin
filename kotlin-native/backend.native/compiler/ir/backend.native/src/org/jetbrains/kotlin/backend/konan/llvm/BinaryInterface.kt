@@ -21,10 +21,9 @@ import org.jetbrains.kotlin.ir.util.findAnnotation
 import org.jetbrains.kotlin.ir.util.fqNameForIrSerialization
 import org.jetbrains.kotlin.ir.util.getAnnotationStringValue
 import org.jetbrains.kotlin.ir.util.render
-import org.jetbrains.kotlin.konan.library.KonanLibrary
+import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.library.uniqueName
 import org.jetbrains.kotlin.name.Name
-
 
 // This file describes the ABI for Kotlin descriptors of exported declarations.
 // TODO: revise the naming scheme to ensure it produces unique names.
@@ -102,6 +101,12 @@ internal val IrClass.writableTypeInfoSymbolName: String
         return "ktypew:" + this.fqNameForIrSerialization.toString()
     }
 
+internal val IrClass.objCTypeAdapterSymbolName: String
+    get() {
+        assert (this.isExported())
+        return "kobjcadapter:" + this.fqNameForIrSerialization.toString()
+    }
+
 internal val IrClass.globalObjectStorageSymbolName: String
     get() {
         assert (this.isExported())
@@ -154,5 +159,5 @@ internal val IrClass.typeInfoHasVtableAttached: Boolean
 internal val String.moduleConstructorName
     get() = "_Konan_init_${this}"
 
-internal val KonanLibrary.moduleConstructorName
+internal val KotlinLibrary.moduleConstructorName
     get() = uniqueName.moduleConstructorName

@@ -1,4 +1,3 @@
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -11,5 +10,5 @@
 
 // TESTCASE NUMBER: 1
 fun case_1(value_1: Int) {
-    when (<!UNUSED_EXPRESSION!>value_1<!>) {}
+    when (value_1) {}
 }

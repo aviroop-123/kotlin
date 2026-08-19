@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.jvm.compiler
 
 import org.jetbrains.kotlin.codegen.CodegenTestCase
+import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.utils.sure
 import org.jetbrains.org.objectweb.asm.*
@@ -15,6 +16,12 @@ import java.util.*
 import java.util.regex.MatchResult
 
 abstract class AbstractWriteSignatureTest : CodegenTestCase() {
+    override val useFir: Boolean
+        get() = true
+
+    override val firParser: FirParser
+        get() = FirParser.LightTree
+
     override fun doMultiFileTest(wholeFile: File, files: List<TestFile>) {
         val isIgnored = InTextDirectivesUtils.isIgnoredTarget(backend, wholeFile)
         compile(files)
@@ -22,7 +29,7 @@ abstract class AbstractWriteSignatureTest : CodegenTestCase() {
             parseExpectations(wholeFile).check()
         } catch (e: Throwable) {
             if (!isIgnored) {
-                println(classFileFactory.createText())
+                println(classFileFactory?.createText())
             }
             throw e
         }
@@ -87,7 +94,7 @@ abstract class AbstractWriteSignatureTest : CodegenTestCase() {
             val checker = Checker()
             val relativeClassFileName = "${className.replace('.', '/')}.class"
 
-            val outputFile = classFileFactory.currentOutput.single { it.relativePath == relativeClassFileName }
+            val outputFile = classFileFactory!!.currentOutput.single { it.relativePath == relativeClassFileName }
             processClassFile(checker, outputFile.asByteArray())
 
             if (className.endsWith("Package")) {
@@ -102,9 +109,9 @@ abstract class AbstractWriteSignatureTest : CodegenTestCase() {
             // Look for package parts in the same directory.
             // Package part file names for package SomePackage look like SomePackage$<hash>.class.
             val partPrefix = relativeClassFileName.replace(".class", "\$")
-            classFileFactory.currentOutput.filter {
+            classFileFactory?.currentOutput?.filter {
                 it.relativePath.startsWith(partPrefix) && it.relativePath.endsWith(".class")
-            }.forEach { packageFacadeFile ->
+            }?.forEach { packageFacadeFile ->
                 processClassFile(checker, packageFacadeFile.asByteArray())
             }
         }

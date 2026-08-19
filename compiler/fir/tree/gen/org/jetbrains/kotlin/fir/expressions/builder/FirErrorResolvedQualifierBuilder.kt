@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.fir.builder.toMutableOrEmpty
 import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.expressions.FirErrorResolvedQualifier
+import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.impl.FirErrorResolvedQualifierImpl
 import org.jetbrains.kotlin.fir.resolve.FirResolvedSymbolOrigin
@@ -30,13 +31,15 @@ import org.jetbrains.kotlin.name.FqName
 @FirBuilderDsl
 class FirErrorResolvedQualifierBuilder : FirAbstractResolvedQualifierBuilder, FirAnnotationContainerBuilder, FirExpressionBuilder {
     override var source: KtSourceElement? = null
+    override var contextSensitiveAlternative: FirPropertyAccessExpression? = null
     override var coneTypeOrNull: ConeKotlinType? = null
     override val annotations: MutableList<FirAnnotation> = mutableListOf()
     override lateinit var packageFqName: FqName
     override var relativeClassFqName: FqName? = null
     override var symbol: FirClassLikeSymbol<*>? = null
     override var explicitParent: FirResolvedQualifier? = null
-    override var isNullableLHSForCallableReference: Boolean = false
+    override var isNullableLhsForCallableReference: Boolean = false
+    override var resolvedLhsTypeForCallableReferenceOrNull: ConeKotlinType? = null
     override var resolvedToCompanionObject: Boolean by kotlin.properties.Delegates.notNull<Boolean>()
     override var canBeValue: Boolean = false
     override var isFullyQualified: Boolean = false
@@ -48,13 +51,15 @@ class FirErrorResolvedQualifierBuilder : FirAbstractResolvedQualifierBuilder, Fi
     override fun build(): FirErrorResolvedQualifier {
         return FirErrorResolvedQualifierImpl(
             source,
+            contextSensitiveAlternative,
             coneTypeOrNull,
             annotations.toMutableOrEmpty(),
             packageFqName,
             relativeClassFqName,
             symbol,
             explicitParent,
-            isNullableLHSForCallableReference,
+            isNullableLhsForCallableReference,
+            resolvedLhsTypeForCallableReferenceOrNull,
             resolvedToCompanionObject,
             canBeValue,
             isFullyQualified,

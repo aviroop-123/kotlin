@@ -2,7 +2,6 @@ description = "Kotlin Daemon"
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
@@ -10,6 +9,7 @@ dependencies {
     compileOnly(project(":compiler:incremental-compilation-impl"))
     compileOnly(intellijCore())
     compileOnly(libs.intellij.fastutil)
+    compileOnly(libs.guava)
 
     runtimeOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
 

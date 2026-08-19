@@ -6,9 +6,6 @@
 
 package org.jetbrains.kotlin.ir.declarations
 
-import org.jetbrains.kotlin.CompilerVersionOfApiDeprecation
-import org.jetbrains.kotlin.DeprecatedCompilerApi
-import org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.ir.IrImplementationDetail
 import org.jetbrains.kotlin.ir.declarations.impl.*
@@ -86,6 +83,35 @@ open class IrFactory(
             this.isExpect = isExpect
             this.isFun = isFun
             this.hasEnumEntries = hasEnumEntries
+        }
+
+    fun createConstructorWithLateBinding(
+        startOffset: Int,
+        endOffset: Int,
+        origin: IrDeclarationOrigin,
+        name: Name,
+        visibility: DescriptorVisibility,
+        isInline: Boolean,
+        isExpect: Boolean,
+        returnType: IrType?,
+        isPrimary: Boolean,
+        isExternal: Boolean = false,
+    ): IrConstructor =
+        IrConstructorWithLateBindingImpl(
+            startOffset = startOffset,
+            endOffset = endOffset,
+            origin = origin,
+            name = name,
+            visibility = visibility,
+            isInline = isInline,
+            isExternal = isExternal,
+            isPrimary = isPrimary,
+            isExpect = isExpect,
+            factory = this
+        ).declarationCreated().apply {
+            if (returnType != null) {
+                this.returnType = returnType
+            }
         }
 
     fun createConstructor(
@@ -181,6 +207,7 @@ open class IrFactory(
         isExternal: Boolean = false,
         containerSource: DeserializedContainerSource? = null,
         isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
+        companionExtensionClass: IrClassSymbol? = null,
     ): IrSimpleFunction =
         IrFunctionImpl(
             startOffset = startOffset,
@@ -199,7 +226,8 @@ open class IrFactory(
             isExpect = isExpect,
             isFakeOverride = isFakeOverride,
             containerSource = containerSource,
-            factory = this
+            factory = this,
+            companionExtensionClass = companionExtensionClass,
         ).declarationCreated().apply {
             if (returnType != null) {
                 this.returnType = returnType
@@ -222,6 +250,7 @@ open class IrFactory(
         isInfix: Boolean,
         isExternal: Boolean = false,
         isFakeOverride: Boolean = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
+        companionExtensionClass: IrClassSymbol? = null,
     ): IrFunctionWithLateBinding =
         IrFunctionWithLateBindingImpl(
             startOffset = startOffset,
@@ -238,7 +267,8 @@ open class IrFactory(
             isInfix = isInfix,
             isExpect = isExpect,
             isFakeOverride = isFakeOverride,
-            factory = this
+            factory = this,
+            companionExtensionClass = companionExtensionClass,
         ).declarationCreated().apply {
             if (returnType != null) {
                 this.returnType = returnType
@@ -377,40 +407,6 @@ open class IrFactory(
             factory = this
         ).declarationCreated()
 
-    /**
-     * Please use [createValueParameter] overload that takes [IrParameterKind] parameter.
-     *
-     * See docs/backend/IR_parameter_api_migration.md
-     */
-    @DeprecatedForRemovalCompilerApi(CompilerVersionOfApiDeprecation._2_1_20)
-    fun createValueParameter(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        type: IrType,
-        isAssignable: Boolean,
-        symbol: IrValueParameterSymbol,
-        varargElementType: IrType?,
-        isCrossinline: Boolean,
-        isNoinline: Boolean,
-        isHidden: Boolean,
-    ): IrValueParameter =
-        IrValueParameterImpl(
-            startOffset = startOffset,
-            endOffset = endOffset,
-            origin = origin,
-            symbol = symbol,
-            name = name,
-            type = type,
-            varargElementType = varargElementType,
-            isCrossinline = isCrossinline,
-            isNoinline = isNoinline,
-            isHidden = isHidden,
-            isAssignable = isAssignable,
-            factory = this
-        ).declarationCreated()
-
     fun createValueParameter(
         startOffset: Int,
         endOffset: Int,
@@ -430,6 +426,7 @@ open class IrFactory(
             endOffset = endOffset,
             origin = origin,
             symbol = symbol,
+            kind = kind,
             name = name,
             type = type,
             varargElementType = varargElementType,
@@ -438,41 +435,7 @@ open class IrFactory(
             isHidden = isHidden,
             isAssignable = isAssignable,
             factory = this
-        ).apply {
-            this.kind = kind
-        }.declarationCreated()
-
-    /**
-     * Please use the overload accepting `kind` argument.
-     */
-    @DeprecatedForRemovalCompilerApi(CompilerVersionOfApiDeprecation._2_1_20)
-    @Suppress("unused") // Deprecated, parameter [index] is ignored. Kept for backward compatibility only.
-    fun createValueParameter(
-        startOffset: Int,
-        endOffset: Int,
-        origin: IrDeclarationOrigin,
-        name: Name,
-        type: IrType,
-        isAssignable: Boolean,
-        symbol: IrValueParameterSymbol,
-        index: Int,
-        varargElementType: IrType?,
-        isCrossinline: Boolean,
-        isNoinline: Boolean,
-        isHidden: Boolean,
-    ): IrValueParameter = createValueParameter(
-        startOffset = startOffset,
-        endOffset = endOffset,
-        origin = origin,
-        name = name,
-        type = type,
-        isAssignable = isAssignable,
-        symbol = symbol,
-        varargElementType = varargElementType,
-        isCrossinline = isCrossinline,
-        isNoinline = isNoinline,
-        isHidden = isHidden,
-    )
+        ).declarationCreated()
 
     fun createExpressionBody(
         startOffset: Int,

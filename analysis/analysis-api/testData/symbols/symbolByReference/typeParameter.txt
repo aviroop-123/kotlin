@@ -6,6 +6,7 @@ KaTypeParameterSymbol:
   compilerVisibility: Local
   isActual: false
   isExpect: false
+  isExternal: false
   isReified: false
   location: LOCAL
   modality: FINAL
@@ -17,3 +18,4 @@ KaTypeParameterSymbol:
   getContainingFileSymbol: KaFileSymbol(typeParameter.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

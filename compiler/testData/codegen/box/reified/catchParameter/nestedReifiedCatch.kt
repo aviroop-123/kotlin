@@ -1,6 +1,6 @@
 // LANGUAGE: +AllowReifiedTypeInCatchClause
-// IGNORE_BACKEND_K1: ANY
 
+// FILE: lib.kt
 inline fun <reified E : Throwable> f(): String {
     try {
         return object {
@@ -20,6 +20,7 @@ inline fun <reified E : Throwable> f(): String {
     }
 }
 
+// FILE: main.kt
 fun box(): String {
     return f<AssertionError>()
 }

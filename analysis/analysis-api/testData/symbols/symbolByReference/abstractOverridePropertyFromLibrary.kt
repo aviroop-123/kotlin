@@ -1,4 +1,3 @@
-// DO_NOT_CHECK_SYMBOL_RESTORE_K1
 // MODULE: lib
 // MODULE_KIND: LibraryBinary
 // FILE: lib.kt

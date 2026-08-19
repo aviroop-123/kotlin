@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -126,7 +126,7 @@ inline fun buildVarargArgumentsExpressionWithTargets(
 private fun FirAnnotation.targetArgumentExpressions(): List<FirExpression> =
     when (val mapped = argumentMapping.mapping[StandardClassIds.Annotations.ParameterNames.targetAllowedTargets]) {
         is FirVarargArgumentsExpression -> mapped.arguments
-        is FirArrayLiteral -> mapped.argumentList.arguments
+        is FirCollectionLiteral -> mapped.argumentList.arguments
         else -> listOf(this)
     }
 
@@ -159,7 +159,7 @@ internal fun JavaValueParameter.toFirValueParameter(
     isFromSource = this@toFirValueParameter.isFromSource
     this.moduleData = moduleData
     containingDeclarationSymbol = functionSymbol
-    name = this@toFirValueParameter.name ?: Name.identifier("p$index")
+    name = this@toFirValueParameter.nameOrGeneratedName ?: Name.identifier("p$index")
     returnTypeRef = type.toFirJavaTypeRef(session, source)
     isVararg = this@toFirValueParameter.isVararg
     annotationList = FirLazyJavaAnnotationList(this@toFirValueParameter, moduleData)
@@ -176,7 +176,7 @@ internal fun JavaAnnotationArgument.toFirExpression(
             session,
             expectedArrayElementTypeIfArray
         )
-        is JavaArrayAnnotationArgument -> buildArrayLiteral {
+        is JavaArrayAnnotationArgument -> buildCollectionLiteral {
             val argumentTypeRef = expectedConeType?.let {
                 coneTypeOrNull = it
                 buildResolvedTypeRef {
@@ -218,8 +218,8 @@ internal fun JavaAnnotationArgument.toFirExpression(
         }
     }
 
-    return if (expectedConeType?.lowerBoundIfFlexible()?.isArrayOrPrimitiveArray == true && argument !is FirArrayLiteral) {
-        buildArrayLiteral {
+    return if (expectedConeType?.lowerBoundIfFlexible()?.isArrayOrPrimitiveArray == true && argument !is FirCollectionLiteral) {
+        buildCollectionLiteral {
             coneTypeOrNull = expectedConeType
             argumentList = buildArgumentList {
                 arguments += argument
@@ -289,7 +289,11 @@ private fun fillAnnotationArgumentMapping(
         // Binary session dependencies work differently in the CLI and the Analysis API mode,
         // so some common mechanism has to be used to eliminate the difference.
         // This approach works both for Java and Kotlin annotations, as in the end all of them are just .class files.
-        val binaryClass = javaAnnotation.resolve()?.originalClsJavaClass
+        val javaClass = javaAnnotation.resolve()?.originalClsJavaClass
+
+        // It is still possible to get a source light class if there is no binary class on the classpath.
+        // Usually, this absence leads to a runtime exception, so there is no need to try to analyze source Kotlin code via light classes
+        val binaryClass = javaClass?.takeIf { it.lightClassOriginKind == null }
         binaryClass?.annotationParametersMapping(session, source)
     } else {
         // For source sessions symbol provider-based search is used as it is more precise

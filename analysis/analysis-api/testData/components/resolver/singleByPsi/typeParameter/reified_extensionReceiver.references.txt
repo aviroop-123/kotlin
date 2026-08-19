@@ -1,3 +1,0 @@
-KtNameReferenceExpression(39,40): 'T'
-  KtSimpleNameReference:
-    (in <local>: foo) reified T

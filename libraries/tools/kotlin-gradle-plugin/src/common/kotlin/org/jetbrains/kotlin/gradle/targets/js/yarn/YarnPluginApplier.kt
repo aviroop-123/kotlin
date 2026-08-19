@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.gradle.targets.js.yarn
 
 import org.gradle.api.Project
-import org.gradle.api.model.ObjectFactory
 import org.gradle.api.plugins.ExtensionContainer
 import org.jetbrains.kotlin.gradle.targets.js.MultiplePluginDeclarationDetector
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin
@@ -20,13 +19,9 @@ import org.jetbrains.kotlin.gradle.targets.web.nodejs.BaseNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.web.nodejs.BaseNodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.web.yarn.BaseYarnRootEnvSpec
 import org.jetbrains.kotlin.gradle.targets.web.yarn.BaseYarnRootExtension
-import org.jetbrains.kotlin.gradle.tasks.CleanDataTask
-import org.jetbrains.kotlin.gradle.tasks.CleanDataTask.Companion.deprecationMessage
-import org.jetbrains.kotlin.gradle.tasks.internal.CleanableStore
 import org.jetbrains.kotlin.gradle.tasks.registerTask
 import org.jetbrains.kotlin.gradle.utils.detachedResolvable
-import org.jetbrains.kotlin.gradle.utils.listProperty
-import org.jetbrains.kotlin.gradle.utils.providerWithLazyConvention
+import org.jetbrains.kotlin.gradle.utils.getExecOperations
 import java.io.File
 import kotlin.reflect.KClass
 
@@ -81,9 +76,11 @@ internal class YarnPluginApplier(
             project,
             nodeJsRoot,
             yarnSpec,
+            project.objects,
+            project.getExecOperations(),
         )
 
-        yarnSpec.initializeYarnEnvSpec(project.objects, yarnRootExtension)
+        yarnSpec.initializeYarnEnvSpec(yarnRootExtension)
 
         yarnRootExtension.platform.value(nodeJs.platform)
             .disallowChanges()
@@ -109,45 +106,42 @@ internal class YarnPluginApplier(
         val kotlinNpmInstall = project.tasks.named(platformDisambiguate.extensionName(KotlinNpmInstallTask.BASE_NAME))
         kotlinNpmInstall.configure {
             it.dependsOn(setupTask)
-            it.inputs.property("yarnIgnoreScripts", { yarnRootExtension.ignoreScripts })
+            it.inputs.property("yarnIgnoreScripts", yarnRootExtension.ignoreScriptsProperty)
         }
 
         yarnRootExtension.nodeJsEnvironment.value(
             nodeJs.env
         ).disallowChanges()
 
+        @Suppress("DEPRECATION_ERROR")
         project.tasks.register(
             platformDisambiguate.extensionName(
-                "yarn" + CleanDataTask.NAME_SUFFIX,
+                "yarn" + org.jetbrains.kotlin.gradle.tasks.CleanDataTask.NAME_SUFFIX,
                 prefix = null
             ),
-            CleanDataTask::class.java
-        ) {
-            it.doFirst {
-                it.logger.warn(deprecationMessage(it.path))
-            }
+            org.jetbrains.kotlin.gradle.tasks.CleanDataTask::class.java
+        ) {}
 
-            it.cleanableStoreProvider = yarnSpec
-                .installationDirectory
-                .map { CleanableStore.Companion[it.asFile.path] }
-            it.description = "Clean unused local yarn version"
-        }
-
-        yarnRootExtension.lockFileDirectory = lockFileDirectory(project.rootDir)
+        yarnRootExtension.lockFileDirectoryProperty.convention(
+            project.objects.directoryProperty().fileValue(lockFileDirectory(project.rootDir))
+        )
 
         val upgradeYarnLock =
-            project.tasks.register(platformDisambiguate.extensionName(UPGRADE_YARN_LOCK_BASE_NAME), YarnLockUpgradeTask::class.java) { task ->
+            project.tasks.register(
+                platformDisambiguate.extensionName(UPGRADE_YARN_LOCK_BASE_NAME),
+                YarnLockUpgradeTask::class.java
+            ) { task ->
                 task.dependsOn(kotlinNpmInstall)
                 task.inputFile.set(nodeJsRoot.rootPackageDirectory.map { it.file(LockCopyTask.YARN_LOCK) })
-                task.outputDirectory.set(yarnRootExtension.lockFileDirectory)
-                task.fileName.set(yarnRootExtension.lockFileName)
+                task.outputDirectory.set(yarnRootExtension.lockFileDirectoryProperty)
+                task.fileName.set(yarnRootExtension.lockFileNameProperty)
             }
 
         project.tasks.register(platformDisambiguate.extensionName(STORE_YARN_LOCK_BASE_NAME), YarnLockStoreTask::class.java) { task ->
             task.dependsOn(kotlinNpmInstall)
             task.inputFile.set(nodeJsRoot.rootPackageDirectory.map { it.file(LockCopyTask.YARN_LOCK) })
-            task.outputDirectory.set(yarnRootExtension.lockFileDirectory)
-            task.fileName.set(yarnRootExtension.lockFileName)
+            task.outputDirectory.set(yarnRootExtension.lockFileDirectoryProperty)
+            task.fileName.set(yarnRootExtension.lockFileNameProperty)
 
             task.lockFileMismatchReport.value(
                 project.provider { yarnRootExtension.requireConfigured().yarnLockMismatchReport.toLockFileMismatchReport() }
@@ -164,12 +158,12 @@ internal class YarnPluginApplier(
         }
 
         project.tasks.register(platformDisambiguate.extensionName(RESTORE_YARN_LOCK_BASE_NAME), YarnLockCopyTask::class.java) {
-            val lockFile = yarnRootExtension.lockFileDirectory.resolve(yarnRootExtension.lockFileName)
-            it.inputFile.set(yarnRootExtension.lockFileDirectory.resolve(yarnRootExtension.lockFileName))
+            val lockFile = yarnRootExtension.lockFileDirectoryProperty.file(yarnRootExtension.lockFileNameProperty)
+            it.inputFile.set(yarnRootExtension.lockFileDirectoryProperty.file(yarnRootExtension.lockFileNameProperty))
             it.outputDirectory.set(nodeJsRoot.rootPackageDirectory)
             it.fileName.set(LockCopyTask.YARN_LOCK)
             it.onlyIf {
-                lockFile.exists()
+                lockFile.orNull?.asFile?.exists() == true
             }
         }
 
@@ -193,7 +187,6 @@ internal class YarnPluginApplier(
     }
 
     private fun BaseYarnRootEnvSpec.initializeYarnEnvSpec(
-        objectFactory: ObjectFactory,
         yarnRootExtension: BaseYarnRootExtension,
     ) {
         download.convention(yarnRootExtension.downloadProperty)
@@ -204,16 +197,10 @@ internal class YarnPluginApplier(
         version.convention(yarnRootExtension.versionProperty)
         command.convention(yarnRootExtension.commandProperty)
         platform.convention(yarnRootExtension.platform)
-        ignoreScripts.convention(objectFactory.providerWithLazyConvention { yarnRootExtension.ignoreScripts })
-        yarnLockMismatchReport.convention(objectFactory.providerWithLazyConvention { yarnRootExtension.yarnLockMismatchReport })
-        reportNewYarnLock.convention(objectFactory.providerWithLazyConvention { yarnRootExtension.reportNewYarnLock })
-        yarnLockAutoReplace.convention(objectFactory.providerWithLazyConvention { yarnRootExtension.yarnLockAutoReplace })
-        resolutions.convention(
-            objectFactory.listProperty<YarnResolution>().value(
-                objectFactory.providerWithLazyConvention {
-                    yarnRootExtension.resolutions
-                }
-            )
-        )
+        ignoreScripts.convention(yarnRootExtension.ignoreScriptsProperty)
+        yarnLockMismatchReport.convention(yarnRootExtension.yarnLockMismatchReportProperty)
+        reportNewYarnLock.convention(yarnRootExtension.reportNewYarnLockProperty)
+        yarnLockAutoReplace.convention(yarnRootExtension.yarnLockAutoReplaceProperty)
+        resolutions.convention(yarnRootExtension.resolutionsProperty)
     }
 }

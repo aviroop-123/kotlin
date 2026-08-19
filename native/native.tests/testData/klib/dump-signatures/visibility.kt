@@ -1,5 +1,3 @@
-// FIR_IDENTICAL
-
 package visibility
 
 public fun publicFun(): String = ""

@@ -5,6 +5,9 @@
 
 package org.jetbrains.kotlin.gradle.testbase
 
+import org.jetbrains.kotlin.testFederation.AffectedByJs
+import org.jetbrains.kotlin.testFederation.AffectedByNative
+import org.jetbrains.kotlin.testFederation.AffectedBySwiftExport
 import org.junit.jupiter.api.Tag
 
 /**
@@ -41,6 +44,7 @@ annotation class JvmGradlePluginTests
 @Target(AnnotationTarget.CLASS, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 @Tag("JsKGP")
+@AffectedByJs
 annotation class JsGradlePluginTests
 
 /**
@@ -53,7 +57,20 @@ annotation class JsGradlePluginTests
 @Target(AnnotationTarget.CLASS, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 @Tag("NativeKGP")
+@AffectedByNative
 annotation class NativeGradlePluginTests
+
+/**
+ * Add it to tests covering SwiftPM import feature.
+ *
+ * You could add tag onto test suite once, but then all tests
+ * in test suite should be for the related tag.
+ * Preferably add tag for each test.
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+@Tag("SwiftPMImportKGP")
+annotation class SwiftPMImportGradlePluginTests
 
 /**
  * Add it to tests covering Swift Export Kotlin Gradle Plugin/Native platform.
@@ -65,6 +82,7 @@ annotation class NativeGradlePluginTests
 @Target(AnnotationTarget.CLASS, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 @Tag("SwiftExportKGP")
+@AffectedBySwiftExport
 annotation class SwiftExportGradlePluginTests
 
 /**

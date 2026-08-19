@@ -1,6 +1,5 @@
 // DISABLE_JAVA_FACADE
 // RUN_PIPELINE_TILL: BACKEND
-// LANGUAGE: +ExpectedTypeFromCast
 // DIAGNOSTICS: -UNUSED_VARIABLE -DEBUG_INFO_LEAKING_THIS
 
 // FILE: a/View.java
@@ -29,7 +28,7 @@ val xExplicit: X = Test().findViewById(0)
 val xCast = Test().findViewById(0) as X
 
 val xCastExplicitType = Test().findViewById<X>(0) as X
-val xSafeCastExplicitType = Test().findViewById<X>(0) <!USELESS_CAST!>as? X<!>
+val xSafeCastExplicitType = Test().findViewById<X>(0) as? X
 
 val yExplicit: Y<String> = Test().findViewById(0)
 val yCast = Test().findViewById(0) as Y<String>
@@ -52,7 +51,7 @@ fun test(t: Test) {
 }
 
 fun test2(t: Test?) {
-    val xSafeCallSafeCast = t?.findViewById(0) as? X
+    val xSafeCallSafeCast = t?.findViewById(0) <!USELESS_CAST!>as? X<!>
     val xSafeCallSafeCastExplicitType = t?.findViewById<X>(0) <!USELESS_CAST!>as? X<!>
 
     val xSafeCallCast = t?.findViewById(0) as X

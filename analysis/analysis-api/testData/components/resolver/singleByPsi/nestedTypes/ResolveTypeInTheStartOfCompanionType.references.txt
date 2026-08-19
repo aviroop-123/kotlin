@@ -1,3 +1,0 @@
-KtNameReferenceExpression(109,111): 'AA'
-  KtSimpleNameReference:
-    (in foo.bar.baz) class AA

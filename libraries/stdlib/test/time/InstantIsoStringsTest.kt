@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -38,7 +38,7 @@ class InstantIsoStringsTest {
         val leapYears = listOf(
             0, 1972, 1976, 1980, 2000, 1200, 400, -400, -4, -8,
         )
-        for ((month, lastDayOfMonth) in arrayOf(
+        for ([month, lastDayOfMonth] in arrayOf(
             1 to 31, 3 to 31, 4 to 30, 5 to 31, 6 to 30,
             7 to 31, 8 to 31, 9 to 30, 10 to 31, 11 to 30, 12 to 31,
         )) {
@@ -56,7 +56,7 @@ class InstantIsoStringsTest {
 
     @Test
     fun parseIsoString() {
-        for ((str, seconds, nanos) in arrayOf<Triple<String, Long, Int>>(
+        for ([str, seconds, nanos] in arrayOf<Triple<String, Long, Int>>(
             // all components are taken into account
             Triple("1970-01-01T00:00:00Z", 0, 0),
             Triple("1970-01-01T00:00:00.000000001Z", 0, 1),
@@ -200,6 +200,7 @@ class InstantIsoStringsTest {
             Triple("-819839065-09-06T07:25:58.953784983Z", -25871684167672442, 953784983),
             Triple("+673467211-06-05T02:15:40.712392732Z", 21252510297310540, 712392732),
             Triple("+982441727-04-13T12:12:06.776817565Z", 31002804263391126, 776817565),
+            Triple("0010-09-11T23:47:55Z", -61829655125L, 0),
         )) {
             val instant = Instant.parse(str)
             assertEquals(
@@ -210,7 +211,7 @@ class InstantIsoStringsTest {
             assertEquals(str, instant.toString())
         }
         // non-canonical strings are parsed as well, but formatted differently
-        for ((str, seconds, nanos) in arrayOf(
+        for ([str, seconds, nanos] in arrayOf(
             // upper, lower case, trailing zeros
             Triple("2024-07-15T14:06:29.461245000z", 1721052389, 461245000),
             Triple("2024-07-15t14:06:29.4612450z", 1721052389, 461245000),
@@ -348,6 +349,13 @@ class InstantIsoStringsTest {
             "1970-02-03T04:05:06.123456789+1:12:50",
             "1970-02-03T04:05:06.123456789+01:2:60",
             "1970-02-03T04:05:06.123456789+01:12:6",
+            // padding characters in the end
+            "2005-04-01T00:59:00Zzz",
+            // year is too long
+            "10000000005-04-01T00:59:00Z",
+            "2000000000-04-01T00:59:00Z",
+            // too many digits in a fractional part
+            "2005-04-01T00:59:00.00123456789Z",
         )) {
             assertInvalidFormat(nonIsoString) { Instant.parse(nonIsoString) }
             assertNull(Instant.parseOrNull(nonIsoString), nonIsoString)
@@ -368,7 +376,7 @@ class InstantIsoStringsTest {
             Pair("2020-01-01T00:01:01.010203040+17:59", "2019-12-31T06:02:01.010203040Z"),
             Pair("2020-01-01T00:01:01+00", "2020-01-01T00:01:01Z"),
         )
-        strings.forEach { (str, strInZ) ->
+        strings.forEach { [str, strInZ] ->
             val instant = Instant.parse(str)
             assertEquals(Instant.parse(strInZ), instant, str)
             assertEquals(instant, Instant.parseOrNull(str), str)
@@ -407,7 +415,7 @@ class InstantIsoStringsTest {
         )
 
         for (instant in instants) {
-            for ((offsetSeconds, offsetString) in offsets) {
+            for ([offsetSeconds, offsetString] in offsets) {
                 if (instant == Instant.MAX && offsetSeconds < 0 ||
                     instant == Instant.MIN && offsetSeconds > 0
                 ) continue

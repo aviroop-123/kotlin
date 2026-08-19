@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
@@ -9,7 +8,7 @@ dependencies {
 
     api(project(":tools:kotlinp"))
 
-    testApi(intellijCore())
+    testImplementation(intellijCore())
 
     testCompileOnly(project(":kotlin-metadata"))
     testCompileOnly(project(":kotlinx-metadata-klib"))

@@ -46,7 +46,6 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
             parents += typeParameterRefsOwnerBuilder
             defaultNull("companionObjectSymbol")
             openBuilder()
-            withCopy()
         }
 
         val qualifiedAccessExpressionBuilder by builder {
@@ -117,7 +116,6 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
         builder(typeAlias) {
             parents += declarationBuilder
             parents += typeParameterRefsOwnerBuilder
-            withCopy()
         }
 
         builder(receiverParameter) {
@@ -148,7 +146,7 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
             additionalImports(emptyArgumentListType, emptyAnnotationArgumentMappingType, firImplicitTypeWithoutSourceType)
         }
 
-        builder(arrayLiteral) {
+        builder(collectionLiteral) {
             parents += callBuilder
         }
 
@@ -167,7 +165,7 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
             parents += qualifiedAccessExpressionBuilder
             defaultNull("explicitReceiver")
             defaultNoReceivers()
-            defaultFalse("hasQuestionMarkAtLHS")
+            defaultFalse("hasQuestionMarkAtLhs")
         }
 
         builder(componentCall) {
@@ -264,10 +262,6 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
         builder(backingField) {
             parents += variableBuilder
             default("resolvePhase", "FirResolvePhase.DECLARATIONS")
-        }
-
-        builder(enumEntry) {
-            withCopy()
         }
 
         builder(typeOperatorCall) {
@@ -371,7 +365,7 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
         builder(valueParameter, type = "FirDefaultSetterValueParameter") {
         }
 
-        builder(simpleFunction) {
+        builder(namedFunction) {
             parents += functionBuilder
             parents += typeParametersOwnerBuilder
             defaultNull("body", "contractDescription")
@@ -380,6 +374,11 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
         }
 
         builder(smartCastExpression) {
+            withCopy()
+        }
+
+        builder(inaccessibleReceiverExpression) {
+            withCopy()
         }
 
         builder(tryExpression) {
@@ -393,6 +392,11 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
         }
 
         builder(elvisExpression) {
+            default("calleeReference", "FirStubReference")
+            additionalImports(stubReferenceType)
+        }
+
+        builder(equalityOperatorCall) {
             default("calleeReference", "FirStubReference")
             additionalImports(stubReferenceType)
         }
@@ -429,23 +433,15 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
             fields from resolvedQualifier
         }
 
-        builder(script) {
-            withCopy()
-        }
-
-        builder(codeFragment) {
-            withCopy()
-        }
-
         builder(resolvedQualifier) {
             parents += abstractResolvedQualifierBuilder
-            defaultFalse("isNullableLHSForCallableReference", "isFullyQualified", "canBeValue")
+            defaultFalse("isNullableLhsForCallableReference", "isFullyQualified", "canBeValue")
             defaultNull("resolvedSymbolOrigin")
         }
 
         builder(errorResolvedQualifier) {
             parents += abstractResolvedQualifierBuilder
-            defaultFalse("isNullableLHSForCallableReference", "isFullyQualified", "canBeValue")
+            defaultFalse("isNullableLhsForCallableReference", "isFullyQualified", "canBeValue")
             defaultNull("resolvedSymbolOrigin")
         }
 
@@ -463,7 +459,7 @@ class BuilderConfigurator(model: Model) : AbstractFirBuilderConfigurator<Abstrac
 
         noBuilder(literalExpression)
 
-        builder(samConversionExpression) {
+        builder(functionTypeConversionExpression) {
             withCopy()
         }
 

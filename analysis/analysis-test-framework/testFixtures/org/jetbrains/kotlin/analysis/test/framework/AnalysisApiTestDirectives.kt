@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -17,7 +17,6 @@ object AnalysisApiTestDirectives : SimpleDirectivesContainer() {
     )
 
     val DISABLE_DEPENDED_MODE by directive("Analysis in dependent mode should not be run in this test")
-    val IGNORE_FE10 by directive("FE10 Analysis API implementation test should not be run")
     val IGNORE_FIR by directive("FIR Analysis API implementation test should not be run")
     val IGNORE_STANDALONE by directive("Standalone implementation test should not be run")
 
@@ -39,16 +38,6 @@ object AnalysisApiTestDirectives : SimpleDirectivesContainer() {
 
     val CONTEXT_MODULE by stringDirective(
         description = "Specifies the module name used to find the 'context psi element' for this module",
-        applicability = DirectiveApplicability.Module
-    )
-
-    /*
-    Note: the 'contextElement' can be different from the 'contextModule'.
-    E.g., consider a multiplatform project where the contextElement is in 'commonMain', but the contextModule can be
-    configured as 'jvmMain'
-    */
-    val ANALYSIS_CONTEXT_MODULE by stringDirective(
-        description = "Specifies the module name which should be treated as a context module for the current one (can overwrite 'CONTEXT_MODULE')",
         applicability = DirectiveApplicability.Module
     )
 

@@ -5,13 +5,13 @@
 
 package org.jetbrains.kotlin.compiler.plugins
 
-import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
-import org.jetbrains.kotlin.generators.impl.generateTestGroupSuite
+import org.jetbrains.kotlin.generators.dsl.junit4.generateTestGroupSuiteWithJUnit4
+import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil
 
 fun main(args: Array<String>) {
     val mainClassName = TestGeneratorUtil.getMainClassName()
-    generateTestGroupSuite(args, mainClassName) {
+    generateTestGroupSuiteWithJUnit4(args, mainClassName) {
         testGroup("plugins/plugins-interactions-testing/tests-gen", "plugins/plugins-interactions-testing/testData") {
             testClass<AbstractPluginCliTests> {
                 model("cli", extension = "args", testMethod = "doJvmTest", recursive = false)

@@ -1,0 +1,180 @@
+KtFile: 'simpleDisabledFeature.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtClass(78,108): 'enum class MyEnum {'
+  null
+
+KtDeclarationModifierList(78,82): 'enum'
+  null
+
+KtClassBody(96,108): '{'
+  null
+
+KtEnumEntry(102,104): 'X,'
+  null
+
+KtEnumEntry(105,106): 'Y'
+  null
+
+KtNamedFunction(110,131): 'fun foo(a: MyEnum) {}'
+  null
+
+KtParameterList(117,128): '(a: MyEnum)'
+  null
+
+KtParameter(118,127): 'a: MyEnum'
+  null
+
+KtTypeReference(121,127): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtUserType(121,127): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(121,127): 'MyEnum'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtBlockExpression(129,131): '{}'
+  null
+
+KtNamedFunction(133,248): 'fun main() {'
+  null
+
+KtParameterList(141,143): '()'
+  null
+
+KtBlockExpression(144,248): '{'
+  null
+
+KtProperty(151,167): 'val L = MyEnum.X'
+  null
+
+KtDotQualifiedExpression(159,167): 'MyEnum.X'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum.X
+    ]
+
+KtNameReferenceExpression(159,165): 'MyEnum'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(166,167): 'X'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum.X
+    ]
+
+KtProperty(173,191): 'val t1: MyEnum = X'
+  null
+
+KtTypeReference(181,187): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtUserType(181,187): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(181,187): 'MyEnum'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(190,191): 'X'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'X'.>
+
+KtProperty(196,214): 'val t2: MyEnum = L'
+  null
+
+KtTypeReference(204,210): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtUserType(204,210): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(204,210): 'MyEnum'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(213,214): 'L'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val L: MyEnum
+    ]
+
+KtProperty(219,246): 'val t3: MyEnum = UNRESOLVED'
+  null
+
+KtTypeReference(227,233): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtUserType(227,233): 'MyEnum'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(227,233): 'MyEnum'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyEnum
+    ]
+
+KtNameReferenceExpression(236,246): 'UNRESOLVED'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'UNRESOLVED'.>

@@ -136,6 +136,15 @@ fun RigidTypeMarker.isStubType(): Boolean = with(c) { isStubType() }
 context(c: TypeSystemContext)
 fun RigidTypeMarker.isStubTypeForVariableInSubtyping(): Boolean = with(c) { isStubTypeForVariableInSubtyping() }
 
+context(_: TypeSystemContext)
+fun RigidTypeMarker.isStubTypeForVariableInSubtypingOrCaptured(): Boolean =
+    isStubTypeForVariableInSubtyping() || isCapturedStubTypeForVariableInSubtyping()
+
+context(_: TypeSystemContext)
+private fun RigidTypeMarker.isCapturedStubTypeForVariableInSubtyping() =
+    asCapturedTypeUnwrappingDnn()?.typeConstructor()?.projection()?.takeUnless { it.isStarProjection() }
+        ?.getType()?.asRigidType()?.isStubTypeForVariableInSubtyping() == true
+
 context(c: TypeSystemContext)
 fun RigidTypeMarker.isStubTypeForBuilderInference(): Boolean = with(c) { isStubTypeForBuilderInference() }
 
@@ -322,6 +331,10 @@ context(c: TypeSystemContext)
 fun TypeConstructorMarker.isArrayConstructor(): Boolean = with(c) { isArrayConstructor() }
 
 context(c: TypeSystemContext)
+fun KotlinTypeMarker.withNewTypeSince(languageFeature: Any, newType: KotlinTypeMarker): KotlinTypeMarker =
+    with(c) { withNewTypeSince(languageFeature, newType) }
+
+context(c: TypeSystemContext)
 fun RigidTypeMarker.isSingleClassifierType(): Boolean = with(c) { isSingleClassifierType() }
 
 context(c: TypeSystemContext)
@@ -341,3 +354,6 @@ fun KotlinTypeMarker.isTypeVariableType(): Boolean = with(c) { isTypeVariableTyp
 
 context(c: TypeSystemContext)
 fun TypeSubstitutorMarker.safeSubstitute(type: KotlinTypeMarker): KotlinTypeMarker = with(c) { safeSubstitute(type) }
+
+context(c: TypeSystemContext)
+fun KotlinTypeMarker.unwrapToSimpleTypeUsingLowerBound(): SimpleTypeMarker = lowerBoundIfFlexible().originalIfDefinitelyNotNullable()

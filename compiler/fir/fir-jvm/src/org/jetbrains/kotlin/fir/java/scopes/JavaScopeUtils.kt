@@ -7,18 +7,19 @@
 
 package org.jetbrains.kotlin.fir.java.scopes
 
-import org.jetbrains.kotlin.config.JvmAnalysisFlags
+import org.jetbrains.kotlin.builtins.StandardNames
+import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.declarations.hasAnnotation
 import org.jetbrains.kotlin.fir.dispatchReceiverClassLookupTagOrNull
 import org.jetbrains.kotlin.fir.java.scopes.ClassicBuiltinSpecialProperties.getBuiltinSpecialPropertyGetterName
-import org.jetbrains.kotlin.fir.languageVersionSettings
-import org.jetbrains.kotlin.fir.resolve.providers.firProvider
-import org.jetbrains.kotlin.fir.resolve.providers.getContainingFile
 import org.jetbrains.kotlin.fir.resolve.toSymbol
-import org.jetbrains.kotlin.fir.scopes.*
+import org.jetbrains.kotlin.fir.scopes.FirTypeScope
+import org.jetbrains.kotlin.fir.scopes.ProcessorAction
+import org.jetbrains.kotlin.fir.scopes.ScopeFunctionRequiresPrewarm
 import org.jetbrains.kotlin.fir.scopes.jvm.computeJvmSignature
+import org.jetbrains.kotlin.fir.scopes.processOverriddenFunctionsAndSelf
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.load.java.BuiltinSpecialProperties
@@ -28,7 +29,6 @@ import org.jetbrains.kotlin.load.java.SpecialGenericSignatures.Companion.ERASED_
 import org.jetbrains.kotlin.load.java.SpecialGenericSignatures.Companion.REMOVE_AT_NAME_AND_SIGNATURE
 import org.jetbrains.kotlin.load.java.SpecialGenericSignatures.Companion.SIGNATURE_TO_JVM_REPRESENTATION_NAME
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.name.StandardClassIds
 
 fun FirCallableSymbol<*>.doesOverrideBuiltinWithDifferentJvmName(containingScope: FirTypeScope, session: FirSession): Boolean {
     return getOverriddenBuiltinWithDifferentJvmName(containingScope, session) != null
@@ -142,10 +142,16 @@ object ClassicBuiltinSpecialProperties {
 }
 
 private fun FirCallableSymbol<*>.isFromBuiltinClass(session: FirSession): Boolean {
-    if (dispatchReceiverClassLookupTagOrNull()?.toSymbol(session)?.fir?.origin?.isBuiltIns == true) return true
-    if (!session.languageVersionSettings.getFlag(JvmAnalysisFlags.expectBuiltinsAsPartOfStdlib)) return false
-    val containingFile = session.firProvider.getContainingFile(this) ?: return false
-    return containingFile.symbol.hasAnnotation(StandardClassIds.Annotations.JvmBuiltin, session)
+    return dispatchReceiverClassLookupTagOrNull()?.toSymbol(session)?.isBuiltinClass() == true
+}
+
+fun FirClassLikeSymbol<*>.isBuiltinClass(): Boolean {
+    if (fir.origin.isBuiltIns) return true
+    // Generally the condition above should be enough, but in some environments built-in classes
+    // might be loaded without the correct expected origin, e.g., when building stdlib artifact itself or for K2CL.
+    // See KT-68154 and KT-80524 for details.
+    // Having this branch, we may actually remove the line above, but leaving it as a fast-path.
+    return classId.packageFqName.startsWith(StandardNames.BUILT_INS_PACKAGE_NAME) && JavaToKotlinClassMap.isMappedKotlinClass(classId)
 }
 
 private fun FirNamedFunctionSymbol.firstOverriddenFunction(

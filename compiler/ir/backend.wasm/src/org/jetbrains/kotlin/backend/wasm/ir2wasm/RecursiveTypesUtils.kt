@@ -10,108 +10,48 @@ import org.jetbrains.kotlin.backend.wasm.utils.StronglyConnectedComponents
 import org.jetbrains.kotlin.utils.yieldIfNotNull
 import org.jetbrains.kotlin.wasm.ir.*
 
-typealias RecursiveTypeGroup = List<WasmTypeDeclaration>
+typealias RecursiveTypeGroup = MutableList<WasmTypeDeclaration>
 
-private fun WasmType.toTypeDeclaration(): WasmTypeDeclaration? {
-    val heapType = when (val type = this) {
-        is WasmRefType -> type.heapType
-        is WasmRefNullType -> type.heapType
-        else -> null
-    }
-    return (heapType as? WasmHeapType.Type)?.type?.owner
-}
+internal class RecursiveGroupBuilder(private val resolver: (WasmHeapType.Type) -> WasmTypeDeclaration) {
+    private val componentFinder = StronglyConnectedComponents(::dependencyTypes)
 
-private fun dependencyTypes(type: WasmTypeDeclaration): Sequence<WasmTypeDeclaration> = sequence {
-    when (type) {
-        is WasmStructDeclaration -> {
-            yieldIfNotNull(type.superType?.owner)
-            for (field in type.fields) {
-                yieldIfNotNull(field.type.toTypeDeclaration())
-            }
+    private fun WasmType.toTypeDeclaration(): WasmTypeDeclaration? {
+        val heapType = when (val type = this) {
+            is WasmRefType -> type.heapType
+            is WasmRefNullType -> type.heapType
+            else -> null
         }
-        is WasmArrayDeclaration -> {
-            yieldIfNotNull(type.field.type.toTypeDeclaration())
-        }
-        is WasmFunctionType -> {
-            for (parameter in type.parameterTypes) {
-                yieldIfNotNull(parameter.toTypeDeclaration())
-            }
-            for (parameter in type.resultTypes) {
-                yieldIfNotNull(parameter.toTypeDeclaration())
-            }
-        }
-    }
-}
-
-private fun wasmTypeDeclarationOrderKey(declaration: WasmTypeDeclaration): Int {
-    return when (declaration) {
-        is WasmArrayDeclaration -> 0
-        is WasmFunctionType -> 0
-        is WasmStructDeclaration ->
-            // Subtype depth
-            declaration.superType?.let { wasmTypeDeclarationOrderKey(it.owner) + 1 } ?: 0
-    }
-}
-
-
-fun createRecursiveTypeGroups(types: List<WasmTypeDeclaration>): List<RecursiveTypeGroup> {
-    val componentFinder = StronglyConnectedComponents(::dependencyTypes)
-    types.forEach(componentFinder::visit)
-
-    val components = componentFinder.findComponents()
-
-    components.forEach { component ->
-        component.sortBy(::wasmTypeDeclarationOrderKey)
+        return (heapType as? WasmHeapType.Type)?.let(resolver)
     }
 
-    return components
-}
-
-private fun typeFingerprint(type: WasmType, currentHash: Hash128Bits, visited: MutableSet<WasmTypeDeclaration>): Hash128Bits {
-    val heapType = when (type) {
-        is WasmRefType -> type.getHeapType()
-        is WasmRefNullType -> type.getHeapType()
-        else -> return currentHash.combineWith(Hash128Bits(type.code.toULong()))
+    private fun dependencyTypes(type: WasmTypeDeclaration): Sequence<WasmTypeDeclaration> = sequence {
+        when (type) {
+            is WasmStructDeclaration -> {
+                yieldIfNotNull(type.superType?.let(resolver))
+                for (field in type.fields) {
+                    yieldIfNotNull(field.type.toTypeDeclaration())
+                }
+            }
+            is WasmArrayDeclaration -> {
+                yieldIfNotNull(type.field.type.toTypeDeclaration())
+            }
+            is WasmFunctionType -> {
+                for (parameter in type.parameterTypes) {
+                    yieldIfNotNull(parameter.toTypeDeclaration())
+                }
+                for (parameter in type.resultTypes) {
+                    yieldIfNotNull(parameter.toTypeDeclaration())
+                }
+            }
+        }
     }
-    return when (heapType) {
-        is WasmHeapType.Type -> wasmDeclarationFingerprint(heapType.type.owner, currentHash, visited)
-        is WasmHeapType.Simple -> currentHash.combineWith(Hash128Bits(heapType.code.toULong()))
+
+    fun addTypes(types: Iterable<WasmTypeDeclaration>) {
+        types.forEach(componentFinder::visit)
     }
-}
 
-private val structHash = Hash128Bits(1U, 1U)
-private val functionHash = Hash128Bits(2U, 2U)
-private val arrayHash = Hash128Bits(3U, 3U)
-
-private fun wasmDeclarationFingerprint(
-    declaration: WasmTypeDeclaration,
-    currentHash: Hash128Bits,
-    visited: MutableSet<WasmTypeDeclaration>
-): Hash128Bits {
-    if (!visited.add(declaration)) return currentHash
-    return when (declaration) {
-        is WasmStructDeclaration -> {
-            val structHash = currentHash.combineWith(structHash)
-            val fields = declaration.fields.fold(structHash) { acc, field ->
-                typeFingerprint(field.type, acc, visited)
-            }
-            declaration.superType?.owner?.let {
-                wasmDeclarationFingerprint(it, fields, visited)
-            } ?: fields
-        }
-        is WasmFunctionType -> {
-            val functionHash = currentHash.combineWith(functionHash)
-            val parametersHash = declaration.parameterTypes.fold(functionHash) { acc, parameter ->
-                typeFingerprint(parameter, acc, visited)
-            }
-            declaration.resultTypes.fold(parametersHash) { acc, parameter ->
-                typeFingerprint(parameter, acc, visited)
-            }
-        }
-        is WasmArrayDeclaration -> {
-            val arrayHash = currentHash.combineWith(arrayHash)
-            typeFingerprint(declaration.field.type, arrayHash, visited)
-        }
+    fun build(): MutableList<RecursiveTypeGroup> {
+        return componentFinder.findComponents()
     }
 }
 
@@ -126,34 +66,121 @@ private val indexes = arrayOf(
     WasmFuncRef,
     WasmExternRef,
     WasmAnyRef,
+    WasmEqRef,
+    WasmRefNullrefType,
+    WasmRefNullExternrefType,
+    WasmI31Ref,
     WasmStructRef,
+    WasmArrayRef,
 )
 
-internal fun encodeIndex(index: Int): List<WasmStructFieldDeclaration> {
+internal fun encodeIndex(index: ULong): List<WasmStructFieldDeclaration> {
     var current = index
     val result = mutableListOf<WasmStructFieldDeclaration>()
-    //i31 type is not used by kotlin/wasm, so mixin index would never clash with regular signature
-    result.add(WasmStructFieldDeclaration("", WasmI31Ref, false))
-    while (current != 0) {
-        result.add(WasmStructFieldDeclaration("", indexes[current % 10], false))
-        current /= 10
+    val indexesSize = indexes.size.toUInt()
+
+    var wasI31 = false
+
+    while (current != 0UL) {
+        val fieldType = indexes[(current % indexesSize).toInt()]
+        result.add(WasmStructFieldDeclaration("", fieldType, false))
+        wasI31 = wasI31 || fieldType == WasmI31Ref
+
+        current /= indexesSize
     }
+
+    //i31 type is not used by kotlin/wasm, so mixin index would never clash with regular signature
+    if (!wasI31) {
+        result.add(WasmStructFieldDeclaration("", WasmI31Ref, false))
+    }
+
     return result
 }
 
-internal fun addMixInGroup(group: RecursiveTypeGroup, mixInIndexesForGroups: MutableMap<Hash128Bits, Int>): RecursiveTypeGroup {
-    val firstDeclaration = group.firstOrNull() ?: return group
+private fun wasmTypeDeclarationOrderKey(
+    declaration: WasmTypeDeclaration,
+    resolver: (WasmHeapType.Type) -> WasmTypeDeclaration,
+): Int {
+    return when (declaration) {
+        is WasmArrayDeclaration -> 0
+        is WasmFunctionType -> 0
+        is WasmStructDeclaration ->
+            // Subtype depth
+            declaration.superType?.let { wasmTypeDeclarationOrderKey(resolver(it), resolver) + 1 } ?: 0
+    }
+}
 
-    val fingerprint = wasmDeclarationFingerprint(firstDeclaration, Hash128Bits(), visited = mutableSetOf())
+internal fun canonicalStableSort(
+    group: RecursiveTypeGroup,
+    resolver: (WasmHeapType.Type) -> WasmTypeDeclaration,
+    getStableId: (WasmStructDeclaration) -> Hash128Bits,
+) {
+    if (group.size == 1) return
 
-    val groupIndex = mixInIndexesForGroups[fingerprint]
-    if (groupIndex != null) {
-        val nextIndex = groupIndex + 1
-        mixInIndexesForGroups[fingerprint] = nextIndex
-        val mixIn = WasmStructDeclaration("mixin_$nextIndex", encodeIndex(nextIndex), null, true)
-        return group + mixIn
-    } else {
-        mixInIndexesForGroups[fingerprint] = 0
-        return group
+    group.sortWith(WasmTypeDeclaratorByFingerprint(resolver, getStableId))
+
+    val sortMethod = fun(declaration: WasmTypeDeclaration): Int = wasmTypeDeclarationOrderKey(declaration, resolver)
+    group.sortBy(sortMethod)
+}
+
+private class WasmTypeDeclaratorByFingerprint(
+    private val resolver: (WasmHeapType.Type) -> WasmTypeDeclaration,
+    private val getStableId: (WasmStructDeclaration) -> Hash128Bits,
+) : Comparator<WasmTypeDeclaration> {
+
+    companion object {
+        private val k0 = 0xc3a5c85c97cb3127U
+        private val k1 = 0xb492b66fbe98f273U
+        private val k2 = 0x9ae16a3b2f90404fU
+        private val k3 = 0xc949d7c7509e6557U
+
+        private val structHash = Hash128Bits(k0, k1)
+        private val function1Hash = Hash128Bits(k1, k2)
+        private val function2Hash = Hash128Bits(k2, k3)
+        private val arrayHash = Hash128Bits(k3, k0)
+    }
+
+    private fun combine(hash: Hash128Bits, type: WasmType): Hash128Bits {
+        val heapType = when (type) {
+            is WasmRefType -> type.getHeapType()
+            is WasmRefNullType -> type.getHeapType()
+            else -> return hash.combineWith(Hash128Bits(type.code.toULong()))
+        }
+
+        return when (heapType) {
+            is WasmHeapType.Type -> combine(hash, resolver(heapType))
+            is WasmHeapType.Simple -> hash.combineWith(Hash128Bits(heapType.code.toULong()))
+        }
+    }
+
+    private fun combine(hash: Hash128Bits, declaration: WasmTypeDeclaration): Hash128Bits = when (declaration) {
+        is WasmStructDeclaration ->
+            hash.combineWith(structHash).combineWith(getStableId(declaration))
+        is WasmFunctionType -> {
+            val functionHash = hash.combineWith(function1Hash)
+            val parametersHash = declaration.parameterTypes.fold(functionHash, ::combine)
+            val returnValuesHash = parametersHash.combineWith(function2Hash)
+            declaration.resultTypes.fold(returnValuesHash, ::combine)
+        }
+        is WasmArrayDeclaration -> {
+            val arrayHash = hash.combineWith(arrayHash)
+            combine(arrayHash, declaration.field.type)
+        }
+    }
+
+    private fun getFingerprint(type: WasmTypeDeclaration) =
+        combine(Hash128Bits(0UL, 0UL), type)
+
+    override fun compare(
+        o1: WasmTypeDeclaration,
+        o2: WasmTypeDeclaration,
+    ): Int {
+        val o1Hash = getFingerprint(o1)
+        val o2Hash = getFingerprint(o2)
+        return if (o1Hash.highBytes == o2Hash.highBytes) {
+            o1Hash.lowBytes.compareTo(o2Hash.lowBytes)
+        } else {
+            o1Hash.highBytes.compareTo(o2Hash.highBytes)
+        }
     }
 }

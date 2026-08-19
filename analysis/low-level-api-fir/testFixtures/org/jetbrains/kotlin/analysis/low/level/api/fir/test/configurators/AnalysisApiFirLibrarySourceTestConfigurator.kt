@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.analysis.api.impl.base.test.configurators.AnalysisAp
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.AnalysisApiServiceRegistrar
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.FirStandaloneServiceRegistrar
 import org.jetbrains.kotlin.analysis.low.level.api.fir.test.base.AnalysisApiFirTestServiceRegistrar
+import org.jetbrains.kotlin.analysis.low.level.api.fir.test.base.configureFirConsistencyChecks
+import org.jetbrains.kotlin.analysis.test.data.manager.withAdditionalVariant
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtLibrarySourceTestModuleFactory
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModuleFactory
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModuleStructure
@@ -23,17 +25,19 @@ import org.jetbrains.kotlin.analysis.test.framework.services.libraries.Dispatchi
 import org.jetbrains.kotlin.analysis.test.framework.services.libraries.TestModuleCompiler
 import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiMode
 import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfigurator
-import org.jetbrains.kotlin.analysis.test.framework.test.configurators.FrontendKind
+import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfigurator.Companion.defaultTargetPlatformValue
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.services.TestModuleStructure
 import org.jetbrains.kotlin.test.services.TestServices
-import org.jetbrains.kotlin.test.services.configuration.JsEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.JsFirstStageEnvironmentConfigurator
 
-object AnalysisApiFirLibrarySourceTestConfigurator : AnalysisApiTestConfigurator() {
+class AnalysisApiFirLibrarySourceTestConfigurator(override val defaultTargetPlatform: TargetPlatform = defaultTargetPlatformValue) :
+    AnalysisApiTestConfigurator {
     override val analyseInDependentSession: Boolean get() = false
     override val analysisApiMode: AnalysisApiMode get() = AnalysisApiMode.Ide
-    override val frontendKind: FrontendKind get() = FrontendKind.Fir
-    override val testPrefixes: List<String> get() = listOf("librarySource")
+    override val testPrefixes: List<String>
+        get() = super.testPrefixes.withAdditionalVariant("librarySource")
 
     override fun configureTest(
         builder: TestConfigurationBuilder,
@@ -45,8 +49,9 @@ object AnalysisApiFirLibrarySourceTestConfigurator : AnalysisApiTestConfigurator
             useAdditionalService { AnalysisApiIndexingConfiguration(AnalysisApiBinaryLibraryIndexingMode.INDEX_STUBS) }
             useConfigurators(
                 ::AnalysisApiJvmEnvironmentConfigurator,
-                ::JsEnvironmentConfigurator,
+                ::JsFirstStageEnvironmentConfigurator,
             )
+            configureFirConsistencyChecks()
         }
     }
 

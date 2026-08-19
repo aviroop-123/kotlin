@@ -8,6 +8,8 @@ implicit values:
       type: test/Child
     ownerSymbol = KaNamedClassSymbol:
       test/Child
+    label = Child
+
 
 scopes:
   LocalScope, index = 0
@@ -20,11 +22,15 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -53,8 +59,12 @@ scopes:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -78,8 +88,10 @@ scopes:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -98,8 +110,9 @@ scopes:
         hasSetter: false
         initializer: KaNonConstantInitializerValue(val constructorProp: Int)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -130,6 +143,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -160,8 +174,12 @@ scopes:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -185,8 +203,10 @@ scopes:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -205,8 +225,9 @@ scopes:
         hasSetter: false
         initializer: KaNonConstantInitializerValue(value)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -235,8 +256,12 @@ scopes:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -260,8 +285,10 @@ scopes:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -280,8 +307,9 @@ scopes:
         hasSetter: false
         initializer: KaNonConstantInitializerValue(val value: Int)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -312,6 +340,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -342,8 +371,12 @@ scopes:
           compilerVisibility: Private
           contextReceivers: []
           isActual: false
+          isCompanion: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
+          isNotDefault: false
           isVal: true
           location: PROPERTY
           modality: FINAL
@@ -367,8 +400,10 @@ scopes:
           contextReceivers: []
           hasStableParameterNames: true
           isActual: false
+          isCompanion: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isInline: false
           isNotDefault: false
           isOverride: false
@@ -387,8 +422,9 @@ scopes:
         hasSetter: false
         initializer: KaNonConstantInitializerValue(value)
         isActual: false
+        isCompanion: false
         isConst: false
-        isDelegatedProperty: false
+        isDelegated: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -419,6 +455,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -446,11 +483,15 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             generatedPrimaryConstructorProperty: null
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -477,6 +518,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -509,6 +551,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -540,8 +583,10 @@ scopes:
         contextReceivers: []
         hasStableParameterNames: true
         isActual: false
+        isCompanion: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isPrimary: true
         location: CLASS
         modality: FINAL
@@ -566,8 +611,12 @@ scopes:
                 compilerVisibility: Private
                 contextReceivers: []
                 isActual: false
+                isCompanion: false
+                isDelegated: false
                 isExpect: false
                 isExtension: false
+                isExternal: false
+                isNotDefault: false
                 isVal: true
                 location: PROPERTY
                 modality: FINAL
@@ -591,8 +640,10 @@ scopes:
                 contextReceivers: []
                 hasStableParameterNames: true
                 isActual: false
+                isCompanion: false
                 isExpect: false
                 isExtension: false
+                isExternal: false
                 isInline: false
                 isNotDefault: false
                 isOverride: false
@@ -611,8 +662,9 @@ scopes:
               hasSetter: false
               initializer: KaNonConstantInitializerValue(val constructorProp: Int)
               isActual: false
+              isCompanion: false
               isConst: false
-              isDelegatedProperty: false
+              isDelegated: false
               isExpect: false
               isExtension: false
               isExternal: false
@@ -633,11 +685,15 @@ scopes:
               setter: null
               typeParameters: []
               visibility: PUBLIC
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -658,11 +714,15 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             generatedPrimaryConstructorProperty: null
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -680,13 +740,13 @@ scopes:
         ]
         visibility: PUBLIC
 
-  ExplicitSimpleImportingScope, index = 2
+  ExplicitSimpleImportingScope, index = 3
     packages: 0
     classifiers: 0
     callables: 0
     constructors: 0
 
-  PackageMemberScope, index = 3
+  PackageMemberScope, index = 4
     packages: 0
     classifiers: 2
       KaNamedClassSymbol:
@@ -744,15 +804,14 @@ scopes:
     callables: 0
     constructors: 0
 
-  DefaultSimpleImportingScope, index = 4
-
   DefaultSimpleImportingScope, index = 5
 
-  ExplicitStarImportingScope, index = 6
+  DefaultSimpleImportingScope, index = 6
+
+  ExplicitStarImportingScope, index = 7
     packages: 0
     classifiers: 0
     callables: 0
     constructors: 0
 
-  DefaultStarImportingScope, index = 7
-
+  DefaultStarImportingScope, index = 8

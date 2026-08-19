@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// SKIP_TXT
 open class BaseWithPrivate {
     private companion object {
         val X: Int = 1
@@ -18,7 +17,7 @@ class Derived : Base() {
         object : BaseWithPrivate() {
             fun bar() {
                 X.length
-                <!INVISIBLE_MEMBER!>Y<!>.hashCode()
+                <!INVISIBLE_REFERENCE!>Y<!>.hashCode()
             }
         }
     }

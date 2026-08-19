@@ -10,19 +10,31 @@ import org.jetbrains.kotlin.buildtools.api.ExecutionPolicy
 import org.jetbrains.kotlin.buildtools.api.KotlinLogger
 import org.jetbrains.kotlin.buildtools.api.ProjectId
 import org.jetbrains.kotlin.buildtools.api.trackers.BuildMetricsCollector
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-internal abstract class BuildOperationImpl<R> : BuildOperation<R> {
-    private val options: Options = Options(BuildOperation::class)
+@OptIn(ExperimentalAtomicApi::class)
+internal abstract class BuildOperationImpl<R> : BuildOperation<R>, BuildOperation.Builder {
+    protected abstract val options: Options
+    private val executionStarted = AtomicBoolean(false)
 
     @UseFromImplModuleRestricted
     override fun <V> get(key: BuildOperation.Option<V>): V = options[key.id]
 
     @UseFromImplModuleRestricted
     override fun <V> set(key: BuildOperation.Option<V>, value: V) {
+        checkOptionIsAvailableForVersion(key)
         options[key] = value
     }
 
-    abstract fun execute(projectId: ProjectId, executionPolicy: ExecutionPolicy, logger: KotlinLogger? = null): R
+    fun execute(projectId: ProjectId, executionPolicy: ExecutionPolicy, logger: KotlinLogger? = null): R {
+        check(executionStarted.compareAndSet(expectedValue = false, newValue = true)) {
+            "Build operation $this already started execution."
+        }
+        return executeImpl(projectId, executionPolicy, logger)
+    }
+
+    abstract fun executeImpl(projectId: ProjectId, executionPolicy: ExecutionPolicy, logger: KotlinLogger? = null): R
 
     operator fun <V> get(key: Option<V>): V = options[key]
 
@@ -31,12 +43,11 @@ internal abstract class BuildOperationImpl<R> : BuildOperation<R> {
         options[key] = value
     }
 
-    class Option<V> : BaseOptionWithDefault<V> {
-        constructor(id: String) : super(id)
-        constructor(id: String, default: V) : super(id, default = default)
-    }
+    class Option<V>(id: String, default: V) : BaseOptionWithDefault<V>(id, defaultValue = default)
 
     companion object {
         val METRICS_COLLECTOR: Option<BuildMetricsCollector?> = Option("METRICS_COLLECTOR", default = null)
+        val XX_KGP_METRICS_COLLECTOR: Option<Boolean> = Option("XX_KGP_METRICS_COLLECTOR", default = false)
+        val XX_KGP_METRICS_COLLECTOR_OUT: Option<ByteArray?> = Option("XX_KGP_METRICS_COLLECTOR_OUT", default = null)
     }
 }

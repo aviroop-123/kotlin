@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.resolve.constants.evaluate
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.TypeConversionUtil
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.StandardNames
@@ -55,6 +56,7 @@ import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.exceptions.rethrowIntellijPlatformExceptionIfNeeded
 import java.math.BigInteger
 
+@K1Deprecation
 class ConstantExpressionEvaluator(
     internal val module: ModuleDescriptor,
     internal val languageVersionSettings: LanguageVersionSettings,
@@ -85,7 +87,7 @@ class ConstantExpressionEvaluator(
         trace: BindingTrace
     ): Map<Name, ConstantValue<*>> {
         val arguments = HashMap<Name, ConstantValue<*>>()
-        for ((parameterDescriptor, resolvedArgument) in resolvedCall.valueArguments.entries) {
+        for ([parameterDescriptor, resolvedArgument] in resolvedCall.valueArguments.entries) {
             val value = getAnnotationArgumentValue(trace, parameterDescriptor, resolvedArgument)
             if (value != null) {
                 arguments[parameterDescriptor.name] = value
@@ -164,7 +166,7 @@ class ConstantExpressionEvaluator(
         // array(1, <!>null<!>, 3) - error should be reported on inner expression
         val callArguments = when (argumentExpression) {
             is KtCallExpression -> getArgumentExpressionsForArrayCall(argumentExpression, trace)
-            is KtCollectionLiteralExpression -> getArgumentExpressionsForCollectionLiteralCall(argumentExpression, trace)
+            is KtCollectionLiteralExpression -> getArgumentExpressionsForCollectionLiteral(argumentExpression, trace)
             else -> null
         }
 
@@ -214,7 +216,7 @@ class ConstantExpressionEvaluator(
         return getArgumentExpressionsForArrayLikeCall(resolvedCall)
     }
 
-    private fun getArgumentExpressionsForCollectionLiteralCall(
+    private fun getArgumentExpressionsForCollectionLiteral(
         expression: KtCollectionLiteralExpression,
         trace: BindingTrace
     ): List<KtExpression>? {
@@ -228,7 +230,7 @@ class ConstantExpressionEvaluator(
         }
 
         val result = arrayListOf<KtExpression>()
-        for ((_, resolvedValueArgument) in resolvedCall.valueArguments) {
+        for ([_, resolvedValueArgument] in resolvedCall.valueArguments) {
             for (valueArgument in resolvedValueArgument.arguments) {
                 val valueArgumentExpression = valueArgument.getArgumentExpression()
                 if (valueArgumentExpression != null) {
@@ -492,7 +494,12 @@ private class ConstantExpressionEvaluatorVisitor(
         if (nodeElementType == KtNodeTypes.NULL) return NullValue().wrap()
 
         val result: Any = when (nodeElementType) {
-            KtNodeTypes.INTEGER_CONSTANT, KtNodeTypes.FLOAT_CONSTANT -> parseNumericLiteral(text, nodeElementType)
+            KtNodeTypes.INTEGER_CONSTANT, KtNodeTypes.FLOAT_CONSTANT -> {
+                if (nodeElementType == KtNodeTypes.INTEGER_CONSTANT && hasLeadingZeros(text)) {
+                    trace.report(Errors.INT_LITERAL_WITH_LEADING_ZEROS.on(expression))
+                }
+                parseNumericLiteral(text, nodeElementType)
+            }
             KtNodeTypes.BOOLEAN_CONSTANT -> parseBoolean(text)
             KtNodeTypes.CHARACTER_CONSTANT -> CompileTimeConstantChecker.parseChar(expression)
             else -> throw IllegalArgumentException("Unsupported constant: $expression")
@@ -534,6 +541,10 @@ private class ConstantExpressionEvaluatorVisitor(
                 isConvertableConstVal = false
             )
         )
+    }
+
+    private fun hasLeadingZeros(text: String): Boolean {
+        return text.length > 1 && text[0] == '0' && text[1].let { it.isDigit() || it == '_' }
     }
 
     override fun visitParenthesizedExpression(expression: KtParenthesizedExpression, expectedType: KotlinType?): CompileTimeConstant<*>? {
@@ -700,7 +711,7 @@ private class ConstantExpressionEvaluatorVisitor(
                 )
             )
         } else if (argumentsEntrySet.size == 1) {
-            val (parameter, argument) = argumentsEntrySet.first()
+            val [parameter, argument] = argumentsEntrySet.first()
             val argumentForParameter = createOperationArgumentForFirstParameter(argument, parameter) ?: return null
             if (isStandaloneOnlyConstant(argumentForParameter.expression)) {
                 return null
@@ -1192,6 +1203,7 @@ private fun createCompileTimeConstantForCompareTo(result: Any?, operationReferen
     return null
 }
 
+@K1Deprecation
 fun isIntegerType(value: Any?) = value is Byte || value is Short || value is Int || value is Long
 
 private fun getReceiverExpressionType(resolvedCall: ResolvedCall<*>): KotlinType? {
@@ -1203,10 +1215,12 @@ private fun getReceiverExpressionType(resolvedCall: ResolvedCall<*>): KotlinType
     }
 }
 
+@K1Deprecation
 fun ConstantValue<*>.isStandaloneOnlyConstant(): Boolean {
     return this is KClassValue || this is EnumValue || this is AnnotationValue || this is ArrayValue
 }
 
+@K1Deprecation
 fun CompileTimeConstant<*>.isStandaloneOnlyConstant(): Boolean {
     return when (this) {
         is TypedCompileTimeConstant -> this.constantValue.isStandaloneOnlyConstant()
@@ -1236,31 +1250,28 @@ private fun typeStrToCompileTimeType(str: String) = when (str) {
     else -> throw IllegalArgumentException("Unsupported type: $str")
 }
 
-fun evaluateUnary(name: String, typeStr: String, value: Any): Any? =
-    evalUnaryOp(name, typeStrToCompileTimeType(typeStr), value)
+// K1 will not support the new intrinsic const functions since we are planning on deprecating that frontend soon (KT-75372).
+// The functions must be explicitly excluded as otherwise K1 would evaluate them even if the IntrinsicConstFlag is disabled.
+private val FORBIDDEN_FUNCTIONS = listOf(
+    "Char(INT)",
+    "BYTE.dec()", "SHORT.dec()", "INT.dec()", "LONG.dec()",
+    "BYTE.inc()", "SHORT.inc()", "INT.inc()", "LONG.inc()",
+    "BYTE.and(BYTE)", "SHORT.and(SHORT)",
+    "BYTE.or(BYTE)", "SHORT.or(SHORT)",
+    "BYTE.xor(BYTE)", "SHORT.xor(SHORT)",
+    "BYTE.inv()", "SHORT.inv()",
+    "STRING.uppercase()", "STRING.lowercase()",
+    "STRING.trim()", "STRING.trimEnd()",  "STRING.trimIndent()", "STRING.trimMargin()", "STRING.trimMargin(STRING)", "STRING.trimStart()"
+)
 
-private fun evaluateUnaryAndCheck(name: String, type: CompileTimeType, value: Any, reportIntegerOverflow: () -> Unit): Any? =
-    evalUnaryOp(name, type, value).also { result ->
+private fun evaluateUnaryAndCheck(name: String, type: CompileTimeType, value: Any, reportIntegerOverflow: () -> Unit): Any? {
+    val signature = "${type.name}.$name()"
+    if (signature in FORBIDDEN_FUNCTIONS) return null
+
+    return evalUnaryOp(name, type, value).also { result ->
         if (isIntegerType(value) && (name == "minus" || name == "unaryMinus") && value == result && !isZero(value)) {
             reportIntegerOverflow()
         }
-    }
-
-fun evaluateBinary(
-    name: String,
-    receiverTypeStr: String,
-    receiverValue: Any,
-    parameterTypeStr: String,
-    parameterValue: Any
-): Any? {
-    val receiverType = typeStrToCompileTimeType(receiverTypeStr)
-    val parameterType = typeStrToCompileTimeType(parameterTypeStr)
-
-    return try {
-        evalBinaryOp(name, receiverType, receiverValue, parameterType, parameterValue)
-    } catch (e: Exception) {
-        rethrowIntellijPlatformExceptionIfNeeded(e)
-        null
     }
 }
 
@@ -1272,6 +1283,9 @@ private fun evaluateBinaryAndCheck(
     parameterValue: Any,
     reportIntegerOverflow: () -> Unit,
 ): Any? {
+    val signature = "${receiverType.name}.$name(${parameterType.name})"
+    if (signature in FORBIDDEN_FUNCTIONS) return null
+
     val actualResult = try {
         evalBinaryOp(name, receiverType, receiverValue, parameterType, parameterValue)
     } catch (e: Exception) {

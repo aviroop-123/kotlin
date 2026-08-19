@@ -5,8 +5,8 @@
 
 package org.jetbrains.kotlinx.serialization
 
-import org.jetbrains.kotlin.generators.TestGroup
-import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
+import org.jetbrains.kotlin.generators.dsl.TestGroup
+import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 import org.jetbrains.kotlin.generators.model.annotation
 import org.jetbrains.kotlin.generators.tests.klibIrInliner
 import org.jetbrains.kotlin.generators.tests.provider
@@ -14,7 +14,6 @@ import org.jetbrains.kotlin.generators.tests.standalone
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil
 import org.jetbrains.kotlin.konan.test.blackbox.AbstractNativeCodegenBoxTest
 import org.jetbrains.kotlin.konan.test.blackbox.support.group.UseExtTestCaseGroupProvider
-import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlinx.serialization.matrix.cases.enumsTestMatrix
 import org.jetbrains.kotlinx.serialization.matrix.testMatrix
 import org.jetbrains.kotlinx.serialization.runners.*
@@ -31,10 +30,6 @@ fun main(args: Array<String>) {
             "plugins/kotlinx-serialization/testData"
         ) {
             // ------------------------------- diagnostics -------------------------------
-            testClass<AbstractSerializationPluginDiagnosticTest>() {
-                model("diagnostics", excludedPattern = excludedFirTestdataPattern)
-            }
-
             testClass<AbstractSerializationFirPsiDiagnosticTest> {
                 model("diagnostics", excludedPattern = excludedFirTestdataPattern)
                 model("firMembers")
@@ -42,61 +37,45 @@ fun main(args: Array<String>) {
 
             // ------------------------------- asm instructions -------------------------------
 
-            testClass<AbstractSerializationIrAsmLikeInstructionsListingTest> {
-                model("codegen")
-            }
-
             testClass<AbstractSerializationFirLightTreeAsmLikeInstructionsListingTest> {
                 model("codegen")
             }
 
             // ------------------------------- box -------------------------------
 
-            testClass<AbstractSerializationIrBoxTest> {
-                model("boxIr")
-            }
-
             testClass<AbstractSerializationFirLightTreeBlackBoxTest> {
                 model("boxIr")
                 model("firMembers")
-            }
-
-            testClass<AbstractSerializationJdk11IrBoxTest> {
-                model("jdk11BoxIr")
             }
 
             testClass<AbstractSerializationJdk11FirLightTreeBoxTest> {
                 model("jdk11BoxIr")
             }
 
-            testClass<AbstractSerializationWithoutRuntimeIrBoxTest> {
-                model("boxWithoutRuntime")
-            }
-
             testClass<AbstractSerializationWithoutRuntimeFirLightTreeBoxTest> {
                 model("boxWithoutRuntime")
             }
 
-            testClass<AbstractSerializationFirJsBoxTest> {
+            testClass<AbstractSerializationJsBoxTest> {
                 model("boxIr")
             }
 
-            testClass<AbstractSerializationFirJsBoxWithInlinedFunInKlibTest> {
+            testClass<AbstractSerializationJsBoxWithInlinedFunInKlibTest> {
                 model("boxIr")
             }
 
             // Serialization compiler plugin native tests.
             testClass<AbstractNativeCodegenBoxTest>(
                 suiteTestClassName = "SerializationNativeTestGenerated",
-                annotations = listOf(*standalone(), *serializationNative(), provider<UseExtTestCaseGroupProvider>())
+                annotations = listOf(standalone(), *serializationNative(), provider<UseExtTestCaseGroupProvider>())
             ) {
-                model("boxIr", targetBackend = TargetBackend.NATIVE)
+                model("boxIr")
             }
             testClass<AbstractNativeCodegenBoxTest>(
                 suiteTestClassName = "SerializationNativeWithInlinedFunInKlibTestGenerated",
-                annotations = listOf(*standalone(), klibIrInliner(), *serializationNative(), provider<UseExtTestCaseGroupProvider>())
+                annotations = listOf(standalone(), klibIrInliner(), *serializationNative(), provider<UseExtTestCaseGroupProvider>())
             ) {
-                model("boxIr", targetBackend = TargetBackend.NATIVE)
+                model("boxIr")
             }
 
             // ------------------------------- code compile -------------------------------

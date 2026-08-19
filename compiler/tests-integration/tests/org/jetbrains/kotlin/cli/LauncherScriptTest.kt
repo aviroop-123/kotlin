@@ -18,13 +18,20 @@ package org.jetbrains.kotlin.cli
 
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
+import kotlinx.metadata.klib.KlibMetadataVersion
+import kotlinx.metadata.klib.KlibModuleMetadata
+import kotlin.metadata.isExpect
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.KotlinWasmCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.cliArgument
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.LanguageVersion
+import org.jetbrains.kotlin.library.components.metadata
+import org.jetbrains.kotlin.library.loader.KlibLoader
 import org.jetbrains.kotlin.test.CompilerTestUtil
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.TestCaseWithTmpdir
@@ -71,8 +78,8 @@ class LauncherScriptTest : TestCaseWithTmpdir() {
         process.waitFor(10, TimeUnit.SECONDS)
         val exitCode = process.exitValue()
         try {
-            assertEquals(expectedStdout, stdout)
-            assertEquals(expectedStderr, stderr)
+            assertEquals(expectedStdout.trim(), stdout.trim())
+            assertEquals(expectedStderr.trim(), stderr.trim())
             assertEquals(expectedExitCode, exitCode)
         } catch (e: Throwable) {
             System.err.println("exit code $exitCode")
@@ -95,10 +102,10 @@ class LauncherScriptTest : TestCaseWithTmpdir() {
     }
 
     private val testDataDirectory: String
-        get() = KtTestUtil.getTestDataPathBase() + "/launcher"
+        get() = ForTestCompileRuntime.transformTestDataPath("compiler/tests-integration/testData/launcher").absolutePath
 
     private fun kotlincInProcess(vararg args: String) {
-        val (output, exitCode) = AbstractCliTest.executeCompilerGrabOutput(K2JVMCompiler(), args.toList())
+        val [output, exitCode] = AbstractCliTest.executeCompilerGrabOutput(K2JVMCompiler(), args.toList())
         if (exitCode != ExitCode.OK) error("Failed to compile: ${args.joinToString(" ")}\nOutput:\n$output")
     }
 
@@ -151,7 +158,7 @@ class LauncherScriptTest : TestCaseWithTmpdir() {
             K2JSCompilerArguments::suppressWarnings.cliArgument,
             K2JSCompilerArguments::libraries.cliArgument,
             PathUtil.kotlinPathsForCompiler.jsStdLibKlibPath.absolutePath,
-            K2JSCompilerArguments::irProduceKlibDir.cliArgument,
+            K2JSCompilerArguments::nopack.cliArgument,
             K2JSCompilerArguments::outputDir.cliArgument,
             tmpdir.path,
             K2JSCompilerArguments::moduleName.cliArgument,
@@ -159,6 +166,30 @@ class LauncherScriptTest : TestCaseWithTmpdir() {
             environment = mapOf("JAVA_HOME" to KtTestUtil.getJdk8Home().absolutePath)
         )
     }
+
+    fun testKotlincWasmJsSimple() = testKotlincWasmSimple(target = "wasm-js")
+
+    fun testKotlincWasmWasiSimple() = testKotlincWasmSimple(target = "wasm-wasi")
+
+    private fun testKotlincWasmSimple(target: String) {
+        val stdlib = when (target) {
+            "wasm-wasi" -> PathUtil.kotlinPathsForCompiler.wasmWasiStdLibKlibPath.absolutePath
+            "wasm-js" -> PathUtil.kotlinPathsForCompiler.wasmJsStdLibKlibPath.absolutePath
+            else -> throw IllegalArgumentException("Illegal target specification: $target")
+        }
+        runProcess(
+            "kotlinc-wasm",
+            "$testDataDirectory/emptyMain.kt",
+            KotlinWasmCompilerArguments::suppressWarnings.cliArgument,
+            KotlinWasmCompilerArguments::libraries.cliArgument(stdlib),
+            KotlinWasmCompilerArguments::nopack.cliArgument,
+            KotlinWasmCompilerArguments::outputDir.cliArgument(tmpdir.path),
+            KotlinWasmCompilerArguments::moduleName.cliArgument("out"),
+            KotlinWasmCompilerArguments::wasmTarget.cliArgument(target),
+            environment = mapOf("JAVA_HOME" to KtTestUtil.getJdk8Home().absolutePath)
+        )
+    }
+
 
     fun testKotlinNoReflect() {
         kotlincInProcess("$testDataDirectory/reflectionUsage.kt", K2JVMCompilerArguments::destination.cliArgument, tmpdir.path)
@@ -282,10 +313,11 @@ class LauncherScriptTest : TestCaseWithTmpdir() {
         runProcess(
             "kotlin", "-no-stdlib", "-e", "println(42)",
             expectedExitCode = 1,
-            expectedStderr = """script.kts:1:1: error: unresolved reference 'println'.
-println(42)
-^
-"""
+            expectedStderr = """
+                script.kts:1:1: error: unresolved reference 'println'.
+                println(42)
+                ^
+                """.trimIndent()
         )
     }
 
@@ -337,16 +369,18 @@ println(42)
             ".kts",
             "$testDataDirectory/noInline.myscript",
             expectedExitCode = 1,
-            expectedStderr = """compiler/testData/launcher/noInline.myscript:1:7: error: unresolved reference 'CompilerOptions'.
+            expectedStderr = """compiler/tests-integration/testData/launcher/noInline.myscript:1:7: error: unresolved reference 'CompilerOptions'.
 @file:CompilerOptions("-Xno-inline")
       ^
 """
         )
         runProcess(
-            "kotlin", "-howtorun", ".main.kts", "$testDataDirectory/noInline.myscript",
+            "kotlin", "-howtorun", ".main.kts",
+            "-P", "plugin:kotlin.scripting:disable-script-compilation-cache=true",
+            "$testDataDirectory/noInline.myscript",
             expectedExitCode = 3,
-            expectedStderr = """java.lang.IllegalAccessError: tried to access method kotlin.io.ConsoleKt.println(Ljava/lang/Object;)V from class NoInline_main
-	at NoInline_main.<init>(noInline.myscript:3)
+            expectedStderr = """java.lang.IllegalAccessError: tried to access method kotlin.io.ConsoleKt.println(Ljava/lang/Object;)V from class NoInline
+	at NoInline.<init>(noInline.myscript:3)
 """
         )
     }
@@ -643,10 +677,10 @@ Caused by: java.lang.AssertionError: assert
             "kotlinc", "-Dkotlin.colors.enabled=always", testKt.absolutePath, K2JVMCompilerArguments::destination.cliArgument, tmpdir.path,
             expectedExitCode = 1,
             expectedStdout = "",
-            expectedStderr = """
-                ${"\$TMP_DIR\$"}/test.kt:1:22: [1;31merror: [0;1minitializer type mismatch: expected 'String', actual 'Int'.[m
+            expectedStderr = $$"""
+                $TMP_DIR$/test.kt:1:20: [1;31merror: [0;1minitializer type mismatch: expected 'String', actual 'Int'.[m
                 val result: String = 42
-                                     ^^
+                                   ^
                 
             """.trimIndent(),
         )
@@ -654,10 +688,115 @@ Caused by: java.lang.AssertionError: assert
 
     fun testKaptVersion() {
         val info = $$"info: kotlinc-jvm $VERSION$ (JRE $JVM_VERSION$)\n"
-        val k1 = "warning: language version 1.9 is deprecated and its support will be removed in a future version of Kotlin\n"
-
         runProcess("kapt", "-version", expectedStderr = info)
-        runProcess("kapt", "-language-version", "1.9", "-version", expectedStderr = info + k1)
-        runProcess("kapt", "-language-version=1.9", "-version", expectedStderr = info + k1)
+    }
+
+    fun testCommonFragmentsMetadataDestination() {
+        val metadataDir = compileSimpleCommonPlatformProject()
+
+        val library = KlibLoader { libraryPaths(metadataDir.resolve("common").absolutePath) }.load().librariesStdlibFirst.single()
+        val klibMetadata = library.metadata
+        val module = KlibModuleMetadata.readStrict(object : KlibModuleMetadata.MetadataLibraryProvider {
+            override val moduleHeaderData: ByteArray = klibMetadata.moduleHeaderData
+            override val metadataVersion: KlibMetadataVersion =
+                KlibMetadataVersion(library.versions.metadataVersion!!.toArray())
+
+            override fun packageMetadataParts(fqName: String): Set<String> =
+                klibMetadata.getPackageFragmentNames(fqName)
+
+            override fun packageMetadata(fqName: String, partName: String): ByteArray =
+                klibMetadata.getPackageFragment(fqName, partName)
+        })
+
+        val someClass = module.fragments.flatMap { it.classes }.singleOrNull { it.name == "Some" }
+        assertNotNull("Class 'Some' must be present in the common-fragments metadata", someClass)
+        requireNotNull(someClass)
+        assertTrue("Class 'Some' must be marked as expect", someClass.isExpect)
+        assertTrue(someClass.functions.any { it.name == "foo" })
+        assertFalse(someClass.functions.any { it.name == "bar" })
+    }
+
+    /*
+     * Ideally, the JVM KMP IC should be tested using IC test infrastructure, but
+     * until the BTA part is implemented, this test is the best effort of testing
+     * the compiler behavior
+     */
+    fun testDummyFragmentIncrementalClasspathTest() {
+        val metadataDir = compileSimpleCommonPlatformProject()
+        val newCommonKt = tmpdir.resolve("new-common.kt").apply {
+            writeText(
+                """
+                    fun test(x: Some) {
+                        x.foo() // should be visible
+                        x.bar() // should not be visible
+                        baz() // should be visible
+                    }
+                """.trimIndent()
+            )
+        }
+        val newClassesDir = tmpdir.resolve("new-classes")
+        runProcess(
+            "kotlinc-jvm",
+            newCommonKt.absolutePath,
+            K2JVMCompilerArguments::destination.cliArgument, newClassesDir.absolutePath,
+            K2JVMCompilerArguments::multiPlatform.cliArgument,
+            K2JVMCompilerArguments::expectActualClasses.cliArgument,
+            K2JVMCompilerArguments::incrementalCompilation.cliArgument,
+            K2JVMCompilerArguments::fragments.cliArgument("common,platform"),
+            K2JVMCompilerArguments::fragmentSources.cliArgument("common:${newCommonKt.absolutePath}"),
+            K2JVMCompilerArguments::fragmentRefines.cliArgument("platform:common"),
+            K2JVMCompilerArguments::fragmentIncrementalClasspath.cliArgument("common:${metadataDir.resolve("common").absolutePath}"),
+
+            expectedExitCode = 1,
+            expectedStderr = $$"""
+                $TMP_DIR$/new-common.kt:3:7: error: unresolved reference 'bar' on receiver of type 'Some'.
+                    x.bar() // should not be visible
+                      ^^^
+            """.trimIndent()
+        )
+    }
+
+    /**
+     * @return metadata output directory
+     */
+    private fun compileSimpleCommonPlatformProject(): File {
+        val commonKt = tmpdir.resolve("common.kt").apply {
+            writeText(
+                """
+                    expect class Some {
+                        fun foo()
+                    }
+                    
+                    internal fun baz() {}
+                """.trimIndent()
+            )
+        }
+        val platformKt = tmpdir.resolve("platform.kt").apply {
+            writeText(
+                """
+                    actual class Some {
+                        actual fun foo() {}
+                        fun bar() {}
+                    }
+                """.trimIndent()
+            )
+        }
+
+        val classesDir = tmpdir.resolve("classes")
+        val metadataDir = tmpdir.resolve("common-metadata")
+
+        runProcess(
+            "kotlinc-jvm",
+            commonKt.absolutePath,
+            platformKt.absolutePath,
+            K2JVMCompilerArguments::destination.cliArgument, classesDir.absolutePath,
+            K2JVMCompilerArguments::multiPlatform.cliArgument,
+            K2JVMCompilerArguments::expectActualClasses.cliArgument,
+            K2JVMCompilerArguments::fragments.cliArgument("common,platform"),
+            K2JVMCompilerArguments::fragmentSources.cliArgument("common:${commonKt.absolutePath},platform:${platformKt.absolutePath}"),
+            K2JVMCompilerArguments::fragmentRefines.cliArgument("platform:common"),
+            K2JVMCompilerArguments::commonFragmentsMetadataDestination.cliArgument(metadataDir.absolutePath),
+        )
+        return metadataDir
     }
 }

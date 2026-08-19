@@ -14,7 +14,6 @@ import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.isVisible
-import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.fir.resolve.toClassLikeSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.canBeNull
@@ -59,14 +58,19 @@ sealed class FirExtensionShadowedByMemberChecker(kind: MppCheckerKind) : FirCall
             ?.toClassLikeSymbol()
             ?.fullyExpandedClass()
             ?: return
-        val scope = receiverSymbol.unsubstitutedScope()
+
+        val scope = if (declaration.isCompanionExtension) {
+            receiverSymbol.staticScope(context) ?: return
+        } else {
+            receiverSymbol.unsubstitutedScope()
+        }
 
         val shadowingMember = when (declaration) {
             is FirVariable -> findFirstSymbolByCondition<FirVariableSymbol<*>>(
                 condition = { it.isVisible() && !it.isExtension },
                 processMembers = { scope.processPropertiesByName(declaration.name, it) },
             )
-            is FirSimpleFunction -> findFirstSymbolByCondition<FirNamedFunctionSymbol>(
+            is FirNamedFunction -> findFirstSymbolByCondition<FirNamedFunctionSymbol>(
                 condition = { it.isVisible() && it.shadows(declaration.symbol) },
                 processMembers = { scope.processFunctionsByName(declaration.name, it) },
             )
@@ -82,13 +86,13 @@ sealed class FirExtensionShadowedByMemberChecker(kind: MppCheckerKind) : FirCall
             }
         }
 
-        if (declaration !is FirSimpleFunction) {
+        if (declaration !is FirNamedFunction) {
             return
         }
 
         val shadowingSymbols = findFirstNotNullSymbol(
             transform = { property ->
-                if (!property.isVisible()) {
+                if (!property.isVisible() || property.isExtension || property.hasContextParameters) {
                     return@findFirstNotNullSymbol null
                 }
 
@@ -107,7 +111,7 @@ sealed class FirExtensionShadowedByMemberChecker(kind: MppCheckerKind) : FirCall
             processMembers = { scope.processPropertiesByName(declaration.name, it) },
         )
 
-        val (shadowingInvoke, shadowingProperty) = shadowingSymbols ?: return
+        val [shadowingInvoke, shadowingProperty] = shadowingSymbols ?: return
 
         reporter.reportOn(
             declaration.source,
@@ -158,7 +162,6 @@ sealed class FirExtensionShadowedByMemberChecker(kind: MppCheckerKind) : FirCall
     private fun FirFunctionSymbol<*>.shadows(extension: FirFunctionSymbol<*>): Boolean {
         if (isExtension) return false
 
-        if (extension.contextParameterSymbols.size != contextParameterSymbols.size) return false
         if (extension.valueParameterSymbols.size != valueParameterSymbols.size) return false
         if (extension.varargParameterPosition != varargParameterPosition) return false
         if (extension.isOperator && !isOperator) return false
@@ -177,10 +180,7 @@ sealed class FirExtensionShadowedByMemberChecker(kind: MppCheckerKind) : FirCall
         }
 
         val helper = context.session.declarationOverloadabilityHelper
-        val memberSignature = helper.createSignature(this)
-        val extensionSignature = helper.createSignatureForPossiblyShadowedExtension(extension)
-
-        return helper.isEquallyOrMoreSpecific(extensionSignature, memberSignature)
+        return helper.isExtensionShadowedByMember(extension, this)
     }
 
     private val FirFunctionSymbol<*>.varargParameterPosition: Int

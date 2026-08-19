@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.IrArrayBuilder
 import org.jetbrains.kotlin.backend.jvm.ir.createJvmIrBuilder
@@ -29,10 +29,7 @@ import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
 /**
  * Replaces varargs with array arguments, and lowers [arrayOf] and [emptyArray] calls.
  */
-@PhaseDescription(
-    name = "VarargLowering",
-    prerequisite = [PolymorphicSignatureLowering::class],
-)
+@PhasePrerequisites(PolymorphicSignatureLowering::class)
 internal class VarargLowering(val context: JvmBackendContext) : FileLoweringPass, IrElementTransformerVoidWithContext() {
     override fun lower(irFile: IrFile) = irFile.transformChildrenVoid()
 
@@ -50,7 +47,7 @@ internal class VarargLowering(val context: JvmBackendContext) : FileLoweringPass
 
         // Replace empty varargs with empty arrays
         val irFunction = function.owner
-        for ((parameter, argument) in irFunction.parameters zip expression.arguments) {
+        for ([parameter, argument] in irFunction.parameters zip expression.arguments) {
             if (argument != null) continue
 
             if (parameter.varargElementType != null && !parameter.hasDefaultValue()) {

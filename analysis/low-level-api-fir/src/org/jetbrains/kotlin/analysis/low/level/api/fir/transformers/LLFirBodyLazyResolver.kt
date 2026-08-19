@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -21,10 +21,10 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve.LLFirPhaseUp
 import org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure.llFirModuleData
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.*
 import org.jetbrains.kotlin.fir.*
-import org.jetbrains.kotlin.fir.analysis.checkers.declaration.isLocalMember
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.utils.evaluatedInitializer
 import org.jetbrains.kotlin.fir.declarations.utils.getExplicitBackingField
-import org.jetbrains.kotlin.fir.declarations.utils.isNonLocal
+import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.builder.buildLazyDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.expressions.builder.buildMultiDelegatedConstructorCall
@@ -50,13 +50,11 @@ import org.jetbrains.kotlin.fir.scopes.DelicateScopeAPI
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
-import org.jetbrains.kotlin.fir.types.isResolved
+import org.jetbrains.kotlin.fir.types.hasResolvedType
 import org.jetbrains.kotlin.fir.utils.exceptions.withFirEntry
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.psi
-import org.jetbrains.kotlin.psi.KtCodeFragment
-import org.jetbrains.kotlin.psi.KtElement
-import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.utils.exceptions.checkWithAttachment
 import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
 import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
@@ -308,11 +306,7 @@ private class FirPartialBodyExpressionResolveTransformer(
         private fun shouldBeHandled(element: FirElement): Boolean {
             /** Accepts elements handled by [org.jetbrains.kotlin.fir.resolve.dfa.FirLocalVariableAssignmentAnalyzer] */
             val isElementKindHandled = when (element) {
-                is FirDeclaration -> {
-                    // 'isNonLocal' checks whether a declaration parent is also non-local.
-                    // However, 'isNonLocal' doesn't work for anonymous functions, as 'CallableId's for them are non-local, ooh.
-                    element.isLocalMember || !element.isNonLocal
-                }
+                is FirDeclaration -> element.isLocal
                 is FirLoop -> true
                 else -> false
             }
@@ -615,7 +609,7 @@ private class LLFirBodyTargetResolver(target: LLFirResolveTarget) : LLFirAbstrac
     override fun doResolveWithoutLock(target: FirElementWithResolveState): Boolean {
         when (target) {
             is FirRegularClass -> {
-                if (target.resolvePhase >= resolverPhase) return true
+                if (checkAnalysisReadiness(target, containingDeclarations, resolverPhase)) return true
 
                 // resolve class CFG graph here, to do this we need to have property & init blocks resoled
                 resolveMembersForControlFlowGraph(
@@ -633,7 +627,7 @@ private class LLFirBodyTargetResolver(target: LLFirResolveTarget) : LLFirAbstrac
             }
 
             is FirFile -> {
-                if (target.resolvePhase >= resolverPhase) return true
+                if (checkAnalysisReadiness(target, containingDeclarations, resolverPhase)) return true
 
                 // resolve file CFG graph here, to do this we need to have property blocks resoled
                 resolveMembersForControlFlowGraph(
@@ -651,7 +645,7 @@ private class LLFirBodyTargetResolver(target: LLFirResolveTarget) : LLFirAbstrac
             }
 
             is FirScript -> {
-                if (target.resolvePhase >= resolverPhase) return true
+                if (checkAnalysisReadiness(target, containingDeclarations, resolverPhase)) return true
 
                 // resolve properties so they are available for CFG building
                 resolveMembersForControlFlowGraph(
@@ -778,15 +772,23 @@ private class LLFirBodyTargetResolver(target: LLFirResolveTarget) : LLFirAbstrac
 
         return if (contextKtFile != null) {
             val contextFirFile = resolutionFacade.getOrBuildFirFile(contextKtFile)
-            val elementContext = ContextCollector.process(resolutionFacade, contextFirFile, contextPsiElement)
+
+            // Avoid using body context of expressions/statements, as those can contribute additional smart casts.
+            // Still use body contexts for declarations (e.g., to be able to address parameters of a primary constructor).
+            val preferBodyContext = when (contextPsiElement) {
+                is KtDeclaration -> contextPsiElement !is KtProperty || !contextPsiElement.isLocal
+                is KtBlockExpression -> true
+                else -> false
+            }
+
+            val elementContext = ContextCollector.process(resolutionFacade, contextFirFile, contextPsiElement, preferBodyContext)
                 ?: errorWithAttachment("Cannot find enclosing context for ${contextPsiElement::class}") {
                     withPsiEntry("contextPsiElement", contextPsiElement)
                 }
 
             LLFirCodeFragmentContext(
-                elementContext.towerDataContext.withProperSession(resolveTargetSession, resolveTargetScopeSession)
-                    .withExtraScopes(),
-                elementContext.smartCasts
+                elementContext.towerDataContext.withProperSession(resolveTargetSession, resolveTargetScopeSession).withExtraScopes(),
+                elementContext.smartCasts.associate { it.realVariable to it.upperTypes }
             )
         } else {
             val towerDataContext = FirTowerDataContext().withExtraScopes()
@@ -809,10 +811,10 @@ private class LLFirBodyTargetResolver(target: LLFirResolveTarget) : LLFirAbstrac
     ): FirTowerDataElement = FirTowerDataElement(
         scope?.withReplacedSessionOrNull(session, scopeSession) ?: scope,
         implicitReceiver?.withReplacedSessionOrNull(session, scopeSession),
-        contextReceiverGroup?.map { it.withReplacedSessionOrNull(session, scopeSession) },
         contextParameterGroup,
+        staticScopeOwnerSymbol,
         isLocal,
-        staticScopeOwnerSymbol
+        isAllowedAsCompanionExtensionReceiver,
     )
 
     override fun doLazyResolveUnderLock(target: FirElementWithResolveState) {
@@ -830,6 +832,7 @@ private class LLFirBodyTargetResolver(target: LLFirResolveTarget) : LLFirAbstrac
             is FirAnonymousInitializer -> resolve(target, BodyStateKeepers.ANONYMOUS_INITIALIZER)
             is FirDanglingModifierList,
             is FirTypeAlias,
+            is FirReplSnippet,
                 -> {
                 // No bodies here
             }
@@ -911,6 +914,10 @@ internal object BodyStateKeepers {
     private val VALUE_PARAMETER: StateKeeper<FirValueParameter, FirDesignation> = stateKeeper { builder, valueParameter, _ ->
         if (valueParameter.defaultValue != null) {
             builder.add(FirValueParameter::defaultValue, FirValueParameter::replaceDefaultValue, ::expressionGuard)
+            builder.add(
+                { parameter -> parameter.evaluatedInitializer },
+                { parameter, evaluatorResult -> parameter.evaluatedInitializer = evaluatorResult },
+            )
         }
 
         builder.add(FirValueParameter::controlFlowGraphReference, FirValueParameter::replaceControlFlowGraphReference)
@@ -943,15 +950,24 @@ private fun StateKeeperScope<FirAnonymousInitializer, FirDesignation>.preserveRe
     builder: StateKeeperBuilder,
     initializer: FirAnonymousInitializer
 ) {
-    preservePartialBodyResolveResult(builder, initializer, FirAnonymousInitializer::body) { emptyList() }
+    preservePartialBodyResolveResult(
+        builder = builder,
+        declaration = initializer,
+        bodySupplier = FirAnonymousInitializer::body,
+        parameterSupplier = { emptyList() },
+    )
 }
 
 private fun StateKeeperScope<FirFunction, FirDesignation>.preserveResolvedState(builder: StateKeeperBuilder, function: FirFunction) {
-    if (preservePartialBodyResolveResult(builder, function, FirFunction::body, FirFunction::valueParameters)) {
-        // If the function is partially analyzed, its contract (if present) is also copied, so we don't need to patch it once more.
-        return
+    val analyzedFirStatementCount = preservePartialBodyResolveResult(builder, function, FirFunction::body, FirFunction::valueParameters)
+    // If the function is partially analyzed, its contract (if present) is also copied, so we don't need to patch it once more.
+    // BUT! The function might be partially analyzed with 0 statements, in this case the contract still has to be copied
+    if (analyzedFirStatementCount == null || analyzedFirStatementCount < 1) {
+        preserveLegacyContract(function, builder)
     }
+}
 
+private fun StateKeeperScope<FirFunction, FirDesignation>.preserveLegacyContract(function: FirFunction, builder: StateKeeperBuilder) {
     val oldBody = function.body
     if (oldBody == null || oldBody is FirLazyBlock) {
         return
@@ -975,21 +991,24 @@ private fun StateKeeperScope<FirFunction, FirDesignation>.preserveResolvedState(
     }
 }
 
+/**
+ * @return the number of analyzed fir statements or null if no partial result is present
+ */
 private fun <T : FirDeclaration> StateKeeperScope<T, FirDesignation>.preservePartialBodyResolveResult(
     builder: StateKeeperBuilder,
     declaration: T,
     bodySupplier: (T) -> FirBlock?,
     parameterSupplier: (T) -> List<FirValueParameter>
-): Boolean {
+): Int? {
     val oldBody = bodySupplier(declaration)
     val oldDefaultValues = parameterSupplier(declaration).map { it.defaultValue }
 
     // No need to check parameters explicitly as they are substituted together with the body
     if (oldBody == null || oldBody is FirLazyBlock) {
-        return false
+        return null
     }
 
-    val state = declaration.partialBodyAnalysisState ?: return false
+    val state = declaration.partialBodyAnalysisState ?: return null
 
     builder.postProcess {
         val newBody = bodySupplier(declaration)
@@ -1005,15 +1024,17 @@ private fun <T : FirDeclaration> StateKeeperScope<T, FirDesignation>.preservePar
             }
         }
 
+        // NOTE: parameters might have `evaluatedInitializer` that is not stored in the partial context,
+        // but it is not a problem as long as annotation constructors are not partially resolvable
         val newParameters = parameterSupplier(declaration)
-        for ((index, newParameter) in newParameters.withIndex()) {
+        for ([index, newParameter] in newParameters.withIndex()) {
             if (newParameter.defaultValue != null) {
                 newParameter.replaceDefaultValue(oldDefaultValues[index])
             }
         }
     }
 
-    return true
+    return state.analyzedFirStatementCount
 }
 
 private val FirFunction.isCertainlyResolved: Boolean
@@ -1030,7 +1051,7 @@ private val FirFunction.isCertainlyResolved: Boolean
         }
 
         val body = this.body ?: return false // Not completely sure
-        return body !is FirLazyBlock && body.isResolved
+        return body !is FirLazyBlock && body.hasResolvedType
     }
 
 private val FirVariable.initializerGetterIfUnresolved: KProperty1<FirVariable, FirExpression?>?

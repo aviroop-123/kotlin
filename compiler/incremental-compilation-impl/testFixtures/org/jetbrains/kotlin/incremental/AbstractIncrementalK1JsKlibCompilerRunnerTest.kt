@@ -2,6 +2,7 @@ package org.jetbrains.kotlin.incremental
 
 import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.cli.common.messages.MessageCollectorImpl
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.incremental.testingUtils.BuildLogFinder
 import org.jetbrains.kotlin.incremental.utils.TestCompilationResult
 import org.jetbrains.kotlin.incremental.utils.TestICReporter
@@ -10,12 +11,10 @@ import java.io.File
 abstract class AbstractIncrementalK1JsKlibCompilerRunnerTest : AbstractIncrementalCompilerRunnerTestBase<K2JSCompilerArguments>() {
     override fun createCompilerArguments(destinationDir: File, testDir: File): K2JSCompilerArguments =
         K2JSCompilerArguments().apply {
-            libraries = "build/js-ir-runtime/full-runtime.klib"
+            libraries = ForTestCompileRuntime.stdlibJs().absolutePath
             outputDir = destinationDir.path
             moduleName = testDir.name
             sourceMap = false
-            irProduceKlibDir = false
-            irProduceKlibFile = true
             languageVersion = "1.9"
         }
 

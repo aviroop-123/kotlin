@@ -15,7 +15,6 @@ embedded.apply {
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 val proguardLibraryJars by configurations.creating {
@@ -44,6 +43,10 @@ dependencies {
     testImplementation(libs.junit4)
     testRuntimeOnly("org.slf4j:slf4j-nop:1.7.36")
     testImplementation(project(":kotlin-scripting-dependencies-maven-all"))
+
+    constraints {
+        embedded(libs.apache.commons.lang)
+    }
 }
 
 sourceSets {

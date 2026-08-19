@@ -238,21 +238,21 @@ FILE: [ResolvedTo(IMPORTS)] propagationBetweenLocalMemberFunctionsImplicitBodySc
         }
 
         public final [ResolvedTo(IMPLICIT_TYPES_BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] fun foo(): R|kotlin/Unit| {
-            ^foo R|util/lambda|(<L> = [ResolvedTo(RAW_FIR)] [MatchingParameterFunctionTypeKey=kotlin/Function0<kotlin/Unit>] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^foo R|util/lambda|(<L> = [ResolvedTo(RAW_FIR)] [MatchingParameterFunctionTypeKey=() -> kotlin/Unit] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
                 local final [ResolvedTo(RAW_FIR)] class Local : R|kotlin/Any| {
                     public [ResolvedTo(RAW_FIR)] [ContainingClassKey=Local] constructor(): R|<local>/Local| {
                         super<R|kotlin/Any|>()
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo this@R|<local>/Local|.R|<local>/bar|()
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^bar Null(null)
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo2 this@R|<local>/Local|.R|<local>/bar|()
                     }
 
@@ -287,21 +287,21 @@ FILE: [ResolvedTo(IMPORTS)] propagationBetweenLocalMemberFunctionsImplicitBodySc
         }
 
         public final [ResolvedTo(CONSTANT_EVALUATION)] [ScriptTopLevelDeclaration=true] fun foo(): R|kotlin/Unit| {
-            ^foo R|util/lambda|(<L> = [ResolvedTo(RAW_FIR)] [MatchingParameterFunctionTypeKey=kotlin/Function0<kotlin/Unit>] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^foo R|util/lambda|(<L> = [ResolvedTo(RAW_FIR)] [MatchingParameterFunctionTypeKey=() -> kotlin/Unit] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
                 local final [ResolvedTo(RAW_FIR)] class Local : R|kotlin/Any| {
                     public [ResolvedTo(RAW_FIR)] [ContainingClassKey=Local] constructor(): R|<local>/Local| {
                         super<R|kotlin/Any|>()
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo this@R|<local>/Local|.R|<local>/bar|()
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^bar Null(null)
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo2 this@R|<local>/Local|.R|<local>/bar|()
                     }
 
@@ -336,21 +336,21 @@ FILE: [ResolvedTo(IMPORTS)] propagationBetweenLocalMemberFunctionsImplicitBodySc
         }
 
         public final [ResolvedTo(ANNOTATION_ARGUMENTS)] [ScriptTopLevelDeclaration=true] fun foo(): R|kotlin/Unit| {
-            ^foo R|util/lambda|(<L> = [ResolvedTo(RAW_FIR)] [MatchingParameterFunctionTypeKey=kotlin/Function0<kotlin/Unit>] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^foo R|util/lambda|(<L> = [ResolvedTo(RAW_FIR)] [MatchingParameterFunctionTypeKey=() -> kotlin/Unit] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
                 local final [ResolvedTo(RAW_FIR)] class Local : R|kotlin/Any| {
                     public [ResolvedTo(RAW_FIR)] [ContainingClassKey=Local] constructor(): R|<local>/Local| {
                         super<R|kotlin/Any|>()
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo this@R|<local>/Local|.R|<local>/bar|()
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^bar Null(null)
                     }
 
-                    public final [ResolvedTo(RAW_FIR)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(RAW_FIR)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo2 this@R|<local>/Local|.R|<local>/bar|()
                     }
 
@@ -385,21 +385,21 @@ FILE: [ResolvedTo(IMPORTS)] propagationBetweenLocalMemberFunctionsImplicitBodySc
         }
 
         public final [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] fun foo(): R|kotlin/Unit| {
-            ^foo R|util/lambda|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=kotlin/Function0<kotlin/Unit>] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^foo R|util/lambda|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=() -> kotlin/Unit] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
                 local final [ResolvedTo(BODY_RESOLVE)] class Local : R|kotlin/Any| {
                     public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Local] constructor(): R|<local>/Local| {
                         super<R|kotlin/Any|>()
                     }
 
-                    public final [ResolvedTo(BODY_RESOLVE)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(BODY_RESOLVE)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo this@R|<local>/Local|.R|<local>/bar|()
                     }
 
-                    public final [ResolvedTo(BODY_RESOLVE)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(BODY_RESOLVE)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^bar Null(null)
                     }
 
-                    public final [ResolvedTo(BODY_RESOLVE)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(BODY_RESOLVE)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo2 this@R|<local>/Local|.R|<local>/bar|()
                     }
 
@@ -416,7 +416,7 @@ FILE: [ResolvedTo(BODY_RESOLVE)] propagationBetweenLocalMemberFunctionsImplicitB
         [ResolvedTo(BODY_RESOLVE)] <script receiver parameter>: R|kotlin/script/templates/standard/ScriptTemplateWithArgs|
         [ResolvedTo(BODY_RESOLVE)] lval args: R|kotlin/Array<kotlin/String>|
 
-        @R|kotlin/annotation/Target|[Types](allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)) public final [ResolvedTo(BODY_RESOLVE)] [ContainingScriptKey=FirScriptSymbol util.<script-propagationBetweenLocalMemberFunctionsImplicitBodyScript.kts>, ScriptTopLevelDeclaration=true] annotation class Anno : R|kotlin/Annotation| {
+        @R|kotlin/annotation/Target|[Types](allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|) [evaluated = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.TYPE|)]) public final [ResolvedTo(BODY_RESOLVE)] [ContainingScriptKey=FirScriptSymbol util.<script-propagationBetweenLocalMemberFunctionsImplicitBodyScript.kts>, ScriptTopLevelDeclaration=true] annotation class Anno : R|kotlin/Annotation| {
             public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Anno] constructor([ResolvedTo(BODY_RESOLVE)] [CorrespondingProperty=util/Anno.str] str: R|kotlin/String|): R|util/Anno| {
                 super<R|kotlin/Any|>()
             }
@@ -434,21 +434,21 @@ FILE: [ResolvedTo(BODY_RESOLVE)] propagationBetweenLocalMemberFunctionsImplicitB
         }
 
         public final [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] fun foo(): R|kotlin/Unit| {
-            ^foo R|util/lambda|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=kotlin/Function0<kotlin/Unit>] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            ^foo R|util/lambda|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=() -> kotlin/Unit] lambda@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
                 local final [ResolvedTo(BODY_RESOLVE)] class Local : R|kotlin/Any| {
                     public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Local] constructor(): R|<local>/Local| {
                         super<R|kotlin/Any|>()
                     }
 
-                    public final [ResolvedTo(BODY_RESOLVE)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(BODY_RESOLVE)] fun foo(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo this@R|<local>/Local|.R|<local>/bar|()
                     }
 
-                    public final [ResolvedTo(BODY_RESOLVE)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(BODY_RESOLVE)] fun bar(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^bar Null(null)
                     }
 
-                    public final [ResolvedTo(BODY_RESOLVE)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|))  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|))  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|))  kotlin/Int>>?| {
+                    public final [ResolvedTo(BODY_RESOLVE)] fun foo2(): R|@R|util/Anno|(str = <strcat>(String(bar ), R|util/prop|) [evaluated = String(bar str)])  kotlin/collections/List<@R|util/Anno|(str = <strcat>(String(nested bar ), R|util/prop|) [evaluated = String(nested bar str)])  kotlin/collections/Collection<@R|util/Anno|(str = <strcat>(String(nested nested bar ), R|util/prop|) [evaluated = String(nested nested bar str)])  kotlin/Int>>?| {
                         ^foo2 this@R|<local>/Local|.R|<local>/bar|()
                     }
 

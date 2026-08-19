@@ -1,3 +1,4 @@
+// RUN_PIPELINE_TILL: FRONTEND
 // OPT_IN: kotlin.js.ExperimentalJsExport
 // LANGUAGE: +ContextParameters
 
@@ -31,7 +32,7 @@ fun fooUnsigned1(): UInt = 42u
 @JsExport
 fun fooUnsigned2(): UByte = 42u
 
-<!CONTEXT_PARAMETERS_UNSUPPORTED!>context(x: <!DEBUG_INFO_MISSING_UNRESOLVED!>Int<!>)<!>
+<!EXPORT_DECLARATION_WITH_CONTEXT_PARAMETERS!>context(x: Int)
 @JsExport
 fun fooWithContext() {
-}
+}<!>

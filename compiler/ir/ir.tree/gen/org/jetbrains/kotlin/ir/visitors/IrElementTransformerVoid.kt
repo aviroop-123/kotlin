@@ -214,6 +214,12 @@ abstract class IrElementTransformerVoid : IrTransformer<Nothing?>() {
     final override fun visitConstructorCall(expression: IrConstructorCall, data: Nothing?): IrElement =
         visitConstructorCall(expression)
 
+    open fun visitAnnotation(expression: IrAnnotation): IrExpression =
+        visitConstructorCall(expression)
+
+    final override fun visitAnnotation(expression: IrAnnotation, data: Nothing?): IrElement =
+        visitAnnotation(expression)
+
     open fun visitSingletonReference(expression: IrGetSingletonValue): IrExpression =
         visitDeclarationReference(expression)
 

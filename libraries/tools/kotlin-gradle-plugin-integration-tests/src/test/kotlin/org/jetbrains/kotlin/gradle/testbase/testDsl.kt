@@ -5,21 +5,28 @@
 
 package org.jetbrains.kotlin.gradle.testbase
 
+import org.gradle.api.Project
 import org.gradle.api.initialization.resolve.RepositoriesMode
 import org.gradle.api.logging.configuration.WarningMode
+import org.gradle.kotlin.dsl.support.serviceOf
 import org.gradle.testkit.runner.BuildResult
 import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.internal.DefaultGradleRunner
 import org.gradle.tooling.GradleConnector
+import org.gradle.tooling.events.ProgressEvent
+import org.gradle.tooling.provider.model.ToolingModelBuilder
+import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.cli.common.CompilerSystemProperties
+import org.jetbrains.kotlin.cli.common.*
 import org.jetbrains.kotlin.gradle.report.BuildReportType
 import org.jetbrains.kotlin.gradle.util.isTeamCityRun
 import org.jetbrains.kotlin.gradle.util.runProcess
 import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.presetName
 import org.jetbrains.kotlin.test.util.KtTestUtil
+import org.jetbrains.kotlin.utils.addToStdlib.applyIf
 import org.jetbrains.kotlin.utils.addToStdlib.ifTrue
+import org.junit.jupiter.api.Assumptions
 import java.io.File
 import java.io.InputStream
 import java.io.PrintWriter
@@ -48,6 +55,7 @@ fun KGPBaseTest.project(
     gradleVersion: GradleVersion,
     buildOptions: BuildOptions = defaultBuildOptions,
     enableBuildScan: Boolean = false,
+    enableOfflineMode: Boolean = false,
     addHeapDumpOptions: Boolean = true,
     enableGradleDebug: EnableGradleDebug = EnableGradleDebug.AUTO,
     enableGradleDaemonMemoryLimitInMb: Int? = 1024,
@@ -81,7 +89,7 @@ fun KGPBaseTest.project(
         .create()
         .withProjectDir(projectPath.toFile())
         .withTestKitDir(testKitDir.toAbsolutePath().toFile())
-        .withGradleDistribution(URI("https://cache-redirector.jetbrains.com/services.gradle.org/distributions/gradle-${gradleVersion.version}-bin.zip"))
+        .withGradleDistribution(gradleDistributionUri(gradleVersion))
 
     val testProject = TestProject(
         gradleRunner = gradleRunner,
@@ -90,6 +98,7 @@ fun KGPBaseTest.project(
         buildOptions = buildOptions,
         gradleVersion = gradleVersion,
         enableBuildScan = enableBuildScan,
+        enableOfflineMode = enableOfflineMode,
         enableGradleDebug = enableGradleDebug,
         enableGradleDaemonMemoryLimitInMb = enableGradleDaemonMemoryLimitInMb,
         enableKotlinDaemonMemoryLimitInMb = enableKotlinDaemonMemoryLimitInMb,
@@ -108,6 +117,8 @@ fun KGPBaseTest.project(
     return testProject
 }
 
+private fun gradleDistributionUri(gradleVersion: GradleVersion) = URI("https://cache-redirector.jetbrains.com/services.gradle.org/distributions/gradle-${gradleVersion.version}-bin.zip")
+
 /**
  * Create a new test project with configuring single native target.
  *
@@ -123,6 +134,7 @@ fun KGPBaseTest.nativeProject(
     gradleVersion: GradleVersion,
     buildOptions: BuildOptions = defaultBuildOptions,
     enableBuildScan: Boolean = false,
+    enableOfflineMode: Boolean = false,
     dependencyManagement: DependencyManagement = DependencyManagement.DefaultDependencyManagement(),
     addHeapDumpOptions: Boolean = true,
     enableGradleDebug: EnableGradleDebug = EnableGradleDebug.AUTO,
@@ -140,6 +152,7 @@ fun KGPBaseTest.nativeProject(
         gradleVersion = gradleVersion,
         buildOptions = buildOptions,
         enableBuildScan = enableBuildScan,
+        enableOfflineMode = enableOfflineMode,
         dependencyManagement = dependencyManagement,
         addHeapDumpOptions = addHeapDumpOptions,
         enableGradleDebug = enableGradleDebug,
@@ -164,6 +177,7 @@ fun TestProject.build(
     kotlinDaemonDebugPort: Int? = this.kotlinDaemonDebugPort,
     enableBuildCacheDebug: Boolean = false,
     enableBuildScan: Boolean = this.enableBuildScan,
+    enableOfflineMode: Boolean = this.enableOfflineMode,
     enableGradleDaemonMemoryLimitInMb: Int? = this.enableGradleDaemonMemoryLimitInMb,
     enableKotlinDaemonMemoryLimitInMb: Int? = this.enableKotlinDaemonMemoryLimitInMb,
     buildOptions: BuildOptions = this.buildOptions,
@@ -179,6 +193,7 @@ fun TestProject.build(
         kotlinDaemonDebugPort = kotlinDaemonDebugPort,
         enableBuildCacheDebug = enableBuildCacheDebug,
         enableBuildScan = enableBuildScan,
+        enableOfflineMode = enableOfflineMode,
         buildOptions = buildOptions,
         enableGradleDaemonMemoryLimitInMb = enableGradleDaemonMemoryLimitInMb,
         enableKotlinDaemonMemoryLimitInMb = enableKotlinDaemonMemoryLimitInMb,
@@ -199,6 +214,7 @@ fun TestProject.buildAndFail(
     kotlinDaemonDebugPort: Int? = this.kotlinDaemonDebugPort,
     enableBuildCacheDebug: Boolean = false,
     enableBuildScan: Boolean = this.enableBuildScan,
+    enableOfflineMode: Boolean = this.enableOfflineMode,
     buildOptions: BuildOptions = this.buildOptions,
     enableGradleDaemonMemoryLimitInMb: Int? = this.enableGradleDaemonMemoryLimitInMb,
     enableKotlinDaemonMemoryLimitInMb: Int? = this.enableKotlinDaemonMemoryLimitInMb,
@@ -213,6 +229,7 @@ fun TestProject.buildAndFail(
         kotlinDaemonDebugPort = kotlinDaemonDebugPort,
         enableBuildCacheDebug = enableBuildCacheDebug,
         enableBuildScan = enableBuildScan,
+        enableOfflineMode = enableOfflineMode,
         buildOptions = buildOptions,
         enableGradleDaemonMemoryLimitInMb = enableGradleDaemonMemoryLimitInMb,
         enableKotlinDaemonMemoryLimitInMb = enableKotlinDaemonMemoryLimitInMb,
@@ -230,6 +247,7 @@ private data class BuildParameterization(
     val kotlinDaemonDebugPort: Int?,
     val enableBuildCacheDebug: Boolean,
     val enableBuildScan: Boolean,
+    val enableOfflineMode: Boolean,
     val buildOptions: BuildOptions,
     val enableGradleDaemonMemoryLimitInMb: Int?,
     val enableKotlinDaemonMemoryLimitInMb: Int?,
@@ -260,6 +278,7 @@ private fun TestProject.buildWithAction(
             buildOptions = buildOptions,
             enableBuildCacheDebug = enableBuildCacheDebug,
             enableBuildScan = enableBuildScan,
+            enableOfflineMode = enableOfflineMode,
             enableGradleDaemonMemoryLimitInMb = enableGradleDaemonMemoryLimitInMb,
             enableKotlinDaemonMemoryLimitInMb = enableKotlinDaemonMemoryLimitInMb,
             connectSubprocessVMToDebugger = connectSubprocessVMToDebugger,
@@ -268,7 +287,11 @@ private fun TestProject.buildWithAction(
         )
         val gradleRunnerForBuild = gradleRunner
             .also { if (forwardBuildOutput) it.forwardOutput() }
-            .also { if (environmentVariables.environmentalVariables.isNotEmpty()) it.withEnvironment(System.getenv() + environmentVariables.environmentalVariables) }
+            .withEnvironment(
+                if (environmentVariables.environmentalVariables.isNotEmpty()) {
+                    System.getenv() + environmentVariables.environmentalVariables
+                } else null
+            )
             .withDebug(runWithDebug && !connectSubprocessVMToDebugger)
             .withArguments(allBuildArguments)
 
@@ -296,6 +319,89 @@ private fun TestProject.buildWithAction(
 
 fun getGradleUserHome(): File {
     return testKitDir.toAbsolutePath().toFile().normalize().absoluteFile
+}
+
+
+private class KotlinTestModelBuilder<T>(
+    val name: String,
+    val builder: (Project) -> T,
+) : ToolingModelBuilder {
+    override fun canBuild(modelName: String): Boolean = modelName == name
+
+    override fun buildAll(modelName: String, project: Project): Any? = builder(project)
+}
+
+inline fun <reified T> TestProject.buildModel(
+    vararg tasks: String,
+    enableGradleDebug: EnableGradleDebug = this.enableGradleDebug,
+    kotlinDaemonDebugPort: Int? = this.kotlinDaemonDebugPort,
+    enableBuildCacheDebug: Boolean = false,
+    enableBuildScan: Boolean = this.enableBuildScan,
+    enableOfflineMode: Boolean = this.enableOfflineMode,
+    enableGradleDaemonMemoryLimitInMb: Int? = this.enableGradleDaemonMemoryLimitInMb,
+    enableKotlinDaemonMemoryLimitInMb: Int? = this.enableKotlinDaemonMemoryLimitInMb,
+    buildOptions: BuildOptions = this.buildOptions,
+    environmentVariables: EnvironmentalVariables = this.environmentVariables,
+    noinline progressListener: ((ProgressEvent) -> Unit)? = null,
+    noinline builder: (Project) -> T
+) = buildModel(
+    tasks = tasks, modelClass = T::class.java, enableGradleDebug, kotlinDaemonDebugPort, enableBuildCacheDebug, enableBuildScan,
+    enableOfflineMode, enableGradleDaemonMemoryLimitInMb, enableKotlinDaemonMemoryLimitInMb, buildOptions, environmentVariables,
+    progressListener, builder,
+)
+
+fun <T> TestProject.buildModel(
+    vararg tasks: String,
+    modelClass: Class<T>,
+    enableGradleDebug: EnableGradleDebug = this.enableGradleDebug,
+    kotlinDaemonDebugPort: Int? = this.kotlinDaemonDebugPort,
+    enableBuildCacheDebug: Boolean = false,
+    enableBuildScan: Boolean = this.enableBuildScan,
+    enableOfflineMode: Boolean = this.enableOfflineMode,
+    enableGradleDaemonMemoryLimitInMb: Int? = this.enableGradleDaemonMemoryLimitInMb,
+    enableKotlinDaemonMemoryLimitInMb: Int? = this.enableKotlinDaemonMemoryLimitInMb,
+    buildOptions: BuildOptions = this.buildOptions,
+    environmentVariables: EnvironmentalVariables = this.environmentVariables,
+    progressListener: ((ProgressEvent) -> Unit)? = null,
+    builder: (Project) -> T
+): T {
+    Assumptions.assumeFalse(isWindows, "Building model is not working on windws KT-84353")
+    val buildParams = commonBuildSetup(
+        buildArguments = emptyList(), // it is actually task names, but for build model they passed separately
+        buildOptions = buildOptions,
+        enableBuildCacheDebug = enableBuildCacheDebug,
+        enableBuildScan = enableBuildScan,
+        enableOfflineMode = enableOfflineMode,
+        enableGradleDaemonMemoryLimitInMb = enableGradleDaemonMemoryLimitInMb,
+        enableKotlinDaemonMemoryLimitInMb = enableKotlinDaemonMemoryLimitInMb,
+        connectSubprocessVMToDebugger = enableGradleDebug.toBooleanFlag(),
+        gradleVersion = gradleVersion,
+        kotlinDaemonDebugPort = kotlinDaemonDebugPort
+    )
+
+    val connector = GradleConnector.newConnector()
+        .forProjectDirectory(gradleRunner.projectDir)
+        .useDistribution(gradleDistributionUri(gradleVersion))
+
+    buildScriptInjection {
+        val registry = project.serviceOf<ToolingModelBuilderRegistry>()
+        val builder = KotlinTestModelBuilder(modelClass.name, builder)
+        registry.register(builder)
+    }
+
+    try {
+        val connection = connector.connect()
+        val modelBuilder = connection.model(modelClass)
+        val model = modelBuilder
+            .applyIf(progressListener != null) { addProgressListener(progressListener) }
+            .forTasks(tasks.toList())
+            .withArguments(buildParams)
+            .setEnvironmentVariables(environmentVariables.environmentalVariables)
+            .get()
+        return model
+    } finally {
+        connector.disconnect()
+    }
 }
 
 private fun validateDebuggingSocketIsListeningForTestsWithEnv(
@@ -464,6 +570,7 @@ class TestProject(
     val buildOptions: BuildOptions,
     val gradleVersion: GradleVersion,
     val enableBuildScan: Boolean,
+    val enableOfflineMode: Boolean,
     val enableGradleDaemonMemoryLimitInMb: Int?,
     val enableKotlinDaemonMemoryLimitInMb: Int?,
     val enableGradleDebug: EnableGradleDebug,
@@ -560,17 +667,13 @@ private fun commonBuildSetup(
     buildOptions: BuildOptions,
     enableBuildCacheDebug: Boolean,
     enableBuildScan: Boolean,
+    enableOfflineMode: Boolean,
     enableGradleDaemonMemoryLimitInMb: Int?,
     enableKotlinDaemonMemoryLimitInMb: Int?,
     connectSubprocessVMToDebugger: Boolean,
     gradleVersion: GradleVersion,
     kotlinDaemonDebugPort: Int? = null,
 ): List<String> {
-    val jdkLocations = allJdkProperties
-        .map { System.getProperty(it) }
-        .sortedWith(compareBy { it.toString() })
-        .joinToString(separator = ",")
-
     val gradleJvmOptions =
         collectGradleJvmOptions(enableGradleDaemonMemoryLimitInMb, buildOptions.fileLeaksReportFile, connectSubprocessVMToDebugger)
     val kotlinDaemonJvmArgs = collectKotlinJvmArgs(enableKotlinDaemonMemoryLimitInMb, kotlinDaemonDebugPort)
@@ -584,31 +687,47 @@ private fun commonBuildSetup(
         joinToString(separator = " ")
     }
 
-    return buildOptions.toArguments(gradleVersion) + buildArguments + listOfNotNull(
-        // Required toolchains should be pre-installed via repo. Tests should not download any JDKs
-        "-Porg.gradle.java.installations.auto-download=false",
-        "-Porg.gradle.java.installations.auto-detect=false",
-        "-Porg.gradle.java.installations.paths=$jdkLocations",
-        // Disable automatic download of android SDK.
-        // It should be downloaded in dependencies/android-sdk to enable caching and prevent sdk installation failures.
-        "-Pandroid.builder.sdkDownload=false",
-        // Decreasing Gradle daemon idle timeout to 1 min from default 3 hours.
-        // This should help with OOM on CI when agents do not have enough free memory available.
-        "-Dorg.gradle.daemon.idletimeout=60000",
-        if (gradleJvmOptions.isNotEmpty()) {
-            "-Dorg.gradle.jvmargs=${gradleJvmOptions.joinToJvmArgsString()}"
-        } else null,
-        if (enableBuildCacheDebug) "-Dorg.gradle.caching.debug=true" else null,
-        if (enableBuildScan) "--scan" else null,
-        if (kotlinDaemonJvmArgs.isNotEmpty()) {
-            // do not enclose as KGP transforms arguments like "-Xmx1024m" to -"-Xmx1024m": KT-72870
-            "-Pkotlin.daemon.jvmargs=${kotlinDaemonJvmArgs.joinToJvmArgsString(enclose = false)}"
-        } else null,
-        // Configure a non-default directory to be able to track Kotlin daemons started from the tests
-        // Useful for the tests like KGPDaemonsBaseTest
-        if (buildOptions.customKotlinDaemonRunFilesDirectory != null) {
-            "-D${CompilerSystemProperties.COMPILE_DAEMON_CUSTOM_RUN_FILES_PATH_FOR_TESTS.property}=${buildOptions.customKotlinDaemonRunFilesDirectory.absolutePath}"
-        } else null,
+    return buildOptions.toArguments(gradleVersion) +
+            buildArguments +
+            jdkToolchainConfiguration(gradleVersion) +
+            listOfNotNull(
+                // Disable automatic download of android SDK.
+                // It should be downloaded in dependencies/android-sdk to enable caching and prevent sdk installation failures.
+                "-Pandroid.builder.sdkDownload=false",
+                // Decreasing Gradle daemon idle timeout to 1 min from default 3 hours.
+                // This should help with OOM on CI when agents do not have enough free memory available.
+                "-Dorg.gradle.daemon.idletimeout=60000",
+                if (gradleJvmOptions.isNotEmpty()) {
+                    "-Dorg.gradle.jvmargs=${gradleJvmOptions.joinToJvmArgsString()}"
+                } else null,
+                if (enableBuildCacheDebug) "-Dorg.gradle.caching.debug=true" else null,
+                if (enableBuildScan) "--scan" else null,
+                if (enableOfflineMode) "--offline" else null,
+                if (kotlinDaemonJvmArgs.isNotEmpty()) {
+                    // do not enclose as KGP transforms arguments like "-Xmx1024m" to -"-Xmx1024m": KT-72870
+                    "-Pkotlin.daemon.jvmargs=${kotlinDaemonJvmArgs.joinToJvmArgsString(enclose = false)}"
+                } else null,
+                // Configure a non-default directory to be able to track Kotlin daemons started from the tests
+                // Useful for the tests like KGPDaemonsBaseTest
+                if (buildOptions.customKotlinDaemonRunFilesDirectory != null) {
+                    @Suppress("DEPRECATION")
+                    "-D${CompilerSystemProperties.COMPILE_DAEMON_CUSTOM_RUN_FILES_PATH_FOR_TESTS.property}=${buildOptions.customKotlinDaemonRunFilesDirectory.absolutePath}"
+                } else null,
+            )
+}
+
+// Required toolchains should be pre-installed via repo. Tests should not download any JDKs
+private fun jdkToolchainConfiguration(gradleVersion: GradleVersion): List<String> {
+    val paramType = if (gradleVersion < GradleVersion.version(TestVersions.Gradle.G_9_0)) "-P" else "-D"
+    val jdkLocations = allJdkProperties
+        .map { System.getProperty(it) }
+        .sortedWith(compareBy { it.toString() })
+        .joinToString(separator = ",")
+
+    return listOf(
+        "${paramType}org.gradle.java.installations.auto-download=false",
+        "${paramType}org.gradle.java.installations.auto-detect=false",
+        "${paramType}org.gradle.java.installations.paths=$jdkLocations",
     )
 }
 

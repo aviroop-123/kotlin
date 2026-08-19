@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -37,7 +36,7 @@ package testPackCase1
 import kotlin.text.Regex
 
 fun case() {
-    <!DEBUG_INFO_CALL("fqName: kotlin.text.Regex.<init>; typeCall: function")!>Regex("")<!>
+    <!DEBUG_INFO_CALL("fqName: kotlin.text.Regex.Regex; typeCall: function")!>Regex("")<!>
 }
 
 // FILE: Lib2.kt
@@ -179,7 +178,7 @@ package testPackCase7
 import kotlin.text.Regex
 
 fun case() {
-   <!DEBUG_INFO_CALL("fqName: kotlin.text.Regex.<init>; typeCall: function")!>Regex("")<!>
+   <!DEBUG_INFO_CALL("fqName: kotlin.text.Regex.Regex; typeCall: function")!>Regex("")<!>
 }
 
 // FILE: Lib8.kt
@@ -196,7 +195,7 @@ class Regex(pattern: String) {}
 package testPackCase8
 
 fun case() {
-    <!DEBUG_INFO_CALL("fqName: testPackCase8.Regex.<init>; typeCall: function")!>Regex("")<!>
+    <!DEBUG_INFO_CALL("fqName: testPackCase8.Regex.Regex; typeCall: function")!>Regex("")<!>
 }
 
 // FILE: Lib9.kt
@@ -213,10 +212,9 @@ package testPackCase9
 import kotlin.text.*
 
 fun case() {
-    <!DEBUG_INFO_CALL("fqName: testPackCase9.Regex.<init>; typeCall: function")!>Regex("")<!>
+    <!DEBUG_INFO_CALL("fqName: testPackCase9.Regex.Regex; typeCall: function")!>Regex("")<!>
 }
 
 // FILE: Lib10.kt
 package testPackCase9
 class Regex(pattern: String) {}
-

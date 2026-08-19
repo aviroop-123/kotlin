@@ -1,4 +1,3 @@
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -28,5 +27,5 @@ fun case_2(value_1: Int): String {
         }
     }
 
-    <!UNREACHABLE_CODE!>return ""<!>
+    return ""
 }

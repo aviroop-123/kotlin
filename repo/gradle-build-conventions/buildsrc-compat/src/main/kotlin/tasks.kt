@@ -90,6 +90,8 @@ val kotlinGradlePluginAndItsRequired = arrayOf(
     ":compiler:build-tools:kotlin-build-statistics",
     ":compiler:build-tools:kotlin-build-tools-api",
     ":compiler:build-tools:kotlin-build-tools-impl",
+    ":compiler:build-tools:kotlin-build-tools-compat",
+    ":compiler:build-tools:kotlin-build-tools-cri-impl",
     ":libraries:tools:gradle:fus-statistics-gradle-plugin",
     ":kotlin-util-klib-metadata",
     ":libraries:tools:abi-validation:abi-tools-api",
@@ -120,31 +122,6 @@ fun Task.dependsOnKotlinGradlePluginPublish() {
 
 fun Test.enableJunit5ExtensionsAutodetection() {
     systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
-}
-
-fun Project.confugureFirPluginAnnotationsDependency(testTask: TaskProvider<Test>) {
-    val firPluginJvmAnnotations: Configuration by configurations.creating
-    val firPluginJsAnnotations: Configuration by configurations.creating {
-        attributes {
-            attribute(Usage.USAGE_ATTRIBUTE, objects.named(org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages.KOTLIN_RUNTIME))
-            attribute(KotlinPlatformType.attribute, KotlinPlatformType.js)
-        }
-    }
-
-    dependencies {
-        firPluginJvmAnnotations(project(":plugins:plugin-sandbox:plugin-annotations")) { isTransitive = false }
-        firPluginJsAnnotations(project(":plugins:plugin-sandbox:plugin-annotations")) { isTransitive = false }
-    }
-
-    testTask.configure {
-        dependsOn(firPluginJvmAnnotations, firPluginJsAnnotations)
-        val localFirPluginJvmAnnotations: FileCollection = firPluginJvmAnnotations
-        val localFirPluginJsAnnotations: FileCollection = firPluginJsAnnotations
-        doFirst {
-            systemProperty("firPluginAnnotations.jvm.path", localFirPluginJvmAnnotations.singleFile.canonicalPath)
-            systemProperty("firPluginAnnotations.js.path", localFirPluginJsAnnotations.singleFile.canonicalPath)
-        }
-    }
 }
 
 fun Project.optInTo(annotationFqName: String) {

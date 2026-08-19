@@ -7,10 +7,7 @@ package org.jetbrains.kotlin.fir.serialization
 
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.declarations.FirClass
-import org.jetbrains.kotlin.fir.declarations.FirClassLikeDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.packageFqName
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
@@ -40,7 +37,7 @@ fun serializeSingleFirFile(
 
     val classesProto = mutableListOf<Pair<ProtoBuf.Class, Int>>()
 
-    fun FirClass.makeClassProtoWithNested() {
+    fun FirClass.makeClassProtoWithNested(parentSerializer: FirElementSerializer?) {
         if (!isNotExpectOrShouldBeSerialized(actualizedExpectDeclarations) ||
             !isNotPrivateOrShouldBeSerialized(produceHeaderKlib)
         ) {
@@ -48,7 +45,7 @@ fun serializeSingleFirFile(
         }
 
         val classSerializer = FirElementSerializer.create(
-            session, scopeSession, klass = this, serializerExtension, parentSerializer = null,
+            session, scopeSession, klass = this, serializerExtension, parentSerializer,
             approximator, languageVersionSettings, produceHeaderKlib
         )
         val index = classSerializer.stringTable.getFqNameIndex(this)
@@ -56,14 +53,19 @@ fun serializeSingleFirFile(
         classesProto += classSerializer.classProto(this, file).build() to index
 
         for (nestedClassifierSymbol in classSerializer.computeNestedClassifiersForClass(symbol)) {
-            (nestedClassifierSymbol as? FirClassSymbol<*>)?.fir?.makeClassProtoWithNested()
+            (nestedClassifierSymbol as? FirClassSymbol<*>)?.fir?.makeClassProtoWithNested(parentSerializer = classSerializer)
         }
     }
 
-    serializerExtension.processFile(file) {
-        for (declaration in file.declarations) {
-            (declaration as? FirClass)?.makeClassProtoWithNested()
-        }
+    for (declaration in file.declarations) {
+        (declaration as? FirClass)?.makeClassProtoWithNested(parentSerializer = null)
+    }
+    for (declaration in session.providedDeclarationsForMetadataService.getProvidedTopLevelDeclarations(file)) {
+        (declaration as? FirClass)?.makeClassProtoWithNested(parentSerializer = null)
+    }
+
+    val fileAnnotationProtos = file.nonSourceAnnotations(session).mapNotNull { annotation ->
+        serializerExtension.annotationSerializer.serializeAnnotation(annotation)
     }
 
     return buildKlibPackageFragment(
@@ -74,7 +76,8 @@ fun serializeSingleFirFile(
                 packageProto.propertyList.isEmpty() &&
                 packageProto.typeAliasList.isEmpty() &&
                 classesProto.isEmpty(),
-        serializerExtension.stringTable as SerializableStringTable
+        serializerExtension.stringTable as SerializableStringTable,
+        fileAnnotations = fileAnnotationProtos,
     )
 }
 

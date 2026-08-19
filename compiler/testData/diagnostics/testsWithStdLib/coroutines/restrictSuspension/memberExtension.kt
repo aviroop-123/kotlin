@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// SKIP_TXT
 @kotlin.coroutines.RestrictsSuspension
 class RestrictedController {
     suspend fun member() {

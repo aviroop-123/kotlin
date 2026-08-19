@@ -9,8 +9,8 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.compiler.based
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.low.level.api.fir.LLResolutionFacadeService
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirTestSuppressor
+import org.jetbrains.kotlin.analysis.low.level.api.fir.LLResolutionFacadeService
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.DiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
 import org.jetbrains.kotlin.analysis.low.level.api.fir.diagnostic.compiler.based.facades.LLFirAnalyzerFacadeFactory
@@ -19,16 +19,18 @@ import org.jetbrains.kotlin.analysis.test.framework.base.registerAnalysisApiBase
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtModuleByCompilerConfiguration
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.ktTestModuleStructure
 import org.jetbrains.kotlin.cli.common.disposeRootInWriteAction
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.test.FirParser
-import org.jetbrains.kotlin.test.TestConfiguration
+import org.jetbrains.kotlin.test.NonGroupingStageTestConfiguration
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.firHandlersStep
 import org.jetbrains.kotlin.test.builders.testConfiguration
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
+import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.EXPLICITLY_GENERATE_PLUGIN_FILES
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_PARSER
 import org.jetbrains.kotlin.test.frontend.fir.FirFrontendFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
@@ -37,16 +39,19 @@ import org.jetbrains.kotlin.test.frontend.fir.FirOutputPartForDependsOnModule
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticCollectorService
 import org.jetbrains.kotlin.test.model.DependencyKind
 import org.jetbrains.kotlin.test.model.FrontendKinds
+import org.jetbrains.kotlin.test.model.ResultingArtifact
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerTest
 import org.jetbrains.kotlin.test.services.ServiceRegistrationData
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.isKtFile
 import org.jetbrains.kotlin.test.services.service
+import org.jetbrains.kotlin.testFederation.AffectedByAnalysisApi
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInfo
 
+@AffectedByAnalysisApi
 abstract class AbstractLLCompilerBasedTest : AbstractKotlinCompilerTest() {
     private var _disposable: Disposable? = null
     protected val disposable: Disposable get() = _disposable!!
@@ -64,7 +69,7 @@ abstract class AbstractLLCompilerBasedTest : AbstractKotlinCompilerTest() {
         _disposable = null
     }
 
-    protected fun ignoreTest(filePath: String, configuration: TestConfiguration): Boolean {
+    protected fun ignoreTest(filePath: String, configuration: NonGroupingStageTestConfiguration): Boolean {
         val modules = configuration.moduleStructureExtractor.splitTestDataByModules(filePath, configuration.directives)
 
         if (modules.modules.none { it.files.any { it.isKtFile } }) {
@@ -75,9 +80,9 @@ abstract class AbstractLLCompilerBasedTest : AbstractKotlinCompilerTest() {
     }
 
     /**
-     * Consider [org.jetbrains.kotlin.test.model.AfterAnalysisChecker.suppressIfNeeded] firstly
+     * Consider [org.jetbrains.kotlin.test.model.TestFailureSuppressor.suppressIfNeeded] firstly
      */
-    protected open fun shouldSkipTest(filePath: String, configuration: TestConfiguration): Boolean = false
+    protected open fun shouldSkipTest(filePath: String, configuration: NonGroupingStageTestConfiguration): Boolean = false
 
     @OptIn(TestInfrastructureInternals::class)
     override fun configureInternal(builder: TestConfigurationBuilder) = with(builder) {
@@ -89,11 +94,13 @@ abstract class AbstractLLCompilerBasedTest : AbstractKotlinCompilerTest() {
 
         defaultDirectives {
             FIR_PARSER with FirParser.Psi
+            +EXPLICITLY_GENERATE_PLUGIN_FILES
         }
 
         FirLowLevelCompilerBasedTestConfigurator.configureTest(this, disposable)
         configure(this)
         defaultConfiguration(this)
+        startingArtifactFactory = { ResultingArtifact.Source() }
         registerAnalysisApiBaseTestServices(disposable, FirLowLevelCompilerBasedTestConfigurator)
         useAdditionalServices(service<FirDiagnosticCollectorService>(::AnalysisApiFirDiagnosticCollectorService))
 
@@ -111,7 +118,7 @@ abstract class AbstractLLCompilerBasedTest : AbstractKotlinCompilerTest() {
             useAfterAnalysisCheckers(::LLFirDivergenceCommentChecker)
         }
 
-        useAfterAnalysisCheckers(::LLFirTestSuppressor)
+        useFailureSuppressors(::LLFirTestSuppressor)
     }
 
     inner class LowLevelFirFrontendFacade(
@@ -165,12 +172,13 @@ abstract class AbstractLLCompilerBasedTest : AbstractKotlinCompilerTest() {
     }
 
     override fun runTest(filePath: String) {
-        val configuration = testConfiguration(filePath, configuration)
+        val absoluteFilePath = ForTestCompileRuntime.transformTestDataPath(filePath).path
 
-        if (ignoreTest(filePath, configuration)) {
+        val configuration = testConfiguration(absoluteFilePath, configuration)
+        if (ignoreTest(absoluteFilePath, configuration)) {
             return
         }
 
-        super.runTest(filePath)
+        super.runTest(absoluteFilePath)
     }
 }

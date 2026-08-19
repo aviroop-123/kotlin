@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.KaSpi
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.typeParameters
@@ -14,6 +15,7 @@ import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.types.Variance
 
+@KaSpi
 @KaExperimentalApi
 public interface KaTypeParametersRenderer {
     public fun renderTypeParameters(
@@ -48,7 +50,7 @@ public interface KaTypeParametersRenderer {
     }
 
     @KaExperimentalApi
-    public object WIHTOUT_BOUNDS : KaTypeParametersRenderer {
+    public object WITHOUT_BOUNDS : KaTypeParametersRenderer {
         override fun renderTypeParameters(
             analysisSession: KaSession,
             symbol: KaDeclarationSymbol,
@@ -73,6 +75,28 @@ public interface KaTypeParametersRenderer {
             declarationRenderer: KaDeclarationRenderer,
             printer: PrettyPrinter,
         ) {
+        }
+    }
+
+    @KaExperimentalApi
+    @Deprecated("Use 'WITHOUT_BOUNDS' instead.")
+    public object WIHTOUT_BOUNDS : KaTypeParametersRenderer {
+        override fun renderTypeParameters(
+            analysisSession: KaSession,
+            symbol: KaDeclarationSymbol,
+            declarationRenderer: KaDeclarationRenderer,
+            printer: PrettyPrinter,
+        ) {
+            WITHOUT_BOUNDS.renderTypeParameters(analysisSession, symbol, declarationRenderer, printer)
+        }
+
+        override fun renderWhereClause(
+            analysisSession: KaSession,
+            symbol: KaDeclarationSymbol,
+            declarationRenderer: KaDeclarationRenderer,
+            printer: PrettyPrinter,
+        ) {
+            WITHOUT_BOUNDS.renderWhereClause(analysisSession, symbol, declarationRenderer, printer)
         }
     }
 
@@ -123,7 +147,7 @@ public interface KaTypeParametersRenderer {
                         declarationRenderer.keywordsRenderer.renderKeyword(analysisSession, KtTokens.WHERE_KEYWORD, symbol, printer)
                     },
                     {
-                        printer.printCollection(allBounds) { (typeParameter, bound) ->
+                        printer.printCollection(allBounds) { [typeParameter, bound] ->
                             " : ".separated(
                                 { declarationRenderer.nameRenderer.renderName(analysisSession, typeParameter, declarationRenderer, printer) },
                                 {

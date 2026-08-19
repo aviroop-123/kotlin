@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// SKIP_TXT
 // DIAGNOSTICS: -UNUSED_PARAMETER
 import kotlin.reflect.KProperty0
 import kotlin.reflect.KProperty1

@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.ProtoBuf.Type
 import org.jetbrains.kotlin.metadata.deserialization.*
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.serialization.deserialization.ProtoEnumFlags
 import org.jetbrains.kotlin.serialization.deserialization.getClassId
@@ -42,7 +43,7 @@ class FirTypeDeserializer(
     private val moduleData: FirModuleData,
     private val nameResolver: NameResolver,
     private val typeTable: TypeTable,
-    private val annotationDeserializer: AbstractAnnotationDeserializer,
+    private val annotationDeserializer: AnnotationDeserializer,
     private val flexibleTypeFactory: FlexibleTypeFactory,
     typeParameterProtos: List<ProtoBuf.TypeParameter>,
     private val parent: FirTypeDeserializer?,
@@ -84,7 +85,7 @@ class FirTypeDeserializer(
                 result[proto.id] = symbol
             }
 
-            for ((index, proto) in typeParameterProtos.withIndex()) {
+            for ([index, proto] in typeParameterProtos.withIndex()) {
                 val builder = builders[index]
                 builder.apply {
                     proto.upperBounds(typeTable).mapTo(bounds) {
@@ -103,7 +104,7 @@ class FirTypeDeserializer(
         containingDeclarationSymbol: FirBasedSymbol<*>,
         nameResolver: NameResolver,
         typeTable: TypeTable,
-        annotationDeserializer: AbstractAnnotationDeserializer,
+        annotationDeserializer: AnnotationDeserializer,
     ): FirTypeDeserializer = FirTypeDeserializer(
         moduleData,
         nameResolver,
@@ -119,6 +120,7 @@ class FirTypeDeserializer(
         try {
             // We can't just load local types as is, because later we will get an exception
             // while trying to get corresponding FIR class
+            @OptIn(ClassIdBasedLocality::class)
             val id = nameResolver.getClassId(fqNameIndex).takeIf { !it.isLocal } ?: StandardClassIds.Any
             return id.toLookupTag()
         } catch (e: Throwable) {

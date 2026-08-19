@@ -8,13 +8,9 @@ package org.jetbrains.kotlin.test.runners
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
-import org.jetbrains.kotlin.test.backend.handlers.NoFirCompilationErrorsHandler
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.firHandlersStep
-import org.jetbrains.kotlin.test.configuration.baseFirDiagnosticTestConfiguration
-import org.jetbrains.kotlin.test.configuration.configurationForTestWithLatestLanguageVersion
-import org.jetbrains.kotlin.test.configuration.configureDiagnosticTest
-import org.jetbrains.kotlin.test.configuration.configureIrActualizerDiagnosticsTest
+import org.jetbrains.kotlin.test.configuration.*
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.DISABLE_TYPEALIAS_EXPANSION
 import org.jetbrains.kotlin.test.directives.configureFirParser
@@ -22,6 +18,7 @@ import org.jetbrains.kotlin.test.frontend.fir.Fir2IrResultsConverter
 import org.jetbrains.kotlin.test.services.LibraryProvider
 import org.jetbrains.kotlin.test.services.PlatformModuleProvider
 import org.jetbrains.kotlin.test.services.fir.FirWithoutAliasExpansionTestSuppressor
+import org.jetbrains.kotlin.test.services.fir.OnlyTestsWithTypeAliasesMetaConfigurator
 
 abstract class AbstractFirDiagnosticTestBase(val parser: FirParser) : AbstractKotlinCompilerTest() {
     override fun configure(builder: TestConfigurationBuilder) = with(builder) {
@@ -39,6 +36,13 @@ abstract class AbstractFirLightTreeDiagnosticsWithLatestLanguageVersionTest : Ab
     }
 }
 
+abstract class AbstractFirLightTreeDiagnosticsWithLanguageFeatureDisabledTest : AbstractFirLightTreeDiagnosticsTest() {
+    override fun configure(builder: TestConfigurationBuilder) {
+        super.configure(builder)
+        builder.configurationForTestWithLanguageFeatureDisabled()
+    }
+}
+
 open class AbstractFirLightTreeDiagnosticsWithoutAliasExpansionTest : AbstractFirPhasedDiagnosticTest(FirParser.LightTree) {
     override fun configure(builder: TestConfigurationBuilder) {
         super.configure(builder)
@@ -47,7 +51,8 @@ open class AbstractFirLightTreeDiagnosticsWithoutAliasExpansionTest : AbstractFi
                 +DISABLE_TYPEALIAS_EXPANSION
             }
 
-            useAfterAnalysisCheckers(::FirWithoutAliasExpansionTestSuppressor)
+            useFailureSuppressors(::FirWithoutAliasExpansionTestSuppressor)
+            useMetaTestConfigurators(::OnlyTestsWithTypeAliasesMetaConfigurator)
         }
     }
 }
@@ -64,7 +69,7 @@ open class AbstractFirLightTreeWithActualizerDiagnosticsWithLatestLanguageVersio
         baseFirDiagnosticTestConfiguration()
 
         firHandlersStep {
-            useHandlers(::NoFirCompilationErrorsHandler)
+            commonFirHandlersForCodegenTest()
         }
 
         facadeStep(::Fir2IrResultsConverter)

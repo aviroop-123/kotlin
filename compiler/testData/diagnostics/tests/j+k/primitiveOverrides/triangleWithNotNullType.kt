@@ -1,5 +1,4 @@
-// RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // ISSUE: KT-62554
 // FIR_DUMP
 // SCOPE_DUMP: C:foo
@@ -20,7 +19,7 @@ interface B {
 class C : A(), B
 
 fun main() {
-    C().<!OVERLOAD_RESOLUTION_AMBIGUITY!>foo<!>(42)
+    C().foo(42)
 }
 
 /* GENERATED_FIR_TAGS: classDeclaration, functionDeclaration, integerLiteral, interfaceDeclaration, javaType */

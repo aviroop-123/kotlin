@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_VALUE -VARIABLE_WITH_REDUNDANT_INITIALIZER
-// SKIP_TXT
 // Related issue: KT-28370
 
 class ExcA : Exception()
@@ -30,8 +29,8 @@ fun test2(s: String?) {
             requireNotNull(s)
             t2 = true
         }
-        <!DEBUG_INFO_SMARTCAST!>t2<!>.not()
-        <!DEBUG_INFO_SMARTCAST!>s<!>.length
+        t2.not()
+        s.length
     }
 }
 
@@ -45,7 +44,7 @@ fun test3() {
         s = null
         return
     }
-    <!DEBUG_INFO_SMARTCAST!>s<!>.length
+    s.length
 }
 
 fun test4() {
@@ -61,7 +60,7 @@ fun test4() {
     catch (e: ExcB) {
 
     }
-    <!DEBUG_INFO_SMARTCAST!>s<!>.length
+    s.length
 }
 
 fun test5(s: String?) {
@@ -84,7 +83,7 @@ fun test6(s: String?) {
     catch (e: Exception) {
         return
     }
-    <!DEBUG_INFO_SMARTCAST!>s<!>.length
+    s.length
 }
 
 /* GENERATED_FIR_TAGS: assignment, classDeclaration, equalityExpression, functionDeclaration, ifExpression,

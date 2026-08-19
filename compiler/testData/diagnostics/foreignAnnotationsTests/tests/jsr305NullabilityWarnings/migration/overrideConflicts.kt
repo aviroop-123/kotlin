@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER
 // JSR305_GLOBAL_REPORT: warn
 // JSR305_MIGRATION_REPORT: strict
@@ -76,7 +75,7 @@ fun main(b: B, c: C) {
     b.bar2("")
     b.bar3(<!NULL_FOR_NONNULL_TYPE!>null<!>)
     b.bar3("")
-    b.bar4(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
+    b.bar4(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)
     b.bar4("")
 
     c.foo4()<!UNSAFE_CALL!>.<!>length

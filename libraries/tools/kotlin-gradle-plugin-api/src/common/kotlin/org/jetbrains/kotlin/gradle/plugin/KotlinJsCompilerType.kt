@@ -5,34 +5,18 @@
 
 package org.jetbrains.kotlin.gradle.plugin
 
-import java.util.*
-
 /**
  * The different modes of the Kotlin compiler for compiling source code into an output artifact for the [KotlinPlatformType.js] platform.
  */
+@Deprecated(
+    "Kotlin/JS IR is the only supported compiler type. Remove compiler type selection from the DSL. Scheduled for removal in Kotlin 2.6.",
+    level = DeprecationLevel.WARNING,
+)
 enum class KotlinJsCompilerType {
-    /**
-     * @suppress
-     */
-    @Deprecated(
-        message = "The legacy compiler is deprecated. Migrate your project to the new IR-based compiler. Scheduled for removal in Kotlin 2.3.",
-        level = DeprecationLevel.ERROR
-    )
-    LEGACY,
-
     /**
      * Represents the IR (Intermediate Representation) backend mode of the Kotlin compiler.
      */
-    IR,
-
-    /**
-     * @suppress
-     */
-    @Deprecated(
-        message = "The legacy compiler is deprecated. Migrate your project to the new IR-based compiler. Scheduled for removal in Kotlin 2.3.",
-        level = DeprecationLevel.ERROR
-    )
-    BOTH;
+    IR;
 
     /**
      * @suppress
@@ -40,34 +24,15 @@ enum class KotlinJsCompilerType {
     companion object {
         const val jsCompilerProperty = "kotlin.js.compiler"
 
+        @Suppress("DEPRECATION")
         fun byArgumentOrNull(argument: String): KotlinJsCompilerType? =
             values().firstOrNull { it.name.equals(argument, ignoreCase = true) }
 
+        @Suppress("DEPRECATION")
         fun byArgument(argument: String): KotlinJsCompilerType =
             byArgumentOrNull(argument)
                 ?: throw IllegalArgumentException(
                     "Unable to find $argument setting. Use [${values().toList().joinToString()}]"
                 )
     }
-}
-
-/**
- * @suppress
- */
-@Deprecated(message = "Scheduled for removal in Kotlin 2.3.", level = DeprecationLevel.ERROR)
-val KotlinJsCompilerType.lowerName
-    get() = name.lowercase()
-
-/**
- * @suppress
- */
-@Suppress("DEPRECATION_ERROR")
-@Deprecated(message = "Scheduled for removal in Kotlin 2.3.", level = DeprecationLevel.ERROR)
-fun String.removeJsCompilerSuffix(compilerType: KotlinJsCompilerType): String {
-    val truncatedString = removeSuffix(compilerType.lowerName)
-    if (this != truncatedString) {
-        return truncatedString
-    }
-
-    return removeSuffix(compilerType.lowerName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ENGLISH) else it.toString() })
 }

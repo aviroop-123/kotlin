@@ -100,15 +100,35 @@ internal class KotlinCompilationImpl(
 
     //region Dependency Configuration Management
 
+    @Deprecated(
+        "Accessing apiConfigurationName on Compilation level is deprecated, please use default source set instead",
+        replaceWith = ReplaceWith("defaultSourceSet.apiConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
     override val apiConfigurationName: String
         get() = configurations.apiConfiguration.name
 
+    @Deprecated(
+        "Accessing implementationConfigurationName on Compilation level is deprecated, please use default source set instead",
+        replaceWith = ReplaceWith("defaultSourceSet.implementationConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
     override val implementationConfigurationName: String
         get() = configurations.implementationConfiguration.name
 
+    @Deprecated(
+        "Accessing compileOnlyConfigurationName on Compilation level is deprecated, please use default source set instead",
+        replaceWith = ReplaceWith("defaultSourceSet.compileOnlyConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
     override val compileOnlyConfigurationName: String
         get() = configurations.compileOnlyConfiguration.name
 
+    @Deprecated(
+        "Accessing runtimeOnlyConfigurationName on Compilation level is deprecated, please use default source set instead",
+        replaceWith = ReplaceWith("defaultSourceSet.runtimeOnlyConfigurationName"),
+        level = DeprecationLevel.WARNING
+    )
     override val runtimeOnlyConfigurationName: String
         get() = configurations.runtimeOnlyConfiguration.name
 
@@ -122,10 +142,20 @@ internal class KotlinCompilationImpl(
 
     override var runtimeDependencyFiles: FileCollection? = configurations.runtimeDependencyConfiguration
 
+    @Deprecated(
+        "Declaring dependencies on Compilation level is deprecated, please declare on related source set",
+        replaceWith = ReplaceWith("defaultSourceSet.dependencies"),
+        level = DeprecationLevel.WARNING
+    )
     override fun dependencies(configure: KotlinDependencyHandler.() -> Unit) {
         HasKotlinDependencies(project, configurations).dependencies(configure)
     }
 
+    @Deprecated(
+        "Declaring dependencies on Compilation level is deprecated, please declare on related source set",
+        replaceWith = ReplaceWith("defaultSourceSet.dependencies"),
+        level = DeprecationLevel.WARNING
+    )
     override fun dependencies(configure: Action<KotlinDependencyHandler>) {
         HasKotlinDependencies(project, configurations).dependencies(configure)
     }
@@ -140,24 +170,6 @@ internal class KotlinCompilationImpl(
 
     override val compileAllTaskName: String
         get() = params.compilationTaskNames.compileAllTaskName
-
-    @Suppress("deprecation_error")
-    @Deprecated(
-        "Accessing task instance directly is deprecated. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compileTaskProvider"),
-        level = DeprecationLevel.ERROR,
-    )
-    override val compileKotlinTask: KotlinCompile<KotlinCommonOptions>
-        get() = compileKotlinTaskProvider.get()
-
-    @Suppress("DEPRECATION_ERROR")
-    @Deprecated(
-        "Replaced with compileTaskProvider. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("compileTaskProvider"),
-        level = DeprecationLevel.ERROR
-    )
-    override val compileKotlinTaskProvider: TaskProvider<out KotlinCompile<KotlinCommonOptions>>
-        get() = target.project.locateTask(compileKotlinTaskName) ?: throw GradleException("Couldn't locate  task $compileKotlinTaskName")
 
     override val compileTaskProvider: TaskProvider<out KotlinCompilationTask<*>>
         get() = target.project.locateTask(compileKotlinTaskName) ?: throw GradleException("Couldn't locate task $compileKotlinTaskName")
@@ -186,7 +198,7 @@ internal class KotlinCompilationImpl(
 
     //region Attributes
 
-    private val attributes by lazy { HierarchyAttributeContainer(target.attributes) }
+    private val attributes by lazy { HierarchyAttributeContainer(target.attributes, target.project.objects) }
 
     override fun getAttributes(): AttributeContainer = attributes
 

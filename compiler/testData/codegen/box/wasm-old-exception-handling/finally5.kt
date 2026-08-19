@@ -1,0 +1,33 @@
+// WITH_STDLIB
+// TARGET_BACKEND: WASM
+// USE_OLD_EXCEPTION_HANDLING_PROPOSAL
+// WASM_IGNORE_FOR: vm=Wasmtime
+// WASM_IGNORE_FOR: vm=WasmEdge
+
+import kotlin.test.*
+
+val sb = StringBuilder()
+
+fun box(): String {
+    sb.appendLine(foo())
+
+    assertEquals("""
+        Done
+        Finally
+        0
+
+    """.trimIndent(), sb.toString())
+    return "OK"
+}
+
+fun foo(): Int {
+    try {
+        sb.appendLine("Done")
+        return 0
+    } finally {
+        sb.appendLine("Finally")
+    }
+
+    sb.appendLine("After")
+    return 1
+}

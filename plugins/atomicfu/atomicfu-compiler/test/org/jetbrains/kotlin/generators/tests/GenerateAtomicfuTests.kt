@@ -5,12 +5,13 @@
 
 package org.jetbrains.kotlin.generators.tests
 
-import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
-import org.jetbrains.kotlin.generators.impl.generateTestGroupSuite
+import org.jetbrains.kotlin.generators.dsl.junit4.generateTestGroupSuiteWithJUnit4
+import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 import org.jetbrains.kotlin.generators.model.annotation
 import org.jetbrains.kotlin.konan.test.blackbox.AbstractNativeCodegenBoxTest
-import org.jetbrains.kotlin.konan.test.blackbox.support.group.UseExtTestCaseGroupProvider
 import org.jetbrains.kotlin.konan.test.blackbox.support.EnforcedHostTarget
+import org.jetbrains.kotlin.konan.test.blackbox.support.group.UseExtTestCaseGroupProvider
+import org.jetbrains.kotlin.konan.test.syntheticAccessors.AbstractNativeKlibSyntheticAccessorTest
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlinx.atomicfu.incremental.AbstractIncrementalK2JVMWithAtomicfuRunnerTest
 import org.jetbrains.kotlinx.atomicfu.runners.*
@@ -19,7 +20,7 @@ import org.junit.jupiter.api.Tag
 fun main(args: Array<String>) {
     System.setProperty("java.awt.headless", "true")
 
-    generateTestGroupSuite(args) {
+    generateTestGroupSuiteWithJUnit4(args) {
         testGroup("plugins/atomicfu/atomicfu-compiler/tests-gen", "plugins/atomicfu/atomicfu-compiler/testData/") {
             testClass<AbstractIncrementalK2JVMWithAtomicfuRunnerTest> {
                 model("projects/", extension = null, recursive = false, targetBackend = TargetBackend.JVM_IR)
@@ -34,13 +35,18 @@ fun main(args: Array<String>) {
                 suiteTestClassName = "AtomicfuNativeTestGenerated",
                 annotations = listOf(*atomicfuNative(), provider<UseExtTestCaseGroupProvider>())
             ) {
-                model(targetBackend = TargetBackend.NATIVE)
+                model()
             }
             testClass<AbstractNativeCodegenBoxTest>(
                 suiteTestClassName = "AtomicfuNativeTestWithInlinedFunInKlibGenerated",
                 annotations = listOf(klibIrInliner(), *atomicfuNative(), provider<UseExtTestCaseGroupProvider>())
             ) {
-                model(targetBackend = TargetBackend.NATIVE)
+                model()
+            }
+            testClass<AbstractAtomicfuNativeKlibSyntheticAccessorTest>(
+                annotations = listOf(klibIrInliner(), *klibSyntheticAccessors(), *atomicfuNative())
+            ) {
+                model()
             }
         }
 
@@ -64,10 +70,6 @@ fun main(args: Array<String>) {
         ) {
             testClass<AbstractAtomicfuFirCheckerTest> {
                 model("diagnostics/")
-            }
-
-            testClass<AbstractAtomicfuJvmIrTest> {
-                model("box/", excludeDirs = listOf("context_parameters"))
             }
 
             testClass<AbstractAtomicfuJvmFirLightTreeTest> {

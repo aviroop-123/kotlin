@@ -1,7 +1,5 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -NAME_SHADOWING
-// LANGUAGE: +TrailingCommas
 
 fun foo1(x: Any) = when (x) {
     Comparable::class,

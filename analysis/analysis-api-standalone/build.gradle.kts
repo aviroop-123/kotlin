@@ -1,12 +1,19 @@
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-data-manager")
+    id("test-inputs-check")
 }
 
 dependencies {
     implementation(intellijCore())
+    implementation(project(":core:descriptors.jvm"))
+    implementation(project(":core:language.targets.jvm"))
+    implementation(project(":compiler:config.jvm"))
+    implementation(project(":compiler:psi:parser"))
     implementation(project(":compiler:psi:psi-api"))
     api(project(":analysis:analysis-api"))
     api(project(":analysis:analysis-api-platform-interface"))
@@ -20,6 +27,7 @@ dependencies {
     testFixturesApi(testFixtures(project(":analysis:analysis-api-impl-base")))
     testFixturesApi(testFixtures(project(":analysis:analysis-test-framework")))
     testFixturesApi(testFixtures(project(":analysis:low-level-api-fir")))
+    testImplementation(testFixtures(project(":compiler:psi:psi-api")))
 
     testFixturesApi(kotlinTest("junit"))
     testCompileOnly(toolsJarApi())
@@ -33,7 +41,21 @@ kotlin {
     explicitApi()
 
     compilerOptions {
-        optIn.add("org.jetbrains.kotlin.analysis.api.KaPlatformInterface")
+        optIn.addAll(
+            "org.jetbrains.kotlin.analysis.api.KaPlatformInterface",
+            "org.jetbrains.kotlin.analysis.api.KaImplementationDetail",
+        )
+    }
+
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation {
+        referenceDumpDir = File("api-unstable")
+
+        filters {
+            exclude.annotatedWith.addAll(
+                "org.jetbrains.kotlin.analysis.api.KaImplementationDetail",
+            )
+        }
     }
 }
 
@@ -48,11 +70,36 @@ sourceSets {
 
 projectTests {
     testTask(jUnitMode = JUnitMode.JUnit5, defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_11_0)) {
-        dependsOn(":dist")
-        workingDir = rootDir
-    }.also { confugureFirPluginAnnotationsDependency(it) }
+        testInputsCheck {
+            allowFlightRecorder = true
+        }
+
+        if (!kotlinBuildProperties.isTeamcityBuild.get()) {
+            // Ensure golden tests run first
+            mustRunAfter(":analysis:analysis-api-fir:test")
+        }
+    }
+
+    testCodebaseTask(dumpDirs = listOf("api", "api-unstable"))
+
+    testGenerator("org.jetbrains.kotlin.analysis.api.standalone.fir.test.TestGeneratorKt")
 
     withJvmStdlibAndReflect()
+    withStdlibCommon()
+    withJsRuntime()
+    withTestJar()
+    withMockJdkRuntime()
+    withMockJdkAnnotationsJar()
+    withScriptRuntime()
+    withPluginSandboxAnnotations()
+    withWasmRuntime()
+
+    @OptIn(KotlinCompilerDistUsage::class)
+    withDist()
+
+    testData(project.isolated, "testData")
+    testData(project(":analysis:analysis-api").isolated, "testData")
+    testData(project(":analysis:low-level-api-fir").isolated, "testData/resolveToFirSymbolPsiClass")
 }
 
 testsJar()

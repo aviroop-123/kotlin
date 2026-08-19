@@ -8,30 +8,28 @@ public final class Foo: KotlinRuntime.KotlinBase {
         public init(
             outer__: main.Foo
         ) {
-            if Self.self != main.Foo.Inner.self { fatalError("Inheritance from exported Kotlin classes is not supported yet: \(String(reflecting: Self.self)) inherits from main.Foo.Inner ") }
             let __kt = Foo_Inner_init_allocate()
-            super.init(__externalRCRefUnsafe: __kt, options: .asBoundBridge)
-            Foo_Inner_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_main_Foo__(__kt, outer__.__externalRCRef())
+            super.init(__externalRCRefUnsafe: __kt, options: .asBoundBridge);
+            { Foo_Inner_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_main_Foo__(__kt, outer__.__externalRCRef()); return () }()
         }
         package override init(
             __externalRCRefUnsafe: Swift.UnsafeMutableRawPointer?,
             options: KotlinRuntime.KotlinBaseConstructionOptions
         ) {
-            super.init(__externalRCRefUnsafe: __externalRCRefUnsafe, options: options)
+            super.init(__externalRCRefUnsafe: __externalRCRefUnsafe, options: options);
         }
     }
     public final class Nested: KotlinRuntime.KotlinBase {
         public init() {
-            if Self.self != main.Foo.Nested.self { fatalError("Inheritance from exported Kotlin classes is not supported yet: \(String(reflecting: Self.self)) inherits from main.Foo.Nested ") }
             let __kt = Foo_Nested_init_allocate()
-            super.init(__externalRCRefUnsafe: __kt, options: .asBoundBridge)
-            Foo_Nested_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(__kt)
+            super.init(__externalRCRefUnsafe: __kt, options: .asBoundBridge);
+            { Foo_Nested_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(__kt); return () }()
         }
         package override init(
             __externalRCRefUnsafe: Swift.UnsafeMutableRawPointer?,
             options: KotlinRuntime.KotlinBaseConstructionOptions
         ) {
-            super.init(__externalRCRefUnsafe: __externalRCRefUnsafe, options: options)
+            super.init(__externalRCRefUnsafe: __externalRCRefUnsafe, options: options);
         }
         public static func +(
             this: main.Foo.Nested,
@@ -46,54 +44,80 @@ public final class Foo: KotlinRuntime.KotlinBase {
         }
     }
     public init() {
-        if Self.self != main.Foo.self { fatalError("Inheritance from exported Kotlin classes is not supported yet: \(String(reflecting: Self.self)) inherits from main.Foo ") }
         let __kt = __root___Foo_init_allocate()
-        super.init(__externalRCRefUnsafe: __kt, options: .asBoundBridge)
-        __root___Foo_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(__kt)
+        super.init(__externalRCRefUnsafe: __kt, options: .asBoundBridge);
+        { __root___Foo_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(__kt); return () }()
     }
     package override init(
         __externalRCRefUnsafe: Swift.UnsafeMutableRawPointer?,
         options: KotlinRuntime.KotlinBaseConstructionOptions
     ) {
-        super.init(__externalRCRefUnsafe: __externalRCRefUnsafe, options: options)
+        super.init(__externalRCRefUnsafe: __externalRCRefUnsafe, options: options);
     }
 }
 extension ExportedKotlinPackages.a.b.c {
-    public final class E: KotlinRuntime.KotlinBase, Swift.CaseIterable {
-        public static var A: ExportedKotlinPackages.a.b.c.E {
+    public enum E: KotlinRuntimeSupport._KotlinBridgeable, Swift.CaseIterable, Swift.LosslessStringConvertible, Swift.RawRepresentable {
+        case A
+        case B
+        case C
+        public var description: Swift.String {
             get {
-                return ExportedKotlinPackages.a.b.c.E.__createClassWrapper(externalRCRef: a_b_c_E_A_get())
+                switch self {
+                case .A: "A"
+                case .B: "B"
+                case .C: "C"
+                default: fatalError()
+                }
             }
         }
-        public static var B: ExportedKotlinPackages.a.b.c.E {
+        public var rawValue: Swift.Int32 {
             get {
-                return ExportedKotlinPackages.a.b.c.E.__createClassWrapper(externalRCRef: a_b_c_E_B_get())
+                switch self {
+                case .A: 0
+                case .B: 1
+                case .C: 2
+                default: fatalError()
+                }
             }
         }
-        public static var C: ExportedKotlinPackages.a.b.c.E {
-            get {
-                return ExportedKotlinPackages.a.b.c.E.__createClassWrapper(externalRCRef: a_b_c_E_C_get())
+        public init?(
+            _ description: Swift.String
+        ) {
+            switch description {
+            case "A": self = .A
+            case "B": self = .B
+            case "C": self = .C
+            default: return nil
             }
         }
-        public static var allCases: [ExportedKotlinPackages.a.b.c.E] {
-            get {
-                return a_b_c_E_entries_get() as! Swift.Array<ExportedKotlinPackages.a.b.c.E>
-            }
+        public init?(
+            rawValue: Swift.Int32
+        ) {
+            guard 0..<3 ~= rawValue else { return nil }
+            self = E.allCases[Int(rawValue)]
         }
-        package override init(
-            __externalRCRefUnsafe: Swift.UnsafeMutableRawPointer?,
+        public init(
+            __externalRCRefUnsafe: Swift.UnsafeMutableRawPointer!,
             options: KotlinRuntime.KotlinBaseConstructionOptions
         ) {
-            super.init(__externalRCRefUnsafe: __externalRCRefUnsafe, options: options)
+            switch a_b_c_E_ordinal(__externalRCRefUnsafe) {
+            case 0: self = .A
+            case 1: self = .B
+            case 2: self = .C
+            default: fatalError()
+            }
         }
-        public static func valueOf(
-            value: Swift.String
-        ) -> ExportedKotlinPackages.a.b.c.E {
-            return ExportedKotlinPackages.a.b.c.E.__createClassWrapper(externalRCRef: a_b_c_E_valueOf__TypesOfArguments__Swift_String__(value))
+        public func __externalRCRef() -> Swift.UnsafeMutableRawPointer! {
+            return switch self {
+            case .A: a_b_c_E_A()
+            case .B: a_b_c_E_B()
+            case .C: a_b_c_E_C()
+            default: fatalError()
+            }
         }
     }
 }
-// Can't export foo: inline functions are not supported yet.
-// Can't export foo: inline functions are not supported yet.
+// Can't export foo: inline functions with reified type parameters are not supported yet.
+// Can't export foo: inline functions with reified type parameters are not supported yet.
 // Can't export a.b.c.E.values: static functions are not supported yet.
 // Can't export a.b.c.E.values: static functions are not supported yet.

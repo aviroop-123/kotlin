@@ -1,5 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
+// LANGUAGE: -ProperSupportOfInnerClassesInCallableReferenceLHS
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
  *

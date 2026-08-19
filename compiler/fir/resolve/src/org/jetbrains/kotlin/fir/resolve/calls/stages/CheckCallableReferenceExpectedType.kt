@@ -16,7 +16,10 @@ import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.builder.buildNamedArgumentExpression
 import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.calls.*
-import org.jetbrains.kotlin.fir.resolve.calls.candidate.*
+import org.jetbrains.kotlin.fir.resolve.calls.candidate.CallableReferenceInfo
+import org.jetbrains.kotlin.fir.resolve.calls.candidate.Candidate
+import org.jetbrains.kotlin.fir.resolve.calls.candidate.CheckerSink
+import org.jetbrains.kotlin.fir.resolve.calls.candidate.yieldDiagnostic
 import org.jetbrains.kotlin.fir.resolve.inference.model.ConeArgumentConstraintPosition
 import org.jetbrains.kotlin.fir.scopes.CallableCopyTypeCalculator
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
@@ -27,6 +30,8 @@ import org.jetbrains.kotlin.fir.utils.exceptions.withFirEntry
 import org.jetbrains.kotlin.fir.visitors.FirTransformer
 import org.jetbrains.kotlin.fir.visitors.FirVisitor
 import org.jetbrains.kotlin.name.StandardClassIds
+import org.jetbrains.kotlin.resolve.calls.inference.isSubtypeConstraintCompatible
+import org.jetbrains.kotlin.resolve.calls.inference.model.Constraint
 import org.jetbrains.kotlin.types.TypeApproximatorConfiguration
 import org.jetbrains.kotlin.types.expressions.CoercionStrategy
 import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
@@ -40,17 +45,14 @@ internal object CheckCallableReferenceExpectedType : ResolutionStage() {
         val expectedType = candidate.callInfo.expectedType
         if (candidate.symbol !is FirCallableSymbol<*>) return
 
-        val resultingReceiverType = when (candidate.callInfo.lhs) {
-            is DoubleColonLHS.Type -> candidate.callInfo.lhs.type.takeIf {
-                candidate.callInfo.explicitReceiver?.unwrapSmartcastExpression() !is FirResolvedQualifier
-            }
-            else -> null
+        val resultingReceiverType = candidate.callInfo.lhsAsType?.type.takeIf {
+            candidate.callInfo.explicitReceiver?.unwrapSmartcastExpression() !is FirResolvedQualifier
         }
 
         val fir: FirCallableDeclaration = candidate.symbol.fir as FirCallableDeclaration
 
         val isExpectedTypeReflectionType = candidate.callInfo.expectedType?.isReflectFunctionType(candidate.callInfo.session) == true
-        val (rawResultingType, callableReferenceAdaptation) = buildResultingTypeAndAdaptation(
+        val [rawResultingType, callableReferenceAdaptation] = buildResultingTypeAndAdaptation(
             fir,
             resultingReceiverType,
             candidate,
@@ -65,7 +67,7 @@ internal object CheckCallableReferenceExpectedType : ResolutionStage() {
         )
 
         if (callableReferenceAdaptation != null) {
-            if (!LanguageFeature.DisableCompatibilityModeForNewInference.isEnabled()) {
+            if (enableCompatibilityModeForNewInference()) {
                 sink.reportDiagnostic(LowerPriorityToPreserveCompatibilityDiagnostic)
             }
 
@@ -115,7 +117,7 @@ private fun buildResultingTypeAndAdaptation(
             val callInfo = candidate.callInfo as CallableReferenceInfo
             val callableReferenceAdaptation =
                 context.bodyResolveComponents.getCallableReferenceAdaptation(
-                    context.session,
+                    candidate,
                     fir,
                     callInfo.expectedType?.lowerBoundIfFlexible(),
                     unboundReferenceTarget
@@ -130,7 +132,7 @@ private fun buildResultingTypeAndAdaptation(
             val returnType = if (callableReferenceAdaptation == null) {
                 returnTypeWithoutCoercion.also {
                     fir.valueParameters.mapTo(parameters) {
-                        if ((fir is FirSimpleFunction || fir is FirConstructor) && fir.origin != FirDeclarationOrigin.SamConstructor) {
+                        if ((fir is FirNamedFunction || fir is FirConstructor) && fir.origin != FirDeclarationOrigin.SamConstructor) {
                             it.returnTypeRef.coneType.withParameterNameAnnotation(it)
                         } else {
                             it.returnTypeRef.coneType
@@ -163,12 +165,11 @@ private fun buildResultingTypeAndAdaptation(
                 ?: fir.specialFunctionTypeKind(context.session)
                 ?: FunctionTypeKind.Function
 
-            return createFunctionType(
+            createFunctionType(
                 if (callableReferenceAdaptation == null || forceReflectionType) baseFunctionTypeKind.reflectKind() else baseFunctionTypeKind.nonReflectKind(),
                 parameters,
                 receiverType = receiverType.takeIf { fir.receiverParameter != null },
                 rawReturnType = returnType,
-                contextParameters = fir.contextParameters.map { it.returnTypeRef.coneType }
             ) to callableReferenceAdaptation
         }
         is FirVariable -> {
@@ -188,7 +189,7 @@ private fun buildResultingTypeAndAdaptation(
 }
 
 private fun BodyResolveComponents.getCallableReferenceAdaptation(
-    session: FirSession,
+    candidate: Candidate,
     function: FirFunction,
     expectedType: ConeKotlinType?,
     unboundReceiverCount: Int
@@ -198,19 +199,18 @@ private fun BodyResolveComponents.getCallableReferenceAdaptation(
     // Do not adapt references against KCallable type as it's impossible to map defaults/vararg to absent parameters of KCallable
     if (expectedType.isKCallableType()) return null
 
-    val (inputTypes, returnExpectedType) = extractInputOutputTypesFromCallableReferenceExpectedType(expectedType, session) ?: return null
+    (val inputTypes, val returnExpectedType = outputType) = extractInputOutputTypesFromCallableReferenceExpectedType(expectedType, session)
+        ?: return null
     val expectedArgumentsCount = inputTypes.size - unboundReceiverCount
     if (expectedArgumentsCount < 0) return null
 
     val fakeArguments = createFakeArgumentsForReference(function, expectedArgumentsCount, inputTypes, unboundReceiverCount)
     val originScope = function.dispatchReceiverType?.scope(
-        useSiteSession = session,
-        scopeSession = scopeSession,
         callableCopyTypeCalculator = CallableCopyTypeCalculator.DoNothing,
         requiredMembersPhase = FirResolvePhase.STATUS,
     )
 
-    val argumentMapping = mapArguments(fakeArguments, function, originScope = originScope, callSiteIsOperatorCall = false)
+    val argumentMapping = mapArguments(fakeArguments, function, originScope = originScope, callSiteIsOperatorCall = false, lookInContextParameters = false)
     if (argumentMapping.diagnostics.anyUnsuccessful) return null
 
     /**
@@ -223,7 +223,7 @@ private fun BodyResolveComponents.getCallableReferenceAdaptation(
     val mappedVarargElements = linkedMapOf<FirValueParameter, MutableList<ConeResolutionAtom>>()
     val mappedArgumentTypes = arrayOfNulls<ConeKotlinType?>(fakeArguments.size)
 
-    for ((valueParameter, resolvedArgument) in argumentMapping.parameterToCallArgumentMap) {
+    for ([valueParameter, resolvedArgument] in argumentMapping.parameterToCallArgumentMap) {
         for (fakeArgumentAtom in resolvedArgument.arguments) {
             val fakeArgument = fakeArgumentAtom.expression
             val index = fakeArgument.index
@@ -231,7 +231,8 @@ private fun BodyResolveComponents.getCallableReferenceAdaptation(
 
             val mappedArgument: ConeKotlinType?
             if (substitutedParameter.isVararg) {
-                val (varargType, newVarargMappingState) = varargParameterTypeByExpectedParameter(
+                val [varargType, newVarargMappingState] = varargParameterTypeByExpectedParameter(
+                    candidate,
                     inputTypes[index + unboundReceiverCount],
                     substitutedParameter,
                     varargMappingState
@@ -264,7 +265,7 @@ private fun BodyResolveComponents.getCallableReferenceAdaptation(
     }
     if (mappedArgumentTypes.any { it == null }) return null
 
-    for ((valueParameter, varargElements) in mappedVarargElements) {
+    for ([valueParameter, varargElements] in mappedVarargElements) {
         mappedArguments[valueParameter] = ResolvedCallArgument.VarargArgument(varargElements)
     }
 
@@ -321,7 +322,13 @@ private fun BodyResolveComponents.getCallableReferenceAdaptation(
     )
 }
 
+/**
+ * @returns next parameter type and next VarargMappingState
+ * `null` for the first component means that vararg adaptation is not possible
+ */
+context(_: SessionHolder)
 private fun varargParameterTypeByExpectedParameter(
+    candidate: Candidate,
     expectedParameterType: ConeKotlinType,
     substitutedParameter: FirValueParameter,
     varargMappingState: VarargMappingState,
@@ -335,21 +342,73 @@ private fun varargParameterTypeByExpectedParameter(
 
     return when (varargMappingState) {
         VarargMappingState.UNMAPPED -> {
-            if (expectedParameterType.isPotentiallyArray()) {
-                elementType.createOutArrayType() to VarargMappingState.MAPPED_WITH_ARRAY
-            } else {
-                elementType to VarargMappingState.MAPPED_WITH_PLAIN_ARGS
+            when {
+                expectedParameterType.isArrayOrPrimitiveArray() ||
+                        isApplicableTypeVariableForMappingAsArray(expectedParameterType, candidate, elementType.createOutArrayType()) -> {
+                    elementType.createOutArrayType() to VarargMappingState.MAPPED_WITH_ARRAY
+                }
+                else -> {
+                    elementType to VarargMappingState.MAPPED_WITH_PLAIN_ARGS
+                }
             }
         }
         VarargMappingState.MAPPED_WITH_PLAIN_ARGS -> {
-            if (expectedParameterType.isPotentiallyArray())
-                null to VarargMappingState.MAPPED_WITH_PLAIN_ARGS
-            else
-                elementType to VarargMappingState.MAPPED_WITH_PLAIN_ARGS
+            when {
+                LanguageFeature.RefinedVarargConversionRulesForCallableReferences.isDisabled() -> when {
+                    expectedParameterType.isArrayOrPrimitiveArray() || expectedParameterType is ConeTypeVariableType ->
+                        null to VarargMappingState.MAPPED_WITH_PLAIN_ARGS
+                    else -> elementType to VarargMappingState.MAPPED_WITH_PLAIN_ARGS
+                }
+                else -> elementType to VarargMappingState.MAPPED_WITH_PLAIN_ARGS
+            }
         }
         VarargMappingState.MAPPED_WITH_ARRAY ->
             null to VarargMappingState.MAPPED_WITH_ARRAY
     }
+}
+
+/**
+ * fun <T> myMap(x: (T) -> Unit)
+ * fun of(vararg args: String)
+ *
+ * and for the call myMap(::of), [candidate] is `::of`, [expectedParameterType] is `Tv` and [arrayType] is `Array<String>`.
+ *
+ * @expectedParameterType is a parameter type of function type we're trying to match our callable reference
+ * @candidate is a callable reference candidate (including the outer call CS)
+ * @arrayType is an element type for the vararg parameter
+ *
+ * @returns true if @expectedParameterType is a type variable and there are no contradicting constraints for using it as an array value for @arrayType
+ *
+ */
+context(_: SessionHolder)
+private fun isApplicableTypeVariableForMappingAsArray(
+    expectedParameterType: ConeKotlinType,
+    candidate: Candidate,
+    arrayType: ConeKotlinType
+): Boolean {
+    if (expectedParameterType !is ConeTypeVariableType) return false
+
+    if (LanguageFeature.RefinedVarargConversionRulesForCallableReferences.isDisabled()) return true
+
+    val variableWithConstraints =
+        candidate.system.notFixedTypeVariables[expectedParameterType.typeConstructor]
+            ?: error("Not found type variable: $expectedParameterType")
+
+    return variableWithConstraints.constraints.all { it.doesNotContradictToArrayArgument(candidate, arrayType) }
+}
+
+private fun Constraint.doesNotContradictToArrayArgument(candidate: Candidate, arrayType: ConeKotlinType): Boolean {
+    // if SomeType <: Tv and SomeType (notSubTypeOf) arrayType,
+    // it means that it's not possible to pass `Tv` value as an array.
+    if (kind.impliesLower() && !candidate.system.isSubtypeConstraintCompatible(type, arrayType)) {
+        return false
+    }
+
+    // Here we potentially might check that the upper bound might give an empty intersection with `arrayType`
+    // But it's not an error yet, so we leave the existing behavior.
+    // TODO: Reconsider it with KT-81918
+
+    return true
 }
 
 private enum class VarargMappingState {

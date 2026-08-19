@@ -7,8 +7,9 @@ package org.jetbrains.kotlin.incremental
 
 import org.jetbrains.kotlin.build.DEFAULT_KOTLIN_SOURCE_FILES_EXTENSIONS
 import org.jetbrains.kotlin.build.report.BuildReporter
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.BuildPerformanceMetric
+import org.jetbrains.kotlin.build.report.metrics.BuildTimeMetric
+import org.jetbrains.kotlin.build.report.metrics.SHRINK_AND_SAVE_CURRENT_CLASSPATH_SNAPSHOT_AFTER_COMPILATION
 import org.jetbrains.kotlin.build.report.metrics.measure
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
@@ -16,17 +17,22 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.incremental.ChangedFiles.DeterminableFiles
 import org.jetbrains.kotlin.incremental.classpathDiff.ClasspathSnapshotBuildReporter
 import org.jetbrains.kotlin.incremental.classpathDiff.shrinkAndSaveClasspathSnapshot
+import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.incremental.dirtyFiles.JvmSourcesToCompileCalculator
 import org.jetbrains.kotlin.incremental.snapshots.LazyClasspathSnapshot
+import org.jetbrains.kotlin.progress.CompilationCanceledStatus
 import java.io.File
 
 open class IncrementalJvmCompilerRunner(
     workingDir: File,
-    reporter: BuildReporter<GradleBuildTime, GradleBuildPerformanceMetric>,
+    reporter: BuildReporter<BuildTimeMetric, BuildPerformanceMetric>,
     outputDirs: Collection<File>?,
     private val classpathChanges: ClasspathChanges,
     kotlinSourceFilesExtensions: Set<String> = DEFAULT_KOTLIN_SOURCE_FILES_EXTENSIONS,
     icFeatures: IncrementalCompilationFeatures = IncrementalCompilationFeatures.DEFAULT_CONFIGURATION,
+    generateCompilerRefIndex: Boolean = false,
+    compilationCanceledStatus: CompilationCanceledStatus? = null,
+    override val lookupTrackerDelegate: LookupTracker = LookupTracker.DO_NOTHING,
 ) : IncrementalJvmCompilerRunnerBase(
     workingDir = workingDir,
     reporter = reporter,
@@ -34,6 +40,8 @@ open class IncrementalJvmCompilerRunner(
     outputDirs = outputDirs,
     kotlinSourceFilesExtensions = kotlinSourceFilesExtensions,
     icFeatures = icFeatures,
+    generateCompilerRefIndex = generateCompilerRefIndex,
+    compilationCanceledStatus = compilationCanceledStatus,
 ) {
     override val shouldTrackChangesInLookupCache
         get() = classpathChanges is ClasspathChanges.ClasspathSnapshotEnabled.IncrementalRun
@@ -72,7 +80,7 @@ open class IncrementalJvmCompilerRunner(
 
         // No need to shrink and save classpath snapshot if exitCode != ExitCode.OK as the task will fail anyway
         if (classpathChanges is ClasspathChanges.ClasspathSnapshotEnabled && exitCode == ExitCode.OK) {
-            reporter.measure(GradleBuildTime.SHRINK_AND_SAVE_CURRENT_CLASSPATH_SNAPSHOT_AFTER_COMPILATION) {
+            reporter.measure(SHRINK_AND_SAVE_CURRENT_CLASSPATH_SNAPSHOT_AFTER_COMPILATION) {
                 shrinkAndSaveClasspathSnapshot(
                     compilationWasIncremental = compilationMode is CompilationMode.Incremental, classpathChanges, caches.lookupCache,
                     lazyClasspathSnapshot, ClasspathSnapshotBuildReporter(reporter)

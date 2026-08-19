@@ -5,10 +5,15 @@
 
 package org.jetbrains.kotlin.js.test.handlers
 
-import org.jetbrains.kotlin.js.test.utils.*
+import org.jetbrains.kotlin.js.test.utils.extractEntryModulePath
+import org.jetbrains.kotlin.js.test.utils.getAllFilesForRunner
+import org.jetbrains.kotlin.js.test.utils.getTestModuleName
+import org.jetbrains.kotlin.js.test.utils.testWithModuleSystem
 import org.jetbrains.kotlin.js.testOld.V8JsTestChecker
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.test.directives.JsEnvironmentConfigurationDirectives
 import org.jetbrains.kotlin.test.services.TestServices
+import org.jetbrains.kotlin.test.services.configuration.extractTestPackage
 import org.jetbrains.kotlin.test.services.defaultsProvider
 import org.jetbrains.kotlin.test.services.moduleStructure
 
@@ -34,8 +39,8 @@ class JsBoxRunner(testServices: TestServices) : AbstractJsArtifactsCollector(tes
 
         val dontSkipRegularMode = JsEnvironmentConfigurationDirectives.SKIP_REGULAR_MODE !in globalDirectives
         if (dontSkipRegularMode) {
-            for ((mode, jsFiles) in allJsFiles) {
-                val entryModulePath = extractEntryModulePath(mode, testServices)
+            for ([mode, jsFiles] in allJsFiles) {
+                val entryModulePath = extractEntryModulePath(mode, jsFiles, testServices)
                 runGeneratedCode(entryModulePath, jsFiles, testModuleName, testPackage, withModuleSystem)
             }
         }
@@ -45,7 +50,7 @@ class JsBoxRunner(testServices: TestServices) : AbstractJsArtifactsCollector(tes
         entryModulePath: String?,
         jsFiles: List<String>,
         testModuleName: String?,
-        testPackage: String?,
+        testPackage: FqName,
         withModuleSystem: Boolean
     ) {
         V8JsTestChecker

@@ -1,0 +1,5 @@
+KDocName(85,102): 'KotlinChild.myFun'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      dependency/JavaBase.myFun(<dispatch receiver>: dependency.JavaBase): kotlin.Unit
+    ]

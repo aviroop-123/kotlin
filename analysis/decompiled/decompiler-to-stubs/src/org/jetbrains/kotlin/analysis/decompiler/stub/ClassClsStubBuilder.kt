@@ -1,34 +1,36 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.decompiler.stub
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.stubs.StubElement
+import com.intellij.util.io.StringRef
 import org.jetbrains.kotlin.analysis.decompiler.stub.flags.*
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.builtins.isNumberedFunctionClassFqName
 import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.library.metadata.KlibMetadataProtoBuf
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.*
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmProtoBufUtil
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.psi.KtClassBody
 import org.jetbrains.kotlin.psi.KtSuperTypeEntry
 import org.jetbrains.kotlin.psi.KtSuperTypeList
 import org.jetbrains.kotlin.psi.stubs.elements.KotlinValueClassRepresentation
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
-import org.jetbrains.kotlin.psi.stubs.impl.KotlinClassStubImpl
-import org.jetbrains.kotlin.psi.stubs.impl.KotlinModifierListStubImpl
-import org.jetbrains.kotlin.psi.stubs.impl.KotlinObjectStubImpl
-import org.jetbrains.kotlin.psi.stubs.impl.KotlinPlaceHolderStubImpl
+import org.jetbrains.kotlin.psi.stubs.impl.*
 import org.jetbrains.kotlin.serialization.deserialization.ProtoContainer
 import org.jetbrains.kotlin.serialization.deserialization.getClassId
 import org.jetbrains.kotlin.serialization.deserialization.getName
+import org.jetbrains.kotlin.utils.addToStdlib.ifNotEmpty
 
 fun createClassStub(
     parent: StubElement<out PsiElement>,
@@ -38,6 +40,8 @@ fun createClassStub(
     source: SourceElement?,
     context: ClsStubBuilderContext,
 ) {
+    ProgressManager.checkCanceled()
+
     ClassClsStubBuilder(parent, classProto, nameResolver, classId, source, context).build()
 }
 
@@ -87,9 +91,7 @@ private class ClassClsStubBuilder(
         val classOrObjectStub = doCreateClassOrObjectStub()
         val modifierList = createModifierListForClass(classOrObjectStub)
         typeStubBuilder.createContextReceiverStubs(modifierList, classProto.contextReceiverTypes(c.typeTable))
-        if (Flags.HAS_ANNOTATIONS.get(classProto.flags)) {
-            createAnnotationStubs(c.components.annotationLoader.loadClassAnnotations(thisAsProtoContainer), modifierList)
-        }
+        createAnnotationStubs(c.components.annotationLoader.loadClassAnnotations(thisAsProtoContainer), modifierList)
         return classOrObjectStub
     }
 
@@ -132,31 +134,40 @@ private class ClassClsStubBuilder(
         val superTypeRefs = supertypeIds.filterNot {
             //TODO: filtering function types should go away
             isNumberedFunctionClassFqName(it.asSingleFqName().toUnsafe())
-        }.map { it.shortClassName.ref() }.toTypedArray()
+        }.map { it.shortClassName.ref() }.ifNotEmpty { toTypedArray() } ?: StringRef.EMPTY_ARRAY
+
+        val kdoc = classProto.getExtensionOrNull(KlibMetadataProtoBuf.classKdoc)
+
+        @OptIn(ClassIdBasedLocality::class)
         val classId = classId.takeUnless { it.isLocal }
+        val isTopLevel = classId?.isNestedClass == false
         return when (classKind) {
             ProtoBuf.Class.Kind.OBJECT, ProtoBuf.Class.Kind.COMPANION_OBJECT -> {
                 KotlinObjectStubImpl(
                     parentStub, shortName, fqName,
                     classId = classId,
                     superTypeRefs,
-                    isTopLevel = !this.classId.isNestedClass,
+                    isTopLevel = isTopLevel,
                     isLocal = false,
                     isObjectLiteral = false,
+                    kdocText = kdoc,
                 )
             }
+
+            ProtoBuf.Class.Kind.ENUM_ENTRY -> error("Enum entries have to be created as members via '${::createEnumEntryStubs.name}'")
+
             else -> {
                 KotlinClassStubImpl(
-                    parentStub,
-                    fqName.ref(),
+                    parent = parentStub,
+                    qualifiedName = fqName.ref(),
                     classId = classId,
-                    shortName,
-                    superTypeRefs,
+                    name = shortName,
+                    superNameRefs = superTypeRefs,
                     isInterface = classKind == ProtoBuf.Class.Kind.INTERFACE,
-                    isEnumEntry = classKind == ProtoBuf.Class.Kind.ENUM_ENTRY,
                     isClsStubCompiledToJvmDefaultImplementation = JvmProtoBufUtil.isNewPlaceForBodyGeneration(classProto),
                     isLocal = false,
-                    isTopLevel = !this.classId.isNestedClass,
+                    isTopLevel = isTopLevel,
+                    kdocText = kdoc,
                     valueClassRepresentation = valueClassRepresentation(),
                 )
             }
@@ -212,20 +223,15 @@ private class ClassClsStubBuilder(
         if (classKind != ProtoBuf.Class.Kind.ENUM_CLASS) return
 
         classProto.enumEntryList.forEach { entry ->
+            ProgressManager.checkCanceled()
+
             val name = c.nameResolver.getName(entry.name)
             val annotations = c.components.annotationLoader.loadEnumEntryAnnotations(thisAsProtoContainer, entry)
-            val enumEntryStub = KotlinClassStubImpl(
+            val enumEntryStub = KotlinEnumEntryStubImpl(
                 classBody,
                 qualifiedName = c.containerFqName.child(name).ref(),
-                classId = null, // enum entry do not have class id
                 name = name.ref(),
-                superNameRefs = arrayOf(),
-                isInterface = false,
-                isEnumEntry = true,
-                isClsStubCompiledToJvmDefaultImplementation = JvmProtoBufUtil.isNewPlaceForBodyGeneration(classProto),
                 isLocal = false,
-                isTopLevel = false,
-                valueClassRepresentation = null,
             )
 
             if (annotations.isNotEmpty()) {
@@ -236,6 +242,8 @@ private class ClassClsStubBuilder(
 
     private fun createCallableMemberStubs(classBody: KotlinPlaceHolderStubImpl<KtClassBody>) {
         for (secondaryConstructorProto in classProto.constructorList) {
+            ProgressManager.checkCanceled()
+
             if (Flags.IS_SECONDARY.get(secondaryConstructorProto.flags)) {
                 createConstructorStub(classBody, secondaryConstructorProto, c, thisAsProtoContainer)
             }
@@ -258,6 +266,8 @@ private class ClassClsStubBuilder(
 
     private fun createInnerAndNestedClasses(classBody: KotlinPlaceHolderStubImpl<KtClassBody>) {
         classProto.nestedClassNameList.forEach { id ->
+            ProgressManager.checkCanceled()
+
             val nestedClassName = c.nameResolver.getName(id)
             if (nestedClassName != companionObjectName) {
                 val nestedClassId = classId.createNestedClassId(nestedClassName)
@@ -271,7 +281,11 @@ private class ClassClsStubBuilder(
     }
 
     private fun createNestedClassStub(classBody: StubElement<out PsiElement>, nestedClassId: ClassId) {
-        val (nameResolver, classProto, _, sourceElement) =
+        ProgressManager.checkCanceled()
+
+        (
+            val nameResolver, val classProto, val _ = metadataVersion, val sourceElement
+        ) =
             c.components.classDataFinder.findClassData(nestedClassId)
                 ?: c.components.virtualFileForDebug.let { rootFile ->
                     if (LOG.isDebugEnabled) {

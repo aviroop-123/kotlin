@@ -20,13 +20,10 @@ import org.jetbrains.kotlin.backend.wasm.utils.getJsBuiltinDescriptor
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
-import org.jetbrains.kotlin.ir.backend.js.utils.getJsModule
-import org.jetbrains.kotlin.ir.backend.js.utils.getJsNameOrKotlinName
-import org.jetbrains.kotlin.ir.backend.js.utils.getJsQualifier
-import org.jetbrains.kotlin.ir.backend.js.utils.realOverrideTarget
+import org.jetbrains.kotlin.ir.backend.js.utils.*
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
-import org.jetbrains.kotlin.ir.builders.irCallConstructor
+import org.jetbrains.kotlin.ir.builders.irAnnotation
 import org.jetbrains.kotlin.ir.builders.irString
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
@@ -247,7 +244,8 @@ class ComplexExternalDeclarationsToTopLevelFunctionsLowering(val context: WasmBa
         if (jsFun != null &&
             function.parameters.all { it.defaultValue == null && it.varargElementType == null } &&
             currentFile.getJsQualifier() == null &&
-            currentFile.getJsModule() == null
+            currentFile.getJsModule() == null &&
+            !function.isJsNativeInvoke()
         ) {
             return
         }
@@ -257,6 +255,7 @@ class ComplexExternalDeclarationsToTopLevelFunctionsLowering(val context: WasmBa
         }
 
         val jsFunctionReference = when {
+            function.isJsNativeInvoke() -> ""
             jsFun != null -> "($jsFun)"
             function.isTopLevelDeclaration -> referenceTopLevelExternalDeclaration(function)
             else -> function.getJsNameOrKotlinName().identifier.toSavePropertyAccess(isTopLevel = false)
@@ -440,7 +439,7 @@ class ComplexExternalDeclarationsToTopLevelFunctionsLowering(val context: WasmBa
     private fun referenceTopLevelExternalDeclaration(declaration: IrDeclarationWithName): String {
         var name: String? = declaration.getJsNameOrKotlinName().identifier
 
-        val qualifier = currentFile.getJsQualifier()
+        val qualifier = declaration.getJsQualifier() ?: currentFile.getJsQualifier()
 
         val module = currentFile.getJsModule()
             ?: declaration.getJsModule()?.also {
@@ -473,7 +472,7 @@ fun createExternalJsFunction(
         isExternal = true
     }
     val builder = context.createIrBuilder(res.symbol)
-    res.annotations += builder.irCallConstructor(context.wasmSymbols.jsRelatedSymbols.jsFunConstructor, typeArguments = emptyList()).also {
+    res.annotations += builder.irAnnotation(context.wasmSymbols.jsRelatedSymbols.jsFunConstructor, typeArguments = emptyList()).also {
         it.arguments[0] = builder.irString(jsCode)
     }
     return res

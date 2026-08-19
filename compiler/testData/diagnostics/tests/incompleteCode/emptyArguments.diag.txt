@@ -1,0 +1,181 @@
+/emptyArguments.kt:20:12: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:21:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:22:15: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:23:12: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:23:14: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:23:16: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:24:12: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:24:14: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:25:12: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:25:14: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:26:5: error: No value passed for parameter 'z'.
+
+/emptyArguments.kt:26:12: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:27:15: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:27:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:28:15: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:29:12: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:29:14: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:29:16: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:29:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:30:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:30:20: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:31:12: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:31:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:31:19: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:33:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:34:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:35:21: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:36:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:36:20: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:37:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:37:20: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:37:22: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:38:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:38:20: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:38:22: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:38:24: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:39:18: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:41:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:42:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:43:20: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:44:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:44:19: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:45:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:45:19: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:45:21: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:46:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:46:19: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:46:21: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:46:23: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:47:5: error: No value passed for parameter 'c'.
+
+/emptyArguments.kt:47:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:48:23: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:49:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:49:19: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:50:20: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:50:22: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:51:26: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:53:26: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:54:5: error: No value passed for parameter 'a'.
+
+/emptyArguments.kt:54:26: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:55:5: error: No value passed for parameter 'b'.
+
+/emptyArguments.kt:55:5: error: No value passed for parameter 'c'.
+
+/emptyArguments.kt:55:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:55:19: error: Argument already passed for this parameter.
+
+/emptyArguments.kt:55:28: error: Mixing named and positional arguments is not allowed unless the order of the arguments matches the order of the parameters.
+
+/emptyArguments.kt:56:5: error: No value passed for parameter 'c'.
+
+/emptyArguments.kt:56:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:56:19: error: Argument type mismatch: actual type is 'A', but 'B' was expected.
+
+/emptyArguments.kt:56:22: error: Argument already passed for this parameter.
+
+/emptyArguments.kt:56:31: error: Mixing named and positional arguments is not allowed unless the order of the arguments matches the order of the parameters.
+
+/emptyArguments.kt:57:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:57:28: error: Argument type mismatch: actual type is 'A', but 'C' was expected.
+
+/emptyArguments.kt:57:31: error: Too many arguments for 'fun asTypedFunc(a: A, b: B, c: C): Unit'.
+
+/emptyArguments.kt:58:26: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:59:26: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:60:26: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:61:26: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:62:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:62:19: error: Argument already passed for this parameter.
+
+/emptyArguments.kt:63:5: error: No value passed for parameter 'b'.
+
+/emptyArguments.kt:63:5: error: No value passed for parameter 'c'.
+
+/emptyArguments.kt:63:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:63:19: error: Argument already passed for this parameter.
+
+/emptyArguments.kt:63:28: error: Mixing named and positional arguments is not allowed unless the order of the arguments matches the order of the parameters.
+
+/emptyArguments.kt:63:31: error: Mixing named and positional arguments is not allowed unless the order of the arguments matches the order of the parameters.
+
+/emptyArguments.kt:64:5: error: No value passed for parameter 'c'.
+
+/emptyArguments.kt:64:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:64:19: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:64:21: error: Argument already passed for this parameter.
+
+/emptyArguments.kt:65:17: error: Syntax error: Expecting an argument.
+
+/emptyArguments.kt:65:19: error: Syntax error: Expecting an argument.

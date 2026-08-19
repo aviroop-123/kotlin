@@ -14,6 +14,8 @@ import org.jetbrains.kotlin.fir.caches.getValue
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.FirProperty
+import org.jetbrains.kotlin.fir.declarations.utils.klibFileAnnotations
+import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.declarations.utils.isExpect
 import org.jetbrains.kotlin.fir.isNewPlaceForBodyGeneration
 import org.jetbrains.kotlin.fir.resolve.providers.FirCachedSymbolNamesProvider
@@ -30,12 +32,12 @@ import org.jetbrains.kotlin.serialization.deserialization.descriptors.Deserializ
 import org.jetbrains.kotlin.serialization.deserialization.getName
 import org.jetbrains.kotlin.utils.mapToSetOrEmpty
 import java.nio.file.Path
-import kotlin.io.path.exists
 
 class PackagePartsCacheData(
     val proto: ProtoBuf.Package,
     val context: FirDeserializationContext,
     val extra: Extra? = null,
+    val fileAnnotations: List<FirAnnotation> = emptyList(),
 ) {
     /**
      * Marker interface for 'extra' data that can be attached to a given [PackagePartsCacheData].
@@ -69,18 +71,37 @@ abstract class LibraryPathFilter {
         }
     }
 
-    class LibraryList(libs: Set<Path>) : LibraryPathFilter() {
-        val libs: Set<Path> = libs.mapTo(mutableSetOf()) { it.normalize() }
+    class LibraryList(inputLibs: Set<Path>) : LibraryPathFilter() {
+        // As a cache and normalize lazily
+        private class WrappedPath(val path: Path) {
+            val isAbsolute: Boolean by lazy { path.isAbsolute }
+
+            val normalizedPath: Path by lazy {
+                path.normalize()
+            }
+
+            val absoluteNormalizedPath: Path by lazy {
+                if (isAbsolute) normalizedPath else path.toAbsolutePath().normalize()
+            }
+
+            fun startsWith(wrappedPath: WrappedPath): Boolean =
+                path.startsWith(wrappedPath.normalizedPath)
+        }
+
+        // TODO: Migrate to wrappedLibs only use by K2ScriptingCompilerEnviroment
+        val libs: Set<Path> by lazy { inputLibs.mapTo(mutableSetOf()) { it.normalize() } }
+
+        private val wrappedLibs: List<WrappedPath> = inputLibs.map { WrappedPath(it) }
 
         override fun accepts(path: Path?): Boolean {
             if (path == null) return false
-            val isPathAbsolute = path.isAbsolute
-            val absolutePath by lazy(LazyThreadSafetyMode.NONE) { path.toAbsolutePath().normalize() }
-            return libs.any {
+
+            val wrappedPath = WrappedPath(path)
+            return wrappedLibs.any {
                 when {
-                    it.isAbsolute && !isPathAbsolute -> absolutePath.startsWith(it.normalize())
-                    !it.isAbsolute && isPathAbsolute -> absolutePath.startsWith(it.toAbsolutePath().normalize())
-                    else -> path.startsWith(it)
+                    it.isAbsolute && !wrappedPath.isAbsolute -> wrappedPath.absoluteNormalizedPath.startsWith(it.normalizedPath)
+                    !it.isAbsolute && wrappedPath.isAbsolute -> wrappedPath.absoluteNormalizedPath.startsWith(it.absoluteNormalizedPath)
+                    else -> wrappedPath.startsWith(it)
                 }
             }
         }
@@ -193,6 +214,8 @@ abstract class AbstractFirDeserializedSymbolProvider(
 
     // ------------------------ Deserialization methods ------------------------
 
+    protected val kdocDeserializer: FirKDocDeserializer = session.effectiveKdocDeserializer
+
     sealed class ClassMetadataFindResult {
         data class NoMetadata(
             val classPostProcessor: DeserializedClassPostProcessor
@@ -201,7 +224,7 @@ abstract class AbstractFirDeserializedSymbolProvider(
         data class Metadata(
             val nameResolver: NameResolver,
             val classProto: ProtoBuf.Class,
-            val annotationDeserializer: AbstractAnnotationDeserializer?,
+            val annotationDeserializer: AnnotationDeserializer?,
             val moduleData: FirModuleData?,
             val sourceElement: DeserializedContainerSource?,
             val flexibleTypeFactory: FirTypeDeserializer.FlexibleTypeFactory,
@@ -244,6 +267,9 @@ abstract class AbstractFirDeserializedSymbolProvider(
             val aliasProto = part.proto.getTypeAlias(ids.single())
             val postProcessor: DeserializedTypeAliasPostProcessor = {
                 part.context.memberDeserializer.loadTypeAlias(aliasProto, classId, kotlinScopeProvider, it)
+                if (part.fileAnnotations.isNotEmpty()) {
+                    it.fir.klibFileAnnotations = part.fileAnnotations
+                }
             }
             FirTypeAliasSymbol(classId) to postProcessor
         } ?: (null to null)
@@ -267,6 +293,7 @@ abstract class AbstractFirDeserializedSymbolProvider(
                     session,
                     moduleData,
                     annotationDeserializer,
+                    kdocDeserializer,
                     result.flexibleTypeFactory,
                     kotlinScopeProvider,
                     serializerExtensionProtocol,
@@ -293,6 +320,9 @@ abstract class AbstractFirDeserializedSymbolProvider(
                     deserializationOrigin = defaultDeserializationOrigin
                 )
                 loadFunctionExtensions(part, proto, fir)
+                if (part.fileAnnotations.isNotEmpty()) {
+                    fir.klibFileAnnotations = part.fileAnnotations
+                }
                 fir.symbol
             }
         }
@@ -305,6 +335,9 @@ abstract class AbstractFirDeserializedSymbolProvider(
                 val proto = part.proto.getProperty(it)
                 val fir = part.context.memberDeserializer.loadProperty(proto)
                 loadPropertyExtensions(part, proto, fir)
+                if (part.fileAnnotations.isNotEmpty()) {
+                    fir.klibFileAnnotations = part.fileAnnotations
+                }
                 fir.symbol
             }
         }

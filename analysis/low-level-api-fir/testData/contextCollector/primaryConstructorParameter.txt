@@ -12,11 +12,14 @@ Tower Data Context:
     Element 5
         Scope: FirExplicitSimpleImportingScope
     Element 6
+        Static scope owner symbol: FirRegularClassSymbol public final class Foo : R|kotlin/Any|
+    Element 7
         Scope: FirLocalScope
             Properties:
                 FirValueParameterSymbol a: R|kotlin/String| = String(foo)
                 FirValueParameterSymbol b: R|kotlin/Int| = R|<local>/a|.R|kotlin/String.length|
                 FirValueParameterSymbol c: R|kotlin/Long| = R|<local>/a|.R|kotlin/String.length|.R|kotlin/Int.minus|(Int(1)).R|kotlin/Int.toLong|()
+Expression Stability: ALIEN_PUBLIC_PROPERTY
 
 FILE: [ResolvedTo(IMPORTS)] primaryConstructorParameter.kt
     public final [ResolvedTo(ANNOTATION_ARGUMENTS)] class Foo : R|kotlin/Any| {

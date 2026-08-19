@@ -20,10 +20,9 @@ internal val NativeToolchainProjectSetupAction = KotlinProjectSetupCoroutine {
     KotlinPluginLifecycle.Stage.AfterFinaliseCompilations.await()
     if (kotlinTargets.flatMap { target -> target.compilations }
             .filterIsInstance<AbstractKotlinNativeCompilation>()
-            .any { it.crossCompilationOnCurrentHostSupported.getOrThrow() }
+            .any { it.crossCompilationOnCurrentHostSupported }
     ) {
         addKotlinNativeBundleConfiguration(project)
         KotlinNativeBundleArtifactFormat.setupAttributesMatchingStrategy(project.dependencies.attributesSchema)
-        KotlinNativeBundleArtifactFormat.setupTransform(project)
     }
 }

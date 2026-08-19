@@ -1,5 +1,4 @@
-// FIR_IDENTICAL
-
+// RUN_PIPELINE_TILL: BACKEND
 // MODULE: lib
 // FILE: kotlin1.kt
 @file:OptIn(ExperimentalObjCName::class)

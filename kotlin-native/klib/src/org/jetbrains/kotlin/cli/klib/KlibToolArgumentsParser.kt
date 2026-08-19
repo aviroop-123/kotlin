@@ -16,7 +16,7 @@ internal class KlibToolArgumentsParser(private val output: KlibToolOutput) {
 
         val extraArgs: Map<ExtraOption, List<String>> = parseOptions(rawArgs.drop(2).toTypedArray<String>())
             ?.entries
-            ?.mapNotNull { (option, values) ->
+            ?.mapNotNull { [option, values] ->
                 val knownOption = ExtraOption.parseOrNull(option)
                 if (knownOption == null) {
                     output.logWarning("Unrecognized command-line argument: $option")
@@ -43,7 +43,8 @@ internal class KlibToolArgumentsParser(private val output: KlibToolOutput) {
             libraryPath = rawArgs[1],
             printSignatures = extraArgs[ExtraOption.PRINT_SIGNATURES]?.last()?.toBoolean() == true,
             signatureVersion,
-            testMode = extraArgs[ExtraOption.INTERNAL_TEST_MODE]?.last()?.toBoolean() == true
+            testMode = extraArgs[ExtraOption.INTERNAL_TEST_MODE]?.last()?.toBoolean() == true,
+            absolutePathPrefixes = extraArgs[ExtraOption.ABSOLUTE_PATH_PREFIX] ?: emptyList(),
         )
     }
 
@@ -105,6 +106,11 @@ internal class KlibToolArgumentsParser(private val output: KlibToolOutput) {
 private enum class ExtraOption(val option: String) {
     PRINT_SIGNATURES("-print-signatures"),
     SIGNATURE_VERSION("-signature-version"),
+
+    /**
+     * A file path prefix to be removed from full paths to render relative paths, thus making dumps reproducible.
+     */
+    ABSOLUTE_PATH_PREFIX("-absolute-path-prefix"),
 
     /**
      * This is an option that allows running the commands that support it in a special "test mode".

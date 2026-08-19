@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.gradle.util.buildProjectWithMPP
 import org.jetbrains.kotlin.gradle.util.cocoapods
 import org.jetbrains.kotlin.gradle.util.kotlin
 import org.jetbrains.kotlin.konan.target.HostManager
-import org.junit.Assume
+import org.junit.jupiter.api.Assumptions
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +25,7 @@ class XCFrameworkCocoaPodsTest {
 
     @BeforeTest
     fun runOnMacOSOnly() {
-        Assume.assumeTrue(HostManager.hostIsMac)
+        Assumptions.assumeTrue(HostManager.hostIsMac)
     }
 
     @Test
@@ -33,6 +33,7 @@ class XCFrameworkCocoaPodsTest {
         val project = buildProjectWithMPP {
             applyCocoapodsPlugin()
             kotlin {
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 listOf(
                     iosSimulatorArm64(),
                     iosX64(),

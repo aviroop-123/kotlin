@@ -1,8 +1,5 @@
 // ISSUE: KT-59798
 
-// IGNORE_BACKEND_K1: ANY
-// REASON: red code (see corresponding diagnostic test)
-
 fun box(): String {
     build {
         setTypeVariable(TargetType())

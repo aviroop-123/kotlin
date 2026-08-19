@@ -1,0 +1,2 @@
+KDocName(79,88): 'Child.foo'
+  null

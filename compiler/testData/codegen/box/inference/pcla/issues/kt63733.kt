@@ -1,8 +1,5 @@
 // ISSUE: KT-63733
 
-// IGNORE_BACKEND_K1: ANY
-// REASON: red code (see corresponding diagnostic test)
-
 fun BoundedBuildee<TargetType>.setBoundedTypeVariable(arg: DifferentType) {}
 
 fun box(): String {

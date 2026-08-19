@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.stubs.KotlinClassOrObjectStub
-import org.jetbrains.kotlin.types.expressions.OperatorConventions
+import org.jetbrains.kotlin.psi.utils.OperatorTokens
 import java.util.*
 
 // NOTE: in this file we collect only Kotlin-specific methods working with PSI and not modifying it
@@ -105,7 +105,7 @@ fun KtSimpleNameExpression.getReceiverExpression(): KtExpression? {
             }
         }
         parent is KtBinaryExpression && parent.operationReference == this -> {
-            return if (parent.operationToken in OperatorConventions.IN_OPERATIONS) parent.right else parent.left
+            return if (parent.operationToken in OperatorTokens.IN_OPERATIONS) parent.right else parent.left
         }
         parent is KtUnaryExpression && parent.operationReference == this -> {
             return parent.baseExpression
@@ -233,7 +233,9 @@ fun KtAnnotationsContainer.collectAnnotationEntriesFromStubOrPsi(): List<KtAnnot
 
 private fun StubElement<*>.collectAnnotationEntriesFromStubElement(): List<KtAnnotationEntry> {
     return childrenStubs.flatMap { child ->
-        when (child.stubType) {
+        @Suppress("DEPRECATION") // KT-78356
+        val stubType = child.stubType
+        when (stubType) {
             KtNodeTypes.ANNOTATION_ENTRY -> listOf(child.psi as KtAnnotationEntry)
             KtNodeTypes.ANNOTATION -> (child.psi as KtAnnotation).entries
             else -> emptyList()
@@ -375,7 +377,7 @@ fun PsiElement.parameterIndex(): Int {
     val parent = parent
     return when (this) {
         is KtParameter if parent is KtParameterList -> parent.parameters.indexOf(this)
-        is KtParameter if parent is KtContextReceiverList -> parent.contextParameters().indexOf(this)
+        is KtParameter if parent is KtContextParameterList -> parent.contextParameters.indexOf(this)
         is PsiParameter if parent is PsiParameterList -> parent.getParameterIndex(this)
         else -> -1
     }
@@ -523,18 +525,113 @@ fun KtStringTemplateExpression.isPlainWithEscapes() =
 // Correct for class members only (including constructors and nested classes)
 // Returns null e.g. for member function parameters, member function locals, property accessors
 val KtDeclaration.containingClassOrObject: KtClassOrObject?
-    get() = parent.let {
-        when (it) {
-            is KtClassBody -> it.parent as? KtClassOrObject
-            is KtClassOrObject -> it
-            is KtParameterList -> (it.parent as? KtPrimaryConstructor)?.getContainingClassOrObject()
-            else -> null
-        }
+    get() = when (val parent = parent) {
+        is KtClassBody -> parent.containingClassOrObject
+        is KtClassOrObject -> parent
+        is KtParameterList -> (parent.parent as? KtPrimaryConstructor)?.getContainingClassOrObject()
+        is KtDestructuringDeclaration if this is KtDestructuringDeclarationEntry -> parent.containingClassOrObject
+        else -> null
     }
+
+/**
+ * Whether this declaration is declared inside a companion object block.
+ *
+ * ### Example
+ *
+ * class Foo {
+ *   companion {
+ *     fun static1() {} // true
+ *   }
+ *
+ *   fun regular() {} // false
+ */
+@KtExperimentalApi
+val KtDeclaration.isFromCompanionBlock: Boolean
+    get() = (parent as? KtClassBody)?.parent is KtCompanionBlock
+
+/**
+ * Whether the callable is a [companion extension](https://github.com/Kotlin/KEEP/blob/main/proposals/KEEP-0449-companions-block-extension.md#companion-extensions) or
+ * comes from a [companion block](https://github.com/Kotlin/KEEP/blob/main/proposals/KEEP-0449-companions-block-extension.md#companion-blocks).
+ *
+ * **Note**: according to the KEEP, [KtEnumEntry]  are also considered implicitly declared in a companion block.
+ */
+@KtExperimentalApi
+val KtDeclarationWithReturnType.isCompanion: Boolean
+    get() = this is KtEnumEntry || hasModifier(KtTokens.COMPANION_KEYWORD) || isFromCompanionBlock
+
+/**
+ * The containing script for top-level declarations.
+ *
+ * @see containingClassOrObject
+ */
+@KtExperimentalApi
+val KtDeclaration.containingScript: KtScript?
+    get() = when (val parent = parent) {
+        is KtBlockExpression -> parent.containingScript
+        is KtDestructuringDeclaration if this is KtDestructuringDeclarationEntry -> parent.containingScript
+        else -> null
+    }
+
+/**
+ * The containing class or script for a declaration.
+ *
+ * @see containingClassOrObject
+ * @see containingScript
+ */
+@KtExperimentalApi
+val KtDeclaration.containingClassOrScript: KtNamedDeclaration?
+    get() = containingClassOrObject ?: containingScript
+
+/**
+ * The containing script for the block expression.
+ *
+ * @see KtDeclaration.containingScript
+ */
+@KtExperimentalApi
+val KtBlockExpression.containingScript: KtScript?
+    get() = parent as? KtScript
+
+/**
+ * Containing [ClassId] for a declaration. It supports [KtScript] in REPL mode.
+ *
+ * @see containingScript
+ * @see containingClassOrObject
+ */
+@KtExperimentalApi
+val KtDeclaration.containingClassId: ClassId?
+    get() {
+        containingClassOrObject?.let {
+            return it.getClassId()
+        }
+
+        val script = containingScript?.takeIf(KtScript::isReplSnippet) ?: return null
+        return ClassId.topLevel(script.fqName)
+    }
+
+
+/**
+ * The containing class for the body.
+ *
+ * **Note**: it bypasses [KtCompanionBlock].
+ */
+@OptIn(KtExperimentalApi::class)
+val KtClassBody.containingClassOrObject: KtClassOrObject?
+    get() = when (val parent = parent) {
+        is KtClassOrObject -> parent
+        is KtCompanionBlock -> parent.containingClassOrObject
+        else -> null
+    }
+
+/**
+ * The containing class for the companion block.
+ */
+@KtExperimentalApi
+val KtCompanionBlock.containingClassOrObject: KtClassOrObject?
+    get() = (parent as? KtClassBody)?.containingClassOrObject
 
 fun KtExpression.getOutermostParenthesizerOrThis(): KtExpression {
     return (parentsWithSelf.zip(parents)).firstOrNull {
-        val (element, parent) = it
+        val [element, parent] = it
         when (parent) {
             is KtParenthesizedExpression -> false
             is KtAnnotatedExpression -> parent.baseExpression != element
@@ -578,20 +675,16 @@ fun KtParameter.isPropertyParameter() = ownerFunction is KtPrimaryConstructor &&
 fun isDoubleColonReceiver(expression: KtExpression) =
     expression.getParentOfTypeAndBranch<KtDoubleColonExpression> { this.receiverExpression } != null
 
-fun KtFunctionLiteral.getOrCreateParameterList(): KtParameterList {
-    valueParameterList?.let { return it }
-
-    val psiFactory = KtPsiFactory(project)
-
-    val anchor = lBrace
-    val newParameterList = addAfter(psiFactory.createLambdaParameterList("x"), anchor) as KtParameterList
-    newParameterList.removeParameter(0)
-    if (arrow == null) {
-        val whitespaceAndArrow = psiFactory.createWhitespaceAndArrow()
-        addRangeAfter(whitespaceAndArrow.first, whitespaceAndArrow.second, newParameterList)
-    }
-    return newParameterList
-}
+@Deprecated(
+    "Use getOrCreateFunctionLiteralParameterList() instead",
+    ReplaceWith(
+        "this.getOrCreateFunctionLiteralParameterList()",
+        "org.jetbrains.kotlin.idea.base.psi.getOrCreateFunctionLiteralParameterList",
+    ),
+)
+@OptIn(KtNonPublicApi::class)
+fun KtFunctionLiteral.getOrCreateParameterList(): KtParameterList =
+    KtPsiMutationService.getInstance().getOrCreateFunctionLiteralParameterList(this)
 
 fun KtFunctionLiteral.findLabelAndCall(): Pair<Name?, KtCallExpression?> {
     val literalParent = (this.parent as KtLambdaExpression).parent
@@ -619,20 +712,27 @@ fun KtFunctionLiteral.findLabelAndCall(): Pair<Name?, KtCallExpression?> {
     }
 }
 
-fun KtCallExpression.getOrCreateValueArgumentList(): KtValueArgumentList {
-    valueArgumentList?.let { return it }
-    return addAfter(
-        KtPsiFactory(project).createCallArguments("()"),
-        typeArgumentList ?: calleeExpression,
-    ) as KtValueArgumentList
-}
+@Deprecated(
+    "Use getOrCreateCallValueArgumentList() instead",
+    ReplaceWith(
+        "this.getOrCreateCallValueArgumentList()",
+        "org.jetbrains.kotlin.idea.base.psi.getOrCreateCallValueArgumentList",
+    ),
+)
+@OptIn(KtNonPublicApi::class)
+fun KtCallExpression.getOrCreateValueArgumentList(): KtValueArgumentList =
+    KtPsiMutationService.getInstance().getOrCreateCallValueArgumentList(this)
 
+@Deprecated(
+    "Use appendTypeArgument(typeArgument) instead",
+    ReplaceWith(
+        "this.appendTypeArgument(typeArgument)",
+        "org.jetbrains.kotlin.idea.base.psi.appendTypeArgument",
+    ),
+)
+@OptIn(KtNonPublicApi::class)
 fun KtCallExpression.addTypeArgument(typeArgument: KtTypeProjection) {
-    if (typeArgumentList != null) {
-        typeArgumentList?.addArgument(typeArgument)
-    } else {
-        addAfter(KtPsiFactory(project).createTypeArguments("<${typeArgument.text}>"), calleeExpression)
-    }
+    KtPsiMutationService.getInstance().appendTypeArgument(this, typeArgument)
 }
 
 fun KtDeclaration.hasBody() = when (this) {
@@ -656,14 +756,39 @@ fun KtExpression.getLabeledParent(labelName: String): KtLabeledExpression? {
     return null
 }
 
-fun PsiElement.astReplace(newElement: PsiElement) = parent.node.replaceChild(node, newElement.node)
+@Deprecated(
+    "Use astReplace(newElement) instead",
+    ReplaceWith("this.astReplace(newElement)", "org.jetbrains.kotlin.idea.base.psi.astReplace"),
+)
+@OptIn(KtNonPublicApi::class)
+fun PsiElement.astReplace(newElement: PsiElement) {
+    KtPsiMutationService.getInstance().astReplace(this, newElement)
+}
 
-var KtElement.parentSubstitute: PsiElement? by UserDataProperty(Key.create<PsiElement>("PARENT_SUBSTITUTE"))
+@Deprecated("The API is deprecated and is preserved only for compatibility with K1")
+var KtElement.parentSubstitute: PsiElement? by UserDataProperty(Key.create("PARENT_SUBSTITUTE"))
 
 private val HARD_KEYWORDS: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
     KtTokens.KEYWORDS.types.mapTo(HashSet()) { (it as KtKeywordToken).value }
 }
 
+/**
+ * Checks if this string is a valid Kotlin identifier.
+ *
+ * A regular identifier (without backticks) must:
+ * - Start with a letter (including Unicode letters) or underscore;
+ * - Contain only letters, digits, or underscores;
+ * - Not be a hard keyword.
+ *
+ * Escaped identifiers (strings starting with a backtick) are also supported: the function returns `true` for strings like
+ * "`class`" or "`with spaces`".
+ *
+ * The function performs only basic, platform-agnostic validation. Individual build targets may impose additional restrictions.
+ * Such as, for the JVM platform, Java bytecode and Dalvik restrictions apply
+ * (see 'org.jetbrains.kotlin.resolve.jvm.checkers.DalvikIdentifierUtils.isValidDalvikCharacter').
+ *
+ * @see quoteIfNeeded
+ */
 fun String?.isIdentifier(): Boolean {
     if (this == null || isEmpty()) return false
 
@@ -683,14 +808,9 @@ fun String?.isIdentifier(): Boolean {
     while (index < length) {
         val codePoint = codePointAt(index)
 
-        val isValid = if (codePoint < 256) {
-            (codePoint == '_'.code)
-                    || (codePoint in 'A'.code..'Z'.code)
-                    || (codePoint in 'a'.code..'z'.code)
-                    || (index > 0 && codePoint in '0'.code..'9'.code)
-        } else {
-            Character.isLetter(codePoint) || (index > 0 && Character.isDigit(codePoint))
-        }
+        val isValid = (codePoint == '_'.code)
+                || Character.isLetter(codePoint)
+                || (index > 0 && Character.isDigit(codePoint))
 
         if (!isValid) {
             return false

@@ -1,0 +1,488 @@
+RAW_FIR:
+FILE: [ResolvedTo(RAW_FIR)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public? final? [ResolvedTo(RAW_FIR)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+IMPORTS:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public? final? [ResolvedTo(RAW_FIR)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+COMPILER_REQUIRED_ANNOTATIONS:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public? final? [ResolvedTo(COMPILER_REQUIRED_ANNOTATIONS)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+COMPANION_GENERATION:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public? final? [ResolvedTo(COMPANION_GENERATION)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+SUPER_TYPES:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public? final? [ResolvedTo(SUPER_TYPES)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+TYPES:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public? final? [ResolvedTo(TYPES)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+STATUS:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public final [ResolvedTo(STATUS)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+EXPECT_ACTUAL_MATCHING:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public final [ResolvedTo(EXPECT_ACTUAL_MATCHING)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+CONTRACTS:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public final [ResolvedTo(CONTRACTS)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+IMPLICIT_TYPES_BODY_RESOLVE:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public final [ResolvedTo(IMPLICIT_TYPES_BODY_RESOLVE)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+CONSTANT_EVALUATION:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public final [ResolvedTo(CONSTANT_EVALUATION)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+ANNOTATION_ARGUMENTS:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public? final? [ResolvedTo(RAW_FIR)] val outcome: Outcome<String, Long> = LAZY_EXPRESSION
+        public? [ResolvedTo(RAW_FIR)] get(): Outcome<String, Long>
+    public final [ResolvedTo(ANNOTATION_ARGUMENTS)] fun foo(): R|kotlin/Unit| { LAZY_BLOCK }
+    public final? [ResolvedTo(RAW_FIR)] class Outcome<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any> : R|kotlin/Any| {
+        private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(RAW_FIR)] out I, [ResolvedTo(RAW_FIR)] out T : Any>([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.value] value: Any): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final? [ResolvedTo(RAW_FIR)] [IsFromPrimaryConstructor=true] val value: Any = R|<local>/value|
+            private [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Any
+
+        public? final? [ResolvedTo(RAW_FIR)] val isIncomplete: Boolean
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outcome] get(): Boolean
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+BODY_RESOLVE:
+FILE: [ResolvedTo(IMPORTS)] useSitePropertyAccessorWithContract.kt
+    public final [ResolvedTo(STATUS)] val outcome: R|Outcome<kotlin/String, kotlin/Long>| = LAZY_EXPRESSION
+        public [ResolvedTo(STATUS)] get(): R|Outcome<kotlin/String, kotlin/Long>|
+    public final [ResolvedTo(BODY_RESOLVE)] fun foo(): R|kotlin/Unit| {
+        when () {
+            R|/outcome|.R|SubstitutionOverride</Outcome.isIncomplete: R|kotlin/Boolean|>| ->  {
+            }
+        }
+
+    }
+    public final [ResolvedTo(STATUS)] class Outcome<[ResolvedTo(STATUS)] out I, [ResolvedTo(STATUS)] out T : R|kotlin/Any|> : R|kotlin/Any| {
+        private [ResolvedTo(STATUS)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(STATUS)] out I, [ResolvedTo(STATUS)] out T : R|kotlin/Any|>([ResolvedTo(STATUS)] [CorrespondingProperty=/Outcome.value] value: R|kotlin/Any|): R|Outcome<I, T>| {
+            LAZY_super<R|kotlin/Any|>
+        }
+
+        private final [ResolvedTo(STATUS)] [IsFromPrimaryConstructor=true] val value: R|kotlin/Any| = R|<local>/value|
+            private [ResolvedTo(STATUS)] [ContainingClassKey=Outcome] get(): R|kotlin/Any|
+
+        public final [ResolvedTo(STATUS)] val isIncomplete: R|kotlin/Boolean|
+            public [ResolvedTo(STATUS)] [ContainingClassKey=Outcome] get(): R|kotlin/Boolean|
+                [L|Contract description] { LAZY_BLOCK }
+
+        private final? data [ResolvedTo(RAW_FIR)] class Incomplete : R|kotlin/Any| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(RAW_FIR)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: Any?): R|Outcome.Incomplete| {
+                LAZY_super<R|kotlin/Any|>
+            }
+
+            public? final? [ResolvedTo(RAW_FIR)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: Any? = R|<local>/incompleteValue|
+                public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Incomplete] get(): Any?
+
+            public? final operator [ResolvedTo(RAW_FIR)] fun component1(): Any?
+
+            public? final [ResolvedTo(RAW_FIR)] fun copy([ResolvedTo(RAW_FIR)] incompleteValue: Any? = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }
+
+FILE RAW TO BODY:
+FILE: [ResolvedTo(BODY_RESOLVE)] useSitePropertyAccessorWithContract.kt
+    public final [ResolvedTo(BODY_RESOLVE)] val outcome: R|Outcome<kotlin/String, kotlin/Long>| = Null(null)!!
+        public [ResolvedTo(BODY_RESOLVE)] get(): R|Outcome<kotlin/String, kotlin/Long>|
+    public final [ResolvedTo(BODY_RESOLVE)] fun foo(): R|kotlin/Unit| {
+        when () {
+            R|/outcome|.R|SubstitutionOverride</Outcome.isIncomplete: R|kotlin/Boolean|>| ->  {
+            }
+        }
+
+    }
+    public final [ResolvedTo(BODY_RESOLVE)] class Outcome<[ResolvedTo(BODY_RESOLVE)] out I, [ResolvedTo(BODY_RESOLVE)] out T : R|kotlin/Any|> : R|kotlin/Any| {
+        private [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Outcome] constructor<[ResolvedTo(BODY_RESOLVE)] out I, [ResolvedTo(BODY_RESOLVE)] out T : R|kotlin/Any|>([ResolvedTo(BODY_RESOLVE)] [CorrespondingProperty=/Outcome.value] value: R|kotlin/Any|): R|Outcome<I, T>| {
+            super<R|kotlin/Any|>()
+        }
+
+        private final [ResolvedTo(BODY_RESOLVE)] [IsFromPrimaryConstructor=true] val value: R|kotlin/Any| = R|<local>/value|
+            private [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Outcome] get(): R|kotlin/Any|
+
+        public final [ResolvedTo(BODY_RESOLVE)] val isIncomplete: R|kotlin/Boolean|
+            public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Outcome] get(): R|kotlin/Boolean|
+                [R|Contract description]
+                 <
+                    Returns(FALSE) -> this is Outcome<kotlin/Nothing, T>
+                    Returns(TRUE) -> this is Outcome<I, kotlin/Nothing>
+                >
+             {
+                 {
+                    R|kotlin/contracts/contract|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=kotlin/contracts/ContractBuilder.() -> kotlin/Unit] contract@fun [ResolvedTo(BODY_RESOLVE)] R|kotlin/contracts/ContractBuilder|.<anonymous>(): R|kotlin/Unit| <inline=Inline, kind=UNKNOWN>  {
+                        this@R|special/anonymous|.R|kotlin/contracts/ContractBuilder.returns|(Boolean(false)).R|kotlin/contracts/SimpleEffect.implies|((this@R|/Outcome| is R|Outcome<kotlin/Nothing, T>|))
+                        this@R|special/anonymous|.R|kotlin/contracts/ContractBuilder.returns|(Boolean(true)).R|kotlin/contracts/SimpleEffect.implies|((this@R|/Outcome| is R|Outcome<I, kotlin/Nothing>|))
+                    }
+                    )
+                }
+
+                ^ (this@R|/Outcome|.R|/Outcome.value| is R|Outcome.Incomplete|)
+            }
+
+        private final data [ResolvedTo(BODY_RESOLVE)] class Incomplete : R|kotlin/Any| {
+            public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Incomplete] constructor([ResolvedTo(BODY_RESOLVE)] [CorrespondingProperty=/Outcome.Incomplete.incompleteValue] incompleteValue: R|kotlin/Any?|): R|Outcome.Incomplete| {
+                super<R|kotlin/Any|>()
+            }
+
+            public final [ResolvedTo(BODY_RESOLVE)] [ComponentFunctionSymbolKey=/Outcome.Incomplete.component1, IsFromPrimaryConstructor=true] val incompleteValue: R|kotlin/Any?| = R|<local>/incompleteValue|
+                public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=Incomplete] get(): R|kotlin/Any?|
+
+            public final operator [ResolvedTo(BODY_RESOLVE)] fun component1(): R|kotlin/Any?|
+
+            public final [ResolvedTo(BODY_RESOLVE)] fun copy([ResolvedTo(BODY_RESOLVE)] incompleteValue: R|kotlin/Any?| = this@R|/Outcome.Incomplete|.R|/Outcome.Incomplete.incompleteValue|): R|Outcome.Incomplete|
+
+        }
+
+    }

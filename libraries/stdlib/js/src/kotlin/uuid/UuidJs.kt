@@ -7,19 +7,14 @@ package kotlin.uuid
 
 import kotlin.js.internal.boxedLong.BoxedLongApi
 
-@ExperimentalUuidApi
-internal actual fun secureRandomUuid(): Uuid {
-    val randomBytes = ByteArray(16)
-    js("crypto").getRandomValues(randomBytes)
-    return uuidFromRandomBytes(randomBytes)
+internal actual fun secureRandomBytes(destination: ByteArray): Unit {
+    js("crypto").getRandomValues(destination)
 }
 
-@ExperimentalUuidApi
 internal actual fun serializedUuid(uuid: Uuid): Any =
     throw UnsupportedOperationException("Serialization is supported only in Kotlin/JVM")
 
 // Avoid bitwise operations with Longs in JS
-@ExperimentalUuidApi
 @OptIn(BoxedLongApi::class)  // Long constructor is intrinsified when BigInt-backed Longs are enabled.
 internal actual fun ByteArray.getLongAt(index: Int): Long {
     return Long(
@@ -36,7 +31,6 @@ private fun ByteArray.getIntAt(index: Int): Int {
 }
 
 // Avoid bitwise operations with Longs in JS
-@ExperimentalUuidApi
 @OptIn(BoxedLongApi::class) // Long's `high` and `low` properties are intrinsified when BigInt-backed Longs are enabled.
 internal actual fun Long.formatBytesInto(dst: ByteArray, dstOffset: Int, startIndex: Int, endIndex: Int) {
     var dstIndex = dstOffset
@@ -49,6 +43,7 @@ internal actual fun Long.formatBytesInto(dst: ByteArray, dstOffset: Int, startIn
 }
 
 @OptIn(ExperimentalStdlibApi::class)
+@IgnorableReturnValue
 private fun Int.formatBytesInto(dst: ByteArray, dstOffset: Int, startIndex: Int, endIndex: Int): Int {
     var dstIndex = dstOffset
     for (reversedIndex in 3 - startIndex downTo 4 - endIndex) {
@@ -62,7 +57,6 @@ private fun Int.formatBytesInto(dst: ByteArray, dstOffset: Int, startIndex: Int,
 }
 
 // Avoid bitwise operations with Longs in JS
-@ExperimentalUuidApi
 @OptIn(BoxedLongApi::class) // Long's `high` and `low` properties are intrinsified when BigInt-backed Longs are enabled.
 internal actual fun ByteArray.setLongAt(index: Int, value: Long) {
     setIntAt(index, value.high)
@@ -78,21 +72,38 @@ private fun ByteArray.setIntAt(index: Int, value: Int) {
 }
 
 // Avoid bitwise operations with Longs in JS
-@OptIn(ExperimentalStdlibApi::class)
-@ExperimentalUuidApi
 internal actual fun uuidParseHexDash(hexDashString: String): Uuid {
+    return uuidParseHexDash(hexDashString) { inputString, errorDescription, errorIndex ->
+        uuidThrowUnexpectedCharacterException(inputString, errorDescription, errorIndex)
+    }
+}
+
+// Avoid bitwise operations with Longs in JS
+@ExperimentalUuidApi
+internal actual fun uuidParseHexDashOrNull(hexDashString: String): Uuid? {
+    return uuidParseHexDash(hexDashString) { _, _, _ ->
+        return null
+    }
+}
+
+internal inline fun uuidParseHexDash(
+    hexDashString: String,
+    onError: (inputString: String, errorDescription: String, errorIndex: Int) -> Nothing
+): Uuid {
+    val hexDigitExpectedMessage = "a hexadecimal digit"
+
     // xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     // 8 hex digits fit into an Int
-    val part1 = hexDashString.hexToInt(startIndex = 0, endIndex = 8)
-    hexDashString.checkHyphenAt(8)
-    val part2 = hexDashString.hexToInt(startIndex = 9, endIndex = 13)
-    hexDashString.checkHyphenAt(13)
-    val part3 = hexDashString.hexToInt(startIndex = 14, endIndex = 18)
-    hexDashString.checkHyphenAt(18)
-    val part4 = hexDashString.hexToInt(startIndex = 19, endIndex = 23)
-    hexDashString.checkHyphenAt(23)
-    val part5a = hexDashString.hexToInt(startIndex = 24, endIndex = 28)
-    val part5b = hexDashString.hexToInt(startIndex = 28, endIndex = 36)
+    val part1 = hexDashString.parseHexToInt(startIndex = 0, endIndex = 8) { onError(this, hexDigitExpectedMessage, it) }
+    hexDashString.uuidCheckHyphenAt(8, onError)
+    val part2 = hexDashString.parseHexToInt(startIndex = 9, endIndex = 13) { onError(this, hexDigitExpectedMessage, it) }
+    hexDashString.uuidCheckHyphenAt(13, onError)
+    val part3 = hexDashString.parseHexToInt(startIndex = 14, endIndex = 18) { onError(this, hexDigitExpectedMessage, it) }
+    hexDashString.uuidCheckHyphenAt(18, onError)
+    val part4 = hexDashString.parseHexToInt(startIndex = 19, endIndex = 23) { onError(this, hexDigitExpectedMessage, it) }
+    hexDashString.uuidCheckHyphenAt(23, onError)
+    val part5a = hexDashString.parseHexToInt(startIndex = 24, endIndex = 28) { onError(this, hexDigitExpectedMessage, it) }
+    val part5b = hexDashString.parseHexToInt(startIndex = 28, endIndex = 36) { onError(this, hexDigitExpectedMessage, it) }
 
     @OptIn(BoxedLongApi::class) // Long constructor is intrinsified when BigInt-backed Longs are enabled.
     val msb = Long(
@@ -109,20 +120,35 @@ internal actual fun uuidParseHexDash(hexDashString: String): Uuid {
 }
 
 // Avoid bitwise operations with Longs in JS
-@OptIn(ExperimentalStdlibApi::class)
-@ExperimentalUuidApi
 internal actual fun uuidParseHex(hexString: String): Uuid {
+    return uuidParseHex(hexString) { inputString, errorDescription, errorIndex ->
+        uuidThrowUnexpectedCharacterException(inputString, errorDescription, errorIndex)
+    }
+}
+
+// Avoid bitwise operations with Longs in JS
+@ExperimentalUuidApi
+internal actual fun uuidParseHexOrNull(hexString: String): Uuid? {
+    return uuidParseHex(hexString) { _, _, _ ->
+        return null
+    }
+}
+
+private inline fun uuidParseHex(
+    hexString: String,
+    onError: (inputString: String, errorDescription: String, errorIndex: Int) -> Nothing
+): Uuid {
     // 8 hex digits fit into an Int
     @OptIn(BoxedLongApi::class) // Long constructor is intrinsified when BigInt-backed Longs are enabled.
     val msb = Long(
-        high = hexString.hexToInt(startIndex = 0, endIndex = 8),
-        low = hexString.hexToInt(startIndex = 8, endIndex = 16)
+        high = hexString.parseHexToInt(startIndex = 0, endIndex = 8) { onError(this, "a hexadecimal digit", it) },
+        low = hexString.parseHexToInt(startIndex = 8, endIndex = 16) { onError(this, "a hexadecimal digit", it) }
     )
 
     @OptIn(BoxedLongApi::class) // Long constructor is intrinsified when BigInt-backed Longs are enabled.
     val lsb = Long(
-        high = hexString.hexToInt(startIndex = 16, endIndex = 24),
-        low = hexString.hexToInt(startIndex = 24, endIndex = 32)
+        high = hexString.parseHexToInt(startIndex = 16, endIndex = 24) { onError(this, "a hexadecimal digit", it) },
+        low = hexString.parseHexToInt(startIndex = 24, endIndex = 32) { onError(this, "a hexadecimal digit", it) }
     )
     return Uuid.fromLongs(msb, lsb)
 }

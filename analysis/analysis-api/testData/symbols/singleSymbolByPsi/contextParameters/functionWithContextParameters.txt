@@ -9,8 +9,11 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL
@@ -23,20 +26,24 @@ KaNamedFunctionSymbol:
             psi: KtAnnotationEntry
         ]
         typeArguments: []
-        type: @R|Anno|(position = <strcat>(String(1), String(2)))  kotlin/String
+        type: @R|Anno|(position = <strcat>(String(1), String(2)) [evaluated = String(12)])  kotlin/String
       visibility: PUBLIC
       getContainingFileSymbol: KaFileSymbol(functionWithContextParameters.kt)
       getContainingJvmClassName: FunctionWithContextParametersKt
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     KaContextParameterSymbol:
       annotations: []
       callableId: null
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL
@@ -52,14 +59,15 @@ KaNamedFunctionSymbol:
                 psi: KtAnnotationEntry
             ]
             typeArguments: []
-            type: @R|Anno|(position = String(str))  kotlin/Int
+            type: @R|Anno|(position = String(str) [evaluated = String(str)])  kotlin/Int
         ]
-        type: kotlin/collections/List<@R|Anno|(position = String(str))  kotlin/Int>
+        type: kotlin/collections/List<@R|Anno|(position = String(str) [evaluated = String(str)])  kotlin/Int>
       visibility: PUBLIC
       getContainingFileSymbol: KaFileSymbol(functionWithContextParameters.kt)
       getContainingJvmClassName: FunctionWithContextParametersKt
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   contextReceivers: [
     KaContextReceiver:
@@ -70,7 +78,7 @@ KaNamedFunctionSymbol:
             psi: KtAnnotationEntry
         ]
         typeArguments: []
-        type: @R|Anno|(position = <strcat>(String(1), String(2)))  kotlin/String
+        type: @R|Anno|(position = <strcat>(String(1), String(2)) [evaluated = String(12)])  kotlin/String
     KaContextReceiver:
       label: parameter2
       type: KaUsualClassType:
@@ -82,14 +90,15 @@ KaNamedFunctionSymbol:
                 psi: KtAnnotationEntry
             ]
             typeArguments: []
-            type: @R|Anno|(position = String(str))  kotlin/Int
+            type: @R|Anno|(position = String(str) [evaluated = String(str)])  kotlin/Int
         ]
-        type: kotlin/collections/List<@R|Anno|(position = String(str))  kotlin/Int>
+        type: kotlin/collections/List<@R|Anno|(position = String(str) [evaluated = String(str)])  kotlin/Int>
   ]
   contractEffects: []
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -117,3 +126,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: foo

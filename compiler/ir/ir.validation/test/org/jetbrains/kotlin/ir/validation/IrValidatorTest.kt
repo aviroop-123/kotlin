@@ -5,58 +5,67 @@
 
 package org.jetbrains.kotlin.ir.validation
 
-import org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi
 import org.jetbrains.kotlin.backend.common.ir.createExtensionReceiver
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns
-import org.jetbrains.kotlin.builtins.PrimitiveType
-import org.jetbrains.kotlin.builtins.UnsignedType
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity.ERROR
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity.WARNING
-import org.jetbrains.kotlin.cli.common.messages.MessageCollectorImpl
 import org.jetbrains.kotlin.cli.common.messages.MessageCollectorImpl.Message
+import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.IrVerificationMode
-import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
-import org.jetbrains.kotlin.ir.IrBuiltIns
-import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
+import org.jetbrains.kotlin.diagnostics.KtDiagnosticWithoutSource
+import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector
+import org.jetbrains.kotlin.diagnostics.impl.DiagnosticsCollectorImpl
+import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.builders.declarations.*
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.declarations.impl.*
+import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrModuleFragmentImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrVariableImpl
+import org.jetbrains.kotlin.ir.expressions.IrStatementContainer
 import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
 import org.jetbrains.kotlin.ir.expressions.impl.*
-import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
-import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
-import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.*
-import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.types.IrDynamicType
+import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
+import org.jetbrains.kotlin.ir.types.createType
 import org.jetbrains.kotlin.ir.types.impl.IrDynamicTypeImpl
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
+import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.ir.validation.checkers.IrValidationError
+import org.jetbrains.kotlin.ir.validation.checkers.expression.IrTypeOperatorRedundancyChecker
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.Variance
-import kotlin.reflect.KProperty
-import kotlin.test.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class IrValidatorTest {
 
-    private lateinit var messageCollector: MessageCollectorImpl
+    private lateinit var diagnosticReporter: BaseDiagnosticsCollector
+    private lateinit var irDiagnosticReporter: IrDiagnosticReporter
     private lateinit var module: IrModuleFragment
     private val defaultValidationConfig = IrValidatorConfig(checkTreeConsistency = true, checkUnboundSymbols = true)
         .withAllChecks()
         .withInlineFunctionCallsiteCheck { it.symbol.owner.name.toString() != "inlineFunctionUseSiteNotPermitted" }
 
-    @BeforeTest
+    @BeforeEach
     fun setUp() {
-        messageCollector = MessageCollectorImpl()
+        diagnosticReporter = DiagnosticsCollectorImpl()
+        irDiagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(
+            diagnosticReporter,
+            LanguageVersionSettingsImpl(LanguageVersion.LATEST_STABLE, ApiVersion.LATEST_STABLE)
+        )
 
         val moduleDescriptor = ModuleDescriptorImpl(
             Name.special("<testModule>"),
@@ -102,8 +111,12 @@ class IrValidatorTest {
         return file
     }
 
-    private fun createIrFile(name: String = "test.kt", packageFqName: FqName = FqName("org.sample")): IrFile {
-        val fileEntry = NaiveSourceBasedFileEntryImpl(name, lineStartOffsets = intArrayOf(0, 10, 25), maxOffset = 75)
+    private fun createIrFile(
+        name: String = "test.kt",
+        packageFqName: FqName = FqName("org.sample"),
+        maxOffset: Int = 75,
+    ): IrFile {
+        val fileEntry = NaiveSourceBasedFileEntryImpl(name, lineStartOffsets = intArrayOf(0, 10, 25), maxOffset = maxOffset)
         return IrFileImpl(fileEntry, IrFileSymbolImpl(), packageFqName).also(module::addFile)
     }
 
@@ -140,11 +153,22 @@ class IrValidatorTest {
         return file
     }
 
+    private fun buildValidIrTree(): IrElement {
+        val file = createIrFile()
+        val function = IrFactoryImpl.buildFun {
+            name = Name.identifier("foo")
+            returnType = TestIrBuiltins.unitType
+        }
+        val body = IrFactoryImpl.createBlockBody(5, 24)
+        function.body = body
+        file.addChild(function)
+        return file
+    }
+
     private inline fun runValidationAndAssert(mode: IrVerificationMode, block: () -> Unit) {
+        block()
         if (mode == IrVerificationMode.ERROR) {
-            assertFailsWith<IrValidationError>(block = block)
-        } else {
-            block()
+            assert(irDiagnosticReporter.hasErrors)
         }
     }
 
@@ -154,16 +178,27 @@ class IrValidatorTest {
         expectedMessages: List<Message>,
         config: IrValidatorConfig = defaultValidationConfig,
     ) {
-        runValidationAndAssert(mode) {
-            validateIr(messageCollector, mode) {
-                performBasicIrValidation(
+        try {
+            runValidationAndAssert(mode) {
+                validateIr(
                     tree,
                     TestIrBuiltins,
+                    config,
+                    irDiagnosticReporter,
+                    mode,
                     phaseName = "IrValidatorTest",
-                    config
                 )
-                assertEquals(expectedMessages, messageCollector.messages)
             }
+        } finally {
+            assertEquals(
+                expectedMessages,
+                diagnosticReporter.diagnostics.map {
+                    Message(
+                        it.severity.toCompilerMessageSeverity(),
+                        it.renderMessage(),
+                        (it as KtDiagnosticWithoutSource).location
+                    )
+                })
         }
     }
 
@@ -217,6 +252,36 @@ class IrValidatorTest {
                     CompilerMessageLocation.create(null, 1, 10, null),
                 ),
             ),
+        )
+    }
+
+    @Test
+    fun `sanity check for IrValidatorTest, whether message is really verified, when IrValidationException is really thrown if IrVerificationMode is ERROR`() {
+        val exception = assertThrows<AssertionError> {
+            testValidation(
+                IrVerificationMode.ERROR,
+                buildInvalidIrExpressionWithNoLocations(),
+                listOf(
+                    Message(
+                        ERROR,
+                        $$"""
+                        IT'S THE INTENTIONALLY WRONG MESSAGE TO VERIFY THE ASSERTION ERROR WOULD HAPPEN
+                        """.trimIndent(),
+                        CompilerMessageLocation.create(null, 0, 0, null),
+                    ),
+                ),
+            )
+        }
+        assertEquals(
+            $$"""
+            expected: <[error: IT'S THE INTENTIONALLY WRONG MESSAGE TO VERIFY THE ASSERTION ERROR WOULD HAPPEN]> but was: <[error: [IR VALIDATION] IrValidatorTest: Duplicate IR node: STRING_CONCATENATION type=kotlin.Any
+            STRING_CONCATENATION type=kotlin.Any
+              inside CALL 'public final fun foo ($receiver: kotlin.String, p0: kotlin.Any): kotlin.Any declared in <no parent>' type=kotlin.Any origin=null
+                inside BLOCK_BODY
+                  inside FUN name:bar visibility:public modality:FINAL <> () returnType:kotlin.Any
+                    inside FILE fqName:org.sample fileName:test.kt]>
+            """.trimIndent(),
+            exception.message
         )
     }
 
@@ -544,69 +609,6 @@ class IrValidatorTest {
                     """.trimIndent(),
                     CompilerMessageLocation.create("b.kt", 0, 0, null),
                 )
-            )
-        )
-    }
-
-    @Test
-    fun `private annotations can't be referenced from a different file`() {
-        val file1 = createIrFile("MyAnnotation.kt")
-        val annotationClass = IrFactoryImpl.buildClass {
-            name = Name.identifier("MyAnnotation")
-            visibility = DescriptorVisibilities.PRIVATE
-            kind = ClassKind.ANNOTATION_CLASS
-        }
-        file1.addChild(annotationClass)
-        val annotationConstructor = IrFactoryImpl.createConstructor(
-            startOffset = UNDEFINED_OFFSET,
-            endOffset = UNDEFINED_OFFSET,
-            origin = IrDeclarationOrigin.DEFINED,
-            name = SpecialNames.INIT,
-            visibility = DescriptorVisibilities.PRIVATE,
-            isInline = false,
-            isExpect = false,
-            returnType = null,
-            symbol = IrConstructorSymbolImpl(),
-            isPrimary = true
-        )
-        annotationClass.addChild(annotationConstructor)
-        val file2 = createIrFile("b.kt")
-        val annotatedClass = IrFactoryImpl.buildClass {
-            name = Name.identifier("AnnotatedClass")
-        }
-        annotatedClass.annotations = listOf(
-            IrConstructorCallImpl(
-                startOffset = UNDEFINED_OFFSET,
-                endOffset = UNDEFINED_OFFSET,
-                type = IrSimpleTypeImpl(annotationClass.symbol, SimpleTypeNullability.NOT_SPECIFIED, emptyList(), emptyList()),
-                symbol = annotationConstructor.symbol,
-                typeArgumentsCount = 0,
-                constructorTypeArgumentsCount = 0,
-            )
-        )
-        file2.addChild(annotatedClass)
-        testValidation(
-            IrVerificationMode.WARNING,
-            file2,
-            listOf(
-                Message(
-                    WARNING,
-                    """
-                    [IR VALIDATION] IrValidatorTest: The following element references 'private' declaration that is invisible in the current scope:
-                    CONSTRUCTOR_CALL 'private constructor <init> () [primary] declared in org.sample.MyAnnotation' type=org.sample.MyAnnotation origin=null
-                      inside FILE fqName:org.sample fileName:b.kt
-                    """.trimIndent(),
-                    CompilerMessageLocation.create("b.kt", 0, 0, null),
-                ),
-                Message(
-                    WARNING,
-                    """
-                    [IR VALIDATION] IrValidatorTest: The following element references 'private' declaration that is invisible in the current scope:
-                    CONSTRUCTOR_CALL 'private constructor <init> () [primary] declared in org.sample.MyAnnotation' type=org.sample.MyAnnotation origin=null
-                      inside FILE fqName:org.sample fileName:b.kt
-                    """.trimIndent(),
-                    CompilerMessageLocation.create("b.kt", 0, 0, null),
-                ),
             )
         )
     }
@@ -1295,7 +1297,7 @@ class IrValidatorTest {
         )
     }
 
-    @OptIn(DelicateIrParameterIndexSetter::class, DeprecatedForRemovalCompilerApi::class)
+    @OptIn(DelicateIrParameterIndexSetter::class)
     @Test
     fun `functions with incorrect parameter index are reported`() {
         val file = createIrFile()
@@ -1310,7 +1312,6 @@ class IrValidatorTest {
         function.addTypeParameter {
             name = Name.identifier("T")
         }
-        function.parameters[0].indexInOldValueParameters = 1
         function.parameters[0].indexInParameters = 1
         function.typeParameters[0].index = 1
         file.addChild(function)
@@ -1321,16 +1322,7 @@ class IrValidatorTest {
                 Message(
                     WARNING,
                     """
-                    [IR VALIDATION] IrValidatorTest: Inconsistent index (old API) of value parameter 1 != 0
-                    FUN name:foo visibility:public modality:FINAL <T> (x:kotlin.Any) returnType:kotlin.Any
-                      inside FILE fqName:org.sample fileName:test.kt
-                    """.trimIndent(),
-                    CompilerMessageLocation.create("test.kt", 0, 0, null)
-                ),
-                Message(
-                    WARNING,
-                    """
-                    [IR VALIDATION] IrValidatorTest: Inconsistent index (new API) of value parameter 1 != 0
+                    [IR VALIDATION] IrValidatorTest: Inconsistent index of parameter 1 != 0
                     FUN name:foo visibility:public modality:FINAL <T> (x:kotlin.Any) returnType:kotlin.Any
                       inside FILE fqName:org.sample fileName:test.kt
                     """.trimIndent(),
@@ -2226,6 +2218,62 @@ class IrValidatorTest {
     }
 
     @Test
+    fun `redundant IMPLICIT_CAST is reported`() {
+        val file = createIrFile("test.kt")
+        val function = IrFactoryImpl.buildFun {
+            name = Name.identifier("foo")
+            returnType = TestIrBuiltins.unitType
+        }
+        val body = IrFactoryImpl.createBlockBody(
+            startOffset = UNDEFINED_OFFSET,
+            endOffset = UNDEFINED_OFFSET,
+        )
+
+        // Redundant: result type equals argument type
+        val redundantImplicitCast = IrTypeOperatorCallImpl(
+            startOffset = UNDEFINED_OFFSET,
+            endOffset = UNDEFINED_OFFSET,
+            type = TestIrBuiltins.booleanType,
+            operator = IrTypeOperator.IMPLICIT_CAST,
+            typeOperand = TestIrBuiltins.booleanType,
+            argument = createTrueConst()
+        )
+
+        // Non-redundant: argument type differs from result type
+        val nonRedundantImplicitCast = IrTypeOperatorCallImpl(
+            startOffset = UNDEFINED_OFFSET,
+            endOffset = UNDEFINED_OFFSET,
+            type = TestIrBuiltins.anyType,
+            operator = IrTypeOperator.IMPLICIT_CAST,
+            typeOperand = TestIrBuiltins.anyType,
+            argument = createTrueConst() // Boolean is a subtype of Any
+        )
+
+        body.statements.addAll(listOf(redundantImplicitCast, nonRedundantImplicitCast))
+        function.body = body
+        file.addChild(function)
+
+        testValidation(
+            IrVerificationMode.ERROR,
+            file,
+            listOf(
+                Message(
+                    ERROR,
+                    """
+                    [IR VALIDATION] IrValidatorTest: Redundant IMPLICIT_CAST: TYPE_OP type=kotlin.Boolean origin=IMPLICIT_CAST typeOperand=kotlin.Boolean
+                    TYPE_OP type=kotlin.Boolean origin=IMPLICIT_CAST typeOperand=kotlin.Boolean
+                      inside BLOCK_BODY
+                        inside FUN name:foo visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create("test.kt", 0, 0, null),
+                )
+            ),
+            config = defaultValidationConfig.withCheckers(IrTypeOperatorRedundancyChecker)
+        )
+    }
+
+    @Test
     fun `calls with incorrect type are reported`() {
         val file = createIrFile("test.kt")
         val function = IrFactoryImpl.buildFun {
@@ -2562,6 +2610,555 @@ class IrValidatorTest {
     }
 
     @Test
+    fun `elements with invalid offsets are reported`() {
+        val file = createIrFile("test.kt")
+
+        val functionWithTooSmallOffsets = IrFactoryImpl.buildFun {
+            name = Name.identifier("tooSmall")
+            returnType = TestIrBuiltins.unitType
+        }.apply {
+            body = IrFactoryImpl.createBlockBody(
+                startOffset = -3,
+                endOffset = 0,
+            )
+        }
+
+        val functionWithMismatchedNegativeOffsets = IrFactoryImpl.buildFun {
+            name = Name.identifier("mismatchNegatives")
+            returnType = TestIrBuiltins.unitType
+        }.apply {
+            body = IrFactoryImpl.createBlockBody(
+                startOffset = -1,
+                endOffset = 0,
+            )
+        }
+
+        val functionWithStartGreaterThanEnd = IrFactoryImpl.buildFun {
+            name = Name.identifier("startGreater")
+            returnType = TestIrBuiltins.unitType
+        }.apply {
+            body = IrFactoryImpl.createBlockBody(
+                startOffset = 4,
+                endOffset = 2,
+            )
+        }
+
+        file.addChild(functionWithTooSmallOffsets)
+        file.addChild(functionWithMismatchedNegativeOffsets)
+        file.addChild(functionWithStartGreaterThanEnd)
+
+        testValidation(
+            IrVerificationMode.WARNING,
+            file,
+            listOf(
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: Element has invalid offsets. Offsets must be >= 0, UNDEFINED_OFFSET (-1) or SYNTHETIC_OFFSET (-2). Actual: startOffset=-3, endOffset=0
+                    BLOCK_BODY
+                      inside FUN name:tooSmall visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                        inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create("test.kt", 0, 0, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: Element has invalid offsets. UNDEFINED_OFFSET (-1) and SYNTHETIC_OFFSET (-2) can only appear simultaneously in both startOffset and endOffset. Actual: startOffset=-1, endOffset=0
+                    BLOCK_BODY
+                      inside FUN name:mismatchNegatives visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                        inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create("test.kt", 0, 0, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: Element has invalid offsets. startOffset must not be greater than endOffset Actual: startOffset=4, endOffset=2
+                    BLOCK_BODY
+                      inside FUN name:startGreater visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                        inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create("test.kt", 1, 5, null),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `nested offset ranges violations are reported`() {
+        class Context(
+            val offsetRangeStart: Int, val offsetRangeEnd: Int,
+            val parent: IrDeclarationParent,
+            val container: IrElement,
+        ) {
+            fun buildFun(
+                start: Int,
+                end: Int,
+                block: (Context.() -> Unit)? = null,
+            ) {
+                fun StringBuilder.appendOffset(offset: Int) = if (offset < 0) append('m').append(-offset) else append(offset)
+                val funName = buildString {
+                    append("f_").appendOffset(start).append("_").appendOffset(end)
+                }
+                val function = IrFactoryImpl.buildFun builder@{
+                    this@builder.name = Name.identifier(funName)
+                    this@builder.startOffset = start
+                    this@builder.endOffset = end
+                    this@builder.returnType = TestIrBuiltins.unitType
+                }
+                val body = IrFactoryImpl.createBlockBody(-1, -1) // Use synthetic offsets to bypass this block during the validation.
+                function.body = body
+
+                function.setDeclarationsParent(parent)
+                addToContainer(function)
+
+                if (block != null) {
+                    Context(
+                        offsetRangeStart = start,
+                        offsetRangeEnd = end,
+                        parent = function,
+                        container = body
+                    ).block()
+                }
+            }
+
+            fun buildInlinedFunBlock(
+                start: Int,
+                end: Int,
+                block: (Context.() -> Unit),
+            ) {
+                val inlinedFunBlock = IrInlinedFunctionBlockImpl(
+                    startOffset = -1, // Use synthetic offsets to bypass this block during the validation.
+                    endOffset = -1,
+                    type = TestIrBuiltins.unitType,
+                    inlinedFunctionSymbol = null,
+                    inlinedFunctionStartOffset = start,
+                    inlinedFunctionEndOffset = end,
+                    inlinedFunctionFileEntry = NaiveSourceBasedFileEntryImpl(name = "dummy"),
+                )
+                addToContainer(inlinedFunBlock)
+
+                Context(
+                    offsetRangeStart = start,
+                    offsetRangeEnd = end,
+                    parent = this.parent,
+                    container = inlinedFunBlock
+                ).block()
+            }
+
+            private fun addToContainer(statement: IrStatement) {
+                when (container) {
+                    is IrDeclarationContainer -> container.declarations += statement as IrDeclaration
+                    is IrStatementContainer -> container.statements += statement
+                    else -> error("Unexpected container type: ${container::class.java}")
+                }
+            }
+        }
+
+        val file = createIrFile(maxOffset = 2000)
+        val fileContext = Context(
+            offsetRangeStart = file.startOffset,
+            offsetRangeEnd = file.endOffset,
+            parent = file,
+            container = file,
+        )
+
+        with(fileContext) {
+            // Top-level entities with any non-violating offsets.
+            buildFun(start = -1, end = -1)
+            buildFun(start = -2, end = -2)
+            buildFun(start = 0, end = 0)
+            buildFun(start = file.endOffset, end = file.endOffset)
+            buildFun(start = 0, end = file.endOffset)
+            buildFun(start = 1, end = file.endOffset - 1)
+
+            // Top-level entity that violates offsets.
+            buildFun(start = 0, end = file.endOffset + 1)
+
+            buildFun(start = 100, end = 200) {
+                val topLevelFunContext = this
+
+                // Nested entities, which do not violate offsets.
+                buildFun(start = -1, end = -1)
+                buildFun(start = -2, end = -2)
+                buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeStart)
+                buildFun(start = topLevelFunContext.offsetRangeEnd, end = topLevelFunContext.offsetRangeEnd)
+                buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeEnd)
+                buildFun(start = topLevelFunContext.offsetRangeStart + 1, end = topLevelFunContext.offsetRangeEnd - 1)
+
+                // Nested entities, which violate offsets.
+                buildFun(start = topLevelFunContext.offsetRangeStart - 1, end = topLevelFunContext.offsetRangeEnd)
+                buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeEnd + 1)
+
+                // Nested entities, which transitively violate offsets.
+                buildFun(start = -1, end = -1) {
+                    buildFun(start = -2, end = -2) {
+                        buildFun(start = topLevelFunContext.offsetRangeStart - 1, end = topLevelFunContext.offsetRangeEnd)
+                        buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeEnd + 1)
+
+                        buildFun(start = topLevelFunContext.offsetRangeStart + 10, end = topLevelFunContext.offsetRangeEnd - 10) {
+                            val nestedClassContext = this
+                            buildFun(start = nestedClassContext.offsetRangeStart - 1, end = nestedClassContext.offsetRangeEnd)
+                            buildFun(start = nestedClassContext.offsetRangeStart, end = nestedClassContext.offsetRangeEnd + 1)
+                        }
+                    }
+                }
+            }
+
+            buildFun(start = 300, end = 400) {
+                val topLevelFunContext = this
+
+                buildInlinedFunBlock(start = -1, end = -1) {
+                    // Nested entities, which do not violate offsets.
+                    buildFun(start = -1, end = -1)
+                    buildFun(start = -2, end = -2)
+                    buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeStart)
+                    buildFun(start = topLevelFunContext.offsetRangeEnd, end = topLevelFunContext.offsetRangeEnd)
+                    buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeEnd)
+                    buildFun(start = topLevelFunContext.offsetRangeStart + 1, end = topLevelFunContext.offsetRangeEnd - 1)
+
+                    // Nested entities, which violate offsets.
+                    buildFun(start = topLevelFunContext.offsetRangeStart - 1, end = topLevelFunContext.offsetRangeEnd)
+                    buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeEnd + 1)
+
+                    // Nested entities, which transitively violate offsets.
+                    buildFun(start = -1, end = -1) {
+                        buildFun(start = -2, end = -2) {
+                            buildFun(start = topLevelFunContext.offsetRangeStart - 1, end = topLevelFunContext.offsetRangeEnd)
+                            buildFun(start = topLevelFunContext.offsetRangeStart, end = topLevelFunContext.offsetRangeEnd + 1)
+
+                            buildFun(start = topLevelFunContext.offsetRangeStart + 10, end = topLevelFunContext.offsetRangeEnd - 10) {
+                                val nestedClassContext = this
+                                buildFun(start = nestedClassContext.offsetRangeStart - 1, end = nestedClassContext.offsetRangeEnd)
+                                buildFun(start = nestedClassContext.offsetRangeStart, end = nestedClassContext.offsetRangeEnd + 1)
+                            }
+                        }
+                    }
+                }
+            }
+
+            buildFun(start = 500, end = 600) {
+                buildInlinedFunBlock(start = 700, end = 800) {
+                    val inlinedBlockContext = this
+
+                    // Nested entities, which do not violate offsets.
+                    buildFun(start = -1, end = -1)
+                    buildFun(start = -2, end = -2)
+                    buildFun(start = inlinedBlockContext.offsetRangeStart, end = inlinedBlockContext.offsetRangeStart)
+                    buildFun(start = inlinedBlockContext.offsetRangeEnd, end = inlinedBlockContext.offsetRangeEnd)
+                    buildFun(start = inlinedBlockContext.offsetRangeStart, end = inlinedBlockContext.offsetRangeEnd)
+                    buildFun(start = inlinedBlockContext.offsetRangeStart + 1, end = inlinedBlockContext.offsetRangeEnd - 1)
+
+                    // Nested entities, which violate offsets.
+                    buildFun(start = inlinedBlockContext.offsetRangeStart - 1, end = inlinedBlockContext.offsetRangeEnd)
+                    buildFun(start = inlinedBlockContext.offsetRangeStart, end = inlinedBlockContext.offsetRangeEnd + 1)
+
+                    // Nested entities, which transitively violate offsets.
+                    buildFun(start = -1, end = -1) {
+                        buildFun(start = -2, end = -2) {
+                            buildFun(start = inlinedBlockContext.offsetRangeStart - 1, end = inlinedBlockContext.offsetRangeEnd)
+                            buildFun(start = inlinedBlockContext.offsetRangeStart, end = inlinedBlockContext.offsetRangeEnd + 1)
+
+                            buildFun(start = inlinedBlockContext.offsetRangeStart + 10, end = inlinedBlockContext.offsetRangeEnd - 10) {
+                                val nestedClassContext = this
+                                buildFun(start = nestedClassContext.offsetRangeStart - 1, end = nestedClassContext.offsetRangeEnd)
+                                buildFun(start = nestedClassContext.offsetRangeStart, end = nestedClassContext.offsetRangeEnd + 1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        testValidation(
+            IrVerificationMode.WARNING,
+            file,
+            listOf(
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [0:2001] is not within the outer offsets range [0:2000] (owner = FILE fqName:org.sample fileName:test.kt)
+                    FUN name:f_0_2001 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside FILE fqName:org.sample fileName:test.kt
+                                        """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 1, 1, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [99:200] is not within the outer offsets range [100:200] (owner = FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_99_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 75, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [100:201] is not within the outer offsets range [100:200] (owner = FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_100_201 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 76, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [99:200] is not within the outer offsets range [100:200] (owner = FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_99_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 75, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [100:201] is not within the outer offsets range [100:200] (owner = FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_100_201 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 76, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [109:190] is not within the outer offsets range [110:190] (owner = FUN name:f_110_190 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_109_190 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_110_190 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside BLOCK_BODY
+                                    inside FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                      inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 85, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [110:191] is not within the outer offsets range [110:190] (owner = FUN name:f_110_190 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_110_191 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_110_190 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside BLOCK_BODY
+                                    inside FUN name:f_100_200 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                      inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 86, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [299:400] is not within the outer offsets range [300:400] (owner = FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_299_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside INLINED_BLOCK type=kotlin.Unit origin=null
+                        inside BLOCK_BODY
+                          inside FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                            inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 275, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [300:401] is not within the outer offsets range [300:400] (owner = FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_300_401 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside INLINED_BLOCK type=kotlin.Unit origin=null
+                        inside BLOCK_BODY
+                          inside FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                            inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 276, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [299:400] is not within the outer offsets range [300:400] (owner = FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_299_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                inside BLOCK_BODY
+                                  inside FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                    inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 275, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [300:401] is not within the outer offsets range [300:400] (owner = FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_300_401 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                inside BLOCK_BODY
+                                  inside FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                    inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 276, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [309:390] is not within the outer offsets range [310:390] (owner = FUN name:f_310_390 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_309_390 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_310_390 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                    inside BLOCK_BODY
+                                      inside FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                        inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 285, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [310:391] is not within the outer offsets range [310:390] (owner = FUN name:f_310_390 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_310_391 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_310_390 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                    inside BLOCK_BODY
+                                      inside FUN name:f_300_400 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                        inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 286, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [699:800] is not within the outer offsets range [700:800] (owner = INLINED_BLOCK type=kotlin.Unit origin=null)
+                    FUN name:f_699_800 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside INLINED_BLOCK type=kotlin.Unit origin=null
+                        inside BLOCK_BODY
+                          inside FUN name:f_500_600 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                            inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 675, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [700:801] is not within the outer offsets range [700:800] (owner = INLINED_BLOCK type=kotlin.Unit origin=null)
+                    FUN name:f_700_801 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside INLINED_BLOCK type=kotlin.Unit origin=null
+                        inside BLOCK_BODY
+                          inside FUN name:f_500_600 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                            inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 676, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [699:800] is not within the outer offsets range [700:800] (owner = INLINED_BLOCK type=kotlin.Unit origin=null)
+                    FUN name:f_699_800 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                inside BLOCK_BODY
+                                  inside FUN name:f_500_600 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                    inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 675, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [700:801] is not within the outer offsets range [700:800] (owner = INLINED_BLOCK type=kotlin.Unit origin=null)
+                    FUN name:f_700_801 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                inside BLOCK_BODY
+                                  inside FUN name:f_500_600 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                    inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 676, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [709:790] is not within the outer offsets range [710:790] (owner = FUN name:f_710_790 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_709_790 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_710_790 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                    inside BLOCK_BODY
+                                      inside FUN name:f_500_600 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                        inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 685, null),
+                ),
+                Message(
+                    WARNING,
+                    """
+                    [IR VALIDATION] IrValidatorTest: The offsets range [710:791] is not within the outer offsets range [710:790] (owner = FUN name:f_710_790 visibility:public modality:FINAL <> () returnType:kotlin.Unit)
+                    FUN name:f_710_791 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                      inside BLOCK_BODY
+                        inside FUN name:f_710_790 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                          inside BLOCK_BODY
+                            inside FUN name:f_m2_m2 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                              inside BLOCK_BODY
+                                inside FUN name:f_m1_m1 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                  inside INLINED_BLOCK type=kotlin.Unit origin=null
+                                    inside BLOCK_BODY
+                                      inside FUN name:f_500_600 visibility:public modality:FINAL <> () returnType:kotlin.Unit
+                                        inside FILE fqName:org.sample fileName:test.kt
+                    """.trimIndent(),
+                    CompilerMessageLocation.create(file.fileEntry.name, 3, 686, null),
+                ),
+            )
+        )
+    }
+
+    @Test
     fun `unbound symbols are reported`() {
         val file = createIrFile("test.kt")
 
@@ -2654,269 +3251,4 @@ class IrValidatorTest {
             ),
         )
     }
-}
-
-private object TestIrBuiltins : IrBuiltIns() {
-    override val symbolFinder by lazy { missingBuiltIn() }
-
-    private val builtinsPackage = IrExternalPackageFragmentImpl(IrExternalPackageFragmentSymbolImpl(), FqName("kotlin"))
-
-    override val languageVersionSettings: LanguageVersionSettings
-        get() = LanguageVersionSettingsImpl.DEFAULT
-
-    override val irFactory: IrFactory
-        get() = IrFactoryImpl
-
-    override val anyClass: IrClassSymbol by builtinClass("Any")
-    override val anyType: IrType by builtinType(anyClass)
-    override val anyNType: IrType by builtinType(anyClass, nullable = true)
-    override val booleanClass: IrClassSymbol by builtinClass("Boolean")
-    override val booleanType: IrType by builtinType(booleanClass)
-    override val charClass: IrClassSymbol by builtinClass("Char")
-    override val charType: IrType by builtinType(charClass)
-    override val numberClass: IrClassSymbol by builtinClass("Number")
-    override val numberType: IrType by builtinType(numberClass)
-    override val byteClass: IrClassSymbol by builtinClass("Byte")
-    override val byteType: IrType by builtinType(byteClass)
-    override val shortClass: IrClassSymbol by builtinClass("Short")
-    override val shortType: IrType by builtinType(shortClass)
-    override val intClass: IrClassSymbol by builtinClass("Int")
-    override val intType: IrType by builtinType(intClass)
-    override val longClass: IrClassSymbol by builtinClass("Long")
-    override val longType: IrType by builtinType(longClass)
-    override val floatClass: IrClassSymbol by builtinClass("Float")
-    override val floatType: IrType by builtinType(floatClass)
-    override val doubleClass: IrClassSymbol by builtinClass("Double")
-    override val doubleType: IrType by builtinType(doubleClass)
-    override val nothingClass: IrClassSymbol by builtinClass("Nothing")
-    override val nothingType: IrType by builtinType(nothingClass)
-    override val nothingNType: IrType by builtinType(nothingClass)
-    override val unitClass: IrClassSymbol by builtinClass("Unit")
-    override val unitType: IrType by builtinType(unitClass)
-    override val stringClass: IrClassSymbol by builtinClass("String")
-    override val stringType: IrType by builtinType(stringClass)
-    override val charSequenceClass: IrClassSymbol by builtinClass("CharSequence")
-    override val collectionClass: IrClassSymbol by builtinClass("Collection")
-    override val arrayClass: IrClassSymbol by builtinClass("Array")
-    override val setClass: IrClassSymbol by builtinClass("Set")
-    override val listClass: IrClassSymbol by builtinClass("List")
-    override val mapClass: IrClassSymbol by builtinClass("Map")
-    override val mapEntryClass: IrClassSymbol by builtinClass("Entry")
-    override val iterableClass: IrClassSymbol by builtinClass("Iterable")
-    override val iteratorClass: IrClassSymbol by builtinClass("Iterator")
-    override val listIteratorClass: IrClassSymbol by builtinClass("ListIterator")
-    override val mutableCollectionClass: IrClassSymbol by builtinClass("MutableCollection")
-    override val mutableSetClass: IrClassSymbol by builtinClass("MutableSet")
-    override val mutableListClass: IrClassSymbol by builtinClass("MutableList")
-    override val mutableMapClass: IrClassSymbol by builtinClass("MutableMap")
-    override val mutableMapEntryClass: IrClassSymbol by builtinClass("Entry")
-    override val mutableIterableClass: IrClassSymbol by builtinClass("MutableIterable")
-    override val mutableIteratorClass: IrClassSymbol by builtinClass("MutableIterator")
-    override val mutableListIteratorClass: IrClassSymbol by builtinClass("MutableListIterator")
-    override val comparableClass: IrClassSymbol by builtinClass("Comparable")
-    override val throwableClass: IrClassSymbol by builtinClass("Throwable")
-    override val throwableType: IrType by builtinType(throwableClass)
-    override val kCallableClass: IrClassSymbol by builtinClass("KCallable")
-    override val kPropertyClass: IrClassSymbol by builtinClass("KProperty")
-    override val kClassClass: IrClassSymbol by builtinClass("KClass")
-    override val kTypeClass: IrClassSymbol by builtinClass("KType")
-    override val kProperty0Class: IrClassSymbol by builtinClass("KProperty0")
-    override val kProperty1Class: IrClassSymbol by builtinClass("KProperty1")
-    override val kProperty2Class: IrClassSymbol by builtinClass("KProperty2")
-    override val kMutableProperty0Class: IrClassSymbol by builtinClass("KMutableProperty0")
-    override val kMutableProperty1Class: IrClassSymbol by builtinClass("KMutableProperty1")
-    override val kMutableProperty2Class: IrClassSymbol by builtinClass("KMutableProperty2")
-    override val functionClass: IrClassSymbol by builtinClass("Function")
-    override val kFunctionClass: IrClassSymbol by builtinClass("KFunction")
-    override val annotationClass: IrClassSymbol by builtinClass("Annotation")
-    override val annotationType: IrType by builtinType(annotationClass)
-    override val ubyteClass: IrClassSymbol by builtinClass("UByte")
-    override val ubyteType: IrType by builtinType(ubyteClass)
-    override val ushortClass: IrClassSymbol by builtinClass("UShort")
-    override val ushortType: IrType by builtinType(ushortClass)
-    override val uintClass: IrClassSymbol by builtinClass("UInt")
-    override val uintType: IrType by builtinType(uintClass)
-    override val ulongClass: IrClassSymbol by builtinClass("ULong")
-    override val ulongType: IrType by builtinType(ulongClass)
-
-    override val primitiveTypeToIrType: Map<PrimitiveType, IrType> = mapOf(
-        PrimitiveType.BOOLEAN to booleanType,
-        PrimitiveType.CHAR to charType,
-        PrimitiveType.BYTE to byteType,
-        PrimitiveType.SHORT to shortType,
-        PrimitiveType.INT to intType,
-        PrimitiveType.LONG to longType,
-        PrimitiveType.FLOAT to floatType,
-        PrimitiveType.DOUBLE to doubleType
-    )
-
-    override val primitiveIrTypes: List<IrType>
-        get() = missingBuiltIn()
-    override val primitiveIrTypesWithComparisons: List<IrType>
-        get() = missingBuiltIn()
-    override val primitiveFloatingPointIrTypes: List<IrType>
-        get() = missingBuiltIn()
-
-    override val byteIterator: IrClassSymbol by builtinClass("ByteIterator")
-    override val charIterator: IrClassSymbol by builtinClass("CharIterator")
-    override val shortIterator: IrClassSymbol by builtinClass("ShortIterator")
-    override val intIterator: IrClassSymbol by builtinClass("IntIterator")
-    override val longIterator: IrClassSymbol by builtinClass("LongIterator")
-    override val floatIterator: IrClassSymbol by builtinClass("FloatIterator")
-    override val doubleIterator: IrClassSymbol by builtinClass("DoubleIterator")
-    override val booleanIterator: IrClassSymbol by builtinClass("BooleanIterator")
-    override val byteArray: IrClassSymbol by builtinClass("ByteArray")
-    override val charArray: IrClassSymbol by builtinClass("CharArray")
-    override val shortArray: IrClassSymbol by builtinClass("ShortArray")
-    override val intArray: IrClassSymbol by builtinClass("IntArray")
-    override val longArray: IrClassSymbol by builtinClass("LongArray")
-    override val floatArray: IrClassSymbol by builtinClass("FloatArray")
-    override val doubleArray: IrClassSymbol by builtinClass("DoubleArray")
-    override val booleanArray: IrClassSymbol by builtinClass("BooleanArray")
-    override val ubyteArray: IrClassSymbol by builtinClass("UByteArray")
-    override val ushortArray: IrClassSymbol by builtinClass("UShortArray")
-    override val uintArray: IrClassSymbol by builtinClass("UIntArray")
-    override val ulongArray: IrClassSymbol by builtinClass("ULongArray")
-    val booleanArrayType: IrType by builtinType(booleanArray)
-    val array: IrClassSymbol by builtinClass("Array")
-    val arrayOfStringType: IrType by builtinType(array, listOf(stringType))
-
-    override val primitiveArraysToPrimitiveTypes: Map<IrClassSymbol, PrimitiveType>
-        get() = missingBuiltIn()
-    override val primitiveTypesToPrimitiveArrays: Map<PrimitiveType, IrClassSymbol>
-        get() = missingBuiltIn()
-    override val primitiveArrayElementTypes: Map<IrClassSymbol, IrType?>
-        get() = mapOf(
-            booleanArray to booleanType,
-            charArray to charType,
-            byteArray to byteType,
-            shortArray to shortType,
-            intArray to intType,
-            longArray to longType,
-            floatArray to floatType,
-            doubleArray to doubleType,
-        )
-    override val primitiveArrayForType: Map<IrType?, IrClassSymbol>
-        get() = missingBuiltIn()
-    override val unsignedTypesToUnsignedArrays: Map<UnsignedType, IrClassSymbol>
-        get() = missingBuiltIn()
-    override val unsignedArraysElementTypes: Map<IrClassSymbol, IrType?>
-        get() = mapOf(
-            ubyteArray to ubyteType,
-            ushortArray to ushortType,
-            uintArray to uintType,
-            ulongArray to ulongType,
-        )
-    override val lessFunByOperandType: Map<IrClassifierSymbol, IrSimpleFunctionSymbol>
-        get() = missingBuiltIn()
-    override val lessOrEqualFunByOperandType: Map<IrClassifierSymbol, IrSimpleFunctionSymbol>
-        get() = missingBuiltIn()
-    override val greaterOrEqualFunByOperandType: Map<IrClassifierSymbol, IrSimpleFunctionSymbol>
-        get() = missingBuiltIn()
-    override val greaterFunByOperandType: Map<IrClassifierSymbol, IrSimpleFunctionSymbol>
-        get() = missingBuiltIn()
-    override val ieee754equalsFunByOperandType: Map<IrClassifierSymbol, IrSimpleFunctionSymbol>
-        get() = missingBuiltIn()
-    override val booleanNotSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val eqeqeqSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val eqeqSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val throwCceSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val throwIseSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val andandSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val ororSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val noWhenBranchMatchedExceptionSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val illegalArgumentExceptionSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val checkNotNullSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val dataClassArrayMemberHashCodeSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val dataClassArrayMemberToStringSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-
-    override val enumClass: IrClassSymbol by builtinClass("Enum")
-
-    override val intPlusSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val intTimesSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val intXorSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val intAndSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val extensionToString: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val memberToString: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val extensionStringPlus: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val memberStringPlus: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val arrayOf: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val arrayOfNulls: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-    override val linkageErrorSymbol: IrSimpleFunctionSymbol
-        get() = missingBuiltIn()
-
-    override fun functionN(arity: Int): IrClass {
-        missingBuiltIn()
-    }
-
-    override fun kFunctionN(arity: Int): IrClass {
-        missingBuiltIn()
-    }
-
-    override fun suspendFunctionN(arity: Int): IrClass {
-        missingBuiltIn()
-    }
-
-    override fun kSuspendFunctionN(arity: Int): IrClass {
-        missingBuiltIn()
-    }
-
-    override fun getKPropertyClass(mutable: Boolean, n: Int): IrClassSymbol {
-        missingBuiltIn()
-    }
-
-    override val operatorsPackageFragment: IrExternalPackageFragment
-        get() = missingBuiltIn()
-    override val kotlinInternalPackageFragment: IrExternalPackageFragment
-        get() = missingBuiltIn()
-
-    private fun builtinClass(name: String) = object {
-        val klass = irFactory.buildClass {
-            this.name = Name.identifier(name)
-        }.apply {
-            parent = builtinsPackage
-        }
-
-        operator fun getValue(thisRef: TestIrBuiltins, property: KProperty<*>): IrClassSymbol {
-            return klass.symbol
-        }
-    }
-
-    private fun builtinType(klass: IrClassSymbol, nullable: Boolean = false) = object {
-        val type = IrSimpleTypeImpl(klass, SimpleTypeNullability.fromHasQuestionMark(nullable), emptyList(), emptyList())
-        operator fun getValue(thisRef: TestIrBuiltins, property: KProperty<*>): IrType {
-            return type
-        }
-    }
-
-    private fun builtinType(klass: IrClassSymbol, arguments: List<IrTypeArgument>, nullable: Boolean = false) = object {
-        val type = IrSimpleTypeImpl(klass, SimpleTypeNullability.fromHasQuestionMark(nullable), arguments, emptyList())
-        operator fun getValue(thisRef: TestIrBuiltins, property: KProperty<*>): IrType {
-            return type
-        }
-    }
-
-    private fun missingBuiltIn(): Nothing = fail("Missing built-in")
 }

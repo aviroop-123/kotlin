@@ -1,3 +1,0 @@
-KtOperationReferenceExpression(138,139): '+'
-  KtSimpleNameReference:
-    (in kotlin.Int) operator fun plus(other: kotlin.Int): kotlin.Int

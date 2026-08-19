@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
 // FILE: test/J.java
 
 package test;
@@ -11,6 +10,6 @@ public interface J {
 
 // FILE: K.kt
 
-import test.<!DEPRECATION!>J<!>
+import test.J
 
 /* GENERATED_FIR_TAGS:  */

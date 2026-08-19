@@ -19,7 +19,6 @@ import org.jetbrains.kotlin.backend.jvm.metadata.MetadataSerializer
 import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap.mapKotlinToJava
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.codegen.VersionIndependentOpcodes
-import org.jetbrains.kotlin.codegen.addRecordComponent
 import org.jetbrains.kotlin.codegen.inline.*
 import org.jetbrains.kotlin.codegen.signature.JvmSignatureWriter
 import org.jetbrains.kotlin.codegen.state.GenerationState
@@ -41,13 +40,13 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classOrNull
 import org.jetbrains.kotlin.ir.types.isArray
 import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.load.java.JavaDescriptorVisibilities
 import org.jetbrains.kotlin.load.java.JvmAnnotationNames
 import org.jetbrains.kotlin.load.java.JvmAnnotationNames.METADATA_JVM_IR_FLAG
 import org.jetbrains.kotlin.load.java.JvmAnnotationNames.METADATA_JVM_IR_STABLE_ABI_FLAG
 import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
 import org.jetbrains.kotlin.load.kotlin.header.KotlinClassHeader
 import org.jetbrains.kotlin.load.kotlin.internalName
-import org.jetbrains.kotlin.metadata.jvm.deserialization.BitEncoding
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmMemberSignature
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmProtoBufUtil
 import org.jetbrains.kotlin.name.ClassId
@@ -60,6 +59,8 @@ import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.jvm.JvmConstants
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmClassSignature
+import org.jetbrains.kotlin.serialization.deserialization.ProtoEnumFlags
+import org.jetbrains.kotlin.serialization.deserialization.descriptorVisibility
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import org.jetbrains.org.objectweb.asm.*
 import org.jetbrains.org.objectweb.asm.commons.Method
@@ -188,7 +189,8 @@ class ClassCodegen private constructor(
         visitor.visitSMAP(
             smap,
             !config.languageVersionSettings.supportsFeature(LanguageFeature.CorrectSourceMappingSyntax),
-            parentFunction != null && parentFunction.isInline
+            parentFunction != null && parentFunction.isInline,
+            config.shouldValidateBytecode
         )
 
         reifiedTypeParametersUsages.mergeAll(irClass.reifiedTypeParameters)
@@ -196,8 +198,8 @@ class ClassCodegen private constructor(
         generateInnerAndOuterClasses()
 
         visitor.done(config.generateSmapCopyToAnnotation)
-        jvmMethodSignatureClashDetector.reportErrorsTo(context.ktDiagnosticReporter)
-        jvmFieldSignatureClashDetector.reportErrorsTo(context.ktDiagnosticReporter)
+        jvmMethodSignatureClashDetector.reportErrorsTo(context.diagnosticReporter)
+        jvmFieldSignatureClashDetector.reportErrorsTo(context.diagnosticReporter)
     }
 
     private fun shouldSkipCodeGenerationAccordingToGenerationFilter(): Boolean {
@@ -277,6 +279,20 @@ class ClassCodegen private constructor(
     }
 
     private fun generateKotlinMetadataAnnotation() {
+        fun addSyntheticClassVisibilityFlags(extraFlags: Int): Int {
+            val normalizedVisibilityForSyntheticClass: DescriptorVisibility =
+                if (irClass.isOriginallyLocal && irClass.visibility == JavaDescriptorVisibilities.PACKAGE_VISIBILITY) {
+                    // `package-private` is used for lambdas for historical reasons, but we want them to be
+                    // normalized to `local` instead of `protected`
+                    DescriptorVisibilities.LOCAL
+                } else irClass.visibility.normalize()
+            val visibilityFlagsValue = ProtoEnumFlags.descriptorVisibility(normalizedVisibilityForSyntheticClass).number
+            val maxVisibilityBits =
+                1 + JvmAnnotationNames.METADATA_SYNTHETIC_CLASS_VISIBILITY_BIT_LAST - JvmAnnotationNames.METADATA_SYNTHETIC_CLASS_VISIBILITY_BIT_FIRST
+            assert(visibilityFlagsValue in 0 until (1 shl maxVisibilityBits)) { "Visibility flag value is out of range: $visibilityFlagsValue" }
+            return extraFlags or (visibilityFlagsValue shl JvmAnnotationNames.METADATA_SYNTHETIC_CLASS_VISIBILITY_BIT_FIRST)
+        }
+
         val facadeClassName = irClass.multifileFacadeForPart
         val metadata = irClass.metadata
         val entry = irClass.fileParent.fileEntry
@@ -290,11 +306,6 @@ class ClassCodegen private constructor(
             entry is MultifileFacadeFileEntry -> KotlinClassHeader.Kind.MULTIFILE_CLASS
             else -> KotlinClassHeader.Kind.SYNTHETIC_CLASS
         }
-        val serializedIr = when (metadata) {
-            is MetadataSource.Class -> metadata.serializedIr
-            is MetadataSource.File -> metadata.serializedIr
-            else -> null
-        }
 
         val isMultifileClassOrPart = kind == KotlinClassHeader.Kind.MULTIFILE_CLASS || kind == KotlinClassHeader.Kind.MULTIFILE_CLASS_PART
 
@@ -307,17 +318,21 @@ class ClassCodegen private constructor(
             extraFlags = extraFlags or JvmAnnotationNames.METADATA_SCRIPT_FLAG
         }
 
+        if (kind == KotlinClassHeader.Kind.SYNTHETIC_CLASS) {
+            extraFlags = addSyntheticClassVisibilityFlags(extraFlags)
+        }
+
         // There are four kinds of classes which are regenerated during inlining.
-        // 1) Anonymous classes which are in the scope of an inline function.
-        // 2) SAM wrappers used in an inline function. These are identified by name, since they
-        //    can be reused in different functions and are thus generated in the enclosing top-level
-        //    class instead of inside of an inline function.
+        // 1) Anonymous classes which are in the scope of an inline function, including anonymous
+        //    objects, function references and lambda classes.
+        // 2) SAM wrappers used in an inline function. These are marked with `isPublicAbi` in
+        //    `JvmSingleAbstractMethodLowering`
         // 3) WhenMapping classes used from public inline functions. These are collected in
         //    `JvmBackendContext.publicAbiSymbols` in `MappedEnumWhenLowering`.
         // 4) Annotation implementation classes used from public inline function. Similar to
         //    public WhenMapping classes, these are collected in `publicAbiSymbols` in
         //    `JvmAnnotationImplementationTransformer`.
-        val isPublicAbi = irClass.isPublicAbi || irClass.isInlineSamWrapper ||
+        val isPublicAbi = irClass.isPublicAbi ||
                 type.isAnonymousClass && irClass.isInPublicInlineScope
 
         writeKotlinMetadata(visitor, context.config, kind, isPublicAbi, extraFlags) { av ->
@@ -327,7 +342,7 @@ class ClassCodegen private constructor(
                     is MetadataSource.CodeFragment -> null
                     else -> error("Cannot serialize class metadata without containing file: ${irClass.render()}")
                 }
-                metadataSerializer.serialize(metadata, containingFile)?.let { (proto, stringTable) ->
+                metadataSerializer.serialize(metadata, containingFile)?.let { [proto, stringTable] ->
                     AsmUtil.writeAnnotationData(
                         av, JvmProtoBufUtil.writeData(proto, stringTable), ArrayUtil.toStringArray(stringTable.strings),
                     )
@@ -353,7 +368,6 @@ class ClassCodegen private constructor(
                 av.visit(JvmAnnotationNames.METADATA_PACKAGE_NAME_FIELD_NAME, irClass.fqNameWhenAvailable!!.parent().asString())
             }
         }
-        serializedIr?.let { storeSerializedIr(it) }
     }
 
     private fun IrFile.loadSourceFilesInfo(): List<File> {
@@ -403,7 +417,7 @@ class ClassCodegen private constructor(
         }
 
         if (irClass.hasAnnotation(JVM_RECORD_ANNOTATION_FQ_NAME) && !field.isStatic) {
-            val rcv = visitor.addRecordComponent(fieldName, fieldType.descriptor, fieldSignature)
+            val rcv = visitor.newRecordComponent(fieldName, fieldType.descriptor, fieldSignature)
             val annotationCodegen = object : AnnotationCodegen(this@ClassCodegen) {
                 override fun visitAnnotation(descr: String, visible: Boolean): AnnotationVisitor {
                     return rcv.visitAnnotation(descr, visible)
@@ -430,7 +444,7 @@ class ClassCodegen private constructor(
         }
 
         // Only allow generation of one inline method at a time, to avoid deadlocks when files call inline methods of each other.
-        val (node, smap) =
+        (val node, val smap = classSMAP) =
             generatedInlineMethods[method] ?: synchronized(context.inlineMethodGenerationLock) {
                 generatedInlineMethods.getOrPut(method) { FunctionCodegen(method, this).generate() }
             }
@@ -443,7 +457,7 @@ class ClassCodegen private constructor(
             return
         }
 
-        val (node, smap) = generateMethodNode(method)
+        (val node, val smap = classSMAP) = generateMethodNode(method)
         node.preprocessSuspendMarkers(
             method.origin == JvmLoweredDeclarationOrigin.FOR_INLINE_STATE_MACHINE_TEMPLATE || method.isEffectivelyInlineOnly(),
             method.origin == JvmLoweredDeclarationOrigin.FOR_INLINE_STATE_MACHINE_TEMPLATE_CAPTURES_CROSSINLINE
@@ -544,9 +558,6 @@ class ClassCodegen private constructor(
     private val IrClass.isAnonymousInnerClass: Boolean
         get() = isSamWrapper || name.isSpecial || isAnnotationImplementation // NB '<Continuation>' is treated as anonymous inner class here
 
-    private val IrClass.isInlineSamWrapper: Boolean
-        get() = isSamWrapper && visibility == DescriptorVisibilities.PUBLIC
-
     private val IrClass.isSamWrapper: Boolean
         get() = origin == IrDeclarationOrigin.GENERATED_SAM_IMPLEMENTATION
 
@@ -558,17 +569,6 @@ class ClassCodegen private constructor(
         while (!c.isTopLevelDeclaration && innerClasses.add(c)) {
             c = c.parentClassOrNull ?: break
         }
-    }
-
-    private fun storeSerializedIr(serializedIr: ByteArray) {
-        val av = visitor.newAnnotation(JvmAnnotationNames.SERIALIZED_IR_DESC, true)
-        val partsVisitor = av.visitArray(JvmAnnotationNames.SERIALIZED_IR_BYTES_FIELD_NAME)
-        val serializedIrParts = BitEncoding.encodeBytes(serializedIr)
-        for (part in serializedIrParts) {
-            partsVisitor.visit(null, part)
-        }
-        partsVisitor.visitEnd()
-        av.visitEnd()
     }
 
     companion object {

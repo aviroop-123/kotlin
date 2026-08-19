@@ -13,6 +13,6 @@ interface CInteropModuleDeserializerFactory {
     fun createIrModuleDeserializer(
         moduleDescriptor: ModuleDescriptor,
         klib: KotlinLibrary,
-        moduleDependencies: Collection<IrModuleDeserializer>,
+        linker: KonanIrLinker,
     ): IrModuleDeserializer
 }

@@ -1,3 +1,4 @@
+// RUN_PIPELINE_TILL: FRONTEND
 open class C1
 
 interface I1
@@ -6,7 +7,7 @@ external open class EC1
 
 external class <!EXTERNAL_TYPE_EXTENDS_NON_EXTERNAL_TYPE!>EC2<!> : C1
 
-external class <!EXTERNAL_TYPE_EXTENDS_NON_EXTERNAL_TYPE!>EC3<!> : I1, C1
+external class <!EXTERNAL_TYPE_EXTENDS_NON_EXTERNAL_TYPE, EXTERNAL_TYPE_EXTENDS_NON_EXTERNAL_TYPE!>EC3<!> : I1, C1
 
 external interface <!EXTERNAL_TYPE_EXTENDS_NON_EXTERNAL_TYPE!>EI1<!> : I1
 

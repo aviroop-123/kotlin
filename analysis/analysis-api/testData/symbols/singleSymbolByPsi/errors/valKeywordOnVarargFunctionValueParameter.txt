@@ -4,11 +4,15 @@ KaValueParameterSymbol:
   compilerVisibility: Public
   contextReceivers: []
   generatedPrimaryConstructorProperty: null
+  hasDeclaredDefaultValue: false
   hasDefaultValue: false
   isActual: false
+  isCompanion: false
   isCrossinline: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isImplicitLambdaParameter: false
   isNoinline: false
   isVal: true
@@ -26,3 +30,4 @@ KaValueParameterSymbol:
   getContainingJvmClassName: ValKeywordOnVarargFunctionValueParameterKt
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER
 // JSR305_GLOBAL_REPORT: strict
 // ISSUE: KT-55548
@@ -40,7 +39,7 @@ import test.CrudRepository
 import java.util.*
 
 fun test(repository: SpringTemplateRepository, int: Int) {
-    repository.<!OVERLOAD_RESOLUTION_AMBIGUITY!>findById<!>(int)
+    repository.findById(int)
 }
 
 interface SpringTemplateRepository : TemplateRepository, CrudRepository<String, Int>

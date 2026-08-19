@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 publish()
@@ -12,6 +11,7 @@ dependencies {
     api(kotlinStdlib())
     api(project(":kotlin-scripting-common"))
     api(project(":kotlin-scripting-jvm"))
+    compileOnly(project(":core:descriptors"))
     compileOnly(project(":kotlin-scripting-compiler"))
     compileOnly(project(":compiler:cli"))
     compileOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
@@ -31,4 +31,3 @@ tasks.withType<KotlinJvmCompile>().configureEach {
 }
 
 standardPublicJars()
-

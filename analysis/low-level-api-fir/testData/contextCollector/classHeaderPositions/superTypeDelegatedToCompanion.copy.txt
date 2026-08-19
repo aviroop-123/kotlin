@@ -19,8 +19,10 @@ Tower Data Context:
         Scope: FirNestedClassifierScopeImpl
             Classifiers:
                 FirRegularClassSymbol public final? companion object Companion : MyInterface
+        Static scope owner symbol: FirRegularClassSymbol public final class MyClass : R|test/MyInterface|
     Element 8
         Scope: FirLocalScope
+Expression Stability: STABLE_VALUE
 
 FILE: [ResolvedTo(IMPORTS)] superTypeDelegatedToCompanion.kt
     public final? [ResolvedTo(RAW_FIR)] interface MyInterface : R|kotlin/Any| {

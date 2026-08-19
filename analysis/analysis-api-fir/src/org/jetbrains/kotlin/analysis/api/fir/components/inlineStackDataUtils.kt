@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.analysis.api.fir.components
 
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.parents
-import org.jetbrains.kotlin.analysis.api.components.DebuggerExtension
+import org.jetbrains.kotlin.analysis.api.components.KaDebuggerExtension
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFir
 import org.jetbrains.kotlin.analysis.low.level.api.fir.compile.InlineLambdaArgument
@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.getNonLoc
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.isInlinable
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.toResolvedCallableSymbol
@@ -28,7 +29,7 @@ import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtElement
 
-class InlineStackData(
+internal class InlineStackData(
     val capturedReifiedTypeParameterMapping: Map<FirTypeParameterSymbol, ConeKotlinType>,
     val inlineLambdaParameterMapping: Map<FirValueParameterSymbol, InlineLambdaArgument>,
     val firstNonInlineNonLocalFunInStack: KtDeclaration?,
@@ -38,7 +39,7 @@ class InlineStackData(
 internal fun retrieveInlineStackData(
     file: FirFile,
     resolutionFacade: LLResolutionFacade,
-    debuggerExtension: DebuggerExtension?,
+    debuggerExtension: KaDebuggerExtension?,
 ): InlineStackData {
 
     if (debuggerExtension == null) return InlineStackData(emptyMap(), emptyMap(), null)
@@ -79,7 +80,7 @@ internal fun retrieveInlineStackData(
     }
 
     val toConeTypeMapping: LinkedHashMap<FirTypeParameterSymbol, ConeKotlinType> =
-        reifiedTypeParametersMapping.mapValues { (_, firTypeRef) -> firTypeRef.coneType }.toMap(LinkedHashMap())
+        reifiedTypeParametersMapping.mapValues { [_, firTypeRef] -> firTypeRef.coneType }.toMap(LinkedHashMap())
 
     val typeSubstitutor = substitutorByMap(toConeTypeMapping, resolutionFacade.useSiteFirSession)
 
@@ -129,8 +130,26 @@ private fun updateInlineLambdaInfo(
         .firstNotNullOfOrNull { psiElement ->
             psiElement.getOrBuildFir(resolutionFacade) as? FirCall
         } ?: return
-    val paramToExpr = inlineCall.resolvedArgumentMapping?.entries?.associate { (key, value) -> value.symbol to key } ?: return
-    val newlyMapped = paramToExpr.keys.intersect(unsubstitutedInlineLambdaParameters)
+    // Retrieve param->arg mapping from the parameters default values
+    val paramsWithDefaultValues = buildList {
+        if (inlineCall is FirQualifiedAccessExpression) {
+            val callee = inlineCall.calleeReference.toResolvedCallableSymbol()?.fir
+            if (callee is FirFunction) {
+                val defaultValuesMap = callee.valueParameters
+                    .filter { valueParam ->
+                        valueParam.defaultValue != null && valueParam.symbol in unsubstitutedInlineLambdaParameters
+                    }
+                    .associate { valueParam ->
+                        valueParam.symbol to InlineLambdaArgument(valueParam.defaultValue!!, depth - 1)
+                    }
+                inlineLambdaParameterMapping.putAll(defaultValuesMap)
+                addAll(defaultValuesMap.keys)
+            }
+        }
+    }
+    // Retrieve param->arg mapping from the arguments list, overwrite default values
+    val paramToExpr = inlineCall.resolvedArgumentMapping?.entries?.associate { [key, value] -> value.symbol to key } ?: return
+    val newlyMapped = paramToExpr.keys.intersect(unsubstitutedInlineLambdaParameters.union(paramsWithDefaultValues))
     inlineLambdaParameterMapping.putAll(newlyMapped.associateWith { InlineLambdaArgument(paramToExpr[it]!!, depth) })
     unsubstitutedInlineLambdaParameters.removeAll(newlyMapped)
     collectInlineLambdaParameters(inlineCall, unsubstitutedInlineLambdaParameters, resolutionFacade.useSiteFirSession)
@@ -182,7 +201,7 @@ private fun updateReifiedTypeParametersInfo(
 
     val extractedFromPreviousExpression = extractReifiedTypeArguments(typeArgumentHolder)
 
-    for ((extractedParam, extractedArg) in extractedFromPreviousExpression) {
+    for ([extractedParam, extractedArg] in extractedFromPreviousExpression) {
         if (extractedParam in unmappedTypeParameters) {
             mapping[extractedParam] = extractedArg
             unmappedTypeParameters.remove(extractedParam)
@@ -194,7 +213,7 @@ private fun updateReifiedTypeParametersInfo(
 private fun extractReifiedTypeArguments(typeArgumentsHolder: FirQualifiedAccessExpression): Map<FirTypeParameterSymbol, FirTypeRef> {
     val callableSymbol = typeArgumentsHolder.calleeReference.toResolvedCallableSymbol() ?: return emptyMap()
     return buildMap {
-        for ((typeParameterSymbol, typeArgument) in callableSymbol.typeParameterSymbols.zip(typeArgumentsHolder.typeArguments)) {
+        for ([typeParameterSymbol, typeArgument] in callableSymbol.typeParameterSymbols.zip(typeArgumentsHolder.typeArguments)) {
             if (typeParameterSymbol.isReified && typeArgument is FirTypeProjectionWithVariance) {
                 put(typeParameterSymbol, typeArgument.typeRef)
             }

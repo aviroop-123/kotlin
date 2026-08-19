@@ -8,7 +8,7 @@ package org.jetbrains.kotlin.kapt.cli.test
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil.convertLineSeparators
 import org.jetbrains.kotlin.cli.common.arguments.readArgumentsFromArgFile
-import org.jetbrains.kotlin.config.LanguageVersion
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.test.services.JUnit5Assertions
 import org.jetbrains.kotlin.test.util.KtTestUtil
 import org.junit.jupiter.api.BeforeEach
@@ -32,7 +32,7 @@ abstract class AbstractKaptToolIntegrationTest {
     }
 
     fun runTest(filePath: String) {
-        val testDir = File(filePath)
+        val testDir = ForTestCompileRuntime.transformTestDataPath(filePath)
         val testFile = File(testDir, "build.txt")
         assert(testFile.isFile) { "build.txt doesn't exist" }
 
@@ -40,7 +40,7 @@ abstract class AbstractKaptToolIntegrationTest {
         doTestInTempDirectory(testFile, File(tmpdir, testFile.name))
     }
 
-    private class GotResult(val actual: String): RuntimeException()
+    private class GotResult(val actual: String) : RuntimeException()
 
     private fun doTestInTempDirectory(originalTestFile: File, testFile: File) {
         val sections = Section.parse(testFile)
@@ -88,14 +88,14 @@ abstract class AbstractKaptToolIntegrationTest {
     }
 
     private fun runKotlinDistBinary(name: String, args: List<String>) {
-        val executableName = if (SystemInfo.isWindows) name + ".bat" else name
-        val executablePath = File("dist/kotlinc/bin/" + executableName).absolutePath
+        val executableName = if (SystemInfo.isWindows) "$name.bat" else name
+        val executablePath = File(ForTestCompileRuntime.distKotlincForTests(), "bin/$executableName").absolutePath
         runProcess(executablePath, args)
     }
 
     private fun runJavac(args: List<String>) {
         val executableName = if (SystemInfo.isWindows) "javac.exe" else "javac"
-        val executablePath = File(KtTestUtil.getJdk8Home(), "bin/" + executableName).absolutePath
+        val executablePath = File(KtTestUtil.getJdk8Home(), "bin/$executableName").absolutePath
         runProcess(executablePath, args)
     }
 
@@ -103,7 +103,7 @@ abstract class AbstractKaptToolIntegrationTest {
         val outputFile = File(tmpdir, "javaOutput.txt")
 
         val executableName = if (SystemInfo.isWindows) "java.exe" else "java"
-        val executablePath = File(KtTestUtil.getJdk8Home(), "bin/" + executableName).absolutePath
+        val executablePath = File(KtTestUtil.getJdk8Home(), "bin/$executableName").absolutePath
         runProcess(executablePath, args, outputFile)
 
         throw GotResult(outputFile.takeIf { it.isFile }?.readText() ?: "")
@@ -133,8 +133,8 @@ abstract class AbstractKaptToolIntegrationTest {
     private fun transformArguments(args: List<String>): List<String> {
         return args.map {
             val arg = it
-                .replace("%KOTLIN_STDLIB%", File("dist/kotlinc/lib/kotlin-stdlib.jar").absolutePath)
-                .replace("%KOTLIN_COMPILER%", File("dist/kotlinc/lib/kotlin-compiler.jar").absolutePath)
+                .replace("%KOTLIN_STDLIB%", File(ForTestCompileRuntime.distKotlincForTests(), "lib/kotlin-stdlib.jar").absolutePath)
+                .replace("%KOTLIN_COMPILER%", File(ForTestCompileRuntime.distKotlincForTests(), "lib/kotlin-compiler.jar").absolutePath)
             if (SystemInfo.isWindows && (arg.contains("=") || arg.contains(":") || arg.contains(";"))) {
                 "\"" + arg + "\""
             } else {

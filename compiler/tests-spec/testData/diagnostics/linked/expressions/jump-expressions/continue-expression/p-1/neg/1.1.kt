@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -16,7 +15,7 @@ fun case1() {
     val inputList = listOf(1, 2, 3)
     inputList.forEach {
         listOf("1.", "2.", "3.").forEach {
-            if (true) <!NOT_A_LOOP_LABEL!>continue<!LABEL_NAME_CLASH!>@forEach<!><!>
+            if (true) <!BREAK_OR_CONTINUE_OUTSIDE_A_LOOP!>continue@forEach<!>
         }
     }
 }

@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.gradle.targets.wasm.nodejs
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-import org.jetbrains.kotlin.gradle.targets.web.HasPlatformDisambiguator
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin.Companion.TASKS_GROUP_NAME
 import org.jetbrains.kotlin.gradle.targets.js.npm.KotlinNpmResolutionManager
 import org.jetbrains.kotlin.gradle.targets.js.npm.LockCopyTask
@@ -16,6 +15,7 @@ import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinToolingSetupTask
 import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinToolingSetupTask.Companion.NPM_TOOLING_DIR_NAME
 import org.jetbrains.kotlin.gradle.targets.wasm.npm.WasmNpmExtension
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnPlugin
+import org.jetbrains.kotlin.gradle.targets.web.HasPlatformDisambiguator
 import org.jetbrains.kotlin.gradle.targets.web.nodejs.CommonNodeJsRootPlugin
 import org.jetbrains.kotlin.gradle.targets.web.nodejs.NodeJsRootPluginApplier
 import org.jetbrains.kotlin.gradle.targets.web.nodejs.configureNodeJsEnvironmentTasks
@@ -51,12 +51,23 @@ abstract class WasmNodeJsRootPlugin internal constructor() : CommonNodeJsRootPlu
             lockFileDirectory = { it.dir(LockCopyTask.Companion.KOTLIN_JS_STORE).dir(rootDirectoryName) },
             singleNodeJsPluginApply = { WasmNodeJsPlugin.apply(it) },
             yarnPlugin = WasmYarnPlugin::class,
+            beforePackageManager = { rootProject ->
+                kotlinToolingSetup(rootProject)
+            },
             platformType = KotlinPlatformType.wasm,
         )
 
         nodeJsRootPluginApplier.apply(target)
+    }
 
+    private fun kotlinToolingSetup(
+        target: Project,
+    ) {
         val nodeJsRoot = target.extensions.getByName(WasmNodeJsRootExtension.EXTENSION_NAME) as WasmNodeJsRootExtension
+
+        @Suppress("DEPRECATION_ERROR")
+        nodeJsRoot.version = "26.2.0"
+
         val nodeJs = target.extensions.getByName(WasmNodeJsEnvSpec.EXTENSION_NAME) as WasmNodeJsEnvSpec
 
         val packageManagerName = nodeJsRoot.packageManagerExtension.map { it.name }
@@ -103,12 +114,10 @@ abstract class WasmNodeJsRootPlugin internal constructor() : CommonNodeJsRootPlu
                 .fileProvider(npmTooling.map { it.dir.resolve("node_modules") })
                 .disallowChanges()
 
-            with(nodeJsRootPluginApplier) {
-                toolingInstall.configureNodeJsEnvironmentTasks(
-                    nodeJsRoot,
-                    nodeJs
-                )
-            }
+            toolingInstall.configureNodeJsEnvironmentTasks(
+                nodeJsRoot,
+                nodeJs
+            )
 
             with(nodeJs) {
                 toolingInstall.dependsOn(target.nodeJsSetupTaskProvider)

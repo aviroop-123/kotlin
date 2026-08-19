@@ -5,6 +5,9 @@
 
 package org.jetbrains.kotlin.fir.declarations
 
+import org.jetbrains.kotlin.fir.declarations.utils.isReplSnippetDeclaration
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
+
 // Semantically all states here are parts of FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE and just BODY_RESOLVE
 enum class FirPropertyBodyResolveState {
     NOTHING_RESOLVED,
@@ -13,4 +16,4 @@ enum class FirPropertyBodyResolveState {
     ALL_BODIES_RESOLVED,
 }
 
-val FirProperty.isLocal: Boolean get() = symbol.isLocal
+val FirProperty.isEffectivelyLocal: Boolean get() = symbol is FirLocalPropertySymbol || isReplSnippetDeclaration == true

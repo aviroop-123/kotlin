@@ -12,10 +12,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.publishing.configureResourcesPublicationAttributes
 import org.jetbrains.kotlin.gradle.plugin.mpp.publishing.configureSourcesPublicationAttributes
 import org.jetbrains.kotlin.gradle.plugin.mpp.resources.resourcesPublicationExtension
-import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
-import org.jetbrains.kotlin.gradle.utils.addSecondaryOutgoingJvmClassesVariant
-import org.jetbrains.kotlin.gradle.utils.maybeCreateConsumable
-import org.jetbrains.kotlin.gradle.utils.maybeCreateDependencyScope
+import org.jetbrains.kotlin.gradle.utils.*
 
 internal val CreateTargetConfigurationsSideEffect = KotlinTargetSideEffect { target ->
     val project = target.project
@@ -25,19 +22,20 @@ internal val CreateTargetConfigurationsSideEffect = KotlinTargetSideEffect { tar
     val mainCompilation = target.compilations.maybeCreate(KotlinCompilation.MAIN_COMPILATION_NAME)
 
     val compileConfiguration = mainCompilation.internal.configurations.deprecatedCompileConfiguration
-    val implementationConfiguration = configurations.maybeCreateDependencyScope(mainCompilation.implementationConfigurationName)
+    val implementationConfiguration = configurations.maybeCreateDependencyScope(mainCompilation.legacyImplementationConfigurationName)
 
     @Suppress("TYPEALIAS_EXPANSION_DEPRECATION_ERROR")
     val runtimeOnlyConfiguration = when (mainCompilation) {
-        is DeprecatedKotlinCompilationToRunnableFiles<*> -> configurations.maybeCreateDependencyScope(mainCompilation.runtimeOnlyConfigurationName)
+        is DeprecatedKotlinCompilationToRunnableFiles<*> ->
+            configurations.maybeCreateDependencyScope(mainCompilation.legacyRuntimeOnlyConfigurationName)
         else -> null
     }
 
-    val apiElementScope = configurations.maybeCreateDependencyScope(mainCompilation.apiConfigurationName)
+    val apiElementScope = configurations.maybeCreateDependencyScope(mainCompilation.legacyApiConfigurationName)
 
     configurations.maybeCreateConsumable(target.apiElementsConfigurationName).apply {
+        setInvisibleIfSupported()
         description = "API elements for main."
-        isVisible = false
         KotlinUsages.configureProducerApiUsage(this, target)
         attributes.attribute(Category.CATEGORY_ATTRIBUTE, project.categoryByName(Category.LIBRARY))
         extendsFrom(apiElementScope)
@@ -59,8 +57,8 @@ internal val CreateTargetConfigurationsSideEffect = KotlinTargetSideEffect { tar
     @Suppress("TYPEALIAS_EXPANSION_DEPRECATION_ERROR")
     if (mainCompilation is DeprecatedKotlinCompilationToRunnableFiles<*>) {
         configurations.maybeCreateConsumable(target.runtimeElementsConfigurationName).apply {
+            setInvisibleIfSupported()
             description = "Elements of runtime for main."
-            isVisible = false
             KotlinUsages.configureProducerRuntimeUsage(this, target)
             attributes.attribute(Category.CATEGORY_ATTRIBUTE, project.categoryByName(Category.LIBRARY))
             val runtimeConfiguration = mainCompilation.internal.configurations.deprecatedRuntimeConfiguration
@@ -71,17 +69,18 @@ internal val CreateTargetConfigurationsSideEffect = KotlinTargetSideEffect { tar
         }
     }
 
-    configurations.maybeCreateConsumable(target.sourcesElementsConfigurationName).apply {
+    @Suppress("DEPRECATION")
+    configurations.maybeCreateConsumableCompat(target.sourcesElementsConfigurationName).apply {
+        setInvisibleIfSupported()
         description = "Source files of main compilation of ${target.name}."
-        isVisible = false
         configureSourcesPublicationAttributes(target)
         project.launch { isCanBeConsumed = target.internal.isSourcesPublishableFuture.await() }
     }
 
     project.multiplatformExtensionOrNull?.resourcesPublicationExtension?.subscribeOnPublishResources(target) {
         configurations.maybeCreateConsumable(target.internal.resourcesElementsConfigurationName).apply {
+            setInvisibleIfSupported()
             description = "Resource files of main compilation of ${target.name}."
-            isVisible = false
             // Publish with dependencies of apiElements configuration, so that transitives are resolved correctly. Don't inherit from
             // apiElementsConfiguration directly, because it contains klibs in project dependencies.
             extendsFrom(apiElementScope)
@@ -95,11 +94,14 @@ internal val CreateTargetConfigurationsSideEffect = KotlinTargetSideEffect { tar
     if (target !is KotlinMetadataTarget) {
         val testCompilation = target.compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME)
         val compileTestsConfiguration = testCompilation.internal.configurations.deprecatedCompileConfiguration
-        val testImplementationConfiguration = configurations.maybeCreateDependencyScope(testCompilation.implementationConfigurationName)
+
+        val testImplementationConfiguration =
+            configurations.maybeCreateDependencyScope(testCompilation.legacyImplementationConfigurationName)
 
         @Suppress("TYPEALIAS_EXPANSION_DEPRECATION_ERROR")
         val testRuntimeOnlyConfiguration = when (testCompilation) {
-            is DeprecatedKotlinCompilationToRunnableFiles<*> -> configurations.maybeCreateDependencyScope(testCompilation.runtimeOnlyConfigurationName)
+            is DeprecatedKotlinCompilationToRunnableFiles<*> ->
+                configurations.maybeCreateDependencyScope(testCompilation.legacyRuntimeOnlyConfigurationName)
             else -> null
         }
 
@@ -114,17 +116,6 @@ internal val CreateTargetConfigurationsSideEffect = KotlinTargetSideEffect { tar
             val runtimeConfiguration = mainCompilation.internal.configurations.deprecatedRuntimeConfiguration
             val testRuntimeConfiguration = testCompilation.internal.configurations.deprecatedRuntimeConfiguration
             runtimeConfiguration?.let { testRuntimeConfiguration?.extendsFrom(it) }
-        }
-    }
-
-    if (target is KotlinJsIrTarget && !target.isMpp) {
-        target.project.configurations.maybeCreateConsumable(
-            target.commonFakeApiElementsConfigurationName
-        ).apply {
-            description = "Common Fake API elements for main."
-            isVisible = false
-            KotlinUsages.configureProducerApiUsage(this, target)
-            attributes.attribute(KotlinPlatformType.attribute, KotlinPlatformType.common)
         }
     }
 }

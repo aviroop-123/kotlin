@@ -11,11 +11,15 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -32,13 +36,13 @@ scopes:
         visibility: PUBLIC
     constructors: 0
 
-  ExplicitSimpleImportingScope, index = 1
+  ExplicitSimpleImportingScope, index = 2
     packages: 0
     classifiers: 0
     callables: 0
     constructors: 0
 
-  PackageMemberScope, index = 2
+  PackageMemberScope, index = 3
     packages: 0
     classifiers: 2
       KaNamedClassSymbol:
@@ -96,15 +100,14 @@ scopes:
     callables: 0
     constructors: 0
 
-  DefaultSimpleImportingScope, index = 3
-
   DefaultSimpleImportingScope, index = 4
 
-  ExplicitStarImportingScope, index = 5
+  DefaultSimpleImportingScope, index = 5
+
+  ExplicitStarImportingScope, index = 6
     packages: 0
     classifiers: 0
     callables: 0
     constructors: 0
 
-  DefaultStarImportingScope, index = 6
-
+  DefaultStarImportingScope, index = 7

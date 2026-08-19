@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.incremental
 
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
-import org.jetbrains.kotlin.incremental.multiproject.ModulesApiHistory
 import org.jetbrains.kotlin.incremental.utils.TestBuildReporter
 import org.jetbrains.kotlin.incremental.utils.IncrementalJvmCachesTestManager
 import org.jetbrains.kotlin.incremental.utils.TestLookupTracker
@@ -15,18 +14,16 @@ import java.io.File
 class IncrementalJvmCompilerTestRunner(
     workingDir: File,
     val testReporter: TestBuildReporter,
-    buildHistoryFile: File,
+    classpathChanges: ClasspathChanges,
     outputDirs: Collection<File>?,
-    modulesApiHistory: ModulesApiHistory,
     kotlinSourceFilesExtensions: Set<String>,
     icFeatures: IncrementalCompilationFeatures,
-    val testLookupTracker: TestLookupTracker
-) : BuildHistoryJvmICRunner(
+    override val lookupTrackerDelegate: TestLookupTracker,
+) : IncrementalJvmCompilerRunner(
     workingDir,
     testReporter,
-    buildHistoryFile,
     outputDirs,
-    modulesApiHistory,
+    classpathChanges,
     kotlinSourceFilesExtensions,
     icFeatures,
 ) {
@@ -35,9 +32,7 @@ class IncrementalJvmCompilerTestRunner(
             icContext,
             args,
             cacheDirectory,
-            testLookupTracker,
+            lookupTrackerDelegate,
             testReporter,
         )
-
-    override fun getLookupTrackerDelegate() = testLookupTracker
 }

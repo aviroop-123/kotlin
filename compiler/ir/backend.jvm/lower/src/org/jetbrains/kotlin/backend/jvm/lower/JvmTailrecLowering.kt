@@ -6,21 +6,19 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.lower.TailrecLowering
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.defaultValue
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.ir.expressions.IrExpression
-import org.jetbrains.kotlin.ir.expressions.IrFunctionReference
+import org.jetbrains.kotlin.ir.expressions.IrRichFunctionReference
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.types.IrType
 
-@PhaseDescription(name = "Tailrec")
 internal class JvmTailrecLowering(context: JvmBackendContext) : TailrecLowering(context) {
     override val useProperComputationOrderOfTailrecDefaultParameters: Boolean =
         context.config.languageVersionSettings.supportsFeature(LanguageFeature.ProperComputationOrderOfTailrecDefaultParameters)
 
-    override fun followFunctionReference(reference: IrFunctionReference): Boolean =
+    override fun followRichFunctionReference(reference: IrRichFunctionReference): Boolean =
         reference.origin == IrStatementOrigin.INLINE_LAMBDA
 
     override fun nullConst(startOffset: Int, endOffset: Int, type: IrType): IrExpression =

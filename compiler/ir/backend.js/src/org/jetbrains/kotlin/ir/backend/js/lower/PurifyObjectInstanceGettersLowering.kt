@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.ir.backend.js.lower
 
 import org.jetbrains.kotlin.backend.common.DeclarationTransformer
 import org.jetbrains.kotlin.backend.common.ir.isPure
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.backend.js.JsCommonBackendContext
 import org.jetbrains.kotlin.ir.backend.js.hasPureInitialization
@@ -24,7 +25,7 @@ import org.jetbrains.kotlin.utils.addToStdlib.getOrSetIfNull
 /**
  * Optimization: make object instance getter functions pure whenever it's possible.
  */
-class PurifyObjectInstanceGettersLowering(val context: JsCommonBackendContext) : DeclarationTransformer {
+open class PurifyObjectInstanceGettersLowering(val context: JsCommonBackendContext) : DeclarationTransformer {
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         return when {
             (declaration is IrFunction && declaration.isObjectConstructor()) -> declaration.removeInstanceFieldInitializationIfPossible()
@@ -58,7 +59,7 @@ class PurifyObjectInstanceGettersLowering(val context: JsCommonBackendContext) :
             body.statements += JsIrBuilder.buildReturn(
                 symbol,
                 JsIrBuilder.buildGetField(instanceField.symbol),
-                objectToCreate.defaultType
+                context.irBuiltIns.nothingType
             )
         }
 
@@ -70,8 +71,8 @@ class PurifyObjectInstanceGettersLowering(val context: JsCommonBackendContext) :
 
         if (objectToCreate.isPureObject()) {
             initializer = context.irFactory.createExpressionBody(
-                objectToCreate.primaryConstructor?.let { JsIrBuilder.buildConstructorCall(it.symbol) }
-                    ?: objectToCreate.primaryConstructorReplacement?.let { JsIrBuilder.buildCall(it.symbol) }
+                objectToCreate.primaryConstructorReplacement?.let { JsIrBuilder.buildCall(it.symbol) }
+                    ?: objectToCreate.primaryConstructor?.let { JsIrBuilder.buildConstructorCall(it.symbol) }
                     ?: irError("Object should contain a primary constructor") {
                         withIrEntry("objectToCreate", objectToCreate)
                         withIrEntry("this", this@purifyObjectInstanceFieldIfPossible)
@@ -89,7 +90,7 @@ class PurifyObjectInstanceGettersLowering(val context: JsCommonBackendContext) :
 
     private fun IrClass.isPureObject(): Boolean {
         return this::hasPureInitialization.getOrSetIfNull {
-            val constructor = primaryConstructor ?: primaryConstructorReplacement
+            val constructor = primaryConstructorReplacement ?: primaryConstructor
             superClass == null && constructor?.body?.statements?.all { it.isPureStatementForObjectInitialization(this@isPureObject) } != false
         }
     }

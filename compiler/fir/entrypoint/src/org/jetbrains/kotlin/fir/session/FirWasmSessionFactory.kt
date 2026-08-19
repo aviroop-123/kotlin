@@ -6,56 +6,88 @@
 package org.jetbrains.kotlin.fir.session
 
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.fir.analysis.checkers.FirPlatformSpecificCastChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.FirPlatformSpecificEqualityChecker
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.SessionConfiguration
-import org.jetbrains.kotlin.fir.checkers.registerWasmCheckers
-import org.jetbrains.kotlin.fir.scopes.FirDefaultImportProviderHolder
+import org.jetbrains.kotlin.fir.analysis.wasm.checkers.FirWasmJsCastChecker
+import org.jetbrains.kotlin.fir.analysis.wasm.checkers.FirWasmJsEqualityChecker
+import org.jetbrains.kotlin.fir.checkers.registerWasmJsCheckers
+import org.jetbrains.kotlin.fir.checkers.registerWasmWasiCheckers
+import org.jetbrains.kotlin.fir.scopes.FirDefaultImportsProviderHolder
+import org.jetbrains.kotlin.fir.scopes.impl.FirEnumEntriesSupport
 import org.jetbrains.kotlin.platform.wasm.WasmTarget
-import org.jetbrains.kotlin.wasm.config.wasmTarget
-import org.jetbrains.kotlin.wasm.resolve.WasmPlatformAnalyzerServices
-import org.jetbrains.kotlin.wasm.resolve.WasmWasiPlatformAnalyzerServices
+import org.jetbrains.kotlin.resolve.DefaultImportsProvider
+import org.jetbrains.kotlin.wasm.resolve.WasmJsDefaultImportsProvider
+import org.jetbrains.kotlin.wasm.resolve.WasmWasiDefaultImportsProvider
 
 @OptIn(SessionConfiguration::class)
-object FirWasmSessionFactory : AbstractFirKlibSessionFactory<FirWasmSessionFactory.Context, FirWasmSessionFactory.Context>() {
+sealed class FirWasmSessionFactory : AbstractFirKlibSessionFactory<Nothing?>() {
+    object WasmJs : FirWasmSessionFactory() {
+        override val defaultImportsProvider: DefaultImportsProvider
+            get() = WasmJsDefaultImportsProvider
+
+        override fun FirSession.registerWasmComponents() {
+            registerCommonWasmComponents()
+            register(FirPlatformSpecificCastChecker::class, FirWasmJsCastChecker)
+            register(FirPlatformSpecificEqualityChecker::class, FirWasmJsEqualityChecker)
+        }
+
+        override fun FirSessionConfigurator.registerPlatformCheckers() {
+            registerWasmJsCheckers()
+        }
+    }
+
+    object WasmWasi : FirWasmSessionFactory() {
+        override val defaultImportsProvider: DefaultImportsProvider
+            get() = WasmWasiDefaultImportsProvider
+
+        override fun FirSession.registerWasmComponents() {
+            registerCommonWasmComponents()
+        }
+
+        override fun FirSessionConfigurator.registerPlatformCheckers() {
+            registerWasmWasiCheckers()
+        }
+    }
+
+    companion object {
+        fun of(wasmTarget: WasmTarget): FirWasmSessionFactory {
+            return when (wasmTarget) {
+                WasmTarget.JS -> WasmJs
+                WasmTarget.WASI -> WasmWasi
+            }
+        }
+    }
+
+    abstract val defaultImportsProvider: DefaultImportsProvider
 
     // ==================================== Library session ====================================
 
-    override fun createLibraryContext(configuration: CompilerConfiguration): Context {
-        return Context(configuration.wasmTarget)
-    }
+    override fun createLibraryContext(configuration: CompilerConfiguration): Nothing? = null
 
-    override fun FirSession.registerLibrarySessionComponents(c: Context) {
-        registerDefaultComponents()
-        registerWasmComponents(c.wasmTarget)
+    override fun FirSession.registerLibrarySessionComponents(c: Nothing?) {
+        registerWasmComponents()
     }
 
     // ==================================== Platform session ====================================
 
-    override fun createSourceContext(configuration: CompilerConfiguration): Context {
-        return Context(configuration.wasmTarget)
+    override fun createSourceContext(configuration: CompilerConfiguration): Nothing? = null
+
+    abstract override fun FirSessionConfigurator.registerPlatformCheckers()
+
+    override fun FirSessionConfigurator.registerExtraPlatformCheckers() {}
+
+    override fun FirSession.registerSourceSessionComponents(c: Nothing?) {
+        registerWasmComponents()
     }
 
-    override fun FirSessionConfigurator.registerPlatformCheckers(c: Context) {
-        registerWasmCheckers(c.wasmTarget)
-    }
+    abstract fun FirSession.registerWasmComponents()
 
-    override fun FirSessionConfigurator.registerExtraPlatformCheckers(c: Context) {}
-
-    override fun FirSession.registerSourceSessionComponents(c: Context) {
-        registerDefaultComponents()
-        registerWasmComponents(c.wasmTarget)
-    }
-
-    @OptIn(SessionConfiguration::class)
-    fun FirSession.registerWasmComponents(wasmTarget: WasmTarget) {
-        val analyzerServices = when (wasmTarget) {
-            WasmTarget.JS -> WasmPlatformAnalyzerServices
-            WasmTarget.WASI -> WasmWasiPlatformAnalyzerServices
-        }
-        register(FirDefaultImportProviderHolder::class, FirDefaultImportProviderHolder(analyzerServices))
+    protected fun FirSession.registerCommonWasmComponents() {
+        register(FirEnumEntriesSupport(this))
+        register(FirDefaultImportsProviderHolder.of(defaultImportsProvider))
     }
 
     // ==================================== Utilities ====================================
-
-    class Context(val wasmTarget: WasmTarget)
 }

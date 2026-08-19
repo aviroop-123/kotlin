@@ -7,6 +7,7 @@ package org.jetbrains.kotlinx.dataframe.plugin.extensions
 
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.declarations.utils.effectiveVisibility
 import org.jetbrains.kotlin.fir.extensions.*
 import org.jetbrains.kotlin.fir.extensions.predicate.LookupPredicate
 import org.jetbrains.kotlin.fir.packageFqName
@@ -25,6 +26,7 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlinx.dataframe.plugin.DataFramePlugin
 import org.jetbrains.kotlinx.dataframe.plugin.impl.*
+import org.jetbrains.kotlinx.dataframe.plugin.utils.ALLOWED_DECLARATION_VISIBILITY
 import org.jetbrains.kotlinx.dataframe.plugin.utils.Names
 
 @OptIn(ExperimentalTopLevelDeclarationsGenerationApi::class)
@@ -39,7 +41,9 @@ class ImportedSchemasGenerator(
     private val predicateBasedProvider = session.predicateBasedProvider
 
     private val matchedClasses by lazy {
-        predicateBasedProvider.getSymbolsByPredicate(predicate).filterIsInstance<FirRegularClassSymbol>()
+        predicateBasedProvider.getSymbolsByPredicate(predicate)
+            .filterIsInstance<FirRegularClassSymbol>()
+            .filter { it.effectiveVisibility in ALLOWED_DECLARATION_VISIBILITY }
     }
 
     val topLevelSchemas: Map<Name, ImportedDataSchema> get() = session.importedSchemasService.topLevelSchemas
@@ -55,7 +59,7 @@ class ImportedSchemasGenerator(
                     ExtensionProperty(id, returnType, owner = classSymbol)
                 }
 
-                nestedSchemas[classSymbol.name]?.entries?.forEach { (nested, columns) ->
+                nestedSchemas[classSymbol.name]?.entries?.forEach { [nested, columns] ->
                     columns.mapTo(this) { column ->
                         val id = CallableId(classSymbol.packageFqName(), Name.identifier(column.name))
                         val returnType = generateReturnType(column, classSymbol, Name.identifier(column.name))
@@ -100,7 +104,7 @@ class ImportedSchemasGenerator(
                 val tag = container.classId.createNestedClassId(Name.identifier(col.name))
                 Names.DATA_ROW_CLASS_ID.createConeType(session, arrayOf(tag.createConeType(session)))
             }
-            is SimpleDataColumn -> col.type.type
+            is SimpleDataColumn -> col.type.coneType
             is SimpleFrameColumn -> {
                 val tag = container.classId.createNestedClassId(Name.identifier(col.name))
                 Names.DF_CLASS_ID.createConeType(session, arrayOf(tag.createConeType(session)))
@@ -121,7 +125,6 @@ class ImportedSchemasGenerator(
                     it.owner,
                     mode,
                     it.returnType,
-                    null,
                     callableId.callableName
                 )
             }.orEmpty()
@@ -152,7 +155,7 @@ class ImportedSchemasGenerator(
             is SimpleColumnGroup -> {
                 Names.DATA_ROW_CLASS_ID.createConeType(session, arrayOf(marker.createConeType(session)))
             }
-            is SimpleDataColumn -> column.type.type
+            is SimpleDataColumn -> column.type.coneType
             is SimpleFrameColumn -> {
                 Names.DF_CLASS_ID.createConeType(session, arrayOf(marker.createConeType(session)))
             }

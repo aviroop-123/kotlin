@@ -44,23 +44,29 @@ internal val IrElement.fqName: String
 
 internal fun IrFunctionAccessExpression.getThisReceiver(): IrValueSymbol = this.symbol.owner.parentAsClass.thisReceiver!!.symbol
 
-internal fun IrConst.toPrimitive(): Primitive = when {
-    type.isByte() -> Primitive((value as Number).toByte(), type)
-    type.isShort() -> Primitive((value as Number).toShort(), type)
+internal fun convertToPrimitive(value: Any?, type: IrType): Primitive = when {
+    type.isByte() -> Primitive(convertTo<Byte>(value!!), type)
+    type.isShort() -> Primitive(convertTo<Short>(value!!), type)
+    type.isUByte() -> Primitive(convertTo<UByte>(value!!), type)
+    type.isUShort() -> Primitive(convertTo<UShort>(value!!), type)
+    type.isUInt() -> Primitive(convertTo<UInt>(value!!), type)
+    type.isULong() -> Primitive(convertTo<ULong>(value!!), type)
     else -> Primitive(value, type)
 }
+
+internal fun IrConst.toPrimitive(): Primitive = convertToPrimitive(value, type)
 
 fun IrAnnotationContainer?.hasAnnotation(annotation: FqName): Boolean {
     this ?: return false
     if (this.annotations.isNotEmpty()) {
-        return this.annotations.any { it.symbol.owner.parentAsClass.fqNameWhenAvailable == annotation }
+        return this.annotations.any { it.isAnnotationWithEqualFqName(annotation) }
     }
     return false
 }
 
-fun IrAnnotationContainer.getAnnotation(annotation: FqName): IrConstructorCall {
-    return this.annotations.firstOrNull { it.symbol.owner.parentAsClass.fqNameWhenAvailable == annotation }
-        ?: ((this as IrFunction).parent as IrClass).annotations.first { it.symbol.owner.parentAsClass.fqNameWhenAvailable == annotation }
+fun IrAnnotationContainer.getAnnotation(annotation: FqName): IrAnnotation {
+    return this.annotations.firstOrNull { it.isAnnotationWithEqualFqName(annotation) }
+        ?: ((this as IrFunction).parent as IrClass).annotations.first { it.isAnnotationWithEqualFqName(annotation) }
 }
 
 internal fun IrAnnotationContainer.getEvaluateIntrinsicValue(): String? {
@@ -105,13 +111,13 @@ fun IrFunction.getLastOverridden(): IrFunction {
 
 internal fun List<Any?>.toPrimitiveStateArray(type: IrType): Primitive {
     return when {
-        type.isByteArray() -> Primitive(ByteArray(size) { i -> (this[i] as Number).toByte() }, type)
-        type.isCharArray() -> Primitive(CharArray(size) { i -> this[i] as Char }, type)
-        type.isShortArray() -> Primitive(ShortArray(size) { i -> (this[i] as Number).toShort() }, type)
-        type.isIntArray() -> Primitive(IntArray(size) { i -> (this[i] as Number).toInt() }, type)
-        type.isLongArray() -> Primitive(LongArray(size) { i -> (this[i] as Number).toLong() }, type)
-        type.isFloatArray() -> Primitive(FloatArray(size) { i -> (this[i] as Number).toFloat() }, type)
-        type.isDoubleArray() -> Primitive(DoubleArray(size) { i -> (this[i] as Number).toDouble() }, type)
+        type.isByteArray() -> Primitive(ByteArray(size) { i -> convertTo<Byte>(this[i]!!) }, type)
+        type.isCharArray() -> Primitive(CharArray(size) { i -> convertTo<Char>(this[i]!!) }, type)
+        type.isShortArray() -> Primitive(ShortArray(size) { i -> convertTo<Short>(this[i]!!) }, type)
+        type.isIntArray() -> Primitive(IntArray(size) { i -> convertTo<Int>(this[i]!!) }, type)
+        type.isLongArray() -> Primitive(LongArray(size) { i -> convertTo<Long>(this[i]!!) }, type)
+        type.isFloatArray() -> Primitive(FloatArray(size) { i -> convertTo<Float>(this[i]!!) }, type)
+        type.isDoubleArray() -> Primitive(DoubleArray(size) { i -> convertTo<Double>(this[i]!!) }, type)
         type.isBooleanArray() -> Primitive(BooleanArray(size) { i -> (this[i] as Boolean) }, type)
         else -> Primitive(this.toTypedArray(), type)
     }
@@ -238,8 +244,8 @@ internal fun IrFunctionAccessExpression.getFunctionThatContainsDefaults(): IrFun
     }
 
     return (arguments zip irFunction.parameters)
-        .first { (arg, _) -> arg == null }
-        .let { (_, param) -> param.lookup() ?: irFunction }
+        .first { [arg, _] -> arg == null }
+        .let { [_, param] -> param.lookup() ?: irFunction }
 }
 
 internal fun IrValueParameter.getDefaultWithActualParameters(
@@ -335,7 +341,7 @@ internal fun IrEnumEntry.toState(irBuiltIns: IrBuiltIns): Common {
             Primitive(this.name.asString(), irBuiltIns.stringType),
             Primitive(enumEntries.indexOf(this), irBuiltIns.intType)
         )
-        irBuiltIns.enumClass.owner.declarations.filterIsInstance<IrProperty>().zip(valueArguments).forEach { (property, argument) ->
+        irBuiltIns.enumClass.owner.declarations.filterIsInstance<IrProperty>().zip(valueArguments).forEach { [property, argument] ->
             enumClassObject.setField(property.symbol, argument)
         }
     }

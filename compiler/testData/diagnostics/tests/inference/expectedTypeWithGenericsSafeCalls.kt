@@ -1,7 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// SKIP_TXT
-// LANGUAGE: +ExpectedTypeFromCast
 
 class X {
     fun <T> foo(): T = TODO()

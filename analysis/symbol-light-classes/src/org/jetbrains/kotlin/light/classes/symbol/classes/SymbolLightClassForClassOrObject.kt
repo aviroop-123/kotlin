@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.pointers.KaSymbolPointer
+import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.asJava.builder.LightMemberOriginForDeclaration
 import org.jetbrains.kotlin.asJava.classes.METHOD_INDEX_BASE
 import org.jetbrains.kotlin.asJava.classes.METHOD_INDEX_FOR_NON_ORIGIN_METHOD
@@ -27,12 +28,15 @@ import org.jetbrains.kotlin.light.classes.symbol.cachedValue
 import org.jetbrains.kotlin.light.classes.symbol.fields.SymbolLightField
 import org.jetbrains.kotlin.light.classes.symbol.fields.SymbolLightFieldForEnumEntry
 import org.jetbrains.kotlin.light.classes.symbol.fields.SymbolLightFieldForObject
+import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightAccessorMethod.Companion.createPropertyAccessors
 import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightConstructor.Companion.createConstructors
 import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightSimpleMethod.Companion.createSimpleMethods
 import org.jetbrains.kotlin.light.classes.symbol.modifierLists.GranularModifiersBox
 import org.jetbrains.kotlin.light.classes.symbol.modifierLists.SymbolLightClassModifierList
+import org.jetbrains.kotlin.light.classes.symbol.records.SymbolLightRecordHeader
 import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.name.JvmStandardClassIds
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtDeclaration
@@ -44,7 +48,8 @@ import org.jetbrains.kotlin.util.OperatorNameConventions.TO_STRING
 import org.jetbrains.kotlin.utils.addToStdlib.applyIf
 
 internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassLike {
-    val isValueClass: Boolean
+    private val isValueClass: Boolean
+    override fun isValueClass() = isValueClass
 
     constructor(
         ktModule: KaModule,
@@ -138,8 +143,20 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
                     }
                 }
 
+            val allSupertypes = classSymbol.defaultType.allSupertypes
+                .filterIsInstance<KaClassType>()
+                .filter { it.classId != StandardClassIds.Any }
+                .toList() // We assume that in practice the list is small enough.
+
+            val filteredDeclarations = processOwnDeclarationsMappedCollectionMethodsAware(
+                containingClass = this@SymbolLightClassForClassOrObject,
+                callableDeclarations = visibleDeclarations,
+                allSupertypes,
+                result
+            )
+
             val suppressStatic = classKind() == KaClassKind.COMPANION_OBJECT
-            createMethods(this@SymbolLightClassForClassOrObject, visibleDeclarations, result, suppressStatic = suppressStatic)
+            createMethods(this@SymbolLightClassForClassOrObject, filteredDeclarations, result, suppressStatic = suppressStatic)
             createConstructors(this@SymbolLightClassForClassOrObject, declaredMemberScope.constructors, result)
 
             addMethodsFromCompanionIfNeeded(result, classSymbol)
@@ -147,7 +164,13 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
             addMethodsFromDataClass(result, classSymbol)
             generateMethodsFromAny(classSymbol, result)
 
-            addDelegatesToInterfaceMethods(result, classSymbol)
+            addDelegatesToInterfaceMethods(result, classSymbol, allSupertypes)
+            generateJavaCollectionMethodStubsIfNeeded(
+                containingClass = this@SymbolLightClassForClassOrObject,
+                classSymbol,
+                allSupertypes,
+                result
+            )
 
             result
         }
@@ -204,7 +227,11 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
         functionsFromAnyByName[EQUALS]?.let { createMethodFromAny(it, result) }
     }
 
-    private fun KaSession.addDelegatesToInterfaceMethods(result: MutableList<PsiMethod>, classSymbol: KaNamedClassSymbol) {
+    private fun KaSession.addDelegatesToInterfaceMethods(
+        result: MutableList<PsiMethod>,
+        classSymbol: KaNamedClassSymbol,
+        allSupertypes: List<KaClassType>
+    ) {
         fun createDelegateMethod(functionSymbol: KaNamedFunctionSymbol) {
             val kotlinOrigin = functionSymbol.psiSafe<KtDeclaration>() ?: classOrObjectDeclaration
             val lightMemberOrigin = kotlinOrigin?.let { LightMemberOriginForDeclaration(it, JvmDeclarationOriginKind.DELEGATION) }
@@ -219,9 +246,45 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
             )
         }
 
-        classSymbol.delegatedMemberScope.callables.forEach { functionSymbol ->
-            if (functionSymbol is KaNamedFunctionSymbol) {
-                createDelegateMethod(functionSymbol)
+        val hasCollectionSupertype by lazy(LazyThreadSafetyMode.NONE) { hasCollectionSupertype(allSupertypes) }
+
+        classSymbol.delegatedMemberScope.callables.forEach { callableSymbol ->
+            when (callableSymbol) {
+                is KaNamedFunctionSymbol -> {
+                    if (!hasCollectionSupertype) {
+                        createDelegateMethod(functionSymbol = callableSymbol)
+                        return@forEach
+                    }
+                    val kotlinCollectionFunction = (callableSymbol.fakeOverrideOriginal as? KaNamedFunctionSymbol).takeIf {
+                        it?.isFromKotlinCollectionsPackage() == true
+                    }
+                    if (kotlinCollectionFunction == null) {
+                        createDelegateMethod(functionSymbol = callableSymbol)
+                        return@forEach
+                    }
+                    val shouldCreateRegularDelegate = processPossiblyMappedCollectionMethod(
+                        containingClass = this@SymbolLightClassForClassOrObject,
+                        ownFunction = callableSymbol,
+                        kotlinCollectionFunction = kotlinCollectionFunction,
+                        allSupertypes = allSupertypes,
+                        result = result,
+                        originKind = JvmDeclarationOriginKind.DELEGATION
+                    )
+                    if (shouldCreateRegularDelegate) {
+                        createDelegateMethod(functionSymbol = callableSymbol)
+                    }
+                }
+
+                is KaKotlinPropertySymbol -> {
+                    createPropertyAccessors(
+                        lightClass = this@SymbolLightClassForClassOrObject,
+                        result = result,
+                        declaration = callableSymbol,
+                        isTopLevel = false
+                    )
+                }
+
+                else -> {}
             }
         }
     }
@@ -281,9 +344,22 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
     override fun isInterface(): Boolean = false
     override fun isAnnotationType(): Boolean = false
     override fun classKind(): KaClassKind = withClassSymbol { it.classKind }
+
     override fun isRecord(): Boolean {
         return modifierList.hasAnnotation(JvmStandardClassIds.Annotations.JvmRecord.asFqNameString())
     }
+
+    override fun getRecordHeader(): PsiRecordHeader? = cachedValue {
+        if (!isRecord) return@cachedValue null
+
+        SymbolLightRecordHeader(
+            kotlinOrigin = (classOrObjectDeclaration as? KtClass)?.primaryConstructor,
+            containingClass = this@SymbolLightClassForClassOrObject,
+        )
+    }
+
+    override fun getRecordComponents(): Array<PsiRecordComponent> =
+        recordHeader?.recordComponents ?: PsiRecordComponent.EMPTY_ARRAY
 
     override fun copy(): SymbolLightClassForClassOrObject = SymbolLightClassForClassOrObject(
         classOrObjectDeclaration = classOrObjectDeclaration,

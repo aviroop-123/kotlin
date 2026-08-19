@@ -1,0 +1,474 @@
+KtFile: 'forWithIterator.kt'
+  null
+
+KtPackageDirective(0,9): 'package f'
+  null
+
+KtNameReferenceExpression(8,9): 'f'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f
+    ]
+
+KtImportList(9,9): ''
+  null
+
+KtClass(11,61): 'class IntProgression(val start: Int, val end: Int)'
+  null
+
+KtPrimaryConstructor(31,61): '(val start: Int, val end: Int)'
+  null
+
+KtParameterList(31,61): '(val start: Int, val end: Int)'
+  null
+
+KtParameter(32,46): 'val start: Int'
+  null
+
+KtTypeReference(43,46): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(43,46): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(43,46): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtParameter(48,60): 'val end: Int'
+  null
+
+KtTypeReference(57,60): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(57,60): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(57,60): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNamedFunction(63,267): 'operator fun IntProgression.iterator() = object : Iterator<Int> {'
+  null
+
+KtDeclarationModifierList(63,71): 'operator'
+  null
+
+KtTypeReference(76,90): 'IntProgression'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f/IntProgression
+    ]
+
+KtUserType(76,90): 'IntProgression'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f/IntProgression
+    ]
+
+KtNameReferenceExpression(76,90): 'IntProgression'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f/IntProgression
+    ]
+
+KtParameterList(99,101): '()'
+  null
+
+KtObjectLiteralExpression(104,267): 'object : Iterator<Int> {'
+  null
+
+KtObjectDeclaration(104,267): 'object : Iterator<Int> {'
+  null
+
+KtSuperTypeList(113,126): 'Iterator<Int>'
+  null
+
+KtSuperTypeEntry(113,126): 'Iterator<Int>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/Iterator
+    ]
+
+KtTypeReference(113,126): 'Iterator<Int>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/Iterator
+    ]
+
+KtUserType(113,126): 'Iterator<Int>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/Iterator
+    ]
+
+KtNameReferenceExpression(113,121): 'Iterator'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/collections/Iterator
+    ]
+
+KtTypeArgumentList(121,126): '<Int>'
+  null
+
+KtTypeProjection(122,125): 'Int'
+  null
+
+KtTypeReference(122,125): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(122,125): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(122,125): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtClassBody(127,267): '{'
+  null
+
+KtProperty(133,166): 'var current = this@iterator.start'
+  null
+
+KtDotQualifiedExpression(147,166): 'this@iterator.start'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val start: kotlin.Int
+    ]
+
+KtThisExpression(147,160): 'this@iterator'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(f/iterator)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: f/IntProgression
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(147,151): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(f/iterator)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: f/IntProgression
+        visibility: PUBLIC
+    ]
+
+KtContainerNode(151,160): '@iterator'
+  null
+
+KtLabelReferenceExpression(151,160): '@iterator'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f/iterator(<extension receiver>: f.IntProgression): kotlin.collections.Iterator<kotlin.Int>
+    ]
+
+KtNameReferenceExpression(161,166): 'start'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val start: kotlin.Int
+    ]
+
+KtNamedFunction(171,224): 'override fun hasNext() = current <= this@iterator.end'
+  null
+
+KtDeclarationModifierList(171,179): 'override'
+  null
+
+KtParameterList(191,193): '()'
+  null
+
+KtBinaryExpression(196,224): 'current <= this@iterator.end'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int.compareTo(<dispatch receiver>: kotlin.Int, other: kotlin.Int): kotlin.Int
+    ]
+
+KtNameReferenceExpression(196,203): 'current'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var current: kotlin.Int
+    ]
+
+KtOperationReferenceExpression(204,206): '<='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int.compareTo(<dispatch receiver>: kotlin.Int, other: kotlin.Int): kotlin.Int
+    ]
+
+KtDotQualifiedExpression(207,224): 'this@iterator.end'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val end: kotlin.Int
+    ]
+
+KtThisExpression(207,220): 'this@iterator'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(f/iterator)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: f/IntProgression
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(207,211): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(f/iterator)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: f/IntProgression
+        visibility: PUBLIC
+    ]
+
+KtContainerNode(211,220): '@iterator'
+  null
+
+KtLabelReferenceExpression(211,220): '@iterator'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f/iterator(<extension receiver>: f.IntProgression): kotlin.collections.Iterator<kotlin.Int>
+    ]
+
+KtNameReferenceExpression(221,224): 'end'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val end: kotlin.Int
+    ]
+
+KtNamedFunction(229,265): 'override fun next(): Int = current++'
+  null
+
+KtDeclarationModifierList(229,237): 'override'
+  null
+
+KtParameterList(246,248): '()'
+  null
+
+KtTypeReference(250,253): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(250,253): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(250,253): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtPostfixExpression(256,265): 'current++'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var current: kotlin.Int,
+      kotlin/Int.inc(<dispatch receiver>: kotlin.Int): kotlin.Int
+    ]
+
+KtNameReferenceExpression(256,263): 'current'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      var current: kotlin.Int
+    ]
+
+KtOperationReferenceExpression(263,265): '++'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int.inc(<dispatch receiver>: kotlin.Int): kotlin.Int
+    ]
+
+KtNamedFunction(269,330): 'fun usage() {'
+  null
+
+KtParameterList(278,280): '()'
+  null
+
+KtBlockExpression(281,330): '{'
+  null
+
+KtForExpression(287,328): 'for (i in IntProgression(1, 10)) {'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f/iterator(<extension receiver>: f.IntProgression): kotlin.collections.Iterator<kotlin.Int>,
+      kotlin/collections/Iterator.hasNext(<dispatch receiver>: kotlin.collections.Iterator<T>): kotlin.Boolean,
+      kotlin/collections/Iterator.next(<dispatch receiver>: kotlin.collections.Iterator<T>): T
+    ]
+
+KtParameter(292,293): 'i'
+  null
+
+KtContainerNode(297,318): 'IntProgression(1, 10)'
+  null
+
+KtCallExpression(297,318): 'IntProgression(1, 10)'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(start: kotlin.Int, end: kotlin.Int): f.IntProgression
+    ]
+
+KtNameReferenceExpression(297,311): 'IntProgression'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      f/IntProgression
+    ]
+
+KtValueArgumentList(311,318): '(1, 10)'
+  null
+
+KtValueArgument(312,313): '1'
+  null
+
+KtConstantExpression(312,313): '1'
+  null
+
+KtValueArgument(315,317): '10'
+  null
+
+KtConstantExpression(315,317): '10'
+  null
+
+KtContainerNodeForControlStructureBody(320,328): '{'
+  null
+
+KtBlockExpression(320,328): '{'
+  null

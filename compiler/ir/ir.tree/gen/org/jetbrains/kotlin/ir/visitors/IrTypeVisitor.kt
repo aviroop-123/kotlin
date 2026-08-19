@@ -42,7 +42,7 @@ abstract class IrTypeVisitor<out R, in D> : IrVisitor<R, D>() {
         }
     }
 
-    open fun visitAnnotationUsage(annotationUsage: IrConstructorCall, data: D) {
+    open fun visitAnnotationUsage(annotationUsage: IrAnnotation, data: D) {
         visitElement(annotationUsage, data)
         visitTypeRecursively(annotationUsage, annotationUsage.type, data)
     }
@@ -90,11 +90,6 @@ abstract class IrTypeVisitor<out R, in D> : IrVisitor<R, D>() {
     override fun visitScript(declaration: IrScript, data: D): R {
         declaration.baseClass?.let { visitTypeRecursively(declaration, it, data) }
         return super.visitScript(declaration, data)
-    }
-
-    override fun visitReplSnippet(declaration: IrReplSnippet, data: D): R {
-        declaration.returnType?.let { visitTypeRecursively(declaration, it, data) }
-        return super.visitReplSnippet(declaration, data)
     }
 
     override fun visitTypeAlias(declaration: IrTypeAlias, data: D): R {

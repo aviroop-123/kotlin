@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,37 +8,12 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve
 import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
-import org.jetbrains.kotlin.fir.declarations.FirAnonymousInitializer
-import org.jetbrains.kotlin.fir.declarations.FirBackingField
-import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirConstructor
-import org.jetbrains.kotlin.fir.declarations.FirDanglingModifierList
-import org.jetbrains.kotlin.fir.declarations.FirEnumEntry
-import org.jetbrains.kotlin.fir.declarations.FirErrorPrimaryConstructor
-import org.jetbrains.kotlin.fir.declarations.FirErrorProperty
-import org.jetbrains.kotlin.fir.declarations.FirFile
-import org.jetbrains.kotlin.fir.declarations.FirFunction
-import org.jetbrains.kotlin.fir.declarations.FirMemberDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirProperty
-import org.jetbrains.kotlin.fir.declarations.FirPropertyAccessor
-import org.jetbrains.kotlin.fir.declarations.FirReceiverParameter
-import org.jetbrains.kotlin.fir.declarations.FirRegularClass
-import org.jetbrains.kotlin.fir.declarations.FirScript
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
-import org.jetbrains.kotlin.fir.declarations.FirTypeAlias
-import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
-import org.jetbrains.kotlin.fir.declarations.FirTypeParameterRefsOwner
-import org.jetbrains.kotlin.fir.declarations.FirValueParameter
-import org.jetbrains.kotlin.fir.declarations.FirVariable
-import org.jetbrains.kotlin.fir.expressions.FirAnnotation
-import org.jetbrains.kotlin.fir.expressions.FirAnnotationArgumentMapping
-import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
-import org.jetbrains.kotlin.fir.expressions.FirArgumentList
-import org.jetbrains.kotlin.fir.expressions.FirErrorAnnotationCall
+import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.types.FirErrorTypeRef
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
-import org.jetbrains.kotlin.fir.types.typeAnnotations
 import org.jetbrains.kotlin.fir.types.forEachType
+import org.jetbrains.kotlin.fir.types.typeAnnotations
 import org.jetbrains.kotlin.fir.visitors.FirVisitor
 
 /**
@@ -113,6 +88,10 @@ internal abstract class NonLocalAnnotationVisitor<T> : FirVisitor<Unit, T>() {
         visitAnnotationContainer(script, data)
     }
 
+    override fun visitReplSnippet(replSnippet: FirReplSnippet, data: T) {
+        visitAnnotationContainer(replSnippet, data)
+    }
+
     override fun visitAnonymousInitializer(anonymousInitializer: FirAnonymousInitializer, data: T) {
         visitAnnotationContainer(anonymousInitializer, data)
     }
@@ -161,8 +140,8 @@ internal abstract class NonLocalAnnotationVisitor<T> : FirVisitor<Unit, T>() {
         function.valueParameters.forEach { it.accept(this, data) }
     }
 
-    override fun visitSimpleFunction(simpleFunction: FirSimpleFunction, data: T) {
-        visitFunction(simpleFunction, data)
+    override fun visitNamedFunction(namedFunction: FirNamedFunction, data: T) {
+        visitFunction(namedFunction, data)
     }
 
     override fun visitConstructor(constructor: FirConstructor, data: T) {

@@ -20,7 +20,7 @@ repositories {
 kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalBuildToolsApi::class)
     compilerVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation
-    jvmToolchain(11)
+    jvmToolchain(17)
 
     compilerOptions {
         allWarningsAsErrors.set(true)
@@ -32,5 +32,15 @@ kotlin {
 dependencies {
     compileOnly(kotlin("stdlib", embeddedKotlinVersion))
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${project.bootstrapKotlinVersion}")
-    implementation("org.jetbrains.kotlin:kotlin-build-gradle-plugin:${kotlinBuildProperties.buildGradlePluginVersion}")
+    implementation(kotlinBuildHelpers())
 }
+
+project.configurations.named(org.jetbrains.kotlin.gradle.plugin.PLUGIN_CLASSPATH_CONFIGURATION_NAME + "Main") {
+    resolutionStrategy {
+        eachDependency {
+            if (this.requested.group == "org.jetbrains.kotlin") useVersion(libs.versions.kotlin.`for`.gradle.plugins.compilation.get())
+        }
+    }
+}
+
+kotlin.compilerOptions.moduleName.value(project.name)

@@ -19,7 +19,7 @@ import org.jetbrains.kotlin.ir.util.isSubclassOf
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.name.Name
 
-val ES6_THROWABLE_CONSTRUCTOR_SLOT by IrDeclarationOriginImpl
+val ES6_THROWABLE_CONSTRUCTOR_SLOT by IrDeclarationOriginImpl.Regular
 /**
  * Capture stack trace in primary constructors of Throwable
  */
@@ -36,7 +36,7 @@ class CaptureStackTraceInThrowables(val context: JsIrBackendContext) : BodyLower
         val statements = (irBody as? IrBlockBody)?.statements ?: return
         val delegatingConstructorCallIndex = statements.indexOfLast { it is IrDelegatingConstructorCall }
 
-        statements.add(delegatingConstructorCallIndex + 1, JsIrBuilder.buildCall(context.intrinsics.captureStack).also { call ->
+        statements.add(delegatingConstructorCallIndex + 1, JsIrBuilder.buildCall(context.symbols.captureStack).also { call ->
             val self = klass.thisReceiver!!.symbol
 
             val constructorRef = if (context.es6mode) {

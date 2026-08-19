@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.forcesPreReleaseBinariesIfEnabled
 import org.jetbrains.kotlin.utils.PathUtil
-import org.jetbrains.kotlin.util.toJvmMetadataVersion
+import org.jetbrains.kotlin.util.toMetadataVersion
 import java.io.File
 import java.util.jar.JarFile
 
@@ -35,28 +35,8 @@ class FirCompileKotlinAgainstCustomBinariesTest : AbstractCompileKotlinAgainstCu
         compileKotlin("source.kt", tmpdir, listOf(compileLibrary("library")))
     }
 
-    fun testDeserializedAnnotationReferencesJava() {
-        // Only Java
-        val libraryAnnotation = compileLibrary("libraryAnnotation")
-        // Specifically, use K1
-        val libraryUsingAnnotation = compileLibrary(
-            "libraryUsingAnnotation",
-            additionalOptions = listOf(
-                CommonCompilerArguments::languageVersion.cliArgument, "1.9",
-                CommonCompilerArguments::suppressVersionWarnings.cliArgument,
-            ),
-            extraClassPath = listOf(libraryAnnotation)
-        )
-
-        compileKotlin(
-            "usage.kt",
-            output = tmpdir,
-            classpath = listOf(libraryAnnotation, libraryUsingAnnotation),
-        )
-    }
-
     fun testStrictMetadataVersionSemanticsOldVersion() {
-        val nextMetadataVersion = languageVersion.toJvmMetadataVersion().next()
+        val nextMetadataVersion = languageVersion.toMetadataVersion().next()
         val library = compileLibrary(
             "library", additionalOptions = listOf("-Xgenerate-strict-metadata-version", "-Xmetadata-version=$nextMetadataVersion")
         )
@@ -82,7 +62,7 @@ class FirCompileKotlinAgainstCustomBinariesTest : AbstractCompileKotlinAgainstCu
     }
 
     fun testReleaseCompilerAgainstPreReleaseFeatureJs() {
-        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled() } ?: return
+        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled(LanguageVersion.LATEST_STABLE) } ?: return
 
         val poisonedLibrary = compileJsLibrary(
             libraryName = "poisonedLibrary",
@@ -104,7 +84,7 @@ class FirCompileKotlinAgainstCustomBinariesTest : AbstractCompileKotlinAgainstCu
     }
 
     fun testReleaseCompilerWithoutUsageOfPreReleaseFeatureJs() {
-        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled() } ?: return
+        val arbitraryPoisoningFeature = LanguageFeature.entries.firstOrNull { it.forcesPreReleaseBinariesIfEnabled(LanguageVersion.LATEST_STABLE) } ?: return
 
         val poisonedLibrary = compileJsLibrary(
             libraryName = "poisonedLibrary",
@@ -128,5 +108,11 @@ class FirCompileKotlinAgainstCustomBinariesTest : AbstractCompileKotlinAgainstCu
     fun testDataClassCompiledWith1_0_5Compiler() {
         val library = File(testDataDirectory, "VeryOldLibraryWithDataClass.jar")
         compileKotlin("source.kt", tmpdir, listOf(library), K2JVMCompiler())
+    }
+
+    fun testAgainstHeaderMode() {
+        val library = compileLibrary("library", additionalOptions = listOf("-Xheader-mode"))
+
+        compileKotlin(fileName = "main.kt", output = tmpdir, classpath = listOf(library))
     }
 }

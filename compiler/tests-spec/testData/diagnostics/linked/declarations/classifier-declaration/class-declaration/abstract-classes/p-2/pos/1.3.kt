@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -33,7 +32,7 @@ open class MainCase1() {
 
 fun case1() {
     val main = MainCase1()
-    <!DEBUG_INFO_EXPRESSION_TYPE("MainCase1.InnerAbstractBase")!>main.implVal<!>.boo()
+    main.implVal.boo()
 }
 
 
@@ -42,7 +41,7 @@ fun case1() {
 //NOTE: attempt to implement inner abstract class in init block
 fun case2() {
     val main = MainCase2()
-    <!DEBUG_INFO_EXPRESSION_TYPE("MainCase2.InnerAbstractBase")!>main.impl<!>.boo()
+    main.impl.boo()
 }
 
 
@@ -72,7 +71,7 @@ open class MainCase2() {
 // NOTE: attempt to inherit inner abstract class as another inner class
 fun case3() {
     val main = MainCase3()
-    <!DEBUG_INFO_EXPRESSION_TYPE("MainCase3.ImplInnerAbstractBase")!>main.ImplInnerAbstractBase()<!>.boo()
+    main.ImplInnerAbstractBase().boo()
 }
 
 open class MainCase3() {
@@ -98,7 +97,7 @@ open class MainCase3() {
 // NOTE: attempt to inherit inner abstract class in a outer class function
 fun case4() {
     val main = MainCase4()
-    <!DEBUG_INFO_EXPRESSION_TYPE("MainCase4.InnerAbstractBase")!>main.zoo()<!>.boo()
+    main.zoo().boo()
 }
 
 

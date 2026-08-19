@@ -1,3 +1,0 @@
-KtNameReferenceExpression(107,111): 'Ann0'
-  KtSimpleNameReference:
-    (in Ann0) constructor()

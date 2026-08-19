@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.light.classes.symbol.*
 import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightMethodBase
 import org.jetbrains.kotlin.psi.KtTypeParameterListOwner
+import javax.swing.Icon
 
 internal class SymbolLightTypeParameterList(
     internal val owner: PsiTypeParameterListOwner,
@@ -60,9 +61,10 @@ internal class SymbolLightTypeParameterList(
 
     override fun getTypeParameters(): Array<PsiTypeParameter> = _typeParameters.toArrayIfNotEmptyOrDefault(PsiTypeParameter.EMPTY_ARRAY)
 
-    override fun getTypeParameterIndex(typeParameter: PsiTypeParameter?): Int = _typeParameters.indexOf(typeParameter)
+    override fun getTypeParameterIndex(typeParameter: PsiTypeParameter): Int = _typeParameters.indexOf(typeParameter)
 
-    override fun toString(): String = "SymbolLightTypeParameterList"
+    override fun toString(): String = this::class.simpleName.orEmpty()
+    override fun getElementIcon(flags: Int): Icon? = null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

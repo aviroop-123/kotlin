@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// SKIP_TXT
 
 public class Foo1 () {}
 public class Foo2 constructor() {}

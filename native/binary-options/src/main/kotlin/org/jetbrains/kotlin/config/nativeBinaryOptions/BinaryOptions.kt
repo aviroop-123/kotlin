@@ -40,6 +40,7 @@ object BinaryOptions : BinaryOptionRegistry() {
     val objcExportErrorOnNameCollisions by booleanOption()
 
     val objcExportEntryPointsPath by stringOption()
+    val objcExportExpandEntryPoints by booleanOption()
 
     val objcExportExplicitMethodFamily by booleanOption()
 
@@ -85,6 +86,8 @@ object BinaryOptions : BinaryOptionRegistry() {
 
     val enableSafepointSignposts by booleanOption()
 
+    val forceNativeThreadStateForFunctions by listOption(StringValueParser)
+
     val packFields by booleanOption()
 
     val cInterfaceMode by option<CInterfaceGenerationMode>()
@@ -111,7 +114,27 @@ object BinaryOptions : BinaryOptionRegistry() {
 
     val minidumpLocation by stringOption()
 
+    val minidumpOnSIGTERM by booleanOption()
+
     val cCallMode by option<CCallMode>()
+
+    /**
+     * Generate a macOS Catalyst binary for the given architecture
+     */
+    val macabi by booleanOption()
+
+    val objcExportCache by booleanOption()
+
+    val escapeAnalysisPropagateExiledToHeapObjects by booleanOption()
+
+    val perFileCacheForStdlib by booleanOption()
+
+    /**
+     * When `true`, llvm postprocessing will be done in Kotlin compiler;
+     * when `false`, new custom llvm C++ passes will be used.
+     * This option exists as a workaround, if new passes introduce regressions.
+     */
+    val runLLVMPassesInCompiler by booleanOption()
 }
 
 open class BinaryOption<T : Any>(
@@ -165,6 +188,16 @@ open class BinaryOptionRegistry {
                 }
             }
 
+    protected fun <T : Any> listOption(
+            elementValueParser: BinaryOption.ValueParser<T>
+    ): PropertyDelegateProvider<Any?, ReadOnlyProperty<Any?, CompilerConfigurationKey<List<T>>>> = PropertyDelegateProvider { _, property ->
+        val option = BinaryOption(property.name, ListValueParser(elementValueParser))
+        register(option)
+        ReadOnlyProperty { _, _ ->
+            option.compilerConfigurationKey
+        }
+    }
+
     protected inline fun <reified T : Enum<T>> option(noinline shortcut : (T) -> String? = { null }, noinline hideValue: (T) -> Boolean = { false }): PropertyDelegateProvider<Any?, ReadOnlyProperty<Any?, CompilerConfigurationKey<T>>> =
             PropertyDelegateProvider { _, property ->
                 val option = BinaryOption(property.name, EnumValueParser(enumValues<T>().toList(), shortcut, hideValue))
@@ -192,7 +225,23 @@ private object UIntValueParser : BinaryOption.ValueParser<UInt> {
 private object StringValueParser : BinaryOption.ValueParser<String> {
     override fun parse(value: String) = value
     override val validValuesHint: String?
-        get() = null
+        get() = "string"
+}
+
+private class ListValueParser<T : Any>(
+        val elementValueParser: BinaryOption.ValueParser<T>
+) : BinaryOption.ValueParser<List<T>> {
+    override fun parse(value: String): List<T>? {
+        if (value == "") return emptyList()
+
+        return value.split(";").map {
+            elementValueParser.parse(it) ?: return null
+        }
+    }
+
+    override val validValuesHint: String?
+        get() = "semicolon-separated list of ${elementValueParser.validValuesHint}"
+
 }
 
 @PublishedApi

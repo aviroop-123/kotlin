@@ -1,6 +1,7 @@
+// RUN_PIPELINE_TILL: BACKEND
 // OPT_IN: kotlin.js.ExperimentalJsExport
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// RENDER_DIAGNOSTICS_MESSAGES
+// RENDER_DIAGNOSTIC_ARGUMENTS
 
 package foo
 
@@ -33,6 +34,9 @@ class A(
     <!NON_EXPORTABLE_TYPE("property; C")!>var x3: C<!>
         get() = C()
         set(value) { }
+
+    val x4: Pair<String, String> = "O" to "K"
+    val x5: Triple<Pair<String, String>, String, String> = Triple(x4, "O", "K")
 }
 
 @JsExport

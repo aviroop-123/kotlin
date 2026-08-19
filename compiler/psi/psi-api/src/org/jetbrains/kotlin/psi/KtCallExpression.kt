@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 package org.jetbrains.kotlin.psi
@@ -8,6 +8,20 @@ import com.intellij.lang.ASTNode
 import org.jetbrains.kotlin.KtStubBasedElementTypes
 import org.jetbrains.kotlin.psi.stubs.KotlinPlaceHolderStub
 
+/**
+ * Represents a function call expression, including the callee and arguments.
+ *
+ * ### Example:
+ *
+ * ```kotlin
+ * fun main() {
+ *     println(0)
+ * //  ^________^
+ * }
+ * ```
+ *
+ * Note: this class is not intended to be extended and is marked `open` solely for backward compatibility.
+ */
 open class KtCallExpression : KtExpressionImplStub<KotlinPlaceHolderStub<KtCallExpression>>, KtCallElement, KtReferenceExpression {
     constructor(node: ASTNode) : super(node)
 
@@ -19,14 +33,17 @@ open class KtCallExpression : KtExpressionImplStub<KotlinPlaceHolderStub<KtCallE
     }
 
     override fun getCalleeExpression(): KtExpression? {
+        @Suppress("DEPRECATION") // KT-78356
         return getStubOrPsiChild(KtStubBasedElementTypes.REFERENCE_EXPRESSION) ?: findChildByClass(KtExpression::class.java)
     }
 
     override fun getValueArgumentList(): KtValueArgumentList? {
+        @Suppress("DEPRECATION") // KT-78356
         return getStubOrPsiChild(KtStubBasedElementTypes.VALUE_ARGUMENT_LIST)
     }
 
     override fun getTypeArgumentList(): KtTypeArgumentList? {
+        @Suppress("DEPRECATION") // KT-78356
         return getStubOrPsiChild(KtStubBasedElementTypes.TYPE_ARGUMENT_LIST)
     }
 

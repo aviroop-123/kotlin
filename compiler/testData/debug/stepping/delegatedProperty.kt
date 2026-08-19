@@ -23,33 +23,7 @@ fun box() {
     a.x = x0
 }
 
-// EXPECTATIONS ClassicFrontend JVM_IR
-// test.kt:21 box
-// test.kt:4 <init>
-// test.kt:7 <init>
-// test.kt:10 <init>
-// test.kt:7 <init>
-// test.kt:4 <init>
-// test.kt:21 box
-// test.kt:22 box
-// test.kt:6 getX
-// test.kt:1 getX
-// test.kt:6 getX
-// test.kt:7 getX
-// test.kt:12 getValue
-// test.kt:7 getX
-// test.kt:22 box
-// test.kt:23 box
-// test.kt:6 setX
-// test.kt:1 setX
-// test.kt:6 setX
-// test.kt:7 setX
-// test.kt:16 setValue
-// test.kt:17 setValue
-// test.kt:7 setX
-// test.kt:24 box
-
-// EXPECTATIONS FIR JVM_IR
+// EXPECTATIONS JVM_IR
 // test.kt:21 box
 // test.kt:4 <init>
 // test.kt:7 <init>
@@ -69,30 +43,41 @@ fun box() {
 // test.kt:7 setX
 // test.kt:24 box
 
+// EXPECTATIONS NATIVE
+// test.kt:21 box
+// test.kt:4 <init>
+// test.kt:7 <init>
+// test.kt:10 <init>
+// test.kt:18 <init>
+// test.kt:7 <init>
+// test.kt:8 <init>
+// test.kt:21 box
+// test.kt:22 box
+// test.kt:5 <get-x>
+// test.kt:7 <get-x>
+// test.kt:11 getValue
+// test.kt:12 getValue
+// test.kt:13 getValue
+// test.kt:7 <get-x>
+// test.kt:22 box
+// test.kt:23 box
+// test.kt:5 <set-x>
+// test.kt:7 <set-x>
+// test.kt:15 setValue
+// test.kt:16 setValue
+// test.kt:16 setValue
+// test.kt:17 setValue
+// test.kt:7 <set-x>
+// test.kt:24 box
+
 // EXPECTATIONS JS_IR
 // test.kt:21 box
 // test.kt:7 <init>
 // test.kt:10 <init>
 // test.kt:4 <init>
 // test.kt:22 box
-// EXPECTATIONS ClassicFrontend JS_IR
-// test.kt:6 <get-x>
-// test.kt:7 <get-x>
-// EXPECTATIONS FIR JS_IR
-// test.kt:7 <get-x>
-// test.kt:7 <get-x>
-// EXPECTATIONS JS_IR
-// test.kt:7 <get-x>
 // test.kt:12 getValue
 // test.kt:23 box
-// EXPECTATIONS ClassicFrontend JS_IR
-// test.kt:6 <set-x>
-// test.kt:7 <set-x>
-// EXPECTATIONS FIR JS_IR
-// test.kt:7 <set-x>
-// test.kt:7 <set-x>
-// EXPECTATIONS JS_IR
-// test.kt:7 <set-x>
 // test.kt:16 setValue
 // test.kt:17 setValue
 // test.kt:24 box
@@ -106,11 +91,7 @@ fun box() {
 // test.kt:22 $box (13, 15)
 // test.kt:12 $B.getValue (15, 8)
 // test.kt:22 $box (15)
-// EXPECTATIONS ClassicFrontend WASM
-// test.kt:23 $box (4, 10, 4)
-// EXPECTATIONS FIR WASM
 // test.kt:23 $box (4, 10, 6)
-// EXPECTATIONS WASM
 // test.kt:16 $B.setValue (19, 28)
 // test.kt:17 $B.setValue (5)
 // test.kt:24 $box (1)

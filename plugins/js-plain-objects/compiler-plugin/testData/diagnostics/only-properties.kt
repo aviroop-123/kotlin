@@ -1,5 +1,4 @@
-// FIR_IDENTICAL
-// SKIP_TXT
+// RUN_PIPELINE_TILL: FRONTEND
 
 // FILE: test.kt
 import kotlinx.js.JsPlainObject

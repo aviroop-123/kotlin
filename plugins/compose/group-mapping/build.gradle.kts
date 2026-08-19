@@ -2,9 +2,12 @@ plugins {
     kotlin("jvm")
 }
 
+configureKotlinCompileTasksGradleCompatibility()
+
 dependencies {
-    implementation(project(":kotlin-stdlib"))
-    implementation("org.ow2.asm:asm-tree:9.7")
+    val coreDepsVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation.get()
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:$coreDepsVersion")
+    implementation("org.ow2.asm:asm-tree:9.9.1")
 }
 
 base {

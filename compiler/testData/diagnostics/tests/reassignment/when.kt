@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// LANGUAGE: +WarnAboutNonExhaustiveWhenOnAlgebraicTypes
 // DIAGNOSTICS: -UNUSED_VALUE
 
 fun foo(f: Boolean): Int {

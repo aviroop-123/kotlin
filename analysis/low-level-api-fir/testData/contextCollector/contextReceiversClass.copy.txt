@@ -12,15 +12,13 @@ Tower Data Context:
     Element 5
         Scope: FirExplicitSimpleImportingScope
     Element 6
+        Static scope owner symbol: FirRegularClassSymbol context(R|Foo|)
+        public final class Test : R|kotlin/Any|
+    Element 7
         Implicit receiver:
             FirRegularClassSymbol context(R|Foo|)
             public final class Test : R|kotlin/Any|
                 Type: Test
-    Element 7
-        Context receivers:
-            FirValueParameterSymbol R|Foo|
-                Type: Foo
-                Label: Foo
     Element 8
         Scope: FirLocalScope
     Element 9
@@ -33,13 +31,12 @@ FILE: [ResolvedTo(IMPORTS)] contextReceiversClass.kt
     }
     context([ResolvedTo(RAW_FIR)] Foo)
     public final? [ResolvedTo(RAW_FIR)] class Test : R|kotlin/Any| {
-        context([ResolvedTo(RAW_FIR)] Foo)
         public? [ResolvedTo(RAW_FIR)] constructor(): R|Test| {
             LAZY_super<R|kotlin/Any|>
         }
 
         public final [ResolvedTo(BODY_RESOLVE)] fun test(): R|kotlin/Unit| {
-            this@R|context of /Test|.R|/Foo.foo|()
+            <Unresolved name: foo>#()
         }
 
     }

@@ -1,6 +1,3 @@
-// FIR_IDENTICAL
-// IGNORE_BACKEND_K1: NATIVE
-// REASON: ClassicFrontendFacade.performNativeModuleResolve expects DependencyKind.Source, not DependencyKind.Binary
 // ISSUE: KT-69965
 
 // MODULE: lib

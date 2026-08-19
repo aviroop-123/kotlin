@@ -19,10 +19,7 @@ import org.gradle.deployment.internal.DeploymentHandle
 import org.gradle.deployment.internal.DeploymentRegistry
 import org.gradle.process.ExecOperations
 import org.gradle.work.NormalizeLineEndings
-import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporter
-import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporterImpl
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.*
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.report.UsesBuildMetricsService
 import org.jetbrains.kotlin.gradle.targets.js.NpmVersions
@@ -31,7 +28,7 @@ import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWebpackRulesContainer
 import org.jetbrains.kotlin.gradle.targets.js.dsl.WebpackRulesDsl
 import org.jetbrains.kotlin.gradle.targets.js.dsl.WebpackRulesDsl.Companion.webpackRulesContainer
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrCompilation
-import org.jetbrains.kotlin.gradle.targets.js.npm.RequiresNpmDependencies
+import org.jetbrains.kotlin.gradle.targets.js.npm.RequiresNpmDependenciesTask
 import org.jetbrains.kotlin.gradle.targets.js.npm.npmProject
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig.Mode
 import org.jetbrains.kotlin.gradle.utils.*
@@ -39,6 +36,20 @@ import org.jetbrains.kotlin.gradle.utils.processes.ExecAsyncHandle
 import java.io.File
 import javax.inject.Inject
 
+/**
+ * Generates webpack configuration, then runs webpack.
+ *
+ * The configuration is created from the options set in
+ * [org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig].
+ *
+ * The task either bundles the browser application
+ * or hosts the browser application using the webpack dev server.
+ *
+ * For more information about how Kotlin JS and Wasm use Webpack, see
+ * https://kotl.in/js-project-setup/webpack-bundling
+ *
+ * @see org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
+ */
 @CacheableTask
 abstract class KotlinWebpack
 @Inject
@@ -48,17 +59,7 @@ internal constructor(
     final override val compilation: KotlinJsIrCompilation,
     private val objects: ObjectFactory,
     private val execOps: ExecOperations,
-) : DefaultTask(), RequiresNpmDependencies, WebpackRulesDsl, UsesBuildMetricsService {
-
-    @Deprecated("Extending this class is deprecated. Scheduled for removal in Kotlin 2.4.")
-    @Suppress("DEPRECATION")
-    constructor(
-        compilation: KotlinJsIrCompilation,
-    ) : this(
-        compilation = compilation,
-        objects = compilation.project.objects,
-        execOps = compilation.project.getExecOperations(),
-    )
+) : DefaultTask(), RequiresNpmDependenciesTask, WebpackRulesDsl, UsesBuildMetricsService {
 
     @get:Internal
     internal abstract val versions: Property<NpmVersions>
@@ -71,16 +72,7 @@ internal constructor(
     override val rules: KotlinWebpackRulesContainer =
         project.objects.webpackRulesContainer()
 
-    @get:Internal
-    @Deprecated(
-        "ExecHandleFactory is an internal Gradle API and must be removed to support Gradle 9.0. Please remove usages of this property. Scheduled for removal in Kotlin 2.4.",
-        ReplaceWith("TODO(\"ExecHandleFactory is an internal Gradle API and must be removed to support Gradle 9.0. Please remove usages of this property.\")"),
-    )
-    @Suppress("unused")
-    open val execHandleFactory: Nothing
-        get() = injected
-
-    private val metrics: Property<BuildMetricsReporter<GradleBuildTime, GradleBuildPerformanceMetric>> = project.objects
+    private val metrics: Property<BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>> = project.objects
         .property(BuildMetricsReporterImpl())
 
     @Suppress("unused")
@@ -159,45 +151,12 @@ internal constructor(
         clean = true,
     )
 
-    @get:Internal
-    @Deprecated(
-        "Use `outputDirectory` instead. Scheduled for removal in Kotlin 2.3.",
-        ReplaceWith("outputDirectory"),
-        level = DeprecationLevel.ERROR
-    )
-    var destinationDirectory: File
-        get() = outputDirectory.asFile.get()
-        set(value) {
-            outputDirectory.set(value)
-        }
-
     @get:OutputDirectory
     @get:Optional
     abstract val outputDirectory: DirectoryProperty
 
     @get:Internal
-    @Deprecated(
-        "Use `mainOutputFileName` instead. Scheduled for removal in Kotlin 2.3.",
-        ReplaceWith("mainOutputFileName"),
-        level = DeprecationLevel.ERROR
-    )
-    var outputFileName: String
-        get() = mainOutputFileName.get()
-        set(value) {
-            mainOutputFileName.set(value)
-        }
-
-    @get:Internal
     abstract val mainOutputFileName: Property<String>
-
-    @get:Internal
-    @Deprecated(
-        "Use `mainOutputFile` instead. Scheduled for removal in Kotlin 2.3.",
-        ReplaceWith("mainOutputFile"),
-        level = DeprecationLevel.ERROR
-    )
-    open val outputFile: File
-        get() = mainOutputFile.get().asFile
 
     @get:Internal
     val mainOutputFile: Provider<RegularFile> =
@@ -232,16 +191,6 @@ internal constructor(
     @Optional
     val devServerProperty: Property<KotlinWebpackConfig.DevServer> = project.objects.property(KotlinWebpackConfig.DevServer::class.java)
 
-    @get:Internal
-    @Deprecated(
-        "Use devServerProperty instead. Scheduled for removal in Kotlin 2.3.",
-        replaceWith = ReplaceWith("devServerProperty"),
-        level = DeprecationLevel.ERROR,
-    )
-    var devServer: KotlinWebpackConfig.DevServer
-        get() = devServerProperty.get()
-        set(value) = devServerProperty.set(value)
-
     @Input
     @Optional
     var watchOptions: KotlinWebpackConfig.WatchOptions? = null
@@ -253,8 +202,20 @@ internal constructor(
     @Internal
     var generateConfigOnly: Boolean = false
 
+    /**
+     * Temporary value holder used to capture specific information
+     * set by users in
+     * [org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsBrowserDsl.commonWebpackConfig].
+     *
+     * Specifically created to handle changes to
+     * [org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig.outputFileName]
+     * to support a request from Compose (KT-79921).
+     *
+     * KT-77145 Workaround because [KotlinWebpackConfig] doesn't use Provider API.
+     */
     private val fakeWebpackConfig: KotlinWebpackConfig = KotlinWebpackConfig(
-        rules = project.objects.webpackRulesContainer()
+        rules = project.objects.webpackRulesContainer(),
+        defineNonBrowserEnvironmentProperties = objects.property<Boolean>().convention(getIsWasm),
     )
 
     fun webpackConfigApplier(body: Action<KotlinWebpackConfig>) {
@@ -286,11 +247,13 @@ internal constructor(
         outputFileName = mainOutputFileName.get(),
         configDirectory = configDirectory,
         rules = rules,
+        watchOptions = watchOptions,
         devServer = devServerProperty.orNull,
         devtool = devtool,
         sourceMaps = sourceMaps,
         resolveFromModulesFirst = resolveFromModulesFirst,
-        resolveLoadersFromKotlinToolingDir = getIsWasm.get()
+        resolveLoadersFromKotlinToolingDir = getIsWasm.get(),
+        defineNonBrowserEnvironmentProperties = objects.property<Boolean>().convention(getIsWasm),
     )
 
     private fun createRunner(): KotlinWebpackRunner {
@@ -313,7 +276,9 @@ internal constructor(
         }
 
         return KotlinWebpackRunner(
-            npmProject = npmProject,
+            name = npmProject.compilationName,
+            npmProjectDir = npmProject.dir.get().asFile,
+            nodeExecutable = npmProject.nodeExecutable,
             logger = logger,
             configFile = configFile.get(),
             tool = bin,
@@ -361,7 +326,7 @@ internal constructor(
                 .map { it.length() }
                 .sum()
                 .let {
-                    buildMetrics.addMetric(GradleBuildPerformanceMetric.BUNDLE_SIZE, it)
+                    buildMetrics.addMetric(BUNDLE_SIZE, it)
                 }
 
             buildMetricsService.orNull?.also { it.addTask(path, this.javaClass, buildMetrics) }

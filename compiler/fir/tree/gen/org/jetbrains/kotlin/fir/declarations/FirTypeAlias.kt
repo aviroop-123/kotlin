@@ -20,6 +20,16 @@ import org.jetbrains.kotlin.fir.visitors.FirVisitor
 import org.jetbrains.kotlin.name.Name
 
 /**
+ * Represents a Kotlin type alias declaration in FIR.
+ * A type alias provides an alternative name for an existing type without introducing a new classifier.
+ *
+ * Notable properties:
+ * - [name] — the simple name of the type alias.
+ * - [symbol] — the symbol which serves as a pointer to this type alias.
+ * - [typeParameters] — type parameters referenced by the alias, if any.
+ * - [expandedTypeRef] — the underlying type this alias expands to.
+ * - [annotations] — annotations present on the type alias, if any.
+ *
  * Generated from: [org.jetbrains.kotlin.fir.tree.generator.FirTree.typeAlias]
  */
 abstract class FirTypeAlias : FirClassLikeDeclaration() {
@@ -29,9 +39,9 @@ abstract class FirTypeAlias : FirClassLikeDeclaration() {
     abstract override val attributes: FirDeclarationAttributes
     abstract override val typeParameters: List<FirTypeParameterRef>
     abstract override val status: FirDeclarationStatus
+    abstract override val isLocal: Boolean
     abstract override val deprecationsProvider: DeprecationsProvider
     abstract override val scopeProvider: FirScopeProvider
-    abstract override val isLocal: Boolean
     abstract val name: Name
     abstract override val symbol: FirTypeAliasSymbol
     abstract val expandedTypeRef: FirTypeRef

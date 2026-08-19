@@ -7,19 +7,19 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.resolve.extensions
 
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import com.intellij.psi.search.GlobalSearchScope
+import org.jetbrains.kotlin.analysis.api.permissions.forbidAnalysis
+import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinDeclarationProvider
+import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinFileBasedDeclarationProvider
+import org.jetbrains.kotlin.analysis.api.platform.packages.KotlinPackageProvider
+import org.jetbrains.kotlin.analysis.api.platform.projectStructure.resolveExtensionFileModule
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.resolve.extensions.KaResolveExtension
 import org.jetbrains.kotlin.analysis.api.resolve.extensions.KaResolveExtensionFile
-import org.jetbrains.kotlin.analysis.api.resolve.extensions.KaResolveExtensionProvider
 import org.jetbrains.kotlin.analysis.api.resolve.extensions.KaResolveExtensionNavigationTargetsProvider
-import org.jetbrains.kotlin.analysis.api.permissions.forbidAnalysis
-import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinFileBasedDeclarationProvider
+import org.jetbrains.kotlin.analysis.api.resolve.extensions.KaResolveExtensionProvider
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
-import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.api.projectStructure.analysisContextModule
-import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinDeclarationProvider
-import org.jetbrains.kotlin.analysis.api.platform.packages.KotlinPackageProvider
-import org.jetbrains.kotlin.analysis.api.platform.projectStructure.isGeneratedByResolveExtensions
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSessionComponent
 import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolNamesProvider
@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Caches generated [KaResolveExtensionFile]s, creates [KotlinDeclarationProvider], [KotlinPackageProvider], [FirSymbolNamesProvider] needed
  * for the [org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProvider].
  */
+@KaImplementationDetail
 abstract class LLFirResolveExtensionTool : FirSessionComponent {
     internal abstract val extensions: List<KaResolveExtension>
 
@@ -49,6 +50,7 @@ abstract class LLFirResolveExtensionTool : FirSessionComponent {
 /**
  * The session's [LLFirResolveExtensionTool], or `null` if the session's module defines no resolve extensions.
  */
+@KaImplementationDetail
 val FirSession.llResolveExtensionTool: LLFirResolveExtensionTool? by FirSession.nullableSessionComponentAccessor()
 
 internal class LLFirNonEmptyResolveExtensionTool(
@@ -114,6 +116,7 @@ private class LLFirResolveExtensionToolSymbolNamesProvider(
     }
 }
 
+@KaImplementationDetail
 class LLFirResolveExtensionToolPackageFilter(
     private val extensions: List<KaResolveExtension>
 ) {
@@ -154,6 +157,7 @@ class LLFirResolveExtensionToolPackageFilter(
     }
 }
 
+@KaImplementationDetail
 class LLFirResolveExtensionToolDeclarationProvider internal constructor(
     private val extensionProvider: LLFirResolveExtensionsFileProvider,
     private val ktModule: KaModule,
@@ -254,7 +258,7 @@ class LLFirResolveExtensionToolDeclarationProvider internal constructor(
             .mapNotNullTo(mutableListOf()) { it.kotlinFile.script }
     }
 
-    override fun computePackageNames(): Set<String>? =
+    override fun computePackageNames(): Set<String> =
         buildSet {
             extensionProvider.extensions.forEach { extension ->
                 extension.getContainedPackages().forEach { fqName ->
@@ -292,7 +296,6 @@ class LLFirResolveExtensionToolDeclarationProvider internal constructor(
         }
     }
 
-
     private fun createKtFile(
         factory: KtPsiFactory,
         fileName: String,
@@ -301,12 +304,10 @@ class LLFirResolveExtensionToolDeclarationProvider internal constructor(
     ): KtFile {
         val ktFile = factory.createFile(fileName, fileText)
         val virtualFile = ktFile.virtualFile
-        virtualFile.analysisContextModule = ktModule
-        virtualFile.isGeneratedByResolveExtensions = true
+        virtualFile.resolveExtensionFileModule = ktModule
         virtualFile.navigationTargetsProvider = navigationTargetsProvider
         return ktFile
     }
-
 
     private inline fun <reified D : KtDeclaration> forEachDeclarationOfType(action: (D) -> Unit) {
         for (file in extensionProvider.getAllFiles()) {
@@ -371,6 +372,7 @@ private fun KaResolveExtensionFile.mayHaveTopLevelCallable(name: Name): Boolean 
     return name in getTopLevelCallableNames()
 }
 
+@KaImplementationDetail
 var VirtualFile.navigationTargetsProvider: KaResolveExtensionNavigationTargetsProvider?
         by UserDataProperty(Key.create("KT_RESOLVE_EXTENSION_NAVIGATION_TARGETS_PROVIDER"))
 

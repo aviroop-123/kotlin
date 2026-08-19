@@ -7,30 +7,14 @@ package org.jetbrains.kotlin.ir.inline
 
 import org.jetbrains.kotlin.backend.common.ModuleLoweringPass
 import org.jetbrains.kotlin.backend.common.PreSerializationLoweringContext
-import org.jetbrains.kotlin.config.languageVersionSettings
-import org.jetbrains.kotlin.diagnostics.impl.deduplicating
-import org.jetbrains.kotlin.ir.IrDiagnosticReporter
-import org.jetbrains.kotlin.ir.KtDiagnosticReporterWithImplicitIrBasedContext
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
-import org.jetbrains.kotlin.ir.validation.checkers.IrInlineDeclarationChecker
-import org.jetbrains.kotlin.ir.visitors.IrVisitor
+import org.jetbrains.kotlin.ir.inline.checkers.IrInlineDeclarationChecker
 
+// When invoked without prior private inliner, IrInlineDeclarationChecker won't report cascading diagnostics.
+@PhasePrerequisites(FunctionInlining::class) // only private inlining is required
 class InlineDeclarationCheckerLowering<Context : PreSerializationLoweringContext>(val context: Context) : ModuleLoweringPass {
     override fun lower(irModule: IrModuleFragment) {
-        val irDiagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(
-            context.diagnosticReporter.deduplicating(),
-            context.configuration.languageVersionSettings
-        )
-
-        irModule.runIrLevelCheckers(irDiagnosticReporter, ::IrInlineDeclarationChecker)
-    }
-}
-
-fun IrModuleFragment.runIrLevelCheckers(
-    diagnosticReporter: IrDiagnosticReporter,
-    vararg checkers: (IrDiagnosticReporter) -> IrVisitor<*, Nothing?>,
-) {
-    for (checker in checkers) {
-        accept(checker(diagnosticReporter), null)
+        irModule.accept(IrInlineDeclarationChecker(context), null)
     }
 }

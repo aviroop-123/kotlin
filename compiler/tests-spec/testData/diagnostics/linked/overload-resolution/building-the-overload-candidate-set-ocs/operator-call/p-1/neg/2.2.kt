@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -28,8 +27,8 @@ inline operator fun B?.plusAssign( c: ()->Any) { } //(1)
 @JvmName("aa")
 inline  operator fun B?.plusAssign( c: ()->C) { //(2)
 
-    this <!RECURSION_IN_INLINE!>+=<!> {<!CONSTANT_EXPECTED_TYPE_MISMATCH, CONSTANT_EXPECTED_TYPE_MISMATCH!>1<!>}
-    <!DEBUG_INFO_CALL("fqName: testPackCase1.plusAssign; typeCall: inline operator extension function")!>this <!RECURSION_IN_INLINE!>+=<!> {<!CONSTANT_EXPECTED_TYPE_MISMATCH, CONSTANT_EXPECTED_TYPE_MISMATCH!>1<!>}<!>
+    this <!RECURSION_IN_INLINE!>+=<!> {<!RETURN_TYPE_MISMATCH!>1<!>}
+    <!DEBUG_INFO_CALL("fqName: testPackCase1.plusAssign; typeCall: inline operator extension function")!>this <!RECURSION_IN_INLINE!>+=<!> {<!RETURN_TYPE_MISMATCH!>1<!>}<!>
 }
 
 class C

@@ -1,6 +1,3 @@
-// FIR_IDENTICAL
-// LANGUAGE: +SuspendConversion
-
 fun useSuspend(fn: suspend () -> Unit) {}
 fun useSuspendNullable(fn: (suspend () -> Unit)?) {}
 fun useSuspendNestedNullable(fn: ((suspend () -> Unit)?)?) {}

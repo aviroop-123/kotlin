@@ -34,6 +34,7 @@ val EXCLUDED_PACKAGES_FROM_VARARG_VALIDATION = listOf(
     "kotlinx.serialization.json.internal"
 ).mapTo(hashSetOf(), ::FqName)
 
+context(checker: IrChecker)
 internal fun validateVararg(irElement: IrElement, type: IrType, varargElementType: IrType, context: CheckerContext) {
     if (context.withinAnnotationUsageSubTree && context.file.packageFqName in EXCLUDED_PACKAGES_FROM_VARARG_VALIDATION) return
 
@@ -68,6 +69,7 @@ internal val EXCLUDED_MODULE_NAMES: Set<Name> =
         KOTLINTEST_MODULE_NAME,
     ).mapTo(mutableSetOf()) { Name.special("<$it>") }
 
+context(checker: IrChecker)
 private fun visibilityError(element: IrElement, visibility: Visibility, context: CheckerContext) {
     val message = "The following element references " +
             if (visibility == Visibilities.Unknown) {
@@ -96,28 +98,12 @@ private fun IrDeclarationWithVisibility.isVisibleAsPrivate(file: IrFile): Boolea
     return file.fileEntry == fileOrNull?.fileEntry
 }
 
-/**
- * The set of declarations' fully qualified names references to which we don't want to check for visibility violations.
- *
- * FIXME: We need to get rid of this list of exceptions (KT-69947).
- */
-private val FQ_NAMES_EXCLUDED_FROM_VISIBILITY_CHECKS: Set<FqName> = listOf(
-    "kotlin.wasm.internal.wasmTypeId",        // TODO: stop it leaking through kotlin.reflect.findAssociatedObject() inline function from Kotlin/Wasm stdlib, KT-76285
-    "kotlin.coroutines.CoroutineImpl",        // TODO: stop it leaking through kotlin.coroutines.intrinsics.startCoroutineUninterceptedOrReturn() inline function in Kotlin/Wasm stdlib, KT-76285
-).mapTo(hashSetOf(), ::FqName)
-
-// Most of the internal annotations declared in these packages make visibility checks fail (KT-78100)
-private val EXCLUDED_PACKAGES_FROM_ANNOTATIONS_VISIBILITY_CHECKS =
-    listOf("kotlin.jvm", "kotlin.internal", "kotlin.native", "kotlin.native.internal").mapTo(hashSetOf(), ::FqName)
-
-private fun IrSymbol.isExcludedFromVisibilityChecks(): Boolean {
-    return FQ_NAMES_EXCLUDED_FROM_VISIBILITY_CHECKS.any { excludedFqName -> hasEqualFqName(excludedFqName) }
-}
-
+context(checker: IrChecker)
 internal fun checkVisibility(
     referencedDeclarationSymbol: IrSymbol,
     reference: IrElement,
     context: CheckerContext,
+    treatInternalAsPublic: Boolean, // To relax the validation on the 2nd compilation stage.
 ) {
     if ((reference as? IrOverridableDeclaration<*>)?.isFakeOverride == true && referencedDeclarationSymbol in reference.overriddenSymbols) {
         return
@@ -127,15 +113,7 @@ internal fun checkVisibility(
         return
     }
 
-    if (referencedDeclarationSymbol.isExcludedFromVisibilityChecks()) {
-        return
-    }
-
-    if (context.withinAnnotationUsageSubTree &&
-        referencedDeclarationSymbol.owner.getPackageFragment()?.packageFqName in EXCLUDED_PACKAGES_FROM_ANNOTATIONS_VISIBILITY_CHECKS
-    ) {
-        return
-    }
+    if (context.withinAnnotationUsageSubTree) return
 
     if (context.file.module.name in EXCLUDED_MODULE_NAMES) return
 
@@ -146,7 +124,7 @@ internal fun checkVisibility(
     val effectiveVisibility = visibility.toEffectiveVisibilityOrNull(
         container = classOfReferenced?.symbol,
         forClass = true,
-        ownerIsPublishedApi = referencedDeclaration.isPublishedApi(),
+        ownerIsPublishedApi = treatInternalAsPublic || referencedDeclaration.isPublishedApi(),
     )
 
     val isVisible = when (effectiveVisibility) {
@@ -174,6 +152,7 @@ internal fun checkVisibility(
     }
 }
 
+context(checker: IrChecker)
 internal fun checkFunctionUseSite(
     expression: IrFunctionAccessExpression,
     inlineFunctionUseSiteChecker: InlineFunctionUseSiteChecker,
@@ -195,6 +174,7 @@ internal fun checkFunctionUseSite(
     context.error(expression, message)
 }
 
+context(checker: IrChecker)
 internal fun IrExpression.ensureTypeIs(expectedType: IrType, context: CheckerContext) {
     if (type != expectedType) {
         context.error(this, "unexpected type: expected ${expectedType.render()}, got ${type.render()}")

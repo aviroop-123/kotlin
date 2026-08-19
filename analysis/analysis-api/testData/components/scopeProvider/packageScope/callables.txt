@@ -6,8 +6,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -24,6 +28,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: test.FooKt
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   callableId: test/foo
   compilerVisibility: Public
   contextParameters: []
@@ -35,8 +40,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -54,13 +61,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: test.FooKt
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaNonConstantInitializerValue(ice + 32)
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -85,476 +94,10 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: test.FooKt
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getFoo
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
-
-KaKotlinPropertySymbol:
-  annotations: []
-  backingFieldSymbol: KaBackingFieldSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Private
-    contextReceivers: []
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isVal: true
-    location: PROPERTY
-    modality: FINAL
-    name: field
-    origin: PROPERTY_BACKING_FIELD
-    owningProperty: KaKotlinPropertySymbol(test/internalFoo)
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    visibility: PRIVATE
-    getContainingFileSymbol: KaFileSymbol(Foo.kt)
-    getContainingJvmClassName: test.FooKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  callableId: test/internalFoo
-  compilerVisibility: Internal
-  contextParameters: []
-  contextReceivers: []
-  getter: KaPropertyGetterSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Internal
-    contextReceivers: []
-    hasStableParameterNames: true
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isInline: false
-    isNotDefault: false
-    isOverride: false
-    location: PROPERTY
-    modality: FINAL
-    origin: SOURCE
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    valueParameters: []
-    visibility: INTERNAL
-    getContainingFileSymbol: KaFileSymbol(Foo.kt)
-    getContainingJvmClassName: test.FooKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  hasBackingField: true
-  hasGetter: true
-  hasSetter: false
-  initializer: KaNonConstantInitializerValue(ice + 32)
-  isActual: false
-  isConst: false
-  isDelegatedProperty: false
-  isExpect: false
-  isExtension: false
-  isExternal: false
-  isFromPrimaryConstructor: false
-  isLateInit: false
-  isOverride: false
-  isStatic: false
-  isVal: true
-  location: TOP_LEVEL
-  modality: FINAL
-  name: internalFoo
-  origin: SOURCE
-  receiverParameter: null
-  returnType: KaUsualClassType:
-    annotations: []
-    typeArguments: []
-    type: kotlin/Int
-  setter: null
-  typeParameters: []
-  visibility: INTERNAL
-  getContainingFileSymbol: KaFileSymbol(Foo.kt)
-  getContainingJvmClassName: test.FooKt
-  getContainingModule: KaSourceModule "Sources of main"
-  deprecationStatus: null
-  getterDeprecationStatus: null
-  javaGetterName: getInternalFoo
-  javaSetterName: null
-  setterDeprecationStatus: null
-  isInline: false
-
-KaKotlinPropertySymbol:
-  annotations: []
-  backingFieldSymbol: KaBackingFieldSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Private
-    contextReceivers: []
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isVal: true
-    location: PROPERTY
-    modality: FINAL
-    name: field
-    origin: PROPERTY_BACKING_FIELD
-    owningProperty: KaKotlinPropertySymbol(test/privateFoo)
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    visibility: PRIVATE
-    getContainingFileSymbol: KaFileSymbol(Foo.kt)
-    getContainingJvmClassName: test.FooKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  callableId: test/privateFoo
-  compilerVisibility: Private
-  contextParameters: []
-  contextReceivers: []
-  getter: KaPropertyGetterSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Private
-    contextReceivers: []
-    hasStableParameterNames: true
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isInline: false
-    isNotDefault: false
-    isOverride: false
-    location: PROPERTY
-    modality: FINAL
-    origin: SOURCE
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    valueParameters: []
-    visibility: PRIVATE
-    getContainingFileSymbol: KaFileSymbol(Foo.kt)
-    getContainingJvmClassName: test.FooKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  hasBackingField: true
-  hasGetter: true
-  hasSetter: false
-  initializer: KaNonConstantInitializerValue(ice + 32)
-  isActual: false
-  isConst: false
-  isDelegatedProperty: false
-  isExpect: false
-  isExtension: false
-  isExternal: false
-  isFromPrimaryConstructor: false
-  isLateInit: false
-  isOverride: false
-  isStatic: false
-  isVal: true
-  location: TOP_LEVEL
-  modality: FINAL
-  name: privateFoo
-  origin: SOURCE
-  receiverParameter: null
-  returnType: KaUsualClassType:
-    annotations: []
-    typeArguments: []
-    type: kotlin/Int
-  setter: null
-  typeParameters: []
-  visibility: PRIVATE
-  getContainingFileSymbol: KaFileSymbol(Foo.kt)
-  getContainingJvmClassName: test.FooKt
-  getContainingModule: KaSourceModule "Sources of main"
-  deprecationStatus: null
-  getterDeprecationStatus: null
-  javaGetterName: getPrivateFoo
-  javaSetterName: null
-  setterDeprecationStatus: null
-  isInline: false
-
-KaKotlinPropertySymbol:
-  annotations: []
-  backingFieldSymbol: KaBackingFieldSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Private
-    contextReceivers: []
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isVal: true
-    location: PROPERTY
-    modality: FINAL
-    name: field
-    origin: PROPERTY_BACKING_FIELD
-    owningProperty: KaKotlinPropertySymbol(test/bar)
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    visibility: PRIVATE
-    getContainingFileSymbol: KaFileSymbol(Bar.kt)
-    getContainingJvmClassName: test.BarKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  callableId: test/bar
-  compilerVisibility: Public
-  contextParameters: []
-  contextReceivers: []
-  getter: KaPropertyGetterSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Public
-    contextReceivers: []
-    hasStableParameterNames: true
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isInline: false
-    isNotDefault: false
-    isOverride: false
-    location: PROPERTY
-    modality: FINAL
-    origin: SOURCE
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    valueParameters: []
-    visibility: PUBLIC
-    getContainingFileSymbol: KaFileSymbol(Bar.kt)
-    getContainingJvmClassName: test.BarKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  hasBackingField: true
-  hasGetter: true
-  hasSetter: false
-  initializer: KaNonConstantInitializerValue(ice - 8)
-  isActual: false
-  isConst: false
-  isDelegatedProperty: false
-  isExpect: false
-  isExtension: false
-  isExternal: false
-  isFromPrimaryConstructor: false
-  isLateInit: false
-  isOverride: false
-  isStatic: false
-  isVal: true
-  location: TOP_LEVEL
-  modality: FINAL
-  name: bar
-  origin: SOURCE
-  receiverParameter: null
-  returnType: KaUsualClassType:
-    annotations: []
-    typeArguments: []
-    type: kotlin/Int
-  setter: null
-  typeParameters: []
-  visibility: PUBLIC
-  getContainingFileSymbol: KaFileSymbol(Bar.kt)
-  getContainingJvmClassName: test.BarKt
-  getContainingModule: KaSourceModule "Sources of main"
-  deprecationStatus: null
-  getterDeprecationStatus: null
-  javaGetterName: getBar
-  javaSetterName: null
-  setterDeprecationStatus: null
-  isInline: false
-
-KaKotlinPropertySymbol:
-  annotations: []
-  backingFieldSymbol: KaBackingFieldSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Private
-    contextReceivers: []
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isVal: true
-    location: PROPERTY
-    modality: FINAL
-    name: field
-    origin: PROPERTY_BACKING_FIELD
-    owningProperty: KaKotlinPropertySymbol(test/internalBar)
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    visibility: PRIVATE
-    getContainingFileSymbol: KaFileSymbol(Bar.kt)
-    getContainingJvmClassName: test.BarKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  callableId: test/internalBar
-  compilerVisibility: Internal
-  contextParameters: []
-  contextReceivers: []
-  getter: KaPropertyGetterSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Internal
-    contextReceivers: []
-    hasStableParameterNames: true
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isInline: false
-    isNotDefault: false
-    isOverride: false
-    location: PROPERTY
-    modality: FINAL
-    origin: SOURCE
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    valueParameters: []
-    visibility: INTERNAL
-    getContainingFileSymbol: KaFileSymbol(Bar.kt)
-    getContainingJvmClassName: test.BarKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  hasBackingField: true
-  hasGetter: true
-  hasSetter: false
-  initializer: KaNonConstantInitializerValue(ice - 8)
-  isActual: false
-  isConst: false
-  isDelegatedProperty: false
-  isExpect: false
-  isExtension: false
-  isExternal: false
-  isFromPrimaryConstructor: false
-  isLateInit: false
-  isOverride: false
-  isStatic: false
-  isVal: true
-  location: TOP_LEVEL
-  modality: FINAL
-  name: internalBar
-  origin: SOURCE
-  receiverParameter: null
-  returnType: KaUsualClassType:
-    annotations: []
-    typeArguments: []
-    type: kotlin/Int
-  setter: null
-  typeParameters: []
-  visibility: INTERNAL
-  getContainingFileSymbol: KaFileSymbol(Bar.kt)
-  getContainingJvmClassName: test.BarKt
-  getContainingModule: KaSourceModule "Sources of main"
-  deprecationStatus: null
-  getterDeprecationStatus: null
-  javaGetterName: getInternalBar
-  javaSetterName: null
-  setterDeprecationStatus: null
-  isInline: false
-
-KaKotlinPropertySymbol:
-  annotations: []
-  backingFieldSymbol: KaBackingFieldSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Private
-    contextReceivers: []
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isVal: true
-    location: PROPERTY
-    modality: FINAL
-    name: field
-    origin: PROPERTY_BACKING_FIELD
-    owningProperty: KaKotlinPropertySymbol(test/privateBar)
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    visibility: PRIVATE
-    getContainingFileSymbol: KaFileSymbol(Bar.kt)
-    getContainingJvmClassName: test.BarKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  callableId: test/privateBar
-  compilerVisibility: Private
-  contextParameters: []
-  contextReceivers: []
-  getter: KaPropertyGetterSymbol:
-    annotations: []
-    callableId: null
-    compilerVisibility: Private
-    contextReceivers: []
-    hasStableParameterNames: true
-    isActual: false
-    isExpect: false
-    isExtension: false
-    isInline: false
-    isNotDefault: false
-    isOverride: false
-    location: PROPERTY
-    modality: FINAL
-    origin: SOURCE
-    receiverParameter: null
-    returnType: KaUsualClassType:
-      annotations: []
-      typeArguments: []
-      type: kotlin/Int
-    valueParameters: []
-    visibility: PRIVATE
-    getContainingFileSymbol: KaFileSymbol(Bar.kt)
-    getContainingJvmClassName: test.BarKt
-    getContainingModule: KaSourceModule "Sources of main"
-    deprecationStatus: null
-  hasBackingField: true
-  hasGetter: true
-  hasSetter: false
-  initializer: KaNonConstantInitializerValue(ice - 8)
-  isActual: false
-  isConst: false
-  isDelegatedProperty: false
-  isExpect: false
-  isExtension: false
-  isExternal: false
-  isFromPrimaryConstructor: false
-  isLateInit: false
-  isOverride: false
-  isStatic: false
-  isVal: true
-  location: TOP_LEVEL
-  modality: FINAL
-  name: privateBar
-  origin: SOURCE
-  receiverParameter: null
-  returnType: KaUsualClassType:
-    annotations: []
-    typeArguments: []
-    type: kotlin/Int
-  setter: null
-  typeParameters: []
-  visibility: PRIVATE
-  getContainingFileSymbol: KaFileSymbol(Bar.kt)
-  getContainingJvmClassName: test.BarKt
-  getContainingModule: KaSourceModule "Sources of main"
-  deprecationStatus: null
-  getterDeprecationStatus: null
-  javaGetterName: getPrivateBar
-  javaSetterName: null
-  setterDeprecationStatus: null
-  isInline: false
+  importableFqName: test.foo
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -566,6 +109,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -593,6 +137,109 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.doFoo
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/internalFoo)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Foo.kt)
+    getContainingJvmClassName: test.FooKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/internalFoo
+  compilerVisibility: Internal
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Internal
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: INTERNAL
+    getContainingFileSymbol: KaFileSymbol(Foo.kt)
+    getContainingJvmClassName: test.FooKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaNonConstantInitializerValue(ice + 32)
+  isActual: false
+  isCompanion: false
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: false
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: internalFoo
+  origin: SOURCE
+  receiverParameter: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: INTERNAL
+  getContainingFileSymbol: KaFileSymbol(Foo.kt)
+  getContainingJvmClassName: test.FooKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getInternalFoo
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.internalFoo
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -604,6 +251,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -631,6 +279,109 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.internalDoFoo
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/privateFoo)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Foo.kt)
+    getContainingJvmClassName: test.FooKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/privateFoo
+  compilerVisibility: Private
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Foo.kt)
+    getContainingJvmClassName: test.FooKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaNonConstantInitializerValue(ice + 32)
+  isActual: false
+  isCompanion: false
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: false
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: privateFoo
+  origin: SOURCE
+  receiverParameter: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: PRIVATE
+  getContainingFileSymbol: KaFileSymbol(Foo.kt)
+  getContainingJvmClassName: test.FooKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getPrivateFoo
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.privateFoo
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -642,6 +393,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -669,6 +421,109 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.privateDoFoo
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/bar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/bar
+  compilerVisibility: Public
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaNonConstantInitializerValue(ice - 8)
+  isActual: false
+  isCompanion: false
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: false
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: bar
+  origin: SOURCE
+  receiverParameter: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: PUBLIC
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getBar
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.bar
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -680,6 +535,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -707,6 +563,109 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.doBar
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/internalBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/internalBar
+  compilerVisibility: Internal
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Internal
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: INTERNAL
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaNonConstantInitializerValue(ice - 8)
+  isActual: false
+  isCompanion: false
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: false
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: internalBar
+  origin: SOURCE
+  receiverParameter: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: INTERNAL
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getInternalBar
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.internalBar
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -718,6 +677,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -745,6 +705,109 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.internalDoBar
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/privateBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/privateBar
+  compilerVisibility: Private
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaNonConstantInitializerValue(ice - 8)
+  isActual: false
+  isCompanion: false
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: false
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: privateBar
+  origin: SOURCE
+  receiverParameter: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: PRIVATE
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getPrivateBar
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.privateBar
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -756,6 +819,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -783,3 +847,706 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.privateDoBar
+
+KaNamedFunctionSymbol:
+  annotations: []
+  callableId: test/companionBar
+  compilerVisibility: Public
+  contextParameters: []
+  contextReceivers: []
+  contractEffects: []
+  hasStableParameterNames: true
+  isActual: false
+  isBuiltinFunctionInvoke: false
+  isCompanion: true
+  isExpect: false
+  isExtension: true
+  isExternal: false
+  isInfix: false
+  isInline: false
+  isOperator: false
+  isOverride: false
+  isStatic: false
+  isSuspend: false
+  isTailRec: false
+  location: TOP_LEVEL
+  modality: FINAL
+  name: companionBar
+  origin: SOURCE
+  receiverParameter: KaReceiverParameterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isVal: true
+    location: LOCAL
+    modality: FINAL
+    name: <receiver>
+    origin: SOURCE
+    owningCallableSymbol: KaNamedFunctionSymbol(test/companionBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: test/Bar
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Unit
+  typeParameters: []
+  valueParameters: []
+  visibility: PUBLIC
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  canBeOperator: false
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.companionBar
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/companionBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/companionBar
+  compilerVisibility: Public
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: KaReceiverParameterSymbol:
+      annotations: []
+      callableId: null
+      compilerVisibility: Public
+      contextReceivers: []
+      isActual: false
+      isCompanion: false
+      isDelegated: false
+      isExpect: false
+      isExtension: false
+      isExternal: false
+      isVal: true
+      location: LOCAL
+      modality: FINAL
+      name: <receiver>
+      origin: SOURCE
+      owningCallableSymbol: KaKotlinPropertySymbol(test/companionBar)
+      receiverParameter: null
+      returnType: KaUsualClassType:
+        annotations: []
+        typeArguments: []
+        type: test/Bar
+      visibility: PUBLIC
+      getContainingFileSymbol: KaFileSymbol(Bar.kt)
+      getContainingJvmClassName: test.BarKt
+      getContainingModule: KaSourceModule "Sources of main"
+      deprecationStatus: null
+      importableFqName: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaConstantInitializerValue(2)
+  isActual: false
+  isCompanion: true
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: true
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: companionBar
+  origin: SOURCE
+  receiverParameter: KaReceiverParameterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isVal: true
+    location: LOCAL
+    modality: FINAL
+    name: <receiver>
+    origin: SOURCE
+    owningCallableSymbol: KaKotlinPropertySymbol(test/companionBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: test/Bar
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: PUBLIC
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getCompanionBar
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.companionBar
+
+KaNamedFunctionSymbol:
+  annotations: []
+  callableId: test/companionInternalBar
+  compilerVisibility: Internal
+  contextParameters: []
+  contextReceivers: []
+  contractEffects: []
+  hasStableParameterNames: true
+  isActual: false
+  isBuiltinFunctionInvoke: false
+  isCompanion: true
+  isExpect: false
+  isExtension: true
+  isExternal: false
+  isInfix: false
+  isInline: false
+  isOperator: false
+  isOverride: false
+  isStatic: false
+  isSuspend: false
+  isTailRec: false
+  location: TOP_LEVEL
+  modality: FINAL
+  name: companionInternalBar
+  origin: SOURCE
+  receiverParameter: KaReceiverParameterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isVal: true
+    location: LOCAL
+    modality: FINAL
+    name: <receiver>
+    origin: SOURCE
+    owningCallableSymbol: KaNamedFunctionSymbol(test/companionInternalBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: test/Bar
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Unit
+  typeParameters: []
+  valueParameters: []
+  visibility: INTERNAL
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  canBeOperator: false
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.companionInternalBar
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/companionInternalBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/companionInternalBar
+  compilerVisibility: Internal
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Internal
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: KaReceiverParameterSymbol:
+      annotations: []
+      callableId: null
+      compilerVisibility: Public
+      contextReceivers: []
+      isActual: false
+      isCompanion: false
+      isDelegated: false
+      isExpect: false
+      isExtension: false
+      isExternal: false
+      isVal: true
+      location: LOCAL
+      modality: FINAL
+      name: <receiver>
+      origin: SOURCE
+      owningCallableSymbol: KaKotlinPropertySymbol(test/companionInternalBar)
+      receiverParameter: null
+      returnType: KaUsualClassType:
+        annotations: []
+        typeArguments: []
+        type: test/Bar
+      visibility: PUBLIC
+      getContainingFileSymbol: KaFileSymbol(Bar.kt)
+      getContainingJvmClassName: test.BarKt
+      getContainingModule: KaSourceModule "Sources of main"
+      deprecationStatus: null
+      importableFqName: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: INTERNAL
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaConstantInitializerValue(2)
+  isActual: false
+  isCompanion: true
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: true
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: companionInternalBar
+  origin: SOURCE
+  receiverParameter: KaReceiverParameterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isVal: true
+    location: LOCAL
+    modality: FINAL
+    name: <receiver>
+    origin: SOURCE
+    owningCallableSymbol: KaKotlinPropertySymbol(test/companionInternalBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: test/Bar
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: INTERNAL
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getCompanionInternalBar
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.companionInternalBar
+
+KaNamedFunctionSymbol:
+  annotations: []
+  callableId: test/companionPrivateBar
+  compilerVisibility: Private
+  contextParameters: []
+  contextReceivers: []
+  contractEffects: []
+  hasStableParameterNames: true
+  isActual: false
+  isBuiltinFunctionInvoke: false
+  isCompanion: true
+  isExpect: false
+  isExtension: true
+  isExternal: false
+  isInfix: false
+  isInline: false
+  isOperator: false
+  isOverride: false
+  isStatic: false
+  isSuspend: false
+  isTailRec: false
+  location: TOP_LEVEL
+  modality: FINAL
+  name: companionPrivateBar
+  origin: SOURCE
+  receiverParameter: KaReceiverParameterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isVal: true
+    location: LOCAL
+    modality: FINAL
+    name: <receiver>
+    origin: SOURCE
+    owningCallableSymbol: KaNamedFunctionSymbol(test/companionPrivateBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: test/Bar
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Unit
+  typeParameters: []
+  valueParameters: []
+  visibility: PRIVATE
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  canBeOperator: false
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: test.companionPrivateBar
+
+KaKotlinPropertySymbol:
+  annotations: []
+  backingFieldSymbol: KaBackingFieldSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isNotDefault: false
+    isVal: true
+    location: PROPERTY
+    modality: FINAL
+    name: field
+    origin: PROPERTY_BACKING_FIELD
+    owningProperty: KaKotlinPropertySymbol(test/companionPrivateBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  callableId: test/companionPrivateBar
+  compilerVisibility: Private
+  contextParameters: []
+  contextReceivers: []
+  getter: KaPropertyGetterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Private
+    contextReceivers: []
+    hasStableParameterNames: true
+    isActual: false
+    isCompanion: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isInline: false
+    isNotDefault: false
+    isOverride: false
+    location: PROPERTY
+    modality: FINAL
+    origin: SOURCE
+    receiverParameter: KaReceiverParameterSymbol:
+      annotations: []
+      callableId: null
+      compilerVisibility: Public
+      contextReceivers: []
+      isActual: false
+      isCompanion: false
+      isDelegated: false
+      isExpect: false
+      isExtension: false
+      isExternal: false
+      isVal: true
+      location: LOCAL
+      modality: FINAL
+      name: <receiver>
+      origin: SOURCE
+      owningCallableSymbol: KaKotlinPropertySymbol(test/companionPrivateBar)
+      receiverParameter: null
+      returnType: KaUsualClassType:
+        annotations: []
+        typeArguments: []
+        type: test/Bar
+      visibility: PUBLIC
+      getContainingFileSymbol: KaFileSymbol(Bar.kt)
+      getContainingJvmClassName: test.BarKt
+      getContainingModule: KaSourceModule "Sources of main"
+      deprecationStatus: null
+      importableFqName: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Int
+    valueParameters: []
+    visibility: PRIVATE
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  hasBackingField: true
+  hasGetter: true
+  hasSetter: false
+  initializer: KaConstantInitializerValue(2)
+  isActual: false
+  isCompanion: true
+  isConst: false
+  isDelegated: false
+  isExpect: false
+  isExtension: true
+  isExternal: false
+  isFromPrimaryConstructor: false
+  isLateInit: false
+  isOverride: false
+  isStatic: false
+  isVal: true
+  location: TOP_LEVEL
+  modality: FINAL
+  name: companionPrivateBar
+  origin: SOURCE
+  receiverParameter: KaReceiverParameterSymbol:
+    annotations: []
+    callableId: null
+    compilerVisibility: Public
+    contextReceivers: []
+    isActual: false
+    isCompanion: false
+    isDelegated: false
+    isExpect: false
+    isExtension: false
+    isExternal: false
+    isVal: true
+    location: LOCAL
+    modality: FINAL
+    name: <receiver>
+    origin: SOURCE
+    owningCallableSymbol: KaKotlinPropertySymbol(test/companionPrivateBar)
+    receiverParameter: null
+    returnType: KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: test/Bar
+    visibility: PUBLIC
+    getContainingFileSymbol: KaFileSymbol(Bar.kt)
+    getContainingJvmClassName: test.BarKt
+    getContainingModule: KaSourceModule "Sources of main"
+    deprecationStatus: null
+    importableFqName: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/Int
+  setter: null
+  typeParameters: []
+  visibility: PRIVATE
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingJvmClassName: test.BarKt
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  javaGetterName: getCompanionPrivateBar
+  javaSetterName: null
+  isInline: false
+  importableFqName: test.companionPrivateBar
+
+KaNamedClassSymbol:
+  annotations: []
+  classId: test/Bar
+  classKind: CLASS
+  companionObject: null
+  compilerVisibility: Public
+  contextReceivers: []
+  isActual: false
+  isData: false
+  isExpect: false
+  isExternal: false
+  isFun: false
+  isInline: false
+  isInner: false
+  location: TOP_LEVEL
+  modality: FINAL
+  name: Bar
+  origin: SOURCE
+  superTypes: [
+    KaUsualClassType:
+      annotations: []
+      typeArguments: []
+      type: kotlin/Any
+  ]
+  typeParameters: []
+  visibility: PUBLIC
+  getContainingFileSymbol: KaFileSymbol(Bar.kt)
+  getContainingModule: KaSourceModule "Sources of main"
+  annotationApplicableTargets: null
+  deprecationStatus: null
+  importableFqName: test.Bar

@@ -16,32 +16,37 @@
 
 package org.jetbrains.kotlin.gradle.plugin
 
-import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ExternalDependency
 import org.gradle.api.logging.Logger
 import org.gradle.api.logging.Logging
+import org.gradle.internal.operations.BuildOperationListenerManager
+import org.gradle.kotlin.dsl.add
+import org.jetbrains.kotlin.compilerRunner.btapi.BuildSessionService
 import org.jetbrains.kotlin.compilerRunner.maybeCreateCommonizerClasspathConfiguration
 import org.jetbrains.kotlin.gradle.dsl.*
 import org.jetbrains.kotlin.gradle.fus.BuildUidService
+import org.jetbrains.kotlin.gradle.internal.KOTLIN_BUILD_TOOLS_API_COMPAT
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_BUILD_TOOLS_API_IMPL
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_COMPILER_EMBEDDABLE
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_MODULE_GROUP
 import org.jetbrains.kotlin.gradle.internal.attributes.setupAttributesMatchingStrategy
 import org.jetbrains.kotlin.gradle.internal.diagnostics.AgpCompatibilityCheck.runAgpCompatibilityCheckIfAgpIsApplied
 import org.jetbrains.kotlin.gradle.internal.diagnostics.AgpWithBuiltInKotlinAppliedCheck.runAgpWithBuiltInKotlinIfAppliedCheck
+import org.jetbrains.kotlin.gradle.internal.diagnostics.AgpWithBuiltInKotlinAppliedCheck.runKmpAgpWithBuiltInKotlinIfAppliedCheck
 import org.jetbrains.kotlin.gradle.internal.diagnostics.GradleCompatibilityCheck.runGradleCompatibilityCheck
 import org.jetbrains.kotlin.gradle.internal.diagnostics.KotlinCompilerEmbeddableCheck.checkCompilerEmbeddableInClasspath
 import org.jetbrains.kotlin.gradle.internal.properties.PropertiesBuildService
 import org.jetbrains.kotlin.gradle.logging.kotlinDebug
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.attributes.KlibPackaging
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.CompilerDiagnosticsProblemsReporter
+import org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultProblemsReporter
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.ProblemsReporter
 import org.jetbrains.kotlin.gradle.plugin.internal.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
-import org.jetbrains.kotlin.gradle.plugin.mpp.apple.swiftexport.internal.initSwiftExportClasspathConfigurations
 import org.jetbrains.kotlin.gradle.plugin.statistics.BuildFinishBuildService
 import org.jetbrains.kotlin.gradle.plugin.statistics.BuildFusService
 import org.jetbrains.kotlin.gradle.report.BuildMetricsService
@@ -59,7 +64,15 @@ import org.jetbrains.kotlin.gradle.tasks.publishing.addSigningValidationHelpers
 import org.jetbrains.kotlin.gradle.testing.internal.KotlinTestsRegistry
 import org.jetbrains.kotlin.gradle.utils.*
 import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+import javax.inject.Inject
 import kotlin.reflect.KClass
+
+
+internal abstract class BuildMetricsPlugin @Inject constructor(val buildOperationListenerManager: BuildOperationListenerManager) : Plugin<Project> {
+    override fun apply(project: Project) {
+        BuildMetricsService.registerIfAbsent(project, buildOperationListenerManager)
+    }
+}
 
 /**
  * Base Kotlin plugin that is responsible for creating basic build services, configurations,
@@ -73,12 +86,19 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
     override fun apply(project: Project) {
         project.checkCompilerEmbeddableInClasspath()
         project.registerDefaultVariantImplementations()
+
         project.runGradleCompatibilityCheck()
         project.runAgpCompatibilityCheckIfAgpIsApplied()
+
+        //BuildMetricsPlugin access variants so it should be applied after it initialization
+        project.pluginManager.apply(BuildMetricsPlugin::class.java)
+
         BuildFinishedListenerService.registerIfAbsent(project)
+        BuildSessionService.registerIfAbsent(project)
 
         val buildUidService = BuildUidService.registerIfAbsent(project.gradle)
-        BuildFusService.registerIfAbsent(project, pluginVersion, buildUidService)
+        val buildFinishBuildService = BuildFinishBuildService.registerIfAbsent(project, buildUidService, pluginVersion)
+        BuildFusService.registerIfAbsent(project, pluginVersion, buildUidService, buildFinishBuildService)
         PropertiesBuildService.registerIfAbsent(project)
 
         project.gradle.projectsEvaluated {
@@ -88,7 +108,7 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         addKotlinCompilerConfiguration(project)
 
         project.configurations.maybeCreateResolvable(PLUGIN_CLASSPATH_CONFIGURATION_NAME).apply {
-            isVisible = false
+            setInvisibleIfSupported()
             addGradlePluginMetadataAttributes(project)
         }
 
@@ -97,9 +117,8 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
             kotlinGradleBuildServices.detectKotlinPluginLoadedInMultipleProjects(project, pluginVersion)
         }
 
-        BuildMetricsService.registerIfAbsent(project)
         KotlinNativeBundleBuildService.registerIfAbsent(project)
-        BuildFinishBuildService.registerIfAbsent(project, buildUidService, pluginVersion)
+
     }
 
     private fun addKotlinCompilerConfiguration(project: Project) {
@@ -107,25 +126,53 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
             .configurations
             .maybeCreateResolvable(COMPILER_CLASSPATH_CONFIGURATION_NAME)
             .defaultDependencies {
+                @Suppress("DEPRECATION")
                 it.add(
-                    project.dependencies.create("$KOTLIN_MODULE_GROUP:$KOTLIN_COMPILER_EMBEDDABLE:${project.getKotlinPluginVersion()}")
+                    project.dependencies.create("$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_COMPAT:$pluginVersion")
+                )
+                it.add(
+                    project.dependencies.create("$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_IMPL:$pluginVersion")
                 )
             }
         project
             .configurations
             .maybeCreateResolvable(BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME)
             .also {
+                project.dependencies.add(it.name, "$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_COMPAT:$pluginVersion")
                 project.dependencies.add(it.name, "$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_IMPL")
                 it.withDependencies { dependencies ->
                     dependencies
                         .withType<ExternalDependency>()
                         .configureEach { dependency ->
+                            if (dependency.name == KOTLIN_BUILD_TOOLS_API_COMPAT) {
+                                // the compat layer is expected to be of a particular version regardless of the chosen compiler
+                                return@configureEach
+                            }
                             dependency.version { versionConstraint ->
                                 versionConstraint.strictly(project.kotlinExtensionOrNull?.compilerVersion?.get() ?: pluginVersion)
                             }
                         }
                 }
             }
+
+        project
+            .configurations
+            .maybeCreateResolvable(ABI_VALIDATION_COMPAT_CLASSPATH_CONFIGURATION_NAME) {
+                project.dependencies.add(name, "$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_COMPAT:$pluginVersion")
+                // ABI validation BTA toolchain was added only in 2.4.0-Beta2.
+                // Before that, abi-tools corresponding to project's KGP version was used.
+                // To support using abiValidation with compilerVersion < 2.4.0-Beta2,
+                // this configuration should be used instead of the BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME.
+                // It will effectively ignore configure compilerVersion
+                // and will fix toolchain's version to the latest 2.4 toolchain (it applies to abiValidation toolchain only).
+                project.dependencies.add(name, "$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_IMPL") {
+                    version { versionConstraint ->
+                        versionConstraint.strictly("[2.4.0-Beta2, 2.5.0)")
+                    }
+                }
+            }
+
+
         project
             .tasks
             .withType(AbstractKotlinCompileTool::class.java)
@@ -148,6 +195,11 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         factories.putIfAbsent(
             ProblemsReporter.Factory::class,
             DefaultProblemsReporter.Factory()
+        )
+
+        factories.putIfAbsent(
+            CompilerDiagnosticsProblemsReporter.Factory::class,
+            DefaultCompilerDiagnosticsProblemsReporter.Factory()
         )
 
         factories.putIfAbsent(
@@ -174,10 +226,25 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
             JavaExecTaskParametersCompatibility.Factory::class,
             DefaultJavaExecTaskParametersCompatibility.Factory()
         )
+
+        factories.putIfAbsent(
+            CopySpecAccessor.Factory::class,
+            DefaultCopySpecAccessor.Factory(),
+        )
+
+        factories.putIfAbsent(
+            BuildIdentifierAccessor.Factory::class,
+            DefaultBuildIdentifierAccessor.Factory(),
+        )
+
+        factories.putIfAbsent(
+            ProjectDependencyAccessor.Factory::class,
+            DefaultProjectDependencyAccessor.Factory()
+        )
     }
 
     protected fun setupAttributeMatchingStrategy(
-        project: Project
+        project: Project,
     ) = with(project.dependencies.attributesSchema) {
         KotlinPlatformType.setupAttributesMatchingStrategy(this)
         KotlinUsages.setupAttributesMatchingStrategy(
@@ -216,16 +283,16 @@ abstract class KotlinBasePluginWrapper : DefaultKotlinBasePlugin() {
         project.logger.info("Using Kotlin Gradle Plugin $pluginVariant variant")
 
         project.configurations.maybeCreateResolvable(NATIVE_COMPILER_PLUGIN_CLASSPATH_CONFIGURATION_NAME).apply {
-            isVisible = false
+            setInvisibleIfSupported()
             isTransitive = false
             addGradlePluginMetadataAttributes(project)
         }
         project.maybeCreateCommonizerClasspathConfiguration()
-        project.initSwiftExportClasspathConfigurations()
         project.addPgpSignatureHelpers()
         project.addPomValidationHelpers()
         project.addSigningValidationHelpers()
         if (projectExtensionClass == KotlinAndroidProjectExtension::class) project.runAgpWithBuiltInKotlinIfAppliedCheck()
+        if (projectExtensionClass == KotlinMultiplatformExtension::class) project.runKmpAgpWithBuiltInKotlinIfAppliedCheck()
 
         project.createKotlinExtension(projectExtensionClass).apply {
             coreLibrariesVersion = pluginVersion
@@ -273,30 +340,9 @@ abstract class AbstractKotlinJsPluginWrapper : KotlinBasePluginWrapper() {
     override fun getPlugin(project: Project): Plugin<Project> =
         KotlinJsPlugin()
 
+    @Suppress("DEPRECATION_ERROR")
     override val projectExtensionClass: KClass<out KotlinJsProjectExtension>
         get() = KotlinJsProjectExtension::class
-
-    override fun whenBuildEvaluated(project: Project) = project.runProjectConfigurationHealthCheck {
-        val isJsTargetUninitialized = !(project.kotlinExtension as KotlinJsProjectExtension).targetFuture.isCompleted
-
-        if (isJsTargetUninitialized) {
-            throw GradleException(
-                """
-                Please initialize the Kotlin/JS target in '${project.name} (${project.path})'. Use:
-                kotlin {
-                    js {
-                        // To build distributions and run tests for browser or Node.js use one or both of:
-                        browser()
-                        nodejs()
-                    }
-                }
-                Read more https://kotlinlang.org/docs/reference/js-project-setup.html
-                """.trimIndent()
-            )
-        }
-    }
-
-    override fun createTestRegistry(project: Project) = KotlinTestsRegistry(project, "test")
 }
 
 abstract class AbstractKotlinMultiplatformPluginWrapper : KotlinBasePluginWrapper() {

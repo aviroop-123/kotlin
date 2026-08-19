@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.wasm.ir
 
 import org.jetbrains.kotlin.wasm.ir.WasmImmediateKind.*
-import java.util.EnumSet
 
 enum class WasmImmediateKind {
     CONST_U8,
@@ -41,6 +40,8 @@ enum class WasmImmediateKind {
     CATCH_VECTOR
 }
 
+private const val SIMPLE_IDX_CACHE_SIZE = 20
+
 sealed class WasmImmediate {
     class ConstU8(val value: UByte) : WasmImmediate()
     class ConstI32(val value: Int) : WasmImmediate()
@@ -56,21 +57,18 @@ sealed class WasmImmediate {
         class Value(val type: WasmType?) : BlockType()
     }
 
-    class FuncIdx(val value: WasmSymbol<WasmFunction>) : WasmImmediate() {
-        constructor(value: WasmFunction) : this(WasmSymbol(value))
+    abstract class FuncIdx : WasmImmediate()
+
+    class LocalIdx private constructor(val value: Int) : WasmImmediate() {
+        companion object {
+            private val localIdxCache = Array<LocalIdx>(SIMPLE_IDX_CACHE_SIZE) { LocalIdx(it) }
+            fun get(value: Int): LocalIdx = if (value < SIMPLE_IDX_CACHE_SIZE) localIdxCache[value] else LocalIdx(value)
+            fun get(local: WasmLocal): LocalIdx = get(local.id)
+        }
     }
 
-    class LocalIdx(val value: WasmSymbol<WasmLocal>) : WasmImmediate() {
-        constructor(value: WasmLocal) : this(WasmSymbol(value))
-    }
-
-    class GlobalIdx(val value: WasmSymbol<WasmGlobal>) : WasmImmediate() {
-        constructor(value: WasmGlobal) : this(WasmSymbol(value))
-    }
-
-    class TypeIdx(val value: WasmSymbolReadOnly<WasmTypeDeclaration>) : WasmImmediate() {
-        constructor(value: WasmTypeDeclaration) : this(WasmSymbol(value))
-    }
+    abstract class GlobalIdx : WasmImmediate()
+    abstract class TypeIdx : WasmImmediate()
 
     class ValTypeVector(val value: List<WasmType>) : WasmImmediate()
 
@@ -84,18 +82,27 @@ sealed class WasmImmediate {
         constructor(value: Int) : this(WasmSymbol(value))
     }
 
-    class LabelIdx(val value: Int) : WasmImmediate()
+    class LabelIdx private constructor(val value: Int) : WasmImmediate() {
+        companion object {
+            private val labelIdxCache = Array<LabelIdx>(SIMPLE_IDX_CACHE_SIZE) { LabelIdx(it) }
+            fun get(value: Int): LabelIdx = if (value < SIMPLE_IDX_CACHE_SIZE) labelIdxCache[value] else LabelIdx(value)
+            fun get(local: WasmLocal): LabelIdx = get(local.id)
+        }
+    }
+
     class TagIdx(val value: WasmSymbol<Int>) : WasmImmediate() {
         constructor(value: Int) : this(WasmSymbol(value))
     }
     class LabelIdxVector(val value: List<Int>) : WasmImmediate()
     class ElemIdx(val value: WasmElement) : WasmImmediate()
 
-    class GcType(val value: WasmSymbol<WasmTypeDeclaration>) : WasmImmediate() {
-        constructor(value: WasmTypeDeclaration) : this(WasmSymbol(value))
+    class StructFieldIdx private constructor(val value: Int) : WasmImmediate() {
+        companion object {
+            private val structFieldIdxCache = Array<StructFieldIdx>(SIMPLE_IDX_CACHE_SIZE) { StructFieldIdx(it) }
+            fun get(value: Int): StructFieldIdx = if (value < SIMPLE_IDX_CACHE_SIZE) structFieldIdxCache[value] else StructFieldIdx(value)
+            fun get(local: WasmLocal): StructFieldIdx = get(local.id)
+        }
     }
-
-    class StructFieldIdx(val value: WasmSymbol<Int>) : WasmImmediate()
 
     class HeapType(val value: WasmHeapType) : WasmImmediate() {
         constructor(type: WasmType) : this(type.getHeapType())
@@ -122,7 +129,8 @@ sealed class WasmImmediate {
 enum class WasmOp(
     val mnemonic: String,
     val opcode: Int,
-    val immediates: List<WasmImmediateKind> = emptyList()
+    val immediates: List<WasmImmediateKind> = emptyList(),
+    val tailMnemonic: String = "",
 ) {
 
     // Unary
@@ -331,6 +339,7 @@ enum class WasmOp(
     BR_TABLE("br_table", 0x0E, listOf(LABEL_IDX_VECTOR, LABEL_IDX)),
     RETURN("return", 0x0F),
     CALL("call", 0x10, FUNC_IDX),
+    CALL_PURE("call", 0x10, FUNC_IDX),
     CALL_INDIRECT("call_indirect", 0x11, listOf(TYPE_IDX, TABLE_IDX)),
     TRY("try", 0x06, BLOCK_TYPE),
     CATCH("catch", 0x07, TAG_IDX),
@@ -397,13 +406,13 @@ enum class WasmOp(
     REF_TEST("ref.test", 0xFB_14, HEAP_TYPE),
     REF_TEST_NULL("ref.test null", 0xFB_15, HEAP_TYPE),
     REF_CAST("ref.cast", 0xFB_16, HEAP_TYPE),
-    REF_CAST_NULL("ref.cast null", 0xFB_17, HEAP_TYPE),
+    REF_CAST_NULL("ref.cast (ref null", 0xFB_17, HEAP_TYPE, tailMnemonic = ")"),
 
     BR_ON_CAST("br_on_cast", 0xFB_18, listOf(CONST_U8, LABEL_IDX, HEAP_TYPE, HEAP_TYPE)),
     BR_ON_CAST_FAIL("br_on_cast_fail", 0xFB_19, listOf(CONST_U8, LABEL_IDX, HEAP_TYPE, HEAP_TYPE)),
 
-    EXTERN_INTERNALIZE("extern.internalize", 0xFB_1A), // externref -> anyref
-    EXTERN_EXTERNALIZE("extern.externalize", 0xFB_1B), // anyref -> externref
+    EXTERN_INTERNALIZE("any.convert_extern", 0xFB_1A), // externref -> anyref
+    EXTERN_EXTERNALIZE("extern.convert_any", 0xFB_1B), // anyref -> externref
 
     // ============================================================
     // Exception handling
@@ -416,9 +425,19 @@ enum class WasmOp(
     PSEUDO_COMMENT_GROUP_START("<comment-group-start>", WASM_OP_PSEUDO_OPCODE),
     PSEUDO_COMMENT_GROUP_END("<comment-group-end>", WASM_OP_PSEUDO_OPCODE),
 
+    // ============================================================
+    // Pseudo-instructions for code metadata annotations
+    // These carry annotation data inline and are filtered out during emission
+    PSEUDO_ANNOTATION_BRANCH_HINT("<annotation-branch-hint>", WASM_OP_PSEUDO_OPCODE,
+                                  // 0=unlikely, 1=likely
+                                  CONST_U8),
+    PSEUDO_ANNOTATION_TRACE_INST("<annotation-trace-inst>", WASM_OP_PSEUDO_OPCODE,
+                                 // trace mark ID
+                                 CONST_I32),
     ;
 
     constructor(mnemonic: String, opcode: Int, vararg immediates: WasmImmediateKind) : this(mnemonic, opcode, immediates.toList())
+    constructor(mnemonic: String, opcode: Int, immediate: WasmImmediateKind, tailMnemonic: String) : this(mnemonic, opcode, listOf(immediate), tailMnemonic)
 }
 
 const val WASM_OP_PSEUDO_OPCODE = 0xFFFF

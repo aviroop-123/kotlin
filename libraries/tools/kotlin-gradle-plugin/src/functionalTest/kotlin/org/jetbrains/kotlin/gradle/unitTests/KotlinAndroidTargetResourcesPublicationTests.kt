@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.resources.resourcesPublicationExte
 import org.jetbrains.kotlin.gradle.util.buildProjectWithMPP
 import org.jetbrains.kotlin.gradle.util.configureDefaults
 import org.jetbrains.kotlin.gradle.util.kotlin
-import org.junit.Test
+import kotlin.test.Test
 import java.io.File
 
 class KotlinAndroidTargetResourcesPublicationTests {
@@ -46,7 +46,9 @@ class KotlinAndroidTargetResourcesPublicationTests {
         val project = mppProjectWithAndroidTarget()
 
         project.evaluate()
+        @Suppress("DEPRECATION")
         project.publishFakeResources(project.multiplatformExtension.androidTarget())
+        @Suppress("DEPRECATION")
         project.publishFakeAssets(project.multiplatformExtension.androidTarget())
 
         @Suppress("DEPRECATION") val androidVariantSourceSets = project.multiplatformExtension.androidTarget()
@@ -74,6 +76,7 @@ class KotlinAndroidTargetResourcesPublicationTests {
         }
 
         project.evaluate()
+        @Suppress("DEPRECATION")
         project.publishFakeResources(project.multiplatformExtension.androidTarget())
 
         @Suppress("DEPRECATION") val androidVariantSourceSets = project.multiplatformExtension.androidTarget()
@@ -116,6 +119,7 @@ class KotlinAndroidTargetResourcesPublicationTests {
         val project = buildProjectWithMPP {
             plugins.apply("com.android.library")
             kotlin {
+                @Suppress("DEPRECATION")
                 androidTarget()
             }
         }

@@ -8,10 +8,10 @@ package org.jetbrains.kotlin.backend.konan.lower
 import org.jetbrains.kotlin.backend.common.ErrorReportingContext
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.getCompilerMessageLocation
-import org.jetbrains.kotlin.backend.common.ir.PreSerializationSymbols
+import org.jetbrains.kotlin.ir.util.isTypeOfIntrinsic
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
 import org.jetbrains.kotlin.backend.konan.NativeGenerationState
-import org.jetbrains.kotlin.backend.konan.ir.KonanSymbols
+import org.jetbrains.kotlin.backend.konan.ir.BackendNativeSymbols
 import org.jetbrains.kotlin.backend.konan.reportCompilationError
 import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.IrElement
@@ -35,7 +35,7 @@ internal class TypeOfProcessingLowering(val generationState: NativeGenerationSta
 
 private class Transformer(
         private val irBuiltIns: IrBuiltIns,
-        private val symbols: KonanSymbols,
+        private val symbols: BackendNativeSymbols,
         private val errorContext: ErrorReportingContext
 ) : IrTransformer<IrDeclaration?>() {
     override fun visitDeclaration(declaration: IrDeclarationBase, data: IrDeclaration?): IrStatement {
@@ -43,11 +43,11 @@ private class Transformer(
     }
 
     override fun visitCall(expression: IrCall, data: IrDeclaration?): IrElement {
-        if (PreSerializationSymbols.isTypeOfIntrinsic(expression.symbol)) {
+        if (expression.symbol.isTypeOfIntrinsic()) {
             val symbol = data?.symbol ?: error("\"typeOf\" call in unexpected position")
             val builder = irBuiltIns
                     .createIrBuilder(symbol, expression.startOffset, expression.endOffset)
-                    .toNativeRuntimeReflectionBuilder(symbols) { message ->
+                    .toNativeConstantReflectionBuilder(symbols) { message ->
                         errorContext.reportCompilationError(message, expression.getCompilerMessageLocation(data.file))
                     }
             return builder.irKType(expression.typeArguments[0]!!)

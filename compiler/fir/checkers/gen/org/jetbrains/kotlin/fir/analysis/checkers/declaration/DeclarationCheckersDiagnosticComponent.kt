@@ -5,7 +5,7 @@
 
 package org.jetbrains.kotlin.fir.analysis.checkers.declaration
 
-import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
+import org.jetbrains.kotlin.diagnostics.PendingDiagnosticReporter
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.CheckersComponentInternal
@@ -25,10 +25,10 @@ import org.jetbrains.kotlin.utils.exceptions.rethrowExceptionWithDetails
 @OptIn(CheckersComponentInternal::class)
 class DeclarationCheckersDiagnosticComponent(
     session: FirSession,
-    reporter: DiagnosticReporter,
+    reporter: PendingDiagnosticReporter,
     private val checkers: DeclarationCheckers,
 ) : AbstractDiagnosticCollectorComponent(session, reporter) {
-    constructor(session: FirSession, reporter: DiagnosticReporter, mppKind: MppCheckerKind) : this(
+    constructor(session: FirSession, reporter: PendingDiagnosticReporter, mppKind: MppCheckerKind) : this(
         session,
         reporter,
         when (mppKind) {
@@ -47,8 +47,8 @@ class DeclarationCheckersDiagnosticComponent(
         checkers.allBasicDeclarationCheckers.check(declaration, data)
     }
 
-    override fun visitSimpleFunction(simpleFunction: FirSimpleFunction, data: CheckerContext) {
-        checkers.allSimpleFunctionCheckers.check(simpleFunction, data)
+    override fun visitNamedFunction(namedFunction: FirNamedFunction, data: CheckerContext) {
+        checkers.allNamedFunctionCheckers.check(namedFunction, data)
     }
 
     override fun visitProperty(property: FirProperty, data: CheckerContext) {

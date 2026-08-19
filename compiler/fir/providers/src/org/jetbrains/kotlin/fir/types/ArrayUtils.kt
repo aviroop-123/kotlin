@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.name.StandardClassIds
 val ConeKotlinType.isArrayOrPrimitiveArray: Boolean
     get() = arrayElementTypeArgument() != null
 
-fun ConeKotlinType.isArrayOrPrimitiveArray(checkUnsignedArrays: Boolean): Boolean {
+fun ConeKotlinType.isArrayOrPrimitiveArray(checkUnsignedArrays: Boolean = true): Boolean {
     return arrayElementTypeArgument(checkUnsignedArrays) != null
 }
 
@@ -26,7 +26,7 @@ fun ConeTypeProjection.createArrayType(nullable: Boolean = false, createPrimitiv
             val primitiveArrayId =
                 StandardClassIds.primitiveArrayTypeByElementType[classId] ?: StandardClassIds.unsignedArrayTypeByElementType[classId]
             if (primitiveArrayId != null) {
-                return primitiveArrayId.constructClassLikeType(emptyArray(), nullable)
+                return primitiveArrayId.constructClassLikeType(isMarkedNullable = nullable)
             }
         }
     }
@@ -37,6 +37,3 @@ fun ConeTypeProjection.createArrayType(nullable: Boolean = false, createPrimitiv
 fun ConeKotlinType.varargElementType(): ConeKotlinType {
     return this.arrayElementType() ?: this
 }
-
-fun ConeKotlinType?.isPotentiallyArray(): Boolean =
-    this != null && (this.arrayElementType() != null || this is ConeTypeVariableType)

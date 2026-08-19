@@ -1,0 +1,138 @@
+KtFile: 'nestedClass.kt'
+  null
+
+KtPackageDirective(0,9): 'package r'
+  null
+
+KtNameReferenceExpression(8,9): 'r'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      r
+    ]
+
+KtImportList(9,9): ''
+  null
+
+KtClass(11,83): 'class A {'
+  null
+
+KtClassBody(19,83): '{'
+  null
+
+KtClass(25,52): 'open class Base(val x: Int)'
+  null
+
+KtDeclarationModifierList(25,29): 'open'
+  null
+
+KtPrimaryConstructor(40,52): '(val x: Int)'
+  null
+
+KtParameterList(40,52): '(val x: Int)'
+  null
+
+KtParameter(41,51): 'val x: Int'
+  null
+
+KtTypeReference(48,51): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(48,51): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(48,51): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtClass(57,81): 'class B(x: Int): Base(x)'
+  null
+
+KtPrimaryConstructor(64,72): '(x: Int)'
+  null
+
+KtParameterList(64,72): '(x: Int)'
+  null
+
+KtParameter(65,71): 'x: Int'
+  null
+
+KtTypeReference(68,71): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtUserType(68,71): 'Int'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtNameReferenceExpression(68,71): 'Int'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Int
+    ]
+
+KtSuperTypeList(74,81): 'Base(x)'
+  null
+
+KtSuperTypeCallEntry(74,81): 'Base(x)'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(x: kotlin.Int): r.A.Base
+    ]
+
+KtConstructorCalleeExpression(74,78): 'Base'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(x: kotlin.Int): r.A.Base
+    ]
+
+KtTypeReference(74,78): 'Base'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      r/A.Base
+    ]
+
+KtUserType(74,78): 'Base'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      r/A.Base
+    ]
+
+KtNameReferenceExpression(74,78): 'Base'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      r/A.Base
+    ]
+
+KtValueArgumentList(78,81): '(x)'
+  null
+
+KtValueArgument(79,80): 'x'
+  null
+
+KtNameReferenceExpression(79,80): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      x: kotlin.Int
+    ]

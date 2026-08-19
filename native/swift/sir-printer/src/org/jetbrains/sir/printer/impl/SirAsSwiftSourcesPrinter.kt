@@ -7,6 +7,7 @@ package org.jetbrains.sir.printer.impl
 
 import org.jetbrains.kotlin.sir.*
 import org.jetbrains.kotlin.sir.util.*
+import org.jetbrains.kotlin.sir.util.returnType
 import org.jetbrains.kotlin.utils.SmartPrinter
 import org.jetbrains.kotlin.utils.filterIsInstanceAnd
 import org.jetbrains.kotlin.utils.withIndent
@@ -91,6 +92,7 @@ internal class SirAsSwiftSourcesPrinter private constructor(
         when (this) {
             is SirClass -> printDeclaration()
             is SirEnum -> printDeclaration()
+            is SirEnumCase -> "case $name"
             is SirExtension -> printDeclaration()
             is SirStruct -> printDeclaration()
             is SirProtocol -> printDeclaration()
@@ -106,7 +108,7 @@ internal class SirAsSwiftSourcesPrinter private constructor(
         print("typealias ")
         printName()
         print(" = ")
-        println(type.swiftRender)
+        println(type.swiftRender(SirTypeVariance.INVARIANT))
     }
 
     private fun SirClass.printDeclaration() {
@@ -156,13 +158,21 @@ internal class SirAsSwiftSourcesPrinter private constructor(
         printer.withContext(Context(this)) {
             println(" {")
             withIndent {
+                if (this is SirEnum) {
+                    for (case in cases) {
+                        println("case ${case.name}")
+                    }
+                }
                 printChildren()
             }
             println("}")
         }
     }
 
-    private fun SirDeclaration.printAttributes() = attributes.render().takeUnless { it.isBlank() }?.let { println(it) }
+    private fun SirDeclaration.printAttributes() = attributes
+        .render(SirTypeVariance.INVARIANT)
+        .takeUnless { it.isBlank() }
+        ?.let { println(it) }
 
     private fun SirDeclarationContainer.printChildren() = with(this.declarations.toList()) {
         filterIsInstanceAnd<SirEnum> { it.origin !is SirOrigin.Namespace }
@@ -211,7 +221,7 @@ internal class SirAsSwiftSourcesPrinter private constructor(
             "var ",
             name.swiftIdentifier,
             ": ",
-            type.swiftRender,
+            type.swiftRender(SirTypeVariance.INVARIANT),
         )
         println(" {")
         withIndent {
@@ -229,7 +239,7 @@ internal class SirAsSwiftSourcesPrinter private constructor(
         print("subscript(")
         parameters.print()
         print(")")
-        print(" -> ${returnType.swiftRender}")
+        print(" -> ${returnType.swiftRender(SirTypeVariance.CONTRAVARIANT)}")
 
         println(" {")
         withIndent {
@@ -295,10 +305,11 @@ internal class SirAsSwiftSourcesPrinter private constructor(
         print(
             when (mode) {
                 SirImport.Mode.Exported -> "@_exported "
+                SirImport.Mode.Default -> ""
                 SirImport.Mode.ImplementationOnly -> "@_implementationOnly "
-                null -> ""
             }
         )
+        print(spi.render(SirTypeVariance.INVARIANT).takeUnless { it.isBlank() }?.let { "$it " } ?: "")
         println("import ${moduleName.swiftIdentifier}")
     }
 
@@ -318,13 +329,14 @@ internal class SirAsSwiftSourcesPrinter private constructor(
             is SirClass -> superClass to protocols
             is SirProtocol -> superClass to protocols
             is SirExtension -> null to protocols
+            is SirEnum -> null to protocols
             else -> null to emptyList()
         }
 
     private fun SirDeclaration.printInheritanceClause() {
-        val (superclass, interfaces) = this.inheritedTypes
+        val [superclass, interfaces] = this.inheritedTypes
 
-        (listOfNotNull(superclass?.swiftRender) + interfaces.map { it.swiftFqName })
+        (listOfNotNull(superclass?.swiftRender(SirTypeVariance.INVARIANT)) + interfaces.map { it.swiftFqName })
             .takeIf { it.isNotEmpty() }
             ?.joinToString(", ")
             ?.let { print(": $it") }
@@ -345,8 +357,8 @@ internal class SirAsSwiftSourcesPrinter private constructor(
 
     private fun SirElement.printName() = print(
         when (this@printName) {
-            is SirNamed -> name.swiftIdentifier
-            is SirExtension -> extendedType.swiftRender
+            is SirScopeDefiningElement -> name.swiftIdentifier
+            is SirExtension -> extendedType.swiftRender(SirTypeVariance.INVARIANT)
             else -> error("There is no printable name for SirElement: ${this@printName}")
         }
     )
@@ -487,22 +499,26 @@ internal class SirAsSwiftSourcesPrinter private constructor(
     private fun SirCallable.collectParameters(): List<SirParameter> = when (this) {
         is SirGetter -> emptyList()
         is SirSetter -> emptyList()
-        is SirFunction -> listOfNotNull(extensionReceiverParameter) + parameters
+        is SirFunction -> listOfNotNull(contextParameter, extensionReceiverParameter) + parameters
         is SirInit -> parameters
     }
 
     private fun SirCallable.printEffects() {
+        if (this !is SirSetter && isAsync) {
+            print(" async")
+        }
+
         if (this !is SirSetter && errorType != SirType.never) {
             print(" throws")
             if (errorType != SirType.any) {
-                print("(", errorType.swiftRender, ")")
+                print("(", errorType.swiftRender(SirTypeVariance.COVARIANT), ")")
             }
         }
     }
 
     private fun SirCallable.printReturnType() = print(
         when (this) {
-            is SirFunction -> " -> ${returnType.swiftRender}"
+            is SirFunction -> " -> ${returnType.swiftRender(SirTypeVariance.COVARIANT)}"
             is SirInit,
             is SirGetter,
             is SirSetter,
@@ -534,28 +550,60 @@ internal class SirAsSwiftSourcesPrinter private constructor(
         }
 
 
-    private val SirType.swiftRender: String
-        get() = "Self".takeIf { currentContext.declaration.let { it is SirExtension && it.extendedType == this && it.extendedType.isBivariantSelf == true } }
+    private fun SirType.swiftRender(position: SirTypeVariance): String {
+        val attributesString = (attributes.render(position).takeUnless { it.isBlank() }?.let { "$it " } ?: "")
+        val renderedType = "Self"
+            .takeIf {
+                currentContext.declaration
+                    .let { it is SirExtension && it.extendedType == this && it.extendedType.isBivariantSelf == true }
+            }
             ?: when (this) {
-                is SirOptionalType -> wrappedType.swiftRender.let { if (it.any { it.isWhitespace() }) "($it)" else it } + "?"
-                is SirArrayType -> "[${elementType.swiftRender}]"
-                is SirDictionaryType -> "[${keyType.swiftRender}: ${valueType.swiftRender}]"
+                is SirImplicitlyUnwrappedOptionalType if wrappedType !is SirWrappedType -> {
+                    wrappedType.swiftRender(position).let { if (it.any { it.isWhitespace() }) "($it)" else it } + "!"
+                }
+                is SirOptionalType -> wrappedType.swiftRender(SirTypeVariance.INVARIANT).let { if (it.any { it.isWhitespace() }) "($it)" else it } + "?"
+                is SirArrayType ->
+                    "[${elementType.swiftRender(SirTypeVariance.INVARIANT)}]"
+                is SirDictionaryType ->
+                    "[${keyType.swiftRender(SirTypeVariance.INVARIANT)}: ${valueType.swiftRender(SirTypeVariance.INVARIANT)}]"
+
+                is SirFunctionalType -> {
+                    val parameters = (listOfNotNull(contextType) + parameterTypes).render()
+                    val async = " async".takeIf { isAsync } ?: ""
+                    val throws = when (errorType) {
+                        SirType.never -> ""
+                        SirType.any -> " throws"
+                        else -> " throws(${errorType.swiftRender(SirTypeVariance.COVARIANT)})"
+                    }
+                    val returnType = returnType.swiftRender(SirTypeVariance.COVARIANT)
+                    "($parameters)$async$throws -> $returnType"
+                }
+
+                is SirTupleType ->
+                    "(${types.joinToString { [name, type] -> "${name?.let { "$it: " } ?: ""}${type.swiftRender(position)}" }})"
 
                 else -> swiftName
             }
+        return attributesString + renderedType
+    }
+
+    private fun List<SirType>.render() = joinToString { it.swiftRender(SirTypeVariance.CONTRAVARIANT) }
 
     private val SirType.swiftRenderAsConstraint: String
         get() = when (this) {
-            is SirExistentialType -> protocols.takeIf { it.isNotEmpty() }?.joinToString(separator = " & ") { it.swiftFqName } ?: "Any"
-            else -> this.swiftRender
+            is SirExistentialType -> protocols.takeIf { it.isNotEmpty() }?.joinToString(separator = " & ") { [protocol, typeArguments] ->
+                val typeArguments = typeArguments.takeIf { it.isNotEmpty() }
+                    ?.joinToString(prefix = "<", postfix = ">", separator = ",") { it.swiftRenderAsConstraint } ?: ""
+                "${protocol.swiftFqName}${typeArguments}"
+            } ?: "Any"
+            else -> this.swiftRender(SirTypeVariance.INVARIANT)
         }
 
     private val SirParameter.swiftRender: String
         get() = (argumentName?.swiftIdentifier ?: "_") +
                 (parameterName?.swiftIdentifier?.let { " $it" } ?: "") + ": " +
-                (type.attributes.render().takeUnless { it.isBlank() }?.let { "$it " } ?: "") +
-                type.swiftRender
-
+                type.swiftRender((SirTypeVariance.CONTRAVARIANT)) +
+                if (isVariadic) "..." else ""
 }
 
 private val SirVisibility.swift
@@ -583,17 +631,20 @@ private val SirExpression.swiftRender: String
         is SirExpression.StringLiteral -> value.swiftStringLiteral
     }
 
-private fun List<SirAttribute>.render(): String = joinToString(" ") { atr ->
+private fun List<SirAttribute>.render(position: SirTypeVariance): String = mapNotNull { atr ->
     buildString {
         fun List<SirArgument>.render(): String = joinToString(prefix = "(", postfix = ")") { it.swiftRender }
         append("@")
         append(atr.identifier.swiftIdentifier)
         append(atr.arguments?.render() ?: "")
     }
-}
+        .takeIf { (atr as? SirFunctionalTypeAttribute)?.isPrintableInPosition(position) ?: true }
+}.joinToString(" ")
+
 
 private val SirType.isBivariantSelf: Boolean? get() = when (this) {
         is SirErrorType, is SirUnsupportedType -> null
         is SirExistentialType, is SirFunctionalType -> true
+        is SirTupleType -> false
         is SirNominalType -> parent == null && typeArguments.isEmpty() && typeDeclaration !is SirClass /* also not actors */
     }

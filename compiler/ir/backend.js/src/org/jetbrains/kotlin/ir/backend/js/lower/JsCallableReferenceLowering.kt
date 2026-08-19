@@ -1,19 +1,22 @@
 /*
- * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.ir.backend.js.lower
 
 import org.jetbrains.kotlin.backend.common.compilationException
-import org.jetbrains.kotlin.backend.common.lower.WebCallableReferenceLowering
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.JsStatementOrigins
+import org.jetbrains.kotlin.ir.backend.js.originalCallableReference
+import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
 import org.jetbrains.kotlin.ir.backend.js.utils.compileSuspendAsJsGenerator
 import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
 import org.jetbrains.kotlin.ir.builders.declarations.buildValueParameter
 import org.jetbrains.kotlin.ir.builders.irDelegatingConstructorCall
+import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrParameterKind
@@ -21,13 +24,16 @@ import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrDelegatingConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrRichFunctionReference
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
+import org.jetbrains.kotlin.ir.inline.FunctionInlining
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classOrFail
+import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.primaryConstructor
+import org.jetbrains.kotlin.ir.util.toIrConst
 
-class JsCallableReferenceLowering(context: JsIrBackendContext) : WebCallableReferenceLowering(context) {
-
+@PhasePrerequisites(PropertyReferenceLowering::class, FunctionInlining::class)
+class JsCallableReferenceLowering(private val jsContext: JsIrBackendContext) : WebCallableReferenceLowering(jsContext) {
     private val compileSuspendAsJsGenerator = context.compileSuspendAsJsGenerator
 
     override fun getConstructorCallOrigin(reference: IrRichFunctionReference) = JsStatementOrigins.CALLABLE_REFERENCE_CREATE
@@ -56,16 +62,20 @@ class JsCallableReferenceLowering(context: JsIrBackendContext) : WebCallableRefe
                     symbol = continuation.symbol,
                     origin = JsStatementOrigins.CALLABLE_REFERENCE_INVOKE,
                 )
+            } else if (functionReference.reflectionTargetSymbol != null) {
+                arguments[0] = functionReference.getFlags().toIrConst(context.irBuiltIns.intType)
+                arguments[1] = functionReference.getArity().toIrConst(context.irBuiltIns.intType)
+                arguments[2] = JsIrBuilder.buildCall(jsContext.symbols.signatureIdSymbol).apply {
+                    arguments[0] = functionReference.getId(jsContext).toIrConst(context.irBuiltIns.stringType)
+                }
             }
         }
     }
 
-    override fun getSuperClassType(reference: IrRichFunctionReference): IrType {
-        return if (reference.shouldAddContinuation) {
-            context.symbols.coroutineImpl.owner.defaultType
-        } else {
-            context.irBuiltIns.anyType
-        }
+    override fun getSuperClassType(reference: IrRichFunctionReference): IrType = when {
+        reference.shouldAddContinuation -> context.symbols.coroutineImpl.owner.defaultType
+        reference.reflectionTargetSymbol != null -> jsContext.symbols.reflectionSymbols.kFunctionImpl.defaultType
+        else -> jsContext.irBuiltIns.anyType
     }
 
     override fun getExtraConstructorParameters(constructor: IrConstructor, reference: IrRichFunctionReference): List<IrValueParameter> {
@@ -79,5 +89,9 @@ class JsCallableReferenceLowering(context: JsIrBackendContext) : WebCallableRefe
                 kind = IrParameterKind.Regular
             }
         )
+    }
+
+    override fun postprocessClass(functionReferenceClass: IrClass, functionReference: IrRichFunctionReference) {
+        functionReferenceClass.originalCallableReference = functionReference
     }
 }

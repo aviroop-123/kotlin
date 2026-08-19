@@ -5,12 +5,14 @@
 
 package org.jetbrains.kotlin.commonizer.konan
 
-import org.jetbrains.kotlin.commonizer.*
+import org.jetbrains.kotlin.commonizer.CommonizerOutputFileLayout
+import org.jetbrains.kotlin.commonizer.CommonizerParameters
+import org.jetbrains.kotlin.commonizer.CommonizerTarget
+import org.jetbrains.kotlin.commonizer.ResultsConsumer
 import org.jetbrains.kotlin.library.SerializedMetadata
-import org.jetbrains.kotlin.library.impl.BaseWriterImpl
 import org.jetbrains.kotlin.library.impl.BuiltInsPlatform
-import org.jetbrains.kotlin.library.impl.KotlinLibraryLayoutForWriter
-import org.jetbrains.kotlin.library.impl.KotlinLibraryWriterImpl
+import org.jetbrains.kotlin.library.writer.KlibWriter
+import org.jetbrains.kotlin.library.writer.includeMetadata
 import java.io.File
 
 internal class ModuleSerializer(
@@ -34,19 +36,15 @@ private fun writeLibrary(
     manifestData: NativeSensitiveManifestData,
     libraryDestination: File
 ) {
-    val layout = org.jetbrains.kotlin.konan.file.File(libraryDestination.path).let { KotlinLibraryLayoutForWriter(it, it) }
-    val library = KotlinLibraryWriterImpl(
-        moduleName = manifestData.uniqueName,
-        versions = manifestData.versions,
-        builtInsPlatform = BuiltInsPlatform.NATIVE,
-        nativeTargets = emptyList(), // will be overwritten with addManifest(manifestData) below
-        nopack = true,
-        shortName = manifestData.shortName,
-        layout = layout
-    )
-    library.addMetadata(metadata)
-    (library.base as BaseWriterImpl).addManifest(manifestData)
-    library.commit()
+    KlibWriter {
+        manifest {
+            moduleName(manifestData.uniqueName)
+            versions(manifestData.versions)
+            platformAndTargets(BuiltInsPlatform.NATIVE, manifestData.nativeTargets)
+            customProperties { addNativeSensitiveManifestProperties(manifestData) }
+        }
+        includeMetadata(metadata)
+    }.writeTo(libraryDestination.absolutePath)
 }
 
 /**

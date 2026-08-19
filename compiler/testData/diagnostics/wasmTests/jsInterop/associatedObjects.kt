@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: FRONTEND
 @file:OptIn(ExperimentalAssociatedObjects::class, ExperimentalWasmJsInterop::class)
 
 import kotlin.reflect.AssociatedObjectKey

@@ -13,19 +13,22 @@ import org.jetbrains.kotlin.backend.konan.llvm.*
 import org.jetbrains.kotlin.backend.konan.llvm.runtime.RuntimeModule
 import org.jetbrains.kotlin.backend.konan.objcexport.NSNumberKind
 import org.jetbrains.kotlin.backend.konan.objcexport.ObjCExportNamer
+import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 
-internal fun patchObjCRuntimeModule(generationState: NativeGenerationState): LLVMModuleRef? {
+internal fun patchObjCRuntimeModule(generationState: NativeGenerationState): Pair<LLVMModuleRef, List<String>>? {
     val config = generationState.config
-    if (!(config.isFinalBinary && config.target.family.isAppleFamily)) return null
+    if (config.produce == CompilerOutputKind.FRAMEWORK && config.objcExportCacheEnabled && config.cachedLibraries.hasStaticCaches) return null
+    if (config.objcExportCacheEnabled && (config.produce == CompilerOutputKind.STATIC_CACHE || config.produce == CompilerOutputKind.HEADER_CACHE) && !generationState.producedLlvmModuleContainsStdlib) return null
+    if (!((config.isFinalBinary || config.objcExportCacheEnabled) && config.target.family.isAppleFamily)) return null
 
     val patchBuilder = PatchBuilder(generationState.objCExport.namer)
     patchBuilder.addObjCPatches()
 
     val bitcodeFile = generationState.runtimeModulesConfig.absolutePathFor(RuntimeModule.OBJC)
-    val parsedModule = parseBitcodeFile(generationState, generationState.messageCollector, generationState.llvmContext, bitcodeFile)
+    val parsedModule = parseBitcodeFile(generationState, generationState.diagnosticReporter, generationState.llvmContext, bitcodeFile)
 
-    patchBuilder.buildAndApply(parsedModule, generationState)
-    return parsedModule
+    val patchedNames = patchBuilder.buildAndApply(parsedModule, generationState)
+    return parsedModule to patchedNames
 }
 
 private class PatchBuilder(val objCExportNamer: ObjCExportNamer) {
@@ -127,11 +130,12 @@ private fun PatchBuilder.addObjCPatches() {
     }
 }
 
-private fun PatchBuilder.buildAndApply(llvmModule: LLVMModuleRef, state: NativeGenerationState) {
+private fun PatchBuilder.buildAndApply(llvmModule: LLVMModuleRef, state: NativeGenerationState): List<String> {
+    val patchedNames = mutableListOf<String>()
     val nameToGlobalPatch = globalPatches.associateNonRepeatingBy { it.globalName }
 
     val sectionToValueToLiteralPatch = literalPatches.groupBy { it.generator.section }
-            .mapValues { (_, patches) ->
+            .mapValues { [_, patches] ->
                 patches.associateNonRepeatingBy { it.value }
             }
 
@@ -139,16 +143,24 @@ private fun PatchBuilder.buildAndApply(llvmModule: LLVMModuleRef, state: NativeG
 
     val globals = generateSequence(LLVMGetFirstGlobal(llvmModule), { LLVMGetNextGlobal(it) }).toList()
     for (global in globals) {
-        val initializer = LLVMGetInitializer(global) ?: continue
         val name = LLVMGetValueName(global)?.toKString().orEmpty()
 
         val globalPatch = nameToGlobalPatch[name]
         if (globalPatch != null) {
             LLVMSetValueName(global, globalPatch.newGlobalName)
+            val linkage = if (state.config.objcExportCacheEnabled && !state.config.isFinalBinary)
+                LLVMLinkage.LLVMWeakAnyLinkage
+            else
+                LLVMLinkage.LLVMExternalLinkage
+            LLVMSetLinkage(global, linkage)
+            LLVMSetVisibility(global, LLVMVisibility.LLVMDefaultVisibility)
+            patchedNames += globalPatch.newGlobalName
             unusedPatches -= globalPatch
-        } else if (PatchBuilder.GlobalKind.values().any { name.startsWith(it.prefix) }) {
+        } else if (PatchBuilder.GlobalKind.values().any { name.startsWith("${it.prefix}Kotlin") }) {
             error("Objective-C global '$name' is not patched")
         }
+
+        val initializer = LLVMGetInitializer(global) ?: continue
 
         val section = LLVMGetSection(global)?.toKString()
         sectionToValueToLiteralPatch[section]?.let { valueToLiteralPatch ->
@@ -163,9 +175,16 @@ private fun PatchBuilder.buildAndApply(llvmModule: LLVMModuleRef, state: NativeG
         }
     }
 
-    unusedPatches.firstOrNull()?.let {
-        error("Patch is not applied: $it")
+    if (state.config.objcExportCacheEnabled && !state.config.isFinalBinary) {
+        val functions = generateSequence(LLVMGetFirstFunction(llvmModule), { LLVMGetNextFunction(it) }).toList()
+        for (function in functions) {
+            if (LLVMIsDeclaration(function) == 0) {
+                LLVMSetLinkage(function, LLVMLinkage.LLVMWeakAnyLinkage)
+            }
+        }
     }
+
+    return patchedNames
 }
 
 private fun getStringValue(initializer: LLVMValueRef): String? = when (LLVMGetValueKind(initializer)) {
@@ -191,7 +210,7 @@ private fun getStringValue(initializer: LLVMValueRef): String? = when (LLVMGetVa
 
 private fun <T, K> List<T>.associateNonRepeatingBy(keySelector: (T) -> K): Map<K, T> =
         this.groupBy(keySelector)
-                .mapValues { (key, values) ->
+                .mapValues { [key, values] ->
                     values.singleOrNull()
                             ?: error("multiple values found for $key: ${values.joinToString()}")
                 }
@@ -208,7 +227,7 @@ private fun patchLiteral(
         val newGlobal = generator.generate(module, state.llvm, newValue).llvm
         LLVMReplaceAllUsesWith(global, newGlobal)
     } else {
-        val newFirstCharPtr = generator.generate(module, llvm, newValue).bitcast(llvm.int8PtrType).llvm
+        val newFirstCharPtr = generator.generate(module, llvm, newValue).llvm
         generateSequence(LLVMGetFirstUse(global), { LLVMGetNextUse(it) }).forEach { use ->
             val firstCharPtr = LLVMGetUser(use)!!.also {
                 require(it.isFirstCharPtr(llvm, global)) {
@@ -221,7 +240,7 @@ private fun patchLiteral(
 }
 
 private fun LLVMValueRef.isFirstCharPtr(llvm: CodegenLlvmHelpers, global: LLVMValueRef): Boolean =
-        this.type == llvm.int8PtrType &&
+    this.type == llvm.pointerType &&
                 LLVMIsConstant(this) != 0 && LLVMGetConstOpcode(this) == LLVMOpcode.LLVMGetElementPtr
                 && LLVMGetNumOperands(this) == 3
                 && LLVMGetOperand(this, 0) == global

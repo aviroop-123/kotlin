@@ -363,12 +363,12 @@ abstract class FirTransformer<in D> : FirVisitor<FirElement, D>() {
         return transformIntegerLiteralOperatorCall(integerLiteralOperatorCall, data)
     }
 
-    open fun transformArrayLiteral(arrayLiteral: FirArrayLiteral, data: D): FirStatement {
-        return transformElement(arrayLiteral, data)
+    open fun transformCollectionLiteral(collectionLiteral: FirCollectionLiteral, data: D): FirStatement {
+        return transformElement(collectionLiteral, data)
     }
 
-    final override fun visitArrayLiteral(arrayLiteral: FirArrayLiteral, data: D): FirStatement {
-        return transformArrayLiteral(arrayLiteral, data)
+    final override fun visitCollectionLiteral(collectionLiteral: FirCollectionLiteral, data: D): FirStatement {
+        return transformCollectionLiteral(collectionLiteral, data)
     }
 
     open fun transformCheckNotNullCall(checkNotNullCall: FirCheckNotNullCall, data: D): FirStatement {
@@ -515,12 +515,12 @@ abstract class FirTransformer<in D> : FirVisitor<FirElement, D>() {
         return transformOuterClassTypeParameterRef(outerClassTypeParameterRef, data)
     }
 
-    open fun transformSimpleFunction(simpleFunction: FirSimpleFunction, data: D): FirStatement {
-        return transformElement(simpleFunction, data)
+    open fun transformNamedFunction(namedFunction: FirNamedFunction, data: D): FirStatement {
+        return transformElement(namedFunction, data)
     }
 
-    final override fun visitSimpleFunction(simpleFunction: FirSimpleFunction, data: D): FirStatement {
-        return transformSimpleFunction(simpleFunction, data)
+    final override fun visitNamedFunction(namedFunction: FirNamedFunction, data: D): FirStatement {
+        return transformNamedFunction(namedFunction, data)
     }
 
     open fun transformContractDescriptionOwner(contractDescriptionOwner: FirContractDescriptionOwner, data: D): FirContractDescriptionOwner {
@@ -723,6 +723,38 @@ abstract class FirTransformer<in D> : FirVisitor<FirElement, D>() {
         return transformReplSnippet(replSnippet, data)
     }
 
+    open fun transformReplDeclarationReference(replDeclarationReference: FirReplDeclarationReference, data: D): FirStatement {
+        return transformElement(replDeclarationReference, data)
+    }
+
+    final override fun visitReplDeclarationReference(replDeclarationReference: FirReplDeclarationReference, data: D): FirStatement {
+        return transformReplDeclarationReference(replDeclarationReference, data)
+    }
+
+    open fun transformReplExpressionReference(replExpressionReference: FirReplExpressionReference, data: D): FirStatement {
+        return transformElement(replExpressionReference, data)
+    }
+
+    final override fun visitReplExpressionReference(replExpressionReference: FirReplExpressionReference, data: D): FirStatement {
+        return transformReplExpressionReference(replExpressionReference, data)
+    }
+
+    open fun transformReplPropertyInitializer(replPropertyInitializer: FirReplPropertyInitializer, data: D): FirStatement {
+        return transformElement(replPropertyInitializer, data)
+    }
+
+    final override fun visitReplPropertyInitializer(replPropertyInitializer: FirReplPropertyInitializer, data: D): FirStatement {
+        return transformReplPropertyInitializer(replPropertyInitializer, data)
+    }
+
+    open fun transformReplPropertyDelegate(replPropertyDelegate: FirReplPropertyDelegate, data: D): FirStatement {
+        return transformElement(replPropertyDelegate, data)
+    }
+
+    final override fun visitReplPropertyDelegate(replPropertyDelegate: FirReplPropertyDelegate, data: D): FirStatement {
+        return transformReplPropertyDelegate(replPropertyDelegate, data)
+    }
+
     open fun transformPackageDirective(packageDirective: FirPackageDirective, data: D): FirPackageDirective {
         return transformElement(packageDirective, data)
     }
@@ -835,6 +867,14 @@ abstract class FirTransformer<in D> : FirVisitor<FirElement, D>() {
         return transformCallableReferenceAccess(callableReferenceAccess, data)
     }
 
+    open fun transformQualifierWithContextSensitiveAlternative(qualifierWithContextSensitiveAlternative: FirQualifierWithContextSensitiveAlternative, data: D): FirQualifierWithContextSensitiveAlternative {
+        return transformElement(qualifierWithContextSensitiveAlternative, data)
+    }
+
+    final override fun visitQualifierWithContextSensitiveAlternative(qualifierWithContextSensitiveAlternative: FirQualifierWithContextSensitiveAlternative, data: D): FirQualifierWithContextSensitiveAlternative {
+        return transformQualifierWithContextSensitiveAlternative(qualifierWithContextSensitiveAlternative, data)
+    }
+
     open fun transformPropertyAccessExpression(propertyAccessExpression: FirPropertyAccessExpression, data: D): FirStatement {
         return transformElement(propertyAccessExpression, data)
     }
@@ -883,12 +923,12 @@ abstract class FirTransformer<in D> : FirVisitor<FirElement, D>() {
         return transformVarargArgumentsExpression(varargArgumentsExpression, data)
     }
 
-    open fun transformSamConversionExpression(samConversionExpression: FirSamConversionExpression, data: D): FirStatement {
-        return transformElement(samConversionExpression, data)
+    open fun transformFunctionTypeConversionExpression(functionTypeConversionExpression: FirFunctionTypeConversionExpression, data: D): FirStatement {
+        return transformElement(functionTypeConversionExpression, data)
     }
 
-    final override fun visitSamConversionExpression(samConversionExpression: FirSamConversionExpression, data: D): FirStatement {
-        return transformSamConversionExpression(samConversionExpression, data)
+    final override fun visitFunctionTypeConversionExpression(functionTypeConversionExpression: FirFunctionTypeConversionExpression, data: D): FirStatement {
+        return transformFunctionTypeConversionExpression(functionTypeConversionExpression, data)
     }
 
     open fun transformResolvedQualifier(resolvedQualifier: FirResolvedQualifier, data: D): FirStatement {

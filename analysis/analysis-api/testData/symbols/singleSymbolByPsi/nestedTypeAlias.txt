@@ -15,6 +15,7 @@ KaTypeAliasSymbol:
     type: kotlin/collections/Map<C, D>
   isActual: false
   isExpect: false
+  isExternal: false
   location: CLASS
   modality: FINAL
   name: MyAlias
@@ -25,6 +26,7 @@ KaTypeAliasSymbol:
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: LOCAL
       modality: FINAL
@@ -36,11 +38,13 @@ KaTypeAliasSymbol:
       getContainingFileSymbol: KaFileSymbol(nestedTypeAlias.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     KaTypeParameterSymbol:
       annotations: []
       compilerVisibility: Local
       isActual: false
       isExpect: false
+      isExternal: false
       isReified: false
       location: LOCAL
       modality: FINAL
@@ -52,8 +56,10 @@ KaTypeAliasSymbol:
       getContainingFileSymbol: KaFileSymbol(nestedTypeAlias.kt)
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(nestedTypeAlias.kt)
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: Outer.MyAlias

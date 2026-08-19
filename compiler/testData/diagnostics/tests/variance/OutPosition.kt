@@ -1,4 +1,13 @@
 // RUN_PIPELINE_TILL: FRONTEND
+// LANGUAGE: +ReportTypeVarianceConflictsInDnnAndFlexible
+// FILE: J.java
+public class J {
+    public static <T> T identity(T t) {
+        return t;
+    }
+}
+
+// FILE: test.kt
 interface In<in T>
 interface Out<out T>
 interface Inv<T>
@@ -27,7 +36,7 @@ interface Test<in I, out O, P> {
     fun neOk5(): Inv<<!TYPE_VARIANCE_CONFLICT_ERROR!>O<!>>
     fun neOk6(): Pair<In<<!TYPE_VARIANCE_CONFLICT_ERROR!>O<!>>, <!TYPE_VARIANCE_CONFLICT_ERROR!>I<!>>
     fun neOk7(): Inv<in <!TYPE_VARIANCE_CONFLICT_ERROR!>O<!>>
-    fun neOk8(): Out<<!CONFLICTING_PROJECTION("Out")!>in<!> I>
+    fun neOk8(): Out<<!CONFLICTING_PROJECTION("Out<in I (of interface Test<in I, out O, P>)>")!>in<!> I>
 
     fun neOk10(): Inv<in <!TYPE_VARIANCE_CONFLICT_ERROR!>O<!>>
     fun neOk11(): Inv<out <!TYPE_VARIANCE_CONFLICT_ERROR!>I<!>>
@@ -38,6 +47,9 @@ interface Test<in I, out O, P> {
     fun neOk33(): Inv<<!SYNTAX!><!>>
     fun neOk34(): Inv<<!UNRESOLVED_REFERENCE!>C<!>>
     fun neOk35(): Inv<!WRONG_NUMBER_OF_TYPE_ARGUMENTS!><P, P><!>
+
+    fun neOk36(): <!TYPE_VARIANCE_CONFLICT_ERROR!>I & Any<!>
+    <!TYPE_VARIANCE_CONFLICT_ERROR!>fun neOk37(i: I)<!> = J.identity(i)
 }
 
 /* GENERATED_FIR_TAGS: functionDeclaration, in, inProjection, interfaceDeclaration, nullableType, out, outProjection,

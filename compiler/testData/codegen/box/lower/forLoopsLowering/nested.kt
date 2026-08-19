@@ -1,25 +1,10 @@
 // WITH_STDLIB
 // FILECHECK_STAGE: CStubs
-import kotlin.test.*
-
-// CHECK-LABEL: define i32 @"kfun:#testIntSumOfIntRange(){}kotlin.Int
-// CHECK-NOT: iterator
-// CHECK-LABEL: epilogue:
+// FILE: lib.kt
 inline fun intRange() = (0..10)
 
-fun testIntSumOfIntRange(): Int {
-    return intRange().sumOf { it }
-}
-
-// CHECK-LABEL: define i32 @"kfun:#testIntSumOfIntRangeAsReturnableBlock(){}kotlin.Int
-// CHECK-NOT: iterator
-// CHECK-LABEL: epilogue:
 inline fun intRangeAsReturnableBlock(): IntRange {
     return 0..10
-}
-
-fun testIntSumOfIntRangeAsReturnableBlock(): Int {
-    return intRangeAsReturnableBlock().sumOf { it }
 }
 
 // Functions using this one, must contain `iterator`, since the actual return type is not IntRange but Iterable,
@@ -28,6 +13,37 @@ inline fun multipleReturnsRequireDeeperAnalysis(useShorterRange: Boolean): Itera
     if (useShorterRange)
         return listOf(1, 2, 3)
     return 0..10
+}
+
+inline fun iterableInt(): Iterable<Int> = (0..10)
+
+inline fun iterableIntWithTempVal(): Iterable<Int> {
+    val iterableInt: Iterable<Int> = 0..10
+    return iterableInt
+}
+
+inline fun iterableIntWithTempValIterableInt(): Iterable<Int> {
+    val iterableInt: Iterable<Int> = iterableInt()
+    return iterableInt
+}
+
+// FILE: main.kt
+import kotlin.test.*
+
+// CHECK-LABEL: define i32 @"kfun:#testIntSumOfIntRange(){}kotlin.Int
+// CHECK-NOT: iterator
+// CHECK-LABEL: epilogue:
+
+fun testIntSumOfIntRange(): Int {
+    return intRange().sumOf { it }
+}
+
+// CHECK-LABEL: define i32 @"kfun:#testIntSumOfIntRangeAsReturnableBlock(){}kotlin.Int
+// CHECK-NOT: iterator
+// CHECK-LABEL: epilogue:
+
+fun testIntSumOfIntRangeAsReturnableBlock(): Int {
+    return intRangeAsReturnableBlock().sumOf { it }
 }
 
 // CHECK-LABEL: define i32 @"kfun:#testMultipleReturnsRequireDeeperAnalysisLongRange(){}kotlin.Int
@@ -44,48 +60,30 @@ fun testMultipleReturnsRequireDeeperAnalysisShortRange(): Int {
     return multipleReturnsRequireDeeperAnalysis(useShorterRange = true).sumOf { it }
 }
 
-// TODO: complex analysis of IrReturnableBlock is required to find out actual return type is IntRange.
-// Meanwhile, iterator is used in every fun which invokes `iterableInt()`
-inline fun iterableInt(): Iterable<Int> = (0..10)
-
 // CHECK-LABEL: define i32 @"kfun:#testIntSumOfIterableInt(){}kotlin.Int
-// CHECK: iterator
+// CHECK-NOT: iterator
 // CHECK-LABEL: epilogue:
 fun testIntSumOfIterableInt(): Int {
     return iterableInt().sumOf { it }
 }
 
 // CHECK-LABEL: define i32 @"kfun:#testIntSumOfTempVal(){}kotlin.Int
-// CHECK: iterator
+// CHECK-NOT: iterator
 // CHECK-LABEL: epilogue:
 fun testIntSumOfTempVal(): Int {
     val iterableInt: Iterable<Int> = iterableInt()
     return iterableInt.sumOf { it }
 }
 
-// TODO: complex analysis of IrReturnableBlock is required to find out actual return type is IntRange.
-// Meanwhile, iterator is used in every fun which invokes `iterableIntWithTempVal()`
-inline fun iterableIntWithTempVal(): Iterable<Int> {
-    val iterableInt: Iterable<Int> = 0..10
-    return iterableInt
-}
-
 // CHECK-LABEL: define i32 @"kfun:#testIntSumOfIterableIntWithTempVal(){}kotlin.Int
-// CHECK: iterator
+// CHECK-NOT: iterator
 // CHECK-LABEL: epilogue:
 fun testIntSumOfIterableIntWithTempVal(): Int {
     return iterableIntWithTempVal().sumOf { it }
 }
 
-// TODO: complex analysis of IrReturnableBlock is required to find out actual return type is IntRange.
-// Meanwhile, iterator is used in every fun which invokes `iterableIntWithTempValIterableInt()`
-inline fun iterableIntWithTempValIterableInt(): Iterable<Int> {
-    val iterableInt: Iterable<Int> = iterableInt()
-    return iterableInt
-}
-
 // CHECK-LABEL: define i32 @"kfun:#testIntSumOfIterableIntWithTempValIterableInt(){}kotlin.Int
-// CHECK: iterator
+// CHECK-NOT: iterator
 // CHECK-LABEL: epilogue:
 fun testIntSumOfIterableIntWithTempValIterableInt(): Int {
     return iterableIntWithTempValIterableInt().sumOf { it }

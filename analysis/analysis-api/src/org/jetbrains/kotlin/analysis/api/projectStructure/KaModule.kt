@@ -293,6 +293,7 @@ public interface KaLibrarySourceModule : KaModule {
  * see the KDoc of [KaLibraryModule] for more information.
  */
 @KaPlatformInterface
+@SubclassOptInRequired(KaPlatformInterface::class)
 public interface KaLibraryFallbackDependenciesModule : KaModule {
     /**
      * The [KaLibraryModule] which relies on these fallback dependencies.
@@ -313,6 +314,7 @@ public interface KaLibraryFallbackDependenciesModule : KaModule {
  * resolution engine.
  */
 @KaPlatformInterface
+@SubclassOptInRequired(KaPlatformInterface::class)
 public interface KaBuiltinsModule : KaModule {
     override val directRegularDependencies: List<KaModule> get() = emptyList()
     override val directDependsOnDependencies: List<KaModule> get() = emptyList()
@@ -349,6 +351,7 @@ public interface KaScriptModule : KaModule {
  * Script dependencies are self-contained and should not depend on other libraries, not even [KaLibraryFallbackDependenciesModule].
  */
 @KaPlatformInterface
+@SubclassOptInRequired(KaPlatformInterface::class)
 public interface KaScriptDependencyModule : KaModule {
     /**
      * The [KtFile] that backs the PSI of the script dependency, or `null` if the module is for project-level dependencies.
@@ -363,6 +366,7 @@ public interface KaScriptDependencyModule : KaModule {
  * applicability, and so on.
  */
 @KaPlatformInterface
+@SubclassOptInRequired(KaPlatformInterface::class)
 public interface KaDanglingFileModule : KaModule {
     /**
      * The dangling file.
@@ -376,6 +380,8 @@ public interface KaDanglingFileModule : KaModule {
 
     /**
      * All dangling files analyzed together, as a single module.
+     *
+     * Throws an exception when the files are no longer valid (see [isValid]).
      */
     public val files: List<KtFile>
 
@@ -396,6 +402,13 @@ public interface KaDanglingFileModule : KaModule {
      */
     public val isCodeFragment: Boolean
 
+    /**
+     * Whether the dangling file module's [files] are still valid.
+     *
+     * @see KtFile.isValid
+     */
+    public val isValid: Boolean
+
     @KaExperimentalApi
     override val moduleDescription: String
         get() = "Temporary file"
@@ -404,10 +417,18 @@ public interface KaDanglingFileModule : KaModule {
 /**
  * Whether the dangling file module supports partial invalidation on PSI modifications. The sessions for such modules can be cached for a
  * longer time.
+ *
+ * For a dangling file module to be stable, its context module must also be stable. Otherwise, cache inconsistencies may occur.
+ *
+ * In more detail, caches for unstable dangling file modules are invalidated after any PSI modification, while stable dangling file modules
+ * react to modification events. A stable module with an unstable context risks cache inconsistencies, as the context module's invalidation
+ * scope is much broader.
  */
 @OptIn(KaPlatformInterface::class)
 public val KaDanglingFileModule.isStable: Boolean
-    get() = files.all { it.isPhysical && it.viewProvider.isEventSystemEnabled }
+    get() =
+        files.all { it.isPhysical && it.viewProvider.isEventSystemEnabled } &&
+                (contextModule as? KaDanglingFileModule)?.isStable != false
 
 /**
  * A module which represents a source file living outside the project's content root. For example, test data files, or the source files of
@@ -416,6 +437,7 @@ public val KaDanglingFileModule.isStable: Boolean
  * Depending on the Analysis API platform implementation, the [KaNotUnderContentRootModule] may have dependencies, e.g., dependencies on the Kotlin standard library or the JDK.
  */
 @KaPlatformInterface
+@SubclassOptInRequired(KaPlatformInterface::class)
 public interface KaNotUnderContentRootModule : KaModule {
     /**
      * A human-readable module name.

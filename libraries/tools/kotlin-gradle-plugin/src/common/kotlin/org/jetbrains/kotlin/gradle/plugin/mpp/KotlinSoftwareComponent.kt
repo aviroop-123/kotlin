@@ -9,7 +9,6 @@ import org.gradle.api.Project
 import org.gradle.api.artifacts.*
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.AttributeContainer
-import org.gradle.api.attributes.Usage
 import org.gradle.api.capabilities.Capability
 import org.gradle.api.component.AdhocComponentWithVariants
 import org.gradle.api.component.ComponentWithCoordinates
@@ -32,7 +31,7 @@ import org.jetbrains.kotlin.gradle.plugin.attributes.KlibPackaging
 import org.jetbrains.kotlin.gradle.plugin.await
 import org.jetbrains.kotlin.gradle.plugin.mpp.publishing.kotlinMultiplatformRootPublication
 import org.jetbrains.kotlin.gradle.plugin.mpp.uklibs.publication.KmpPublicationStrategy
-import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+import org.jetbrains.kotlin.gradle.plugin.sources.defaultImpl
 import org.jetbrains.kotlin.gradle.targets.metadata.*
 import org.jetbrains.kotlin.gradle.utils.*
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
@@ -55,13 +54,7 @@ abstract class KotlinSoftwareComponent(
         return kotlinTargets
             .filter { target ->
                 if (target is KotlinMetadataTarget) return@filter false
-                when (project.kotlinPropertiesProvider.kmpPublicationStrategy) {
-                    KmpPublicationStrategy.UklibPublicationInASingleComponentWithKMPPublication ->
-                        // Exclude subcomponent pointer from the root component
-                        target !is KotlinJvmTarget
-                    KmpPublicationStrategy.StandardKMPPublication ->
-                        true
-                }
+                true
             }
     }
 
@@ -92,18 +85,11 @@ abstract class KotlinSoftwareComponent(
         // if (onlyPublishUklib) return
 
         mutableSetOf<DefaultKotlinUsageContext>().apply {
-            val allMetadataJar = project.tasks.named(KotlinMetadataTargetConfigurator.ALL_METADATA_JAR_NAME)
-            val allMetadataArtifact = project.artifacts.add(Dependency.ARCHIVES_CONFIGURATION, allMetadataJar) { allMetadataArtifact ->
-                allMetadataArtifact.classifier = project.psmJarClassifier ?: ""
-            }
-
             this += DefaultKotlinUsageContext(
                 compilation = metadataTarget.compilations.getByName(MAIN_COMPILATION_NAME),
                 mavenScope = KotlinUsageContext.MavenScope.COMPILE,
-                dependencyConfigurationName = metadataTarget.apiElementsConfigurationName,
-                overrideConfigurationArtifacts = project.setProperty { listOf(allMetadataArtifact) }
+                dependencyConfigurationName = metadataTarget.apiElementsConfigurationName
             )
-
 
             val sourcesElements = metadataTarget.sourcesElementsConfigurationName
             if (metadataTarget.isSourcesPublishable) {
@@ -140,7 +126,7 @@ abstract class KotlinSoftwareComponent(
         "sourcesJar",
         name,
         project,
-        project.future { allPublishableCommonSourceSets().associate { it.name to it.kotlin } },
+        project.future { allPublishableCommonSourceSets().associate { it.name to it.defaultImpl.allKotlin } },
         name.toLowerCaseAsciiOnly()
     )
 
@@ -201,13 +187,6 @@ class DefaultKotlinUsageContext(
 
     private val kotlinTarget: KotlinTarget get() = compilation.target
     private val project: Project get() = kotlinTarget.project
-
-    @Deprecated(
-        message = "Usage is no longer supported. Use `usageScope`",
-        replaceWith = ReplaceWith("usageScope"),
-        level = DeprecationLevel.ERROR
-    )
-    override fun getUsage(): Usage = error("Usage is no longer supported. Use `usageScope`")
 
     override fun getName(): String = dependencyConfigurationName
 

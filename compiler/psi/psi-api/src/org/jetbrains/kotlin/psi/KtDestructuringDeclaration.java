@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,23 +7,42 @@ package org.jetbrains.kotlin.psi;
 
 import com.intellij.lang.ASTNode;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.TokenType;
 import com.intellij.psi.tree.TokenSet;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.KtNodeTypes;
+import org.jetbrains.kotlin.KtStubBasedElementTypes;
 import org.jetbrains.kotlin.lexer.KtTokens;
+import org.jetbrains.kotlin.psi.stubs.KotlinDestructuringDeclarationStub;
 import org.jetbrains.kotlin.psi.psiUtil.KtPsiUtilKt;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.jetbrains.kotlin.lexer.KtTokens.*;
 
-public class KtDestructuringDeclaration extends KtDeclarationImpl
+/**
+ * Represents a destructuring declaration that unpacks an object into multiple variables.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ *    val (x, y) = pair
+ * // ^_______________^
+ * }</pre>
+ *
+ * @see KtDestructuringDeclarationEntry
+ */
+public class KtDestructuringDeclaration extends KtDeclarationStub<KotlinDestructuringDeclarationStub>
         implements KtValVarKeywordOwner, KtDeclarationWithInitializer, KtDeclarationWithReturnType {
 
     public KtDestructuringDeclaration(@NotNull ASTNode node) {
         super(node);
+    }
+
+    public KtDestructuringDeclaration(@NotNull KotlinDestructuringDeclarationStub stub) {
+        super(stub, KtStubBasedElementTypes.DESTRUCTURING_DECLARATION);
     }
 
     @Override
@@ -33,12 +52,32 @@ public class KtDestructuringDeclaration extends KtDeclarationImpl
 
     @NotNull
     public List<KtDestructuringDeclarationEntry> getEntries() {
-        return findChildrenByType(KtNodeTypes.DESTRUCTURING_DECLARATION_ENTRY);
+        List<KtDestructuringDeclarationEntry> result = new ArrayList<>();
+        for (ASTNode child = getNode().getFirstChildNode(); child != null; child = child.getTreeNext()) {
+            if (child.getElementType() == KtNodeTypes.DESTRUCTURING_DECLARATION_ENTRY) {
+                result.add((KtDestructuringDeclarationEntry) child.getPsi());
+            } else if (child.getElementType() == TokenType.ERROR_ELEMENT) {
+                // Entries may be wrapped in ERROR_ELEMENTs (e.g., for top-level destructuring declarations
+                // where the parser reports an error).
+                // TODO(KT-58563): After the reporting is moved out of the parser, this workaround can be removed.
+                for (ASTNode errorChild = child.getFirstChildNode(); errorChild != null; errorChild = errorChild.getTreeNext()) {
+                    if (errorChild.getElementType() == KtNodeTypes.DESTRUCTURING_DECLARATION_ENTRY) {
+                        result.add((KtDestructuringDeclarationEntry) errorChild.getPsi());
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     @Nullable
     @Override
     public KtExpression getInitializer() {
+        KotlinDestructuringDeclarationStub stub = getGreenStub();
+        if (stub != null && !stub.getHasInitializer()) {
+            return null;
+        }
+
         ASTNode eqNode = getNode().findChildByType(EQ);
         if (eqNode == null) {
             return null;
@@ -48,10 +87,20 @@ public class KtDestructuringDeclaration extends KtDeclarationImpl
 
     @Override
     public boolean hasInitializer() {
+        KotlinDestructuringDeclarationStub stub = getGreenStub();
+        if (stub != null) {
+            return stub.getHasInitializer();
+        }
+
         return getInitializer() != null;
     }
 
     public boolean isVar() {
+        KotlinDestructuringDeclarationStub stub = getGreenStub();
+        if (stub != null) {
+            return stub.isVar();
+        }
+
         return getNode().findChildByType(KtTokens.VAR_KEYWORD) != null;
     }
 

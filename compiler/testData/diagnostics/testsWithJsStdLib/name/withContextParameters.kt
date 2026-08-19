@@ -1,11 +1,12 @@
+// RUN_PIPELINE_TILL: BACKEND
 // LANGUAGE: +ContextParameters
 // FILE: DeclarationOverloads.kt
 package DeclarationOverloads
 
-<!CONFLICTING_OVERLOADS!>fun test()<!> {}
+fun test() {}
 
-<!CONFLICTING_OVERLOADS!><!CONTEXT_PARAMETERS_UNSUPPORTED!>context(x: <!DEBUG_INFO_MISSING_UNRESOLVED!>Int<!>)<!> fun test()<!> = <!UNRESOLVED_REFERENCE!>x<!>
+context(x: Int) <!CONTEXTUAL_OVERLOAD_SHADOWED!>fun test()<!> = x
 
-val <!REDECLARATION!>test<!> = 0
+val test = 0
 
-<!CONTEXT_PARAMETERS_UNSUPPORTED!>context(x: <!DEBUG_INFO_MISSING_UNRESOLVED!>Int<!>)<!> val <!REDECLARATION!>test<!> get() = <!UNRESOLVED_REFERENCE!>x<!>
+context(x: Int) <!CONTEXTUAL_OVERLOAD_SHADOWED!>val test<!> get() = x

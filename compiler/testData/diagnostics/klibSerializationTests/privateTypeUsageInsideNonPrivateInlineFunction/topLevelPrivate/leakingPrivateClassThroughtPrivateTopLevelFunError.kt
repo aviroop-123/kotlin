@@ -1,7 +1,7 @@
+// RUN_PIPELINE_TILL: BACKEND
 // LANGUAGE: -IrIntraModuleInlinerBeforeKlibSerialization -IrCrossModuleInlinerBeforeKlibSerialization
 // LANGUAGE: +ForbidExposureOfPrivateTypesInNonPrivateInlineFunctionsInKlibs
 // DIAGNOSTICS: -NOTHING_TO_INLINE
-// FIR_IDENTICAL
 
 interface Foo
 

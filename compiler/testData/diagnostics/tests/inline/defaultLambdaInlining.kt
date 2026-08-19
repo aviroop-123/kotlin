@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -UNUSED_EXPRESSION -UNUSED_PARAMETER -UNUSED_VARIABLE -NOTHING_TO_INLINE
-// LANGUAGE: +InlineDefaultFunctionalParameters
 
 fun test() = "OK"
 
@@ -40,7 +39,7 @@ abstract class Base {
 }
 
 class Derived : Base() {
-    <!OVERRIDE_BY_INLINE!>override final inline fun foo(<!NOT_YET_SUPPORTED_IN_INLINE!>f: () -> Unit<!>)<!> {
+    override final inline <!OVERRIDE_BY_INLINE!>fun foo(<!NOT_YET_SUPPORTED_IN_INLINE!>f: () -> Unit<!>)<!> {
         f()
     }
 }

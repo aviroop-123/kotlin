@@ -5,7 +5,7 @@
 
 package org.jetbrains.kotlin.backend.konan.lower
 
-import org.jetbrains.kotlin.backend.konan.ir.KonanSymbols
+import org.jetbrains.kotlin.backend.konan.ir.BackendNativeSymbols
 import org.jetbrains.kotlin.backend.konan.ir.getSuperClassNotAny
 import org.jetbrains.kotlin.ir.objcinterop.isObjCClass
 import org.jetbrains.kotlin.backend.konan.llvm.computeFullName
@@ -14,8 +14,6 @@ import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.builders.irConstantArray
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
-import org.jetbrains.kotlin.ir.expressions.impl.IrClassReferenceImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrVarargImpl
 import org.jetbrains.kotlin.ir.objcinterop.isExternalObjCClass
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
@@ -28,62 +26,9 @@ import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
-internal fun IrBuilder.toNativeConstantReflectionBuilder(symbols: KonanSymbols, onRecursiveUpperBound: IrBuilder.(String) -> Unit = {}) = NativeConstantReflectionIrBuilder(
+internal fun IrBuilder.toNativeConstantReflectionBuilder(symbols: BackendNativeSymbols, onRecursiveUpperBound: IrBuilder.(String) -> Unit = {}) = NativeConstantReflectionIrBuilder(
         context, startOffset, endOffset, symbols, onRecursiveUpperBound
 )
-
-internal fun IrBuilder.toNativeRuntimeReflectionBuilder(symbols: KonanSymbols, onRecursiveUpperBound: IrBuilder.(String) -> Unit = {}) = NativeRuntimeReflectionIrBuilder(
-        context, startOffset, endOffset, symbols, onRecursiveUpperBound
-)
-
-internal class NativeRuntimeReflectionIrBuilder(
-        context: IrGeneratorContext,
-        startOffset: Int,
-        endOffset: Int, symbols: KonanSymbols,
-        onRecursiveUpperBound: IrBuilder.(String) -> Unit,
-) : NativeReflectionIrBuilderBase<IrExpression>(context, startOffset, endOffset, symbols, onRecursiveUpperBound, isReifiedTypeOfSupported = true) {
-    override fun irKClass(symbol: IrClassSymbol): IrExpression {
-        val kClassType = symbols.kClassImpl.typeWith(symbol.defaultType)
-        return IrClassReferenceImpl(startOffset, endOffset, kClassType, symbol, kClassType)
-    }
-
-    override fun irKTypeOfReified(type: IrType): IrExpression {
-        return irCall(symbols.typeOf).apply {
-            typeArguments[0] = type
-        }
-    }
-
-    override fun irCreateInstance(
-            clazz: IrClass,
-            elements: Map<String, IrExpression>,
-            typeArguments: List<IrType>
-    ): IrExpression {
-        val constructor = clazz.primaryConstructor!!.symbol.owner
-        val arguments = constructor.parameters.also {
-            require(it.size == elements.size) {
-                "Wrong number of values provided for ${clazz.name} construction: ${elements.size} instead of ${it.size}"
-            }
-        }.map {
-            elements[it.name.asString()] ?: error("No value for field named ${it.name} provided")
-        }
-        return irCallConstructor(constructor.symbol, typeArguments).apply {
-            for ((index, arg) in arguments.withIndex()) {
-                this.arguments[index] = arg
-            }
-        }
-    }
-
-    override fun irConstantNull() = irNull()
-    override fun irConstantString(string: String) = irString(string)
-    override fun irConstantInt(int: Int) = irInt(int)
-    override fun irConstantBoolean(boolean: Boolean) = irBoolean(boolean)
-
-    override fun irCreateArray(elementType: IrType, values: List<IrExpression>): IrExpression {
-        val arrayType = context.irBuiltIns.primitiveArrayForType[elementType]?.defaultType ?: context.irBuiltIns.arrayClass.typeWith(elementType)
-        return IrVarargImpl(startOffset, endOffset, arrayType, elementType, values)
-    }
-}
-
 
 // these constants are copy-pasted from KVarianceMapper.Companion in KTypeImpl.kt
 private fun mapVariance(variance: Variance?) = when (variance) {
@@ -96,13 +41,13 @@ private fun mapVariance(variance: Variance?) = when (variance) {
 internal class NativeConstantReflectionIrBuilder(
         context: IrGeneratorContext,
         startOffset: Int,
-        endOffset: Int, symbols: KonanSymbols,
+        endOffset: Int, symbols: BackendNativeSymbols,
         onRecursiveUpperBound: IrBuilder.(String) -> Unit,
-) : NativeReflectionIrBuilderBase<IrConstantValue>(context, startOffset, endOffset, symbols, onRecursiveUpperBound, isReifiedTypeOfSupported = false) {
+) : NativeReflectionIrBuilderBase<IrConstantValue>(context, startOffset, endOffset, symbols, onRecursiveUpperBound) {
 
     override fun irKTypeOfReified(type: IrType): IrConstantValue = shouldNotBeCalled()
 
-    private fun irKClassUnsupported(symbols: KonanSymbols, message: String) =
+    private fun irKClassUnsupported(symbols: BackendNativeSymbols, message: String) =
             irConstantObject(symbols.kClassUnsupportedImpl.owner, mapOf(
                     "message" to irConstantString(message)
             ))
@@ -138,7 +83,8 @@ internal class NativeConstantReflectionIrBuilder(
     }
 
     override fun irCreateArray(elementType: IrType, values: List<IrConstantValue>): IrConstantValue {
-        val arrayType = context.irBuiltIns.primitiveArrayForType[elementType]?.defaultType ?: context.irBuiltIns.arrayClass.typeWith(elementType)
+        val arrayType = context.irBuiltIns.primitiveArrayForType[elementType]?.defaultType
+                ?: context.irBuiltIns.arrayClass.typeWith(elementType)
         return irConstantArray(arrayType, values)
     }
 }
@@ -147,18 +93,16 @@ internal class NativeConstantReflectionIrBuilder(
 internal abstract class NativeReflectionIrBuilderBase<E : IrExpression>(
         context: IrGeneratorContext,
         startOffset: Int,
-        endOffset: Int, val symbols: KonanSymbols,
+        endOffset: Int, val symbols: BackendNativeSymbols,
         val onRecursiveUpperBound: IrBuilder.(String) -> Unit,
-        val isReifiedTypeOfSupported: Boolean,
 ) : IrBuilder(context, startOffset, endOffset) {
     fun irKType(type: IrType): E =
-            irKType(type, leaveReifiedForLater = isReifiedTypeOfSupported, mutableSetOf())
+            irKType(type, mutableSetOf())
 
     private class RecursiveBoundsException(message: String) : Throwable(message)
 
     private fun irKType(
             type: IrType,
-            leaveReifiedForLater: Boolean,
             seenTypeParameters: MutableSet<IrTypeParameter>
     ): E {
         if (type !is IrSimpleType) {
@@ -173,11 +117,6 @@ internal abstract class NativeReflectionIrBuilderBase<E : IrExpression>(
             val kClassifier = when (val classifier = type.classifier) {
                 is IrClassSymbol -> irKClass(classifier)
                 is IrTypeParameterSymbol -> {
-                    if (classifier.owner.isReified && leaveReifiedForLater) {
-                        // Leave as is for reification.
-                        return irKTypeOfReified(type)
-                    }
-
                     // Leave upper bounds of non-reified type parameters as is, even if they are reified themselves.
                     irKTypeParameter(classifier.owner, seenTypeParameters = seenTypeParameters)
                 }
@@ -189,7 +128,7 @@ internal abstract class NativeReflectionIrBuilderBase<E : IrExpression>(
                     irTypeArguments = type.arguments.map {
                         when (it) {
                             is IrStarProjection -> null
-                            is IrTypeProjection -> it.variance to irKType(it.type, leaveReifiedForLater, seenTypeParameters)
+                            is IrTypeProjection -> it.variance to irKType(it.type, seenTypeParameters)
                         }
                     },
                     isMarkedNullable = type.isMarkedNullable(),
@@ -207,7 +146,7 @@ internal abstract class NativeReflectionIrBuilderBase<E : IrExpression>(
     ): E {
         if (!seenTypeParameters.add(typeParameter))
             throw RecursiveBoundsException("Non-reified type parameters with recursive bounds are not supported yet: ${typeParameter.render()}")
-        val upperBounds = typeParameter.superTypes.map { irKType(it, false, seenTypeParameters) }
+        val upperBounds = typeParameter.superTypes.map { irKType(it, seenTypeParameters) }
         seenTypeParameters.remove(typeParameter)
 
         return kTypeParameterImpl(typeParameter, upperBounds)
@@ -219,7 +158,7 @@ internal abstract class NativeReflectionIrBuilderBase<E : IrExpression>(
     ): E = irCreateInstance(symbols.kTypeParameterImpl.owner, mapOf(
             "name" to irConstantString(typeParameter.name.asString()),
             "containerFqName" to irConstantString(typeParameter.parentUniqueName),
-            "upperBoundsArray" to irCreateArray(symbols.array.typeWith(symbols.kType.defaultType), upperBounds),
+            "upperBoundsArray" to irCreateArray(context.irBuiltIns.arrayClass.typeWith(symbols.kType.defaultType), upperBounds),
             "varianceId" to irConstantInt(mapVariance(typeParameter.variance)),
             "isReified" to irConstantBoolean(typeParameter.isReified),
     ))
@@ -261,7 +200,7 @@ internal abstract class NativeReflectionIrBuilderBase<E : IrExpression>(
         }
 
 
-    private fun irKTypeForTypeParametersWithRecursiveBounds() : E {
+    private fun irKTypeForTypeParametersWithRecursiveBounds(): E {
         return irCreateInstance(symbols.kTypeImplForTypeParametersWithRecursiveBounds.owner, emptyMap())
     }
 

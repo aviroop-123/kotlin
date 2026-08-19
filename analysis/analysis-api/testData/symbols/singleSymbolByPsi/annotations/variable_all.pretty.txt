@@ -1,0 +1,8 @@
+@Property
+@PropertyAndField
+@ParameterPropertyAndField
+@Everything
+var prop: kotlin.Int
+  @Get
+  @Everything
+  get()

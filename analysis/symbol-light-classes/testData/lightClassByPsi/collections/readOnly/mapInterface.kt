@@ -1,0 +1,43 @@
+// WITH_STDLIB
+// FULL_JDK
+// LIBRARY_PLATFORMS: JVM
+package test
+
+interface IMap<KElem, VElem> : Map<KElem, VElem>
+
+abstract class CMap<KElem, VElem> : IMap<KElem, VElem>
+
+abstract class CMap2<KElem, VElem>(d: IMap<KElem, VElem>) : IMap<KElem, VElem> by d
+
+open class CMap3<KElem, VElem> : IMap<KElem, VElem> {
+    override val entries: Set<Map.Entry<KElem, VElem>>
+        get() = TODO("Not yet implemented")
+    override val keys: Set<KElem>
+        get() = TODO("Not yet implemented")
+    override val size: Int
+        get() = TODO("Not yet implemented")
+    override val values: Collection<VElem>
+        get() = TODO("Not yet implemented")
+
+    override fun containsKey(key: KElem): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override fun containsValue(value: VElem): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override fun get(key: KElem): VElem? {
+        TODO("Not yet implemented")
+    }
+
+    override fun isEmpty(): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override fun getOrDefault(key: KElem, defaultValue: VElem): VElem {
+        TODO("Not yet implemented")
+    }
+}
+
+// LIGHT_ELEMENTS_NO_DECLARATION: CMap.class[clear;compute;computeIfAbsent;computeIfPresent;entrySet;getEntries;getKeys;getSize;getValues;keySet;merge;put;putAll;putIfAbsent;remove;remove;replace;replace;replaceAll;size;values], CMap2.class[clear;compute;computeIfAbsent;computeIfPresent;entrySet;keySet;merge;put;putAll;putIfAbsent;remove;remove;replace;replace;replaceAll;size;values], CMap3.class[clear;compute;computeIfAbsent;computeIfPresent;entrySet;keySet;merge;put;putAll;putIfAbsent;remove;remove;replace;replace;replaceAll;size;values]

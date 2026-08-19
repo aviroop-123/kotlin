@@ -1,0 +1,337 @@
+KtFile: 'regularlyResolvedNoGenericArgument.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtClass(78,188): 'sealed interface MySealed {'
+  null
+
+KtDeclarationModifierList(78,84): 'sealed'
+  null
+
+KtClassBody(104,188): '{'
+  null
+
+KtClass(110,145): 'class Left(val x: String): MySealed'
+  null
+
+KtPrimaryConstructor(120,135): '(val x: String)'
+  null
+
+KtParameterList(120,135): '(val x: String)'
+  null
+
+KtParameter(121,134): 'val x: String'
+  null
+
+KtTypeReference(128,134): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(128,134): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(128,134): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtSuperTypeList(137,145): 'MySealed'
+  null
+
+KtSuperTypeEntry(137,145): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtTypeReference(137,145): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtUserType(137,145): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtNameReferenceExpression(137,145): 'MySealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtClass(150,186): 'class Right(val y: String): MySealed'
+  null
+
+KtPrimaryConstructor(161,176): '(val y: String)'
+  null
+
+KtParameterList(161,176): '(val y: String)'
+  null
+
+KtParameter(162,175): 'val y: String'
+  null
+
+KtTypeReference(169,175): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(169,175): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(169,175): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtSuperTypeList(178,186): 'MySealed'
+  null
+
+KtSuperTypeEntry(178,186): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtTypeReference(178,186): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtUserType(178,186): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtNameReferenceExpression(178,186): 'MySealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtClass(190,229): 'interface Left<T> {'
+  null
+
+KtTypeParameterList(204,207): '<T>'
+  null
+
+KtTypeParameter(205,206): 'T'
+  null
+
+KtClassBody(208,229): '{'
+  null
+
+KtProperty(214,227): 'val z: String'
+  null
+
+KtTypeReference(221,227): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(221,227): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(221,227): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNamedFunction(231,323): 'fun MySealed.getOrElse() = when (this) {'
+  null
+
+KtTypeReference(235,243): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtUserType(235,243): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtNameReferenceExpression(235,243): 'MySealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtParameterList(253,255): '()'
+  null
+
+KtWhenExpression(258,323): 'when (this) {'
+  null
+
+KtThisExpression(264,268): 'this'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/getOrElse)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: MySealed
+        visibility: PUBLIC
+    ]
+
+KtNameReferenceExpression(264,268): 'this'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      KaReceiverParameterSymbol:
+        annotations: []
+        callableId: null
+        compilerVisibility: Public
+        contextReceivers: []
+        isActual: false
+        isCompanion: false
+        isDelegated: false
+        isExpect: false
+        isExtension: false
+        isExternal: false
+        isVal: true
+        location: LOCAL
+        modality: FINAL
+        name: <receiver>
+        origin: SOURCE
+        owningCallableSymbol: KaNamedFunctionSymbol(/getOrElse)
+        receiverParameter: null
+        returnType: KaUsualClassType:
+          annotations: []
+          typeArguments: []
+          type: MySealed
+        visibility: PUBLIC
+    ]
+
+KtWhenEntry(276,288): 'is Left -> z'
+  null
+
+KtWhenConditionIsPattern(276,283): 'is Left'
+  null
+
+KtTypeReference(279,283): 'Left'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /Left
+    ]
+    diagnostic = ERROR<NO_TYPE_ARGUMENTS_ON_RHS: One type argument expected. Use 'Left<*>' if you do not intend to pass type arguments.>
+
+KtUserType(279,283): 'Left'
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /Left
+    ]
+    diagnostic = ERROR<NO_TYPE_ARGUMENTS_ON_RHS: One type argument expected. Use 'Left<*>' if you do not intend to pass type arguments.>
+
+KtNameReferenceExpression(279,283): 'Left'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = [
+      /Left
+    ]
+    diagnostic = ERROR<NO_TYPE_ARGUMENTS_ON_RHS: One type argument expected. Use 'Left<*>' if you do not intend to pass type arguments.>
+
+KtNameReferenceExpression(287,288): 'z'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'z'.>
+
+KtWhenEntry(293,306): 'is Right -> y'
+  null
+
+KtWhenConditionIsPattern(293,301): 'is Right'
+  null
+
+KtTypeReference(296,301): 'Right'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Right
+    ]
+
+KtUserType(296,301): 'Right'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Right
+    ]
+
+KtNameReferenceExpression(296,301): 'Right'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: true
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Right
+    ]
+
+KtNameReferenceExpression(305,306): 'y'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val y: kotlin.String
+    ]
+
+KtWhenEntry(311,321): 'else -> ""'
+  null
+
+KtStringTemplateExpression(319,321): '""'
+  null

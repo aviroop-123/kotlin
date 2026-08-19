@@ -7,7 +7,6 @@ package org.jetbrains.kotlinx.serialization.runners;
 
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.util.KtTestUtil;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.jupiter.api.Test;
 
@@ -19,14 +18,18 @@ import java.util.regex.Pattern;
 @TestMetadata("plugins/kotlinx-serialization/testData/boxWithoutRuntime")
 @TestDataPath("$PROJECT_ROOT")
 public class SerializationWithoutRuntimeFirLightTreeBoxTestGenerated extends AbstractSerializationWithoutRuntimeFirLightTreeBoxTest {
+  private void run(String fileName) {
+    runTest("plugins/kotlinx-serialization/testData/boxWithoutRuntime/" + fileName);
+  }
+
   @Test
   public void testAllFilesPresentInBoxWithoutRuntime() {
-    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/kotlinx-serialization/testData/boxWithoutRuntime"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.JVM_IR, true);
+    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/kotlinx-serialization/testData/boxWithoutRuntime"), Pattern.compile("^(.+)\\.kt$"), null, true);
   }
 
   @Test
   @TestMetadata("basic.kt")
   public void testBasic() {
-    runTest("plugins/kotlinx-serialization/testData/boxWithoutRuntime/basic.kt");
+    run("basic.kt");
   }
 }

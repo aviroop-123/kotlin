@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
+    id("require-explicit-types")
 }
 
 kotlin {

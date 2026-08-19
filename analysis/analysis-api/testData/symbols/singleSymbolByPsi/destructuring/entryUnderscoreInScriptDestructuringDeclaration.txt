@@ -12,8 +12,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -31,13 +33,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: null
     getContainingModule: KaScriptModule "Script entryUnderscoreInScriptDestructuringDeclaration.kts"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaNonConstantInitializerValue(_)
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -62,9 +66,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: null
   getContainingModule: KaScriptModule "Script entryUnderscoreInScriptDestructuringDeclaration.kts"
   deprecationStatus: null
-  getterDeprecationStatus: null
-  javaGetterName: Could not render due to java.lang.IllegalStateException: not identifier: <unused var>
-
+  javaGetterName: <no name provided>
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: <unused var>

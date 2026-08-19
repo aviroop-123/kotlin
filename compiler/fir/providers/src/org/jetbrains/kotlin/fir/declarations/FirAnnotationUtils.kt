@@ -7,18 +7,19 @@ package org.jetbrains.kotlin.fir.declarations
 
 import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
-import org.jetbrains.kotlin.fir.FirEvaluatorResult
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.SessionHolder
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
-import org.jetbrains.kotlin.fir.references.FirNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.toResolvedEnumEntrySymbol
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
+import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
 import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.fir.resultOrNull
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -167,24 +168,51 @@ fun FirAnnotation.findArgumentByName(name: Name, returnFirstWhenNotFound: Boolea
     return if (!resolved && returnFirstWhenNotFound) arguments.firstOrNull() else null
 }
 
-fun FirAnnotation.getBooleanArgument(name: Name, session: FirSession): Boolean? = getPrimitiveArgumentValue(name, session)
-fun FirAnnotation.getStringArgument(name: Name, session: FirSession): String? = getPrimitiveArgumentValue(name, session)
+@Deprecated(
+    message = "Use getBooleanArgument overload without session parameter",
+    replaceWith = ReplaceWith("getBooleanArgument(name)"),
+    level = DeprecationLevel.HIDDEN
+)
+fun FirAnnotation.getBooleanArgument(name: Name, session: FirSession): Boolean? = getBooleanArgument(name)
+fun FirAnnotation.getBooleanArgument(name: Name): Boolean? = getPrimitiveArgumentValue(name)
 
-private inline fun <reified T> FirAnnotation.getPrimitiveArgumentValue(name: Name, session: FirSession): T? {
+@Deprecated(
+    message = "Use getStringArgument overload without session parameter",
+    replaceWith = ReplaceWith("getStringArgument(name)"),
+    level = DeprecationLevel.HIDDEN
+)
+fun FirAnnotation.getStringArgument(name: Name, session: FirSession): String? = getStringArgument(name)
+fun FirAnnotation.getStringArgument(name: Name): String? = getPrimitiveArgumentValue(name)
+
+private inline fun <reified T> FirAnnotation.getPrimitiveArgumentValue(name: Name): T? {
     val argument = findArgumentByName(name) ?: return null
-    val literal = argument.evaluateAs<FirLiteralExpression>(session) ?: return null
+    val literal = argument as? FirLiteralExpression ?: return null
     return literal.value as? T
 }
 
-fun FirAnnotation.getStringArrayArgument(name: Name, session: FirSession): List<String>? {
+@Deprecated(
+    message = "Use getStringArrayArgument overload without session parameter",
+    replaceWith = ReplaceWith("getStringArrayArgument(name)"),
+    level = DeprecationLevel.HIDDEN
+)
+fun FirAnnotation.getStringArrayArgument(name: Name, session: FirSession): List<String>? = getStringArrayArgument(name)
+
+fun FirAnnotation.getStringArrayArgument(name: Name): List<String>? {
     val argument = findArgumentByName(name) ?: return null
-    val arrayLiteral = argument.evaluateAs<FirArrayLiteral>(session) ?: return null
+    val arrayLiteral = argument as? FirCollectionLiteral ?: return null
     return arrayLiteral.arguments.mapNotNull { (it as? FirLiteralExpression)?.value as? String }
 }
 
-fun FirAnnotation.getKClassArgument(name: Name, session: FirSession): ConeKotlinType? {
+@Deprecated(
+    message = "Use getKClassArgument overload without session parameter",
+    replaceWith = ReplaceWith("getKClassArgument(name)"),
+    level = DeprecationLevel.HIDDEN
+)
+fun FirAnnotation.getKClassArgument(name: Name, session: FirSession): ConeKotlinType? = getKClassArgument(name)
+
+fun FirAnnotation.getKClassArgument(name: Name): ConeKotlinType? {
     val argument = findArgumentByName(name) ?: return null
-    val getClassCall = argument.evaluateAs<FirGetClassCall>(session) ?: return null
+    val getClassCall = argument as? FirGetClassCall ?: return null
     return getClassCall.getTargetType()
 }
 
@@ -197,7 +225,7 @@ data class EnumValueArgumentInfo(val enumClassId: ClassId?, val enumEntryName: N
 fun FirExpression.extractEnumValueArgumentInfo(): EnumValueArgumentInfo? {
     return when (this) {
         is FirPropertyAccessExpression -> {
-            if (isResolved) {
+            if (hasResolvedType) {
                 val entrySymbol = calleeReference.toResolvedEnumEntrySymbol() ?: return null
                 EnumValueArgumentInfo(entrySymbol.callableId.classId!!, entrySymbol.callableId.callableName)
             } else {
@@ -210,14 +238,10 @@ fun FirExpression.extractEnumValueArgumentInfo(): EnumValueArgumentInfo? {
     }
 }
 
-@PrivateForInline
-val FirEvaluatorResult.result: FirElement?
-    get() = (this as? FirEvaluatorResult.Evaluated)?.result
-
 @OptIn(PrivateForInline::class, PrivateConstantEvaluatorAPI::class)
 @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
 inline fun <reified T : FirElement> FirExpression.evaluateAs(session: FirSession): @kotlin.internal.NoInfer T? {
-    return FirExpressionEvaluator.evaluateExpression(this, session)?.result as? T
+    return FirExpressionEvaluator.evaluateExpression(this, session)?.resultOrNull<T>()
 }
 
 // --------------------------- other utilities ---------------------------
@@ -228,7 +252,7 @@ fun FirExpression.unwrapVarargValue(): List<FirExpression> {
             is FirWrappedArgumentExpression -> first.expression.unwrapVarargValue()
             else -> arguments
         }
-        is FirArrayLiteral -> arguments
+        is FirCollectionLiteral -> arguments
         else -> listOf(this)
     }
 }
@@ -246,4 +270,30 @@ private val LOW_PRIORITY_IN_OVERLOAD_RESOLUTION_CLASS_ID: ClassId =
 fun hasLowPriorityAnnotation(annotations: List<FirAnnotation>): Boolean = annotations.any {
     val lookupTag = it.annotationTypeRef.coneType.classLikeLookupTagIfAny ?: return@any false
     lookupTag.classId == LOW_PRIORITY_IN_OVERLOAD_RESOLUTION_CLASS_ID
+}
+
+context(sessionHolder: SessionHolder)
+fun ConeKotlinType.isRestrictSuspensionReceiver(): Boolean {
+    return when (this) {
+        is ConeClassLikeType -> {
+            val regularClassSymbol = fullyExpandedType().lookupTag.toRegularClassSymbol() ?: return false
+            if (regularClassSymbol.hasAnnotationWithClassId(StandardClassIds.Annotations.RestrictsSuspension, sessionHolder.session)) {
+                return true
+            }
+            regularClassSymbol.resolvedSuperTypes.any { it.isRestrictSuspensionReceiver() }
+        }
+        is ConeTypeParameterType -> {
+            lookupTag.typeParameterSymbol.resolvedBounds.any { it.coneType.isRestrictSuspensionReceiver() }
+        }
+        is ConeLookupTagBasedType -> error("impossible branch")
+        is ConeFlexibleType -> upperBound.isRestrictSuspensionReceiver()
+        is ConeDefinitelyNotNullType -> original.isRestrictSuspensionReceiver()
+        is ConeCapturedType -> constructor.supertypes?.any { it.isRestrictSuspensionReceiver() } == true
+        is ConeIntersectionType -> intersectedTypes.any { it.isRestrictSuspensionReceiver() }
+        is ConeIntegerConstantOperatorType,
+        is ConeIntegerLiteralConstantType,
+        is ConeStubTypeForTypeVariableInSubtyping,
+        is ConeTypeVariableType,
+            -> false
+    }
 }

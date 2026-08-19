@@ -9,7 +9,9 @@ import com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 import org.jetbrains.kotlin.test.model.AfterAnalysisChecker
+import org.jetbrains.kotlin.test.model.GroupingTestIsolator
 import org.jetbrains.kotlin.test.model.ResultingArtifact
+import org.jetbrains.kotlin.test.model.TestFailureSuppressor
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.MetaTestConfigurator
 import org.jetbrains.kotlin.test.services.ModuleStructureExtractor
@@ -20,28 +22,28 @@ typealias Constructor<R> = (TestServices) -> R
 
 typealias Constructor2<T, R> = (TestServices, T) -> R
 
-abstract class TestConfiguration {
-    abstract val rootDisposable: Disposable
+interface TestConfiguration<Step : TestStep<*, *>> {
+    val rootDisposable: Disposable
+    val testServices: TestServices
+    val directives: DirectivesContainer
+    val defaultRegisteredDirectives: RegisteredDirectives
+    val moduleStructureExtractor: ModuleStructureExtractor
+    val preAnalysisHandlers: List<PreAnalysisHandler>
+    val metaTestConfigurators: List<MetaTestConfigurator>
+    val afterAnalysisCheckers: List<AfterAnalysisChecker>
+    val failureSuppressors: List<TestFailureSuppressor>
+    val metaInfoHandlerEnabled: Boolean
 
-    abstract val testServices: TestServices
+    val steps: List<Step>
+}
 
-    abstract val directives: DirectivesContainer
+interface NonGroupingStageTestConfiguration : TestConfiguration<TestStep.NonGroupingStep<*, *>> {
+    var startingArtifactFactory: (TestModule) -> ResultingArtifact<*>
+    val groupingTestIsolators: List<GroupingTestIsolator>
+}
 
-    abstract val defaultRegisteredDirectives: RegisteredDirectives
-
-    abstract val moduleStructureExtractor: ModuleStructureExtractor
-
-    abstract val preAnalysisHandlers: List<PreAnalysisHandler>
-
-    abstract val metaTestConfigurators: List<MetaTestConfigurator>
-
-    abstract val afterAnalysisCheckers: List<AfterAnalysisChecker>
-
-    abstract val startingArtifactFactory: (TestModule) -> ResultingArtifact<*>
-
-    abstract val steps: List<TestStep<*, *>>
-
-    abstract val metaInfoHandlerEnabled: Boolean
+interface GroupingStageTestConfiguration : TestConfiguration<TestStep.GroupingStageStep<*, *>> {
+    val mergerWorkers: List<GroupingStageInputsMerger.Worker>
 }
 
 // ---------------------------- Utils ----------------------------

@@ -19,12 +19,14 @@ val testJsr223Runtime by configurations.creating {
 val testCompilationClasspath by configurations.creating
 
 dependencies {
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
-    testApi(libs.junit.platform.launcher)
+    testImplementation(libs.junit.platform.launcher)
+    testImplementation(intellijCore())
     testCompileOnly(project(":kotlin-scripting-jvm-host-unshaded"))
     testCompileOnly(project(":compiler:cli"))
+    testCompileOnly(project(":compiler:cli-jvm"))
     testCompileOnly(project(":core:util.runtime"))
 
     testImplementation(testFixtures(project(":compiler:test-infrastructure-utils")))
@@ -33,12 +35,15 @@ dependencies {
     testRuntimeOnly(project(":kotlin-scripting-jsr223-unshaded"))
     testRuntimeOnly(project(":kotlin-compiler"))
 
+    embeddableTestRuntime(libs.junit.platform.launcher)
     embeddableTestRuntime(libs.junit.jupiter.engine)
+    embeddableTestRuntime(libs.junit.jupiter.api)
     embeddableTestRuntime(project(":kotlin-scripting-jsr223"))
     embeddableTestRuntime(project(":kotlin-scripting-compiler-embeddable"))
     embeddableTestRuntime(testSourceSet.output)
 
     testCompilationClasspath(kotlinStdlib())
+    testImplementation(kotlinTest("junit5"))
 }
 
 sourceSets {
@@ -59,9 +64,8 @@ projectTests {
         configureProperties(testRuntimeProvider, testCompilationClasspathProvider)
     }
 
-    testTask("embeddableTest", jUnitMode = JUnitMode.JUnit5, parallel = true, skipInLocalBuild = false) {
+    testTask("embeddableTest", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = false) {
         workingDir = rootDir
-        dependsOn(embeddableTestRuntime)
         classpath = embeddableTestRuntime
         val testRuntimeProvider = project.provider { embeddableTestRuntime.asPath }
         val testCompilationClasspathProvider = project.provider { testCompilationClasspath.asPath }

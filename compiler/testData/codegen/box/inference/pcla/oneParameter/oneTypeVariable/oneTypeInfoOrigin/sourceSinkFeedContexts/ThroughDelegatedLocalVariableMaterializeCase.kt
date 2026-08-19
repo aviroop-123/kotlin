@@ -1,7 +1,8 @@
 // CHECK_TYPE_WITH_EXACT
 
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-60274
+// WASM_IGNORE_FOR: mode=multi-module os=windows
+// ISSUE: KT-84107
 
 import kotlin.reflect.KProperty
 

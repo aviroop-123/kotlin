@@ -1,6 +1,4 @@
-// FIR_IDENTICAL
 // WITH_STDLIB
-// SKIP_TXT
 
 // MODULE: lib
 // FILE: libtest.kt

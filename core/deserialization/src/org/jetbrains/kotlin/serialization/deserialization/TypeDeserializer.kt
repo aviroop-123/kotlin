@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.serialization.deserialization
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.*
 import org.jetbrains.kotlin.builtins.StandardNames.CONTINUATION_INTERFACE_FQ_NAME
 import org.jetbrains.kotlin.descriptors.*
@@ -12,6 +13,7 @@ import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.*
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameOrNull
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
@@ -25,6 +27,7 @@ import java.util.*
 
 private val EXPERIMENTAL_CONTINUATION_FQ_NAME = FqName("kotlin.coroutines.experimental.Continuation")
 
+@K1Deprecation
 class TypeDeserializer(
     private val c: DeserializationContext,
     private val parent: TypeDeserializer?,
@@ -47,7 +50,7 @@ class TypeDeserializer(
             emptyMap()
         } else {
             val result = LinkedHashMap<Int, TypeParameterDescriptor>()
-            for ((index, proto) in typeParameterProtos.withIndex()) {
+            for ([index, proto] in typeParameterProtos.withIndex()) {
                 result[proto.id] = DeserializedTypeParameterDescriptor(c, proto, index)
             }
             result
@@ -256,6 +259,7 @@ class TypeDeserializer(
 
     private fun computeClassifierDescriptor(fqNameIndex: Int): ClassifierDescriptor? {
         val id = c.nameResolver.getClassId(fqNameIndex)
+        @OptIn(ClassIdBasedLocality::class)
         if (id.isLocal) {
             // Local classes can't be found in scopes
             return c.components.deserializeClass(id)
@@ -264,6 +268,7 @@ class TypeDeserializer(
     }
 
     private fun computeLocalClassifierReplacementType(className: Int): SimpleType? {
+        @OptIn(ClassIdBasedLocality::class)
         if (c.nameResolver.getClassId(className).isLocal) {
             return c.components.localClassifierTypeSettings.replacementTypeForLocalClassifiers
         }
@@ -272,6 +277,7 @@ class TypeDeserializer(
 
     private fun computeTypeAliasDescriptor(fqNameIndex: Int): ClassifierDescriptor? {
         val id = c.nameResolver.getClassId(fqNameIndex)
+        @OptIn(ClassIdBasedLocality::class)
         return if (id.isLocal) {
             // TODO: support deserialization of local type aliases (see KT-13692)
             return null

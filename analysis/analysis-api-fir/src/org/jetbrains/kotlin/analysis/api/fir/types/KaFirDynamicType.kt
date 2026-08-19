@@ -12,12 +12,13 @@ import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationList
 import org.jetbrains.kotlin.analysis.api.fir.KaFirSession
 import org.jetbrains.kotlin.analysis.api.fir.KaSymbolByFirBuilder
 import org.jetbrains.kotlin.analysis.api.fir.annotations.KaFirAnnotationListForType
+import org.jetbrains.kotlin.analysis.api.impl.base.util.requireIsInstance
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
 import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
 import org.jetbrains.kotlin.analysis.api.types.KaDynamicType
+import org.jetbrains.kotlin.analysis.api.types.KaTypeNullability
 import org.jetbrains.kotlin.analysis.api.types.KaTypePointer
 import org.jetbrains.kotlin.analysis.api.types.KaUsualClassType
-import org.jetbrains.kotlin.analysis.utils.errors.requireIsInstance
 import org.jetbrains.kotlin.fir.types.ConeDynamicType
 import org.jetbrains.kotlin.fir.types.create
 import org.jetbrains.kotlin.fir.types.renderForDebugging
@@ -34,10 +35,11 @@ internal class KaFirDynamicType(
 
     @Deprecated(
         "Use `isMarkedNullable`, `isNullable` or `hasFlexibleNullability` instead. See KDocs for the migration guide",
-        replaceWith = ReplaceWith("this.isMarkedNullable")
+        replaceWith = ReplaceWith("this.isMarkedNullable"),
+        level = DeprecationLevel.ERROR
     )
-    @Suppress("Deprecation")
-    override val nullability: org.jetbrains.kotlin.analysis.api.types.KaTypeNullability get() = withValidityAssertion { org.jetbrains.kotlin.analysis.api.types.KaTypeNullability.UNKNOWN }
+    @Suppress("DEPRECATION_ERROR")
+    override val nullability: KaTypeNullability get() = withValidityAssertion { KaTypeNullability.UNKNOWN }
 
     override val abbreviation: KaUsualClassType?
         get() = withValidityAssertion { null }

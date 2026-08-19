@@ -27,7 +27,7 @@ public class JvmAbiContentTestGenerated extends AbstractJvmAbiContentTest {
   }
 
   public void testAllFilesPresentInContent() {
-    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/jvm-abi-gen/testData/content"), Pattern.compile("^([^.]+)$"), null, TargetBackend.JVM_IR, false);
+    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/jvm-abi-gen/testData/content"), Pattern.compile("^([^.]+)$"), null, false);
   }
 
   @TestMetadata("annotation")
@@ -43,6 +43,16 @@ public class JvmAbiContentTestGenerated extends AbstractJvmAbiContentTest {
   @TestMetadata("anonymousAnnotationInstantiation")
   public void testAnonymousAnnotationInstantiation() {
     runTest("plugins/jvm-abi-gen/testData/content/anonymousAnnotationInstantiation/");
+  }
+
+  @TestMetadata("anonymousObjectAbiExposed")
+  public void testAnonymousObjectAbiExposed() {
+    runTest("plugins/jvm-abi-gen/testData/content/anonymousObjectAbiExposed/");
+  }
+
+  @TestMetadata("anonymousObjectNonAbi")
+  public void testAnonymousObjectNonAbi() {
+    runTest("plugins/jvm-abi-gen/testData/content/anonymousObjectNonAbi/");
   }
 
   @TestMetadata("anonymousWhenMapping")

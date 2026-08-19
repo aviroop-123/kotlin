@@ -113,6 +113,9 @@ enum class ConstraintKind {
     fun isUpper(): Boolean = this == UPPER
     fun isEqual(): Boolean = this == EQUALITY
 
+    // For EQUALITY, we effectively have both directions
+    fun impliesLower(): Boolean = !isUpper() // this == LOWER || this == EQUALITY
+
     fun opposite() = when (this) {
         LOWER -> UPPER
         UPPER -> LOWER
@@ -208,6 +211,3 @@ fun checkConstraint(
         ConstraintKind.UPPER -> typeChecker.isSubtypeOf(context, resultType, constraintType)
     }
 }
-
-fun Constraint.replaceType(newType: KotlinTypeMarker) =
-    Constraint(kind, newType, position, typeHashCode, derivedFrom, isNullabilityConstraint, isNoInfer, inputTypePositionBeforeIncorporation)

@@ -13,7 +13,7 @@ import org.gradle.api.internal.project.ProjectInternal
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.util.*
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.test.assertFalse
 
 class MultiplatformAndroidSourceSetLayoutV2DiagnosticsTest {
@@ -21,12 +21,12 @@ class MultiplatformAndroidSourceSetLayoutV2DiagnosticsTest {
     private fun buildMinimalAndroidMultiplatformProject(
         preApplyCode: Project.() -> Unit = {}
     ): ProjectInternal = buildProjectWithMPP(preApplyCode = preApplyCode) {
-        setMultiplatformAndroidSourceSetLayoutVersion(2)
         plugins.apply(LibraryPlugin::class.java)
         androidLibrary {
             compileSdk = 31
         }
         kotlin {
+            @Suppress("DEPRECATION")
             androidTarget()
         }
     }
@@ -72,16 +72,6 @@ class MultiplatformAndroidSourceSetLayoutV2DiagnosticsTest {
         project.evaluate()
 
         project.checkDiagnostics("androidStyleSourceDirUsageNoWarn")
-    }
-
-    @Test
-    fun `test - v1 style source dir usage checker`() {
-        val project = buildMinimalAndroidMultiplatformProject {
-            val v1StyleInstrumentedTest = project.file("src/androidAndroidTest/kotlin")
-            v1StyleInstrumentedTest.mkdirs()
-        }
-        project.evaluate()
-        project.checkDiagnostics("v1LayoutStyleSourceDirUsage")
     }
 
     @Test

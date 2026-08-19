@@ -20,9 +20,11 @@ import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.isIterator
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.FirProperty
+import org.jetbrains.kotlin.fir.declarations.utils.isDelegatedProperty
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.isCatchParameter
 import org.jetbrains.kotlin.fir.references.toResolvedPropertySymbol
+import org.jetbrains.kotlin.fir.render
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.*
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
@@ -80,7 +82,7 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
     override fun analyze(data: VariableInitializationInfoData) {
         @Suppress("UNCHECKED_CAST")
         val properties = data.properties as Set<FirPropertySymbol>
-        val ownData = Data(properties)
+        val ownData = VariableAssignmentData(properties)
         data.graph.traverse(AddAllWrites(ownData))
         if (ownData.unreadWrites.isNotEmpty()) {
             val capturedWrites = data.graph.traverseToFixedPoint(FindCapturedWrites(properties))
@@ -93,8 +95,11 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
             if (statement is FirVariableAssignment) {
                 val variableSymbol = statement.calleeReference?.toResolvedPropertySymbol() ?: continue
                 variablesWithUnobservedWrites.add(variableSymbol)
-                // TODO, KT-59831: report case like "a += 1" where `a` `doesn't writes` different way (special for Idea)
-                reporter.reportOn(statement.lValue.source, FirErrors.ASSIGNED_VALUE_IS_NEVER_READ)
+                if (!variableSymbol.isDelegatedProperty) {
+                    // Writes to delegated properties may not be local and may be read somewhere else.
+                    // TODO, KT-59831: report case like "a += 1" where `a` `doesn't writes` different way (special for Idea)
+                    reporter.reportOn(statement.lValue.source, FirErrors.ASSIGNED_VALUE_IS_NEVER_READ)
+                }
             } else if (statement is FirProperty) {
                 if (statement.symbol !in ownData.variablesWithoutReads && !statement.symbol.ignoreWarnings) {
                     reporter.reportOn(statement.initializer?.source, FirErrors.VARIABLE_INITIALIZER_IS_REDUNDANT)
@@ -102,11 +107,17 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
             }
         }
 
-        for ((symbol, fir) in ownData.variablesWithoutReads) {
+        for ([symbol, fir] in ownData.variablesWithoutReads) {
             if (symbol.ignoreWarnings) continue
             if ((fir.initializer as? FirFunctionCall)?.isIterator == true || fir.isCatchParameter == true) continue
-            val error = if (symbol in variablesWithUnobservedWrites) FirErrors.VARIABLE_NEVER_READ else FirErrors.UNUSED_VARIABLE
-            reporter.reportOn(fir.source, error)
+            val error = when {
+                symbol in variablesWithUnobservedWrites -> when (symbol.isDelegatedProperty) {
+                    false -> FirErrors.VARIABLE_NEVER_READ
+                    true -> null // Delegated properties should only report when completely unused.
+                }
+                else -> FirErrors.UNUSED_VARIABLE
+            }
+            if (error != null) reporter.reportOn(fir.source, error)
         }
     }
 
@@ -120,17 +131,10 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
                 source?.elementType == KtNodeTypes.DESTRUCTURING_DECLARATION ||
                 initializerSource?.kind == KtFakeSourceElementKind.DesugaredForLoop
 
-    private class Data(val localProperties: Set<FirPropertySymbol>) {
-        var writesByNode: Map<CFGNode<*>, PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>> = emptyMap()
-        val unreadWrites: MutableSet<FirStatement /* FirProperty | FirVariableAssignment */> = mutableSetOf()
-        val variableScopes: MutableMap<FirPropertySymbol, ControlFlowGraph> = hashMapOf()
-        val variablesWithoutReads: MutableMap<FirPropertySymbol, FirProperty> = mutableMapOf()
-    }
-
-    private class AddAllWrites(private val data: Data) : ControlFlowGraphVisitorVoid() {
+    private class AddAllWrites(private val data: VariableAssignmentData) : ControlFlowGraphVisitorVoid() {
         override fun visitNode(node: CFGNode<*>) {}
 
-        override fun visitVariableDeclarationNode(node: VariableDeclarationNode) {
+        override fun visitVariableDeclarationExitNode(node: VariableDeclarationExitNode) {
             // `name.isSpecial` checks in this analysis are required to avoid cases like KT-72164:
             // In cases of incorrect syntactic constructions, the analysis is still performed.
             // However, some invalid constructions can be considered as variable declarations.
@@ -178,22 +182,18 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
             from: CFGNode<*>, to: CFGNode<*>, metadata: Edge,
             data: PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>,
         ): PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData> {
-            if (metadata.label == CapturedByValue) return data // Ignore CapturedByValue edges.
-            return super.visitEdge(from, to, metadata, data)
-        }
+            if (metadata.label == CapturedByValue) return persistentMapOf() // Ignore CapturedByValue edges.
 
-        private fun PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>.add(
-            type: PropertyAccessType,
-            symbol: FirPropertySymbol,
-            node: CFGNode<*>,
-        ): PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData> {
-            return transformValues { oldData ->
-                oldData.put(type, oldData[type]?.add(symbol, node) ?: VariableWriteData(symbol, node))
+            return when (from) {
+                // Do not propagate captured writes beyond the property declaration.
+                is VariableDeclarationExitNode -> super.visitEdge(from, to, metadata, data.remove(from.fir.symbol))
+
+                else -> super.visitEdge(from, to, metadata, data)
             }
         }
 
-        override fun visitVariableDeclarationNode(
-            node: VariableDeclarationNode,
+        override fun visitVariableDeclarationExitNode(
+            node: VariableDeclarationExitNode,
             data: PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>,
         ): PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData> {
             return when {
@@ -233,49 +233,46 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
             from: CFGNode<*>, to: CFGNode<*>, metadata: Edge,
             data: PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>,
         ): PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData> {
-            if (metadata.label == CapturedByValue) return data // Ignore CapturedByValue edges.
-            val result = super.visitEdge(from, to, metadata, data)
+            if (metadata.label == CapturedByValue) return persistentMapOf() // Ignore CapturedByValue edges.
+            var result = super.visitEdge(from, to, metadata, data)
 
             val fromGraph = from.owner.nearestNonInPlaceGraph()
-            return when {
+            val toGraph = to.owner.nearestNonInPlaceGraph()
+            when {
                 // Inherit parent-graph captured writes to properties as visible writes.
-                // Care must be taken to gather captured writes from the *in-place following nodes*
-                // of the 'from' node, since the 'from' node will contain captured writes for the
-                // 'to' node as well.
-                fromGraph != to.owner.nearestNonInPlaceGraph() -> {
-                    var data = data
-                    for (node in from.followingCfgNodes) {
-                        if (fromGraph == node.owner.nearestNonInPlaceGraph()) {
-                            val nodeData = super.visitEdge(from, node, metadata, futureWrites[node] ?: continue)
-                            data = data.merge(nodeData) { a, b -> mergeInfo(a, b, to) }
-                        }
+                // Subgraphs should inherit their own captured writes if they are not in-place,
+                // as they could be concurrently executed with themselves, and any write could be read.
+                fromGraph != toGraph -> {
+                    val capturedWrites = futureWrites[from]
+                    if (capturedWrites != null) {
+                        val parentInfo = super.visitEdge(from, to, metadata, capturedWrites)
+                        result = result.merge(parentInfo) { a, b -> mergeInfo(a, b, to) }
                     }
-                    data
                 }
 
                 // Inherit non-in-place subgraph captured writes to properties as visible writes.
                 from is CFGNodeWithSubgraphs<*> -> {
-                    var data = data
                     for (subGraph in from.subGraphs) {
                         if (fromGraph != subGraph.nearestNonInPlaceGraph()) {
                             val node = subGraph.enterNode
                             val nodeData = super.visitEdge(from, node, metadata, futureWrites[node] ?: continue)
-                            data = data.merge(nodeData) { a, b -> mergeInfo(a, b, to) }
+                            result = result.merge(nodeData) { a, b -> mergeInfo(a, b, to) }
                         }
                     }
-                    data
                 }
-
-                else -> result
             }
+
+            return result
         }
 
-        override fun visitVariableDeclarationNode(
-            node: VariableDeclarationNode,
+        override fun visitVariableDeclarationExitNode(
+            node: VariableDeclarationExitNode,
             data: PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>,
         ): PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData> =
             if (node.fir.name.isSpecial) data
-            else data.overwrite(node.fir.symbol, if (node.fir.initializer != null) persistentSetOf(node) else persistentSetOf())
+            else data
+                .remove(node.fir.symbol) // Remove all captured writes of property as well.
+                .overwrite(node.fir.symbol, if (node.fir.initializer != null) persistentSetOf(node) else persistentSetOf())
 
         override fun visitVariableAssignmentNode(
             node: VariableAssignmentNode,
@@ -287,7 +284,7 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
         }
     }
 
-    private class RemoveVisibleWrites(private val data: Data) : ControlFlowGraphVisitorVoid() {
+    private class RemoveVisibleWrites(private val data: VariableAssignmentData) : ControlFlowGraphVisitorVoid() {
         override fun visitNode(node: CFGNode<*>) {
             visitAnnotations(node)
         }
@@ -332,6 +329,13 @@ object UnusedVariableAssignmentChecker : AbstractFirPropertyInitializationChecke
     }
 }
 
+private class VariableAssignmentData(val localProperties: Set<FirPropertySymbol>) {
+    var writesByNode: Map<CFGNode<*>, PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>> = emptyMap()
+    val unreadWrites: MutableSet<FirStatement /* FirProperty | FirVariableAssignment */> = mutableSetOf()
+    val variableScopes: MutableMap<FirPropertySymbol, ControlFlowGraph> = hashMapOf()
+    val variablesWithoutReads: MutableMap<FirPropertySymbol, FirProperty> = mutableMapOf()
+}
+
 private enum class PropertyAccessType {
     InPlace,
     Captured,
@@ -353,8 +357,41 @@ private value class VariableWriteData(val value: PersistentMap<FirPropertySymbol
         return VariableWriteData(value.put(symbol, nodes.add(node)))
     }
 
+    fun remove(symbol: FirPropertySymbol): VariableWriteData? {
+        val newValue = value.remove(symbol)
+        return when {
+            newValue.isEmpty() -> null
+            else -> VariableWriteData(newValue)
+        }
+    }
+
     operator fun iterator(): Iterator<Map.Entry<FirPropertySymbol, PersistentSet<CFGNode<*>>>> {
         return value.iterator()
+    }
+}
+
+private fun PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>.add(
+    type: PropertyAccessType,
+    symbol: FirPropertySymbol,
+    node: CFGNode<*>,
+): PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData> {
+    return transformValues { oldData ->
+        oldData.put(type, oldData[type]?.add(symbol, node) ?: VariableWriteData(symbol, node))
+    }
+}
+
+private fun PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>.remove(
+    symbol: FirPropertySymbol,
+): PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData> {
+    return transformValues { oldData ->
+        oldData.mutate {
+            for ([type, writes] in oldData) {
+                when (val value = writes.remove(symbol)) {
+                    null -> it.remove(type)
+                    else -> it[type] = value
+                }
+            }
+        }
     }
 }
 
@@ -368,4 +405,23 @@ private fun PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>.over
         }
         it.put(PropertyAccessType.InPlace, data)
     }
+}
+
+@Suppress("unused") // Used in debugger
+private fun ControlFlowGraph.render(data: Map<CFGNode<*>, PathAwareControlFlowInfo<PropertyAccessType, VariableWriteData>>): String {
+    return render(options = ControlFlowGraphRenderOptions(data = { node ->
+        buildString {
+            for ([edge, nodeData] in data[node].orEmpty()) {
+                for ([type, variableWriteData] in nodeData) {
+                    appendLine("${edge.label} - $type")
+                    for ([variable, writes] in variableWriteData) {
+                        appendLine("    $variable")
+                        for (node in writes) {
+                            appendLine("        ${node.fir.render()}")
+                        }
+                    }
+                }
+            }
+        }
+    }))
 }

@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.contains
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.getModifierList
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
@@ -22,9 +22,9 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.utils.addToStdlib.lastIsInstanceOrNull
 
 // See old FE's [DeclarationsChecker]
-object FirMemberFunctionsChecker : FirSimpleFunctionChecker(MppCheckerKind.Common) {
+object FirMemberFunctionsChecker : FirNamedFunctionChecker(MppCheckerKind.Common) {
     context(context: CheckerContext, reporter: DiagnosticReporter)
-    override fun check(declaration: FirSimpleFunction) {
+    override fun check(declaration: FirNamedFunction) {
         val containingDeclaration = context.containingDeclarations.lastIsInstanceOrNull<FirClassSymbol<*>>() ?: return
         checkFunction(containingDeclaration, declaration)
     }
@@ -32,7 +32,7 @@ object FirMemberFunctionsChecker : FirSimpleFunctionChecker(MppCheckerKind.Commo
     context(context: CheckerContext, reporter: DiagnosticReporter)
     private fun checkFunction(
         containingDeclaration: FirClassSymbol<*>,
-        function: FirSimpleFunction,
+        function: FirNamedFunction,
     ) {
         val source = function.source ?: return
         if (source.kind is KtFakeSourceElementKind) return
@@ -63,7 +63,7 @@ object FirMemberFunctionsChecker : FirSimpleFunctionChecker(MppCheckerKind.Commo
                 if (Visibilities.isPrivate(function.visibility)) {
                     reporter.reportOn(source, FirErrors.PRIVATE_FUNCTION_WITH_NO_BODY, functionSymbol)
                 }
-                if (!isInsideExpectClass && !hasAbstractModifier && hasOpenModifier) {
+                if (hasOpenModifier && shouldReportOpenInInterface(function.symbol, containingDeclaration)) {
                     reporter.reportOn(source, FirErrors.REDUNDANT_OPEN_IN_INTERFACE)
                 }
             } else if (!isInsideExpectClass && !hasAbstractModifier && !function.isExternal && !isInsideExternal) {

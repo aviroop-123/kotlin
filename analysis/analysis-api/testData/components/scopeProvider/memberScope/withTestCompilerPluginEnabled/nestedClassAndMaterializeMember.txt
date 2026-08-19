@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -39,6 +40,88 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
+
+KaNamedFunctionSymbol:
+  annotations: []
+  callableId: test/MyClass.idWithDefault
+  compilerVisibility: Public
+  contextParameters: []
+  contextReceivers: []
+  contractEffects: []
+  hasStableParameterNames: true
+  isActual: false
+  isBuiltinFunctionInvoke: false
+  isCompanion: false
+  isExpect: false
+  isExtension: false
+  isExternal: false
+  isInfix: false
+  isInline: false
+  isOperator: false
+  isOverride: false
+  isStatic: false
+  isSuspend: false
+  isTailRec: false
+  location: CLASS
+  modality: FINAL
+  name: idWithDefault
+  origin: PLUGIN
+  receiverParameter: null
+  returnType: KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: kotlin/String
+  typeParameters: []
+  valueParameters: [
+    KaValueParameterSymbol:
+      annotations: []
+      callableId: null
+      compilerVisibility: Public
+      contextReceivers: []
+      generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: true
+      hasDefaultValue: true
+      isActual: false
+      isCompanion: false
+      isCrossinline: false
+      isDelegated: false
+      isExpect: false
+      isExtension: false
+      isExternal: false
+      isImplicitLambdaParameter: false
+      isNoinline: false
+      isVal: true
+      isVararg: false
+      location: LOCAL
+      modality: FINAL
+      name: x
+      origin: PLUGIN
+      receiverParameter: null
+      returnType: KaUsualClassType:
+        annotations: []
+        typeArguments: []
+        type: kotlin/String
+      visibility: PUBLIC
+      getContainingFileSymbol: KaFileSymbol(nestedClassAndMaterializeMember.kt)
+      getContainingJvmClassName: test.MyClass
+      getContainingModule: KaSourceModule "Sources of main"
+      deprecationStatus: null
+      importableFqName: null
+  ]
+  visibility: PUBLIC
+  getDispatchReceiver(): KaUsualClassType:
+    annotations: []
+    typeArguments: []
+    type: test/MyClass
+  getContainingFileSymbol: KaFileSymbol(nestedClassAndMaterializeMember.kt)
+  getContainingJvmClassName: test.MyClass
+  canBeOperator: false
+  getContainingModule: KaSourceModule "Sources of main"
+  deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -50,6 +133,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -77,11 +161,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -100,6 +188,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: kotlin.Any
       getContainingModule: KaLibraryModule "Library kotlin-stdlib"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getDispatchReceiver(): KaUsualClassType:
@@ -111,6 +200,8 @@ KaNamedFunctionSymbol:
   canBeOperator: true
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -122,6 +213,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -153,6 +245,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedFunctionSymbol:
   annotations: []
@@ -164,6 +258,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -195,6 +290,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  returnValueStatus: MustUse
+  importableFqName: null
 
 KaNamedClassSymbol:
   annotations: []
@@ -226,6 +323,7 @@ KaNamedClassSymbol:
   getContainingModule: KaSourceModule "Sources of main"
   annotationApplicableTargets: null
   deprecationStatus: null
+  importableFqName: test.MyClass.Nested
 
 KaConstructorSymbol:
   annotations: []
@@ -235,8 +333,10 @@ KaConstructorSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isPrimary: true
   location: CLASS
   modality: FINAL
@@ -253,3 +353,4 @@ KaConstructorSymbol:
   getContainingJvmClassName: test.MyClass
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: test.MyClass

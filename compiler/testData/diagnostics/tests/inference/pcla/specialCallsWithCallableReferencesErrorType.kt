@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // WITH_STDLIB
-// SKIP_TXT
 // DIAGNOSTICS: -CAST_NEVER_SUCCEEDS -UNCHECKED_CAST -UNUSED_PARAMETER -UNUSED_VARIABLE -OPT_IN_USAGE_ERROR -UNUSED_EXPRESSION
 
 import kotlin.experimental.ExperimentalTypeInference
@@ -80,8 +79,8 @@ fun poll75(): Flow<String> {
 
 fun poll76(): Flow<String> {
     return flow {
-        val inv = <!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>::Foo7<!><!NOT_NULL_ASSERTION_ON_CALLABLE_REFERENCE!>!!<!>
-        <!DEBUG_INFO_ELEMENT_WITH_ERROR_TYPE!>inv<!>
+        val inv = ::<!CANNOT_INFER_PARAMETER_TYPE!>Foo7<!><!NOT_NULL_ASSERTION_ON_CALLABLE_REFERENCE!>!!<!>
+        inv
     }
 }
 

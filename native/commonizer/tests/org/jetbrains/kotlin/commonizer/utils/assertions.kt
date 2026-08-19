@@ -13,7 +13,6 @@ import org.jetbrains.kotlin.commonizer.metadata.utils.MetadataDeclarationsCompar
 import org.jetbrains.kotlin.commonizer.metadata.utils.SerializedMetadataLibraryProvider
 import org.jetbrains.kotlin.library.SerializedMetadata
 import java.io.File
-import kotlin.metadata.ExperimentalAnnotationsInMetadata
 import kotlin.test.fail
 
 fun assertIsDirectory(file: File) {
@@ -22,8 +21,8 @@ fun assertIsDirectory(file: File) {
 }
 
 fun assertModulesAreEqual(reference: SerializedMetadata, generated: SerializedMetadata, target: CommonizerTarget) {
-    val referenceModule = KlibModuleMetadata.read(SerializedMetadataLibraryProvider(reference))
-    val generatedModule = KlibModuleMetadata.read(SerializedMetadataLibraryProvider(generated))
+    val referenceModule = KlibModuleMetadata.readStrict(SerializedMetadataLibraryProvider(reference))
+    val generatedModule = KlibModuleMetadata.readStrict(SerializedMetadataLibraryProvider(generated))
 
     when (val result = MetadataDeclarationsComparator.compare(referenceModule, generatedModule)) {
         is Result.Success -> Unit
@@ -51,7 +50,6 @@ fun assertModulesAreEqual(reference: SerializedMetadata, generated: SerializedMe
     }
 }
 
-@OptIn(ExperimentalAnnotationsInMetadata::class)
 private val FILTER_OUT_ACCEPTABLE_MISMATCHES: (Mismatch) -> Boolean = { mismatch ->
     var isAcceptableMismatch = false // don't filter it out by default
 

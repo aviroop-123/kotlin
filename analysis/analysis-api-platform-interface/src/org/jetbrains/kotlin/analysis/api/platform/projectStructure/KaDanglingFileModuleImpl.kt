@@ -7,23 +7,26 @@ package org.jetbrains.kotlin.analysis.api.platform.projectStructure
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.search.GlobalSearchScope
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
+import org.jetbrains.kotlin.analysis.api.KaPlatformInterface
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaDanglingFileResolutionMode
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.api.utils.errors.withKaModuleEntry
-import org.jetbrains.kotlin.analysis.api.utils.errors.withPsiEntry
 import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.psi.KtCodeFragment
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.psiUtil.createSmartPointer
+import org.jetbrains.kotlin.utils.exceptions.ExceptionAttachmentBuilder
 import org.jetbrains.kotlin.utils.exceptions.requireWithAttachment
+import org.jetbrains.kotlin.utils.exceptions.withPsiEntry
 
 /**
  * The default implementation of the dangling file module, which provides all knowledge from the context module.
  * Note that if you need custom behavior, you should create a custom implementation of a [KaDanglingFileModule], as the Analysis API
  * treats this implementation specially (by allowing certain performance optimizations).
  */
+@KaPlatformInterface
 public class KaDanglingFileModuleImpl(
     files: List<KtFile>,
     override val contextModule: KaModule,
@@ -47,7 +50,7 @@ public class KaDanglingFileModuleImpl(
             ) {
                 withKaModuleEntry("contextModule", contextModule)
                 withEntryGroup("this") {
-                    files.forEachIndexed { index, file -> withPsiEntry("file_$index", file, module = null) }
+                    files.forEachIndexed { index, file -> withPsiEntry("file_$index", file) }
                     withEntry("resolutionMode", resolutionMode.toString())
                 }
             }
@@ -65,11 +68,12 @@ public class KaDanglingFileModuleImpl(
 
     override val baseContentScope: GlobalSearchScope
         get() {
-            val virtualFiles = files.mapNotNull { it.virtualFile }
-            return when {
-                virtualFiles.isEmpty() -> GlobalSearchScope.EMPTY_SCOPE
-                else -> GlobalSearchScope.filesScope(project, virtualFiles)
-            }
+            // The content scope should cover the dangling file regardless of whether it's physical or in memory (in-memory elements still
+            // need to be accepted by the resolution scope). To ensure that the content scope covers non-physical files, it's crucial
+            // to go through the file view provider. With it, we will get a virtual file even for non-physical PSI files.
+            // `PsiFile.virtualFile` would NOT achieve the same result, as it returns `null` for in-memory files.
+            val virtualFiles = files.map { it.viewProvider.virtualFile }
+            return GlobalSearchScope.filesScope(project, virtualFiles)
         }
 
     override val directRegularDependencies: List<KaModule>
@@ -83,6 +87,9 @@ public class KaDanglingFileModuleImpl(
 
     override val transitiveDependsOnDependencies: List<KaModule>
         get() = contextModule.transitiveDependsOnDependencies
+
+    override val isValid: Boolean
+        get() = validFilesOrNull != null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -122,4 +129,12 @@ public class KaDanglingFileModuleImpl(
             }
             return result
         }
+}
+
+@OptIn(KaExperimentalApi::class, KaPlatformInterface::class)
+private fun ExceptionAttachmentBuilder.withKaModuleEntry(name: String, module: KaModule?) {
+    withEntry(name, module) { module -> module.moduleDescription }
+    if (module is KaDanglingFileModule) {
+        withKaModuleEntry("${name}contextModule", module.contextModule)
+    }
 }

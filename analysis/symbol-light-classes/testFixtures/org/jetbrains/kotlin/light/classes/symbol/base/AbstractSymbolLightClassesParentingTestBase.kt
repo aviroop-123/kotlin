@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,6 +7,9 @@ package org.jetbrains.kotlin.light.classes.symbol.base
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.*
+import com.intellij.psi.impl.ElementBase
+import org.jetbrains.kotlin.analysis.test.data.manager.TestVariantChain
+import org.jetbrains.kotlin.analysis.test.data.manager.withAdditionalVariant
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
 import org.jetbrains.kotlin.analysis.test.framework.test.configurators.AnalysisApiTestConfigurator
 import org.jetbrains.kotlin.light.classes.symbol.modifierLists.SymbolLightClassModifierList
@@ -17,13 +20,16 @@ import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 import org.jetbrains.kotlin.test.services.AssertionsService
 import org.junit.Assume
+import java.lang.reflect.Method
 import java.nio.file.Path
 
 open class AbstractSymbolLightClassesParentingTestBase(
     configurator: AnalysisApiTestConfigurator,
-    override val currentExtension: String,
     override val isTestAgainstCompiledCode: Boolean,
 ) : AbstractSymbolLightClassesTestBase(configurator) {
+    override val variantChain: TestVariantChain
+        get() = super.variantChain.withAdditionalVariant("parenting")
+
     override val additionalDirectives: List<DirectivesContainer>
         get() = super.additionalDirectives + listOf(Directives)
 
@@ -48,6 +54,39 @@ open class AbstractSymbolLightClassesParentingTestBase(
         val ignoreDecompiledClasses = isTestAgainstCompiledCode
         return object : JavaElementVisitor() {
             private val declarationStack = ArrayDeque<PsiElement>()
+            private val checkedClassesForIcons: MutableSet<Class<*>> = hashSetOf()
+
+            private fun checkGetIconElementImplementation(element: PsiElement) {
+                if (element !is ElementBase) return
+
+                val javaClassToCheck = element.javaClass
+
+                var method: Method? = null
+                var currentClass: Class<*>? = javaClassToCheck
+                while (currentClass != null && currentClass != Any::class.java) {
+                    // This check helps to avoid search for already checked classes.
+                    // If the super type of the class was already visited,
+                    // it means that it is either having the correct override or the exception was already thrown
+                    if (!checkedClassesForIcons.add(currentClass)) return
+
+                    method = currentClass.declaredMethods.find {
+                        it.name == "getElementIcon" && it.parameterCount == 1 && it.parameterTypes[0] == Integer.TYPE
+                    }
+
+                    if (method != null) break
+                    currentClass = currentClass.superclass
+                }
+
+                // If method is completely absent in the hierarchy, fail fast to surface a regression
+                assertions.assertNotNull(method) {
+                    "getElementIcon(int) not found anywhere in hierarchy of ${javaClassToCheck.name}"
+                }
+
+                val owner = method!!.declaringClass
+                assertions.assertNotEquals(ElementBase::class.java, owner) {
+                    "${javaClassToCheck.name} relies on ElementBase.getElementIcon(int) instead of overriding it to `null`"
+                }
+            }
 
             private fun <T : PsiElement> checkParentAndVisitChildren(
                 declaration: T,
@@ -55,6 +94,7 @@ open class AbstractSymbolLightClassesParentingTestBase(
                 action: T.(visitor: JavaElementVisitor) -> Unit = {},
             ) {
                 if (!notCheckItself) {
+                    checkGetIconElementImplementation(declaration)
                     checkDeclarationParent(declaration)
                 }
 
@@ -76,6 +116,10 @@ open class AbstractSymbolLightClassesParentingTestBase(
                         declaration.typeParameterList?.accept(this)
                     }
 
+                    if (declaration is PsiRecordHeader) {
+                        declaration.recordComponents.forEach { it.accept(this) }
+                    }
+
                     declaration.action(this)
                 } finally {
                     val removed = declarationStack.removeLast()
@@ -85,7 +129,15 @@ open class AbstractSymbolLightClassesParentingTestBase(
 
             private fun visitPsiMemberDeclaration(member: PsiMember) {
                 val containingClass = member.containingClass
-                val expectedClass = declarationStack.lastOrNull()
+
+                val expectedClass = if (member is PsiRecordComponent) {
+                    // Record components are PsiMembers, but they are contained in a record header, not the class itself,
+                    // so we take the penultimate element from the stack, that should be a class
+                    declarationStack[declarationStack.lastIndex - 1] as PsiClass
+                } else {
+                    declarationStack.lastOrNull()
+                }
+
                 if (expectedClass != null) {
                     assertions.assertEquals(expectedClass, containingClass)
                 }
@@ -95,6 +147,7 @@ open class AbstractSymbolLightClassesParentingTestBase(
                 val collection = when (memberToCheck) {
                     is PsiMethod -> classToCheck.methods
                     is PsiField -> classToCheck.fields
+                    is PsiRecordComponent -> classToCheck.recordComponents
                     is PsiClass -> classToCheck.innerClasses
                     else -> error("Unexpected member: ${memberToCheck::class}\nElement: $memberToCheck")
                 }
@@ -130,12 +183,28 @@ open class AbstractSymbolLightClassesParentingTestBase(
                 checkParentAndVisitChildren(aClass) { visitor ->
                     annotations.forEach { it.accept(visitor) }
 
+                    recordHeader?.accept(visitor)
                     fields.forEach { it.accept(visitor) }
                     methods.forEach { it.accept(visitor) }
                     innerClasses.forEach { it.accept(visitor) }
 
                     implementsList?.accept(visitor)
                     extendsList?.accept(visitor)
+                }
+            }
+
+            override fun visitRecordHeader(recordHeader: PsiRecordHeader) {
+                val expectedClass = declarationStack.lastOrNull() as? PsiClass
+                if (expectedClass != null) {
+                    assertions.assertEquals(expectedClass, recordHeader.containingClass)
+                }
+
+                checkParentAndVisitChildren(recordHeader)
+            }
+
+            override fun visitRecordComponent(recordComponent: PsiRecordComponent) {
+                checkParentAndVisitChildren(recordComponent) { visitor ->
+                    annotations.forEach { it.accept(visitor) }
                 }
             }
 
@@ -166,19 +235,19 @@ open class AbstractSymbolLightClassesParentingTestBase(
             }
 
             override fun visitNameValuePair(pair: PsiNameValuePair) {
-                checkParentAndVisitChildren(pair) {
+                checkParentAndVisitChildren(pair, notCheckItself = ignoreDecompiledClasses) {
                     value?.let(::checkAnnotationMemberValue)
                 }
             }
 
             override fun visitAnnotationParameterList(list: PsiAnnotationParameterList) {
-                checkParentAndVisitChildren(list) { visitor ->
+                checkParentAndVisitChildren(list, notCheckItself = ignoreDecompiledClasses) { visitor ->
                     attributes.forEach { it.accept(visitor) }
                 }
             }
 
             private fun checkAnnotationMemberValue(memberValue: PsiAnnotationMemberValue) {
-                checkParentAndVisitChildren(memberValue) {
+                checkParentAndVisitChildren(memberValue, notCheckItself = ignoreDecompiledClasses) {
                     if (this is PsiClassObjectAccessExpression) {
                         checkDeclarationParent(this.operand)
                     }
@@ -231,7 +300,7 @@ open class AbstractSymbolLightClassesParentingTestBase(
 
                 if (!ignoreDecompiledClasses) {
                     when (psiModifierListOwner) {
-                        is PsiClass, is PsiParameter -> assertions.assertTrue(owner is SymbolLightClassModifierList<*>)
+                        is PsiClass, is PsiParameter, is PsiRecordComponent -> assertions.assertTrue(owner is SymbolLightClassModifierList<*>)
                         is PsiField, is PsiMethod -> assertions.assertTrue(owner is SymbolLightMemberModifierList<*>)
                         null -> {}
                         else -> throw IllegalStateException("Unexpected annotation owner kind: ${lastDeclaration::class}")

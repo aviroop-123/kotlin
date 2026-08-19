@@ -50,7 +50,7 @@ class FirJavaClass @FirImplementationDetail internal constructor(
     private val annotationList: FirJavaAnnotationList,
     internal val originalStatus: FirResolvedDeclarationStatusImpl,
     override val classKind: ClassKind,
-    private val declarationList: FirJavaDeclarationList,
+    val declarationList: FirJavaDeclarationList,
     override val scopeProvider: FirScopeProvider,
     override val symbol: FirRegularClassSymbol,
     private val nonEnhancedSuperTypes: List<FirTypeRef>,
@@ -118,7 +118,7 @@ class FirJavaClass @FirImplementationDetail internal constructor(
         }.ifEmpty {
             listOf(
                 buildResolvedTypeRef {
-                    coneType = StandardClassIds.Any.constructClassLikeType(emptyArray(), isMarkedNullable = false)
+                    coneType = StandardClassIds.Any.constructClassLikeType()
                 }
             )
         }
@@ -242,15 +242,16 @@ class FirJavaClass @FirImplementationDetail internal constructor(
     override fun replaceStatus(newStatus: FirDeclarationStatus) {
         shouldNotBeCalled(::replaceStatus, ::status)
     }
+
+    override fun replaceDeclarations(newDeclarations: List<FirDeclaration>) {
+        shouldNotBeCalled(::replaceDeclarations, ::declarations)
+    }
 }
 
 @FirBuilderDsl
 class FirJavaClassBuilder : FirRegularClassBuilder(), FirAnnotationContainerBuilder {
     lateinit var visibility: Visibility
-    var modality: Modality? = null
     var isFromSource: Boolean by Delegates.notNull()
-    var isTopLevel: Boolean by Delegates.notNull()
-    var isStatic: Boolean by Delegates.notNull()
     var javaPackage: JavaPackage? = null
     lateinit var javaTypeParameterStack: MutableJavaTypeParameterStack
     val existingNestedClassifierNames: MutableList<Name> = mutableListOf()

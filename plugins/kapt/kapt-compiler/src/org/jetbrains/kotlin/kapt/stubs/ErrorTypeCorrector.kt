@@ -20,13 +20,16 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.sun.tools.javac.code.BoundKind
 import com.sun.tools.javac.tree.JCTree
 import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper
-import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.fir.backend.jvm.FirJvmTypeMapper
 import org.jetbrains.kotlin.fir.realPsi
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
 import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.ir.types.IrErrorType
+import org.jetbrains.kotlin.ir.types.IrSimpleType
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.typeOrNull
 import org.jetbrains.kotlin.kapt.base.javac.kaptError
 import org.jetbrains.kotlin.kapt.base.mapJList
 import org.jetbrains.kotlin.kapt.base.mapJListIndexed
@@ -35,8 +38,6 @@ import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
 import org.jetbrains.kotlin.load.kotlin.getOptimalModeForReturnType
 import org.jetbrains.kotlin.load.kotlin.getOptimalModeForValueParameter
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.resolve.source.getPsi
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.checker.SimpleClassicTypeSystemContext
 import org.jetbrains.kotlin.types.error.ErrorTypeKind
@@ -54,7 +55,6 @@ class ErrorTypeCorrector(
 ) {
     private val defaultType = converter.treeMaker.FqName(Any::class.java.name)
 
-    private val bindingContext get() = converter.kaptContext.bindingContext
     private val treeMaker get() = converter.treeMaker
 
     private val aliasedImports = mutableMapOf<String, JCTree.JCExpression>().apply {
@@ -63,11 +63,6 @@ class ErrorTypeCorrector(
 
             val aliasName = importDirective.aliasName ?: continue
             val importedFqName = importDirective.importedFqName ?: continue
-
-            val importedReference = getReferenceExpression(importDirective.importedReference)
-                ?.let { bindingContext[BindingContext.REFERENCE_TARGET, it] }
-
-            if (importedReference is CallableDescriptor) continue
 
             this[aliasName] = treeMaker.FqName(importedFqName)
         }
@@ -98,76 +93,41 @@ class ErrorTypeCorrector(
         return convert(type, coneType, substitutions)
     }
 
-    private fun convert(type: SimpleType): JCTree.JCExpression {
-        // TODO now the raw Java type is returned. In future we need to properly convert all type parameters
-        return treeMaker.Type(KaptTypeMapper.mapType(type))
-    }
-
     private fun convertUserType(type: KtUserType, coneType: ConeKotlinType?, substitutions: SubstitutionMap): JCTree.JCExpression {
         if (coneType != null) {
             convertFirUserType(type, coneType, substitutions)?.let { return it }
         }
 
-        val target = bindingContext[BindingContext.REFERENCE_TARGET, type.referenceExpression]
+        val referencedName = type.referencedName ?: return defaultType
+        val qualifier = type.qualifier
 
-        val baseExpression: JCTree.JCExpression
-
-        when (target) {
-            is TypeAliasDescriptor -> {
-                val typeAlias = target.source.getPsi() as? KtTypeAlias
-                val actualType = typeAlias?.getTypeReference() ?: return convert(target.expandedType)
-                return convert(actualType, null, typeAlias.getSubstitutions(type, null))
+        if (qualifier == null) {
+            if (referencedName in substitutions) {
+                val [typeParameter, projection] = substitutions.getValue(referencedName)
+                return convertTypeProjection(projection, null, typeParameter.variance, emptyMap())
             }
 
-            is ClassConstructorDescriptor -> {
-                val asmType = KaptTypeMapper.mapType(target.constructedClass.defaultType, TypeMappingMode.GENERIC_ARGUMENT)
+            aliasedImports[referencedName]?.let { return it }
+        }
 
-                baseExpression = converter.treeMaker.Type(asmType)
+        val baseExpression = when {
+            qualifier != null -> {
+                val qualifierType = convertUserType(qualifier, null, substitutions)
+                if (qualifierType === defaultType) return defaultType // Do not allow to use 'defaultType' as a qualifier
+                treeMaker.Select(qualifierType, treeMaker.name(referencedName))
             }
 
-            is ClassDescriptor -> {
-                // We only get here if some type were an error type. In other words, 'type' is either an error type or its argument,
-                // so it's impossible it to be unboxed primitive.
-                val asmType = KaptTypeMapper.mapType(target.defaultType, TypeMappingMode.GENERIC_ARGUMENT)
-
-                baseExpression = converter.treeMaker.Type(asmType)
-            }
-
-            else -> {
-                val referencedName = type.referencedName ?: return defaultType
-                val qualifier = type.qualifier
-
-                if (qualifier == null) {
-                    if (referencedName in substitutions) {
-                        val (typeParameter, projection) = substitutions.getValue(referencedName)
-                        return convertTypeProjection(projection, null, typeParameter.variance, emptyMap())
-                    }
-
-                    aliasedImports[referencedName]?.let { return it }
-                }
-
-                baseExpression = when {
-                    qualifier != null -> {
-                        val qualifierType = convertUserType(qualifier, null, substitutions)
-                        if (qualifierType === defaultType) return defaultType // Do not allow to use 'defaultType' as a qualifier
-                        treeMaker.Select(qualifierType, treeMaker.name(referencedName))
-                    }
-
-                    else -> treeMaker.SimpleName(referencedName)
-                }
-            }
+            else -> treeMaker.SimpleName(referencedName)
         }
 
         val arguments = type.typeArguments
         if (arguments.isEmpty()) return baseExpression
 
-        val typeReference = PsiTreeUtil.getParentOfType(type, KtTypeReference::class.java, true)
-        val kotlinType = bindingContext[BindingContext.TYPE, typeReference] ?: ErrorUtils.createErrorType(ErrorTypeKind.KAPT_ERROR_TYPE)
-
-        val typeParameters = (target as? ClassifierDescriptor)?.typeConstructor?.parameters
         return treeMaker.TypeApply(
             baseExpression,
-            SimpleClassicTypeSystemContext.convertTypeArguments(arguments, typeParameters, kotlinType, substitutions),
+            SimpleClassicTypeSystemContext.convertTypeArguments(
+                arguments, null, ErrorUtils.createErrorType(ErrorTypeKind.KAPT_ERROR_TYPE), substitutions
+            ),
         )
     }
 
@@ -231,7 +191,7 @@ class ErrorTypeCorrector(
     private fun convertFunctionType(type: KtFunctionType, coneType: ConeKotlinType?, substitutions: SubstitutionMap): JCTree.JCExpression {
         val receiverType = type.receiverTypeReference
         val coneTypeArguments = (coneType as? ConeClassLikeType)?.typeArguments
-        var parameterTypes = mapJList(type.parameters.withIndex()) { (index, parameterKtType) ->
+        var parameterTypes = mapJList(type.parameters.withIndex()) { [index, parameterKtType] ->
             convert(
                 parameterKtType.typeReference,
                 (coneTypeArguments?.getOrNull(index + if (receiverType != null) 1 else 0) as? ConeKotlinTypeProjection)?.type,
@@ -302,7 +262,7 @@ class ErrorTypeCorrector(
 
                 if (qualifier == null) {
                     if (referencedName in substitutions) {
-                        val (typeParameter, projection, coneProjection) = substitutions.getValue(referencedName)
+                        val [typeParameter, projection, coneProjection] = substitutions.getValue(referencedName)
                         return convertTypeProjection(projection, coneProjection, typeParameter.variance, emptyMap())
                     }
 
@@ -346,4 +306,10 @@ fun KotlinType.containsErrorTypes(allowedDepth: Int = 10): Boolean {
     if (this.isError) return true
     if (this.arguments.any { !it.isStarProjection && it.type.containsErrorTypes(allowedDepth - 1) }) return true
     return false
+}
+
+fun IrType.containsErrorTypes(allowedDepth: Int = 10): Boolean {
+    if (allowedDepth <= 0) return false
+    return this is IrErrorType ||
+            this is IrSimpleType && arguments.any { it.typeOrNull?.containsErrorTypes(allowedDepth - 1) == true }
 }

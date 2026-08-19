@@ -7,14 +7,22 @@ package org.jetbrains.kotlin.lombok.k2.generators
 
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaClass
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaClassBuilder
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaConstructor
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod
 import org.jetbrains.kotlin.fir.resolve.defaultType
+import org.jetbrains.kotlin.fir.resolve.diagnostics.ConeUnsupported
+import org.jetbrains.kotlin.fir.scopes.impl.toConeType
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.toFirResolvedTypeRef
-import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
+import org.jetbrains.kotlin.fir.types.ConeTypeProjection
+import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
+import org.jetbrains.kotlin.fir.types.builder.FirErrorTypeRefBuilder
+import org.jetbrains.kotlin.fir.types.classId
 import org.jetbrains.kotlin.fir.types.constructClassLikeType
 import org.jetbrains.kotlin.lombok.k2.config.ConeLombokAnnotations.Builder
 import org.jetbrains.kotlin.lombok.utils.LombokNames
@@ -32,8 +40,8 @@ class BuilderGenerator(
         return lombokService.getBuilder(symbol)
     }
 
-    override fun constructBuilderType(builderClassId: ClassId): ConeClassLikeType {
-        return builderClassId.constructClassLikeType(emptyArray(), isMarkedNullable = false)
+    override fun getExtraTypeArguments(): List<ConeTypeProjection> {
+        return emptyList()
     }
 
     override fun getBuilderType(builderSymbol: FirClassSymbol<*>): ConeKotlinType {
@@ -42,16 +50,36 @@ class BuilderGenerator(
 
     override fun MutableMap<Name, FirJavaMethod>.addSpecialBuilderMethods(
         builder: Builder,
-        classSymbol: FirClassSymbol<*>,
         builderSymbol: FirClassSymbol<*>,
+        builderDeclaration: FirDeclaration,
         existingFunctionNames: Set<Name>,
     ) {
-        addIfNonClashing(Name.identifier(builder.buildMethodName), existingFunctionNames) {
+        if (builder.visibility == null) return
+
+        addIfNonClashing(Name.identifier(builder.buildMethodName), existingFunctionNames) { name ->
+            val builderTypeArguments = builderSymbol.typeParameterSymbols.map { typeParameter -> typeParameter.toConeType() }.toTypedArray()
             builderSymbol.createJavaMethod(
-                it,
+                name,
                 valueParameters = emptyList(),
-                returnTypeRef = classSymbol.defaultType().toFirResolvedTypeRef(),
-                visibility = builder.visibility.toVisibility(),
+                returnTypeRef = when (builderDeclaration) {
+                    is FirJavaClass -> builderDeclaration.defaultType().toFirResolvedTypeRef()
+                    is FirJavaMethod -> builderDeclaration.returnTypeRef
+                    is FirJavaConstructor -> builderDeclaration.returnTypeRef
+                    else -> FirErrorTypeRefBuilder().apply {
+                        source = builderDeclaration.source
+                        diagnostic =
+                            ConeUnsupported("Lombok annotations aren't supported on Kotlin declarations", builderDeclaration.source)
+                    }.build()
+                }.let {
+                    // Construct a new type with new type arguments
+                    // that bound to builder's class type parameters instead of its original class with `@Builder` annotation
+                    if (it is FirResolvedTypeRef && builderTypeArguments.isNotEmpty()) {
+                        it.coneType.classId!!.constructClassLikeType(builderTypeArguments).toFirResolvedTypeRef()
+                    } else {
+                        it
+                    }
+                },
+                visibility = builder.visibility,
                 modality = Modality.FINAL
             )
         }

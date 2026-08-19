@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.functionByName
 import org.jetbrains.kotlin.ir.IrElement
@@ -16,6 +15,7 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.types.isNumber
 import org.jetbrains.kotlin.ir.util.resolveFakeOverride
 import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
+import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 
 /**
@@ -27,7 +27,6 @@ import org.jetbrains.kotlin.types.expressions.OperatorConventions
  * Also, this allows to invoke `toChar` on `Number` subclasses declared in Java, which do not have it declared, even though the
  * compiler sees it there because `java.lang.Number` is mapped to `kotlin.Number`.
  */
-@PhaseDescription(name = "ReplaceNumberToCharCallSites")
 internal class ReplaceNumberToCharCallSitesLowering(val context: JvmBackendContext) : IrVisitorVoid(), FileLoweringPass {
     override fun lower(irFile: IrFile) {
         irFile.acceptChildren(this, null)
@@ -50,12 +49,12 @@ internal class ReplaceNumberToCharCallSitesLowering(val context: JvmBackendConte
         val dispatchReceiver = expression.dispatchReceiver ?: return
         expression.dispatchReceiver = IrCallImpl(
             dispatchReceiver.startOffset, dispatchReceiver.endOffset,
-            context.irBuiltIns.intType, context.irBuiltIns.numberClass.functionByName("toInt"),
+            context.irBuiltIns.intType, context.irBuiltIns.numberClass.functionByName(OperatorNameConventions.TO_INT.asString()),
             typeArgumentsCount = 0,
         ).also { toInt ->
             toInt.dispatchReceiver = dispatchReceiver
         }
 
-        expression.symbol = context.irBuiltIns.intClass.functionByName("toChar")
+        expression.symbol = context.irBuiltIns.intClass.functionByName(OperatorNameConventions.TO_CHAR.asString())
     }
 }

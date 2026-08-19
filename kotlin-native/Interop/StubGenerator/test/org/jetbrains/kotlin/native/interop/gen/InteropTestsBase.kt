@@ -8,16 +8,16 @@ package org.jetbrains.kotlin.native.interop.gen
 import kotlinx.cinterop.JvmCInteropCallbacks
 import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.util.DefFile
-import org.jetbrains.kotlin.utils.NativeMemoryAllocator
 import org.jetbrains.kotlin.native.interop.gen.jvm.KotlinPlatform
 import org.jetbrains.kotlin.native.interop.gen.jvm.buildNativeLibrary
 import org.jetbrains.kotlin.native.interop.gen.jvm.prepareTool
 import org.jetbrains.kotlin.native.interop.indexer.*
 import org.jetbrains.kotlin.native.interop.tool.CInteropArguments
-import org.junit.Rule
-import kotlin.test.*
+import org.jetbrains.kotlin.utils.NativeMemoryAllocator
+import org.junit.jupiter.api.TestInfo
 import java.io.File
 import java.nio.file.Paths
+import kotlin.test.*
 
 abstract class InteropTestsBase {
     init {
@@ -32,9 +32,12 @@ abstract class InteropTestsBase {
         }
     }
 
-    @Rule
-    @JvmField
-    val testFilesFactory = TestFilesFactory()
+    private lateinit var testFilesFactory: TestFilesFactory
+
+    @BeforeTest
+    fun setUp(testInfo: TestInfo) {
+        testFilesFactory = TestFilesFactory(testInfo)
+    }
 
     fun testFiles() = testFilesFactory.tempFiles()
 
@@ -50,17 +53,23 @@ abstract class InteropTestsBase {
         NativeMemoryAllocator.dispose()
     }
 
-    protected fun buildNativeLibraryFrom(defFile: File, headersDirectory: File, imports: Imports = ImportsMock()): NativeLibrary {
+    protected fun buildNativeLibraryFrom(defFile: File, cinteropArguments: Array<String>, imports: Imports = ImportsMock()): NativeLibrary {
         val tool = prepareTool(HostManager.hostName, KotlinPlatform.NATIVE, runFromDaemon = true, propertyOverrides = propertyOverrides)
-        val cinteropArguments = CInteropArguments()
-        cinteropArguments.argParser.parse(arrayOf(
-                "-compiler-option", "-I${headersDirectory.absolutePath}"
-        ))
+        val arguments = CInteropArguments()
+        arguments.argParser.parse(cinteropArguments)
         return buildNativeLibrary(
                 tool,
-                DefFile(defFile, tool.substitutions),
-                cinteropArguments,
+                DefFile(defFile, tool.target),
+                arguments,
                 imports
+        )
+    }
+
+    protected fun buildNativeLibraryFrom(defFile: File, headersDirectory: File, imports: Imports = ImportsMock()): NativeLibrary {
+        return buildNativeLibraryFrom(
+                defFile = defFile,
+                cinteropArguments = arrayOf("-compiler-option", "-I${headersDirectory.absolutePath}"),
+                imports = imports,
         )
     }
 
@@ -89,7 +98,7 @@ abstract class InteropTestsBase {
 
     protected fun mockImports(vararg dependencies: Pair<IndexerResult, String>): Imports {
         val headerToPackage = buildMap<HeaderId, String> {
-            dependencies.forEach { (dependency, packageName) ->
+            dependencies.forEach { [dependency, packageName] ->
                 dependency.index.includedHeaders.forEach { headerId ->
                     put(headerId, packageName)
                 }

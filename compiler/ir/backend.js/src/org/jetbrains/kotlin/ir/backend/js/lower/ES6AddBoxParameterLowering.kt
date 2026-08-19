@@ -30,7 +30,7 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.utils.memoryOptimizedPlus
 
-val ES6_BOX_PARAMETER by IrDeclarationOriginImpl
+val ES6_BOX_PARAMETER by IrDeclarationOriginImpl.Regular
 val ES6_BOX_PARAMETER_DEFAULT_RESOLUTION by IrStatementOriginImpl
 
 val IrValueParameter.isBoxParameter: Boolean
@@ -73,7 +73,7 @@ class ES6AddBoxParameterToConstructorsLowering(val context: JsIrBackendContext) 
     }
 
     private fun createJsObjectLiteral(): IrExpression {
-        return JsIrBuilder.buildCall(context.intrinsics.jsEmptyObject)
+        return JsIrBuilder.buildCall(context.symbols.jsEmptyObject)
     }
 
     private fun IrConstructor.generateBoxParameter(irClass: IrClass): IrValueParameter {

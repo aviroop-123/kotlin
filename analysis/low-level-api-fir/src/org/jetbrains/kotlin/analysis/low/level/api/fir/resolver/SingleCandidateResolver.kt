@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.analysis.low.level.api.fir.resolver
 
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.expressions.FirArgumentList
@@ -12,6 +13,7 @@ import org.jetbrains.kotlin.fir.expressions.FirEmptyArgumentList
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
 import org.jetbrains.kotlin.fir.expressions.builder.buildFunctionCall
+import org.jetbrains.kotlin.fir.resolve.CallableReferenceLhsAsType
 import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.calls.ImplicitReceiverValue
 import org.jetbrains.kotlin.fir.resolve.calls.candidate.*
@@ -22,11 +24,12 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.types.FirTypeProjection
 import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability
 
+@KaImplementationDetail
 class SingleCandidateResolver(
     private val firSession: FirSession,
     private val firFile: FirFile,
 ) {
-    private val bodyResolveComponents = createStubBodyResolveComponents(firSession)
+    val bodyResolveComponents = createStubBodyResolveComponents(firSession)
     private val firCallCompleter = FirCallCompleter(
         bodyResolveComponents.transformer,
         bodyResolveComponents,
@@ -53,12 +56,10 @@ class SingleCandidateResolver(
             resolutionParameters.callableSymbol,
             explicitReceiverKind = explicitReceiverKind,
             dispatchReceiver = dispatchReceiverValue?.receiverExpression,
-            givenExtensionReceiverOptions = listOfNotNull(
-                if (explicitReceiverKind.isExtensionReceiver)
-                    callInfo.explicitReceiver
-                else
-                    implicitExtensionReceiverValue?.receiverExpression
-            ),
+            givenExtensionReceiver = if (explicitReceiverKind.isExtensionReceiver)
+                callInfo.explicitReceiver
+            else
+                implicitExtensionReceiverValue?.receiverExpression,
             scope = null,
         )
 
@@ -82,6 +83,11 @@ class SingleCandidateResolver(
     private fun createCandidateInfoProvider(resolutionParameters: ResolutionParameters): CandidateInfoProvider {
         return when (resolutionParameters.singleCandidateResolutionMode) {
             SingleCandidateResolutionMode.CHECK_EXTENSION_FOR_COMPLETION -> CheckExtensionForCompletionCandidateInfoProvider(
+                resolutionParameters,
+                firFile,
+                firSession
+            )
+            SingleCandidateResolutionMode.CHECK_EXTENSION_CALLABlE_REFERENCE_FOR_COMPLETION -> CheckCallableReferenceForCompletionCandidateInfoProvider(
                 resolutionParameters,
                 firFile,
                 firSession
@@ -115,6 +121,7 @@ class SingleCandidateResolver(
  * @param allowUnsafeCall if true, then candidate is resolved even if receiver's nullability doesn't match
  * @param allowUnstableSmartCast if true, then candidate is resolved even if it requires unstable smart cast
  */
+@KaImplementationDetail
 class ResolutionParameters(
     val singleCandidateResolutionMode: SingleCandidateResolutionMode,
     val callableSymbol: FirCallableSymbol<*>,
@@ -122,11 +129,13 @@ class ResolutionParameters(
     val explicitReceiver: FirExpression? = null,
     /** THIS IS UNSAFE TO PASS ORIGINAL ARGUMENTS. THEY HAVE TO BE COPIED TO AVOID MUTABILITY ISSUES */
     val argumentList: FirArgumentList = FirEmptyArgumentList,
+    val callableReferenceLhsAsType: CallableReferenceLhsAsType? = null,
     val typeArgumentList: List<FirTypeProjection> = emptyList(),
     val allowUnsafeCall: Boolean = false,
     val allowUnstableSmartCast: Boolean = false,
 )
 
+@KaImplementationDetail
 enum class SingleCandidateResolutionMode {
     /**
      * Run resolution stages necessary to type check extension receiver (explicit/implicit) for candidate function.
@@ -134,5 +143,13 @@ enum class SingleCandidateResolutionMode {
      * Arguments and type arguments are not expected and not checked.
      * Explicit receiver can be passed and will always be interpreted as extension receiver.
      */
-    CHECK_EXTENSION_FOR_COMPLETION
+    CHECK_EXTENSION_FOR_COMPLETION,
+
+    /**
+     * Run resolution stages necessary to type check callable extension receiver (explicit/implicit) for candidate function.
+     * Candidate is expected to be taken from context scope.
+     * Arguments and type arguments are not expected and not checked.
+     * Explicit receiver can be passed and will always be interpreted as callable reference LHS.
+     */
+    CHECK_EXTENSION_CALLABlE_REFERENCE_FOR_COMPLETION,
 }

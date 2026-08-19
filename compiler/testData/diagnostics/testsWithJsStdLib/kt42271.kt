@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: FRONTEND
 import kotlin.properties.Delegates
 
 private var value by Delegates.notNull<Int>()

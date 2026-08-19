@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER
-// SKIP_TXT
 
 // FILE: Base.java
 public class Base<K> {}
@@ -13,5 +12,5 @@ class Test extends Base<@Nullable String> {}
 fun takeBaseOfNotNullStrings(x: Base<String>) {}
 
 fun main() {
-    val x = takeBaseOfNotNullStrings(<!TYPE_MISMATCH("Base<String>; Test")!>Test()<!>)
+    val x = takeBaseOfNotNullStrings(<!ARGUMENT_TYPE_MISMATCH("Test; Base<String>")!>Test()<!>)
 }

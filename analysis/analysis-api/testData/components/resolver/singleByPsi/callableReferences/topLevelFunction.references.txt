@@ -1,3 +1,0 @@
-KtCallExpression(37,51): 'consume(::foo)'
-  KtInvokeFunctionReference:
-    Nothing (Unresolved reference)

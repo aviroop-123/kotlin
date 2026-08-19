@@ -9,6 +9,7 @@ import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.config.LanguageFeature.*
 import org.jetbrains.kotlin.fir.checkers.generator.diagnostics.model.DiagnosticList
 import org.jetbrains.kotlin.fir.checkers.generator.diagnostics.model.PositioningStrategy
+import org.jetbrains.kotlin.fir.checkers.generator.diagnostics.model.upperBoundViolatedDiagnosticInit
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirFieldSymbol
@@ -53,7 +54,7 @@ object JVM_DIAGNOSTICS_LIST : DiagnosticList("FirJvmErrors") {
         val JVM_EXPOSE_BOXED_CANNOT_EXPOSE_LOCALS by error<PsiElement>()
         val JVM_EXPOSE_BOXED_CANNOT_EXPOSE_REIFIED by error<PsiElement>()
 
-        val WRONG_NULLABILITY_FOR_JAVA_OVERRIDE by warning<PsiElement>(PositioningStrategy.OVERRIDE_MODIFIER) {
+        val WRONG_TYPE_FOR_JAVA_OVERRIDE by warning<PsiElement>(PositioningStrategy.OVERRIDE_MODIFIER) {
             parameter<FirCallableSymbol<*>>("override")
             parameter<FirCallableSymbol<*>>("base")
         }
@@ -76,6 +77,8 @@ object JVM_DIAGNOSTICS_LIST : DiagnosticList("FirJvmErrors") {
         val PROPERTY_HIDES_JAVA_FIELD by warning<KtCallableDeclaration>(PositioningStrategy.DECLARATION_NAME) {
             parameter<FirFieldSymbol>("hidden")
         }
+
+        val CONFLICT_VERSION_AND_JVM_OVERLOADS_ANNOTATION by warning<PsiElement>()
     }
 
     val TYPES by object : DiagnosticGroup("Types") {
@@ -89,7 +92,11 @@ object JVM_DIAGNOSTICS_LIST : DiagnosticList("FirJvmErrors") {
             parameter<ConeKotlinType>("expectedType")
             parameter<String>("messageSuffix")
         }
-        val NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement> {
+        val RECEIVER_MUTABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement> {
+            parameter<ConeKotlinType>("actualType")
+            parameter<ClassId>("expectedType")
+        }
+        val TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement> {
             parameter<ConeKotlinType>("actualType")
             parameter<ConeKotlinType>("expectedType")
             parameter<String>("messageSuffix")
@@ -109,18 +116,20 @@ object JVM_DIAGNOSTICS_LIST : DiagnosticList("FirJvmErrors") {
             parameter<ConeKotlinType>("actualType")
             parameter<ConeKotlinType>("expectedType")
         }
+
+        val UNEXHAUSTIVE_WHEN_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement>(PositioningStrategy.WHEN_EXPRESSION) {
+            parameter<ConeKotlinType>("subjectType")
+        }
     }
 
     val TYPE_PARAMETERS by object : DiagnosticGroup("Type parameters") {
         val UPPER_BOUND_CANNOT_BE_ARRAY by error<PsiElement>()
-        val UPPER_BOUND_VIOLATED_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement> {
-            parameter<ConeKotlinType>("expectedUpperBound")
-            parameter<ConeKotlinType>("actualUpperBound")
-        }
-        val UPPER_BOUND_VIOLATED_IN_TYPEALIAS_EXPANSION_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement> {
-            parameter<ConeKotlinType>("expectedUpperBound")
-            parameter<ConeKotlinType>("actualUpperBound")
-        }
+        val UPPER_BOUND_VIOLATED_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement>(
+            init = upperBoundViolatedDiagnosticInit()
+        )
+        val UPPER_BOUND_VIOLATED_IN_TYPEALIAS_EXPANSION_BASED_ON_JAVA_ANNOTATIONS by warning<PsiElement>(
+            init = upperBoundViolatedDiagnosticInit()
+        )
     }
 
     val ANNOTATIONS by object : DiagnosticGroup("annotations") {
@@ -130,7 +139,7 @@ object JVM_DIAGNOSTICS_LIST : DiagnosticList("FirJvmErrors") {
         val SYNCHRONIZED_IN_ANNOTATION by deprecationError<KtAnnotationEntry>(ForbidJvmAnnotationsOnAnnotationParameters)
         val SYNCHRONIZED_ON_INLINE by warning<KtAnnotationEntry>()
         val SYNCHRONIZED_ON_VALUE_CLASS by deprecationError<KtAnnotationEntry>(ProhibitSynchronizationByValueClassesAndPrimitives)
-        val SYNCHRONIZED_ON_SUSPEND by deprecationError<KtAnnotationEntry>(SynchronizedSuspendError)
+        val SYNCHRONIZED_ON_SUSPEND_ERROR by error<KtAnnotationEntry>()
         val OVERLOADS_WITHOUT_DEFAULT_ARGUMENTS by warning<KtAnnotationEntry>()
         val OVERLOADS_ABSTRACT by error<KtAnnotationEntry>()
         val OVERLOADS_INTERFACE by error<KtAnnotationEntry>()
@@ -176,6 +185,7 @@ object JVM_DIAGNOSTICS_LIST : DiagnosticList("FirJvmErrors") {
         val ENUM_JVM_RECORD by error<PsiElement>(PositioningStrategy.ENUM_MODIFIER)
         val JVM_RECORD_WITHOUT_PRIMARY_CONSTRUCTOR_PARAMETERS by error<PsiElement>()
         val NON_DATA_CLASS_JVM_RECORD by error<PsiElement>()
+        val NON_DATA_VALUE_CLASS_JVM_RECORD by error<PsiElement>()
         val JVM_RECORD_NOT_VAL_PARAMETER by error<PsiElement>()
         val JVM_RECORD_NOT_LAST_VARARG_PARAMETER by error<PsiElement>()
         val INNER_JVM_RECORD by error<PsiElement>(PositioningStrategy.INNER_MODIFIER)
@@ -185,6 +195,7 @@ object JVM_DIAGNOSTICS_LIST : DiagnosticList("FirJvmErrors") {
             parameter<ConeKotlinType>("superType")
         }
         val ILLEGAL_JAVA_LANG_RECORD_SUPERTYPE by error<PsiElement>()
+        val JVM_RECORDS_ILLEGAL_BYTECODE_TARGET by error<PsiElement>()
     }
 
     val MODULES by object : DiagnosticGroup("JVM Modules") {

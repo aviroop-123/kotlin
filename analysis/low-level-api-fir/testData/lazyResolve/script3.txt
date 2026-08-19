@@ -475,7 +475,7 @@ FILE: [ResolvedTo(IMPORTS)] script3.kts
 
         public? final? [ResolvedTo(RAW_FIR)] [ScriptTopLevelDeclaration=true] fun unusedFunction(): <implicit> { LAZY_BLOCK }
 
-        public final [ResolvedTo(CONTRACTS)] [ScriptTopLevelDeclaration=true] fun build([ResolvedTo(CONTRACTS)] action: R|() -> kotlin/Unit|): R|kotlin/Unit| { LAZY_BLOCK }
+        public final [ResolvedTo(STATUS)] [ScriptTopLevelDeclaration=true] fun build([ResolvedTo(STATUS)] action: R|() -> kotlin/Unit|): R|kotlin/Unit| { LAZY_BLOCK }
 
         public final [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] var unusedVariable: R|kotlin/Int| = Int(4)
             public [ResolvedTo(BODY_RESOLVE)] get(): R|kotlin/Int|
@@ -486,7 +486,7 @@ FILE: [ResolvedTo(IMPORTS)] script3.kts
             public [ResolvedTo(BODY_RESOLVE)] set([ResolvedTo(BODY_RESOLVE)] value: R|kotlin/String|): R|kotlin/Unit|
 
         [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] init {
-            R|/build|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=kotlin/Function0<kotlin/Unit>] build@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            R|/build|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=() -> kotlin/Unit] build@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
                 local final [ResolvedTo(BODY_RESOLVE)] class A : R|kotlin/Any| {
                     public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=A] constructor(): R|<local>/A| {
                         super<R|kotlin/Any|>()
@@ -543,7 +543,7 @@ FILE: [ResolvedTo(BODY_RESOLVE)] script3.kts
             public [ResolvedTo(BODY_RESOLVE)] set([ResolvedTo(BODY_RESOLVE)] value: R|kotlin/String|): R|kotlin/Unit|
 
         [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] init {
-            R|/build|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=kotlin/Function0<kotlin/Unit>] build@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
+            R|/build|(<L> = [ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=() -> kotlin/Unit] build@fun <anonymous>(): R|kotlin/Unit| <inline=NoInline>  {
                 local final [ResolvedTo(BODY_RESOLVE)] class A : R|kotlin/Any| {
                     public [ResolvedTo(BODY_RESOLVE)] [ContainingClassKey=A] constructor(): R|<local>/A| {
                         super<R|kotlin/Any|>()
@@ -561,4 +561,3 @@ FILE: [ResolvedTo(BODY_RESOLVE)] script3.kts
         [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] init {
             R|/variable| = String(1)
         }
-

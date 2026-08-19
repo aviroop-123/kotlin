@@ -6,10 +6,11 @@
 package org.jetbrains.kotlin.konan.test.blackbox.support.runner
 
 import org.jetbrains.kotlin.konan.test.blackbox.support.LoggedData
-import org.jetbrains.kotlin.test.services.JUnit5Assertions.assertTrue
+import org.jetbrains.kotlin.test.TestInfrastructureException
+import org.opentest4j.MultipleFailuresError
 import org.opentest4j.TestAbortedException
 
-internal abstract class AbstractRunner<R> : Runner<R> {
+abstract class AbstractRunner<R> : Runner<R> {
     protected abstract fun buildRun(): AbstractRun
     protected abstract fun buildResultHandler(runResult: RunResult): AbstractResultHandler<R>
     protected abstract fun getLoggedParameters(): LoggedData.TestRunParameters
@@ -22,7 +23,7 @@ internal abstract class AbstractRunner<R> : Runner<R> {
         resultHandler.handle()
     } catch (t: Throwable) {
         when (t) {
-            is AssertionError, is TestAbortedException -> throw t
+            is AssertionError, is TestAbortedException, is TestInfrastructureException -> throw t
             else -> {
                 // An unexpected failure.
                 handleUnexpectedFailure(t)
@@ -35,11 +36,15 @@ internal abstract class AbstractRunner<R> : Runner<R> {
     }
 }
 
-internal abstract class AbstractResultHandler<R>(protected val runResult: RunResult) {
+abstract class AbstractResultHandler<R>(protected val runResult: RunResult) {
     abstract fun getLoggedRun(): LoggedData
     abstract fun handle(): R
 
-    protected inline fun verifyExpectation(shouldBeTrue: Boolean, crossinline errorMessage: () -> String) {
-        assertTrue(shouldBeTrue) { getLoggedRun().withErrorMessage(errorMessage()) }
+    protected fun verifyExpectation(shouldBeTrue: Boolean, failedResults: List<TestRunCheck.Result.Failed>, errorMessage: () -> String) {
+        if (!shouldBeTrue) {
+            val message = getLoggedRun().withErrorMessage(errorMessage())
+            val causes = failedResults.mapNotNull { it.cause }
+            throw MultipleFailuresError(message, causes)
+        }
     }
 }

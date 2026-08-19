@@ -1,10 +1,10 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
     compileOnly(project(":compiler:cli"))
+    compileOnly(project(":compiler:frontend.common-psi"))
     compileOnly(project(":compiler:ir.backend.common"))
     compileOnly(project(":compiler:ir.tree"))
     compileOnly(intellijCore())

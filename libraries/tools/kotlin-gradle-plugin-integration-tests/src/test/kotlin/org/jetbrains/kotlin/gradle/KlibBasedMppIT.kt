@@ -25,14 +25,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 
-@DisplayName("KLibs in K1")
+@DisplayName("KLibs in K2")
 @MppGradlePluginTests
 open class KlibBasedMppIT : KGPBaseTest() {
 
     override val defaultBuildOptions: BuildOptions = super.defaultBuildOptions
-        .copyEnsuringK1()
+        .copyEnsuringK2()
         // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-        .copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED)
+        .disableIsolatedProjectsBecauseOfJsAndWasmKT75899()
 
     @DisplayName("Could be compiled with project dependency")
     @GradleTest
@@ -383,8 +383,7 @@ open class KlibBasedMppIT : KGPBaseTest() {
     private fun classpathHasKNStdlib(classpath: Iterable<String>) = classpath.any { "klib/common/stdlib" in it.replace("\\", "/") }
 
     private fun BuildResult.getClasspath(taskPath: String): Iterable<String> {
-        val argsPrefix = " $taskPath Kotlin compiler args:"
-        return output.lines().single { argsPrefix in it }
+        return output.lines().single { it.startsWith(taskPath) && "Kotlin compiler args:" in it }
             .substringAfter("-classpath ").substringBefore(" -").split(File.pathSeparator)
     }
 

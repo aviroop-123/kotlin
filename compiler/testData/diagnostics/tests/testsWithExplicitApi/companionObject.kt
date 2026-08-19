@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
-// SKIP_TXT
 
 public class Bar {
     <!NO_EXPLICIT_VISIBILITY_IN_API_MODE!>companion object<!> {}

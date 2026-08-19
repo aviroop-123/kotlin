@@ -5,9 +5,8 @@
 
 package org.jetbrains.kotlin.konan.test.blackbox.support
 
-import org.jetbrains.kotlin.backend.common.linkage.partial.PartialLinkageConfig
-import org.jetbrains.kotlin.backend.common.linkage.partial.PartialLinkageLogLevel
-import org.jetbrains.kotlin.backend.common.linkage.partial.PartialLinkageMode
+import org.jetbrains.kotlin.config.PartialLinkageConfig
+import org.jetbrains.kotlin.config.PartialLinkageLogLevel
 import org.jetbrains.kotlin.config.nativeBinaryOptions.GC
 import org.jetbrains.kotlin.config.nativeBinaryOptions.GCSchedulerType
 import org.jetbrains.kotlin.konan.target.Distribution
@@ -38,6 +37,7 @@ import org.junit.jupiter.api.extension.ExtensionContext
 import org.junit.jupiter.api.extension.TestInstancePostProcessor
 import java.io.File
 import java.net.URLClassLoader
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.findAnnotation
@@ -89,6 +89,15 @@ fun copyNativeHomeProperty() {
 
 object NativeTestSupport {
     private val NAMESPACE = ExtensionContext.Namespace.create(NativeTestSupport::class.java.simpleName)
+
+    /**
+     * Process-wide guard for [setUpMemoryTracking]. The JUnit Platform store's `getOrComputeIfAbsent`
+     * does not always invoke its factory exactly once under the project's parallel custom grouping engine
+     * (see junit-team/junit-framework#5171), so the lambda passed to [getOrCreateTestProcessSettings] may be
+     * executed by more than one thread. This flag ensures the non-idempotent parts of memory tracking
+     * (`MemoryTracker.startTracking` and the close hook registration) run at most once per JVM.
+     */
+    private val memoryTrackingStarted = AtomicBoolean(false)
 
     /*************** Test process settings ***************/
 
@@ -156,6 +165,12 @@ object NativeTestSupport {
     private fun ExtensionContext.setUpMemoryTracking() {
         if (ProcessLevelProperty.TEAMCITY.readValue().toBoolean())
             return // Don't track memory when running at TeamCity. It tracks memory by itself.
+
+        // The enclosing `getOrComputeIfAbsent` lambda may execute more than once under concurrent calls
+        // (see junit-team/junit-framework#5171). The calls below (`MemoryTracker.startTracking` and the
+        // `root.getStore(...).put(...)` of the close hook) are not idempotent, so gate them with a
+        // process-wide flag to make this method safe to invoke multiple times per JVM.
+        if (!memoryTrackingStarted.compareAndSet(false, true)) return
 
         TestLogger.initialize() // Initialize special logging (directly to Gradle's console).
 
@@ -233,7 +248,6 @@ object NativeTestSupport {
         output += computeForcedNoopTestRunner(enforcedProperties)
         output += computeSharedExecutionTestRunner(enforcedProperties)
         // Parse annotations of current class, since there's no way to put annotations to upper-level enclosing class
-        output += computePipelineType(enforcedProperties, testClass.get())
         output += computeUsedPartialLinkageConfig(enclosingTestClass)
         output += computeCompilerOutputInterceptor(enforcedProperties)
         output += computeBinaryLibraryKind(enforcedProperties)
@@ -281,7 +295,7 @@ object NativeTestSupport {
             .readValue(
                 enforcedProperties,
                 transform = { str -> GC.entries.firstOrNull { it.shortcut == str.lowercase() } },
-                default = GC.PARALLEL_MARK_CONCURRENT_SWEEP
+                default = GC.CONCURRENT_MARK_AND_SWEEP
             ).let { GCType(it) }
 
     private fun computeGCScheduler(enforcedProperties: EnforcedProperties): GCScheduler =
@@ -292,8 +306,18 @@ object NativeTestSupport {
             enforcedProperties, { it.split(",") }, emptyList()
         ).let(::ExplicitBinaryOptions)
 
-    private fun computeAllocator(enforcedProperties: EnforcedProperties): Allocator =
-        ClassLevelProperty.ALLOCATOR.readValue(enforcedProperties, Allocator.values(), default = Allocator.UNSPECIFIED)
+    private fun computeAllocator(enforcedProperties: EnforcedProperties): Allocator {
+        val paged = ClassLevelProperty.PAGED_ALLOCATOR.readValue(
+            enforcedProperties,
+            transform = String::toBooleanStrictOrNull,
+            default = null
+        )?.let { if (it) Allocator.PAGED else Allocator.NOT_PAGED }
+        val legacy = ClassLevelProperty.ALLOCATOR.readValue(enforcedProperties, Allocator.values(), default = Allocator.UNSPECIFIED)
+        if (paged != null && legacy != Allocator.UNSPECIFIED) {
+            fail { "Both `pagedAllocator` and `alloc` can't be specified at the same time" }
+        }
+        return paged ?: legacy
+    }
 
     private fun computeNativeTargets(enforcedProperties: EnforcedProperties, hostManager: HostManager): KotlinNativeTargets {
         val hostTarget = HostManager.host
@@ -565,18 +589,6 @@ object NativeTestSupport {
         )
     }
 
-    private fun computePipelineType(enforcedProperties: EnforcedProperties, testClass: Class<*>): PipelineType {
-        val pipelineTypeFromPipelineAnnotation = if (testClass.annotations.any { it is ClassicPipeline })
-            PipelineType.K1
-        else PipelineType.K2
-
-        return ClassLevelProperty.PIPELINE_TYPE.readValue(
-            enforcedProperties,
-            PipelineType.entries.toTypedArray(),
-            default = pipelineTypeFromPipelineAnnotation
-        )
-    }
-
     private fun computeUsedPartialLinkageConfig(enclosingTestClass: Class<*>): UsedPartialLinkageConfig {
         val findPartialLinkageMode: (Class<*>) -> UsePartialLinkage.Mode? = { clazz ->
             clazz.allInheritedAnnotations.firstIsInstanceOrNull<UsePartialLinkage>()?.mode
@@ -584,12 +596,14 @@ object NativeTestSupport {
 
         val mode = findPartialLinkageMode(enclosingTestClass)
             ?: enclosingTestClass.declaredClasses.firstNotNullOfOrNull { findPartialLinkageMode(it) }
-            ?: UsePartialLinkage.Mode.ENABLED_WITH_ERROR // The default mode.
+            ?: UsePartialLinkage.Mode.ERROR // The default mode for testing.
 
         val config = when (mode) {
-            UsePartialLinkage.Mode.DISABLED -> PartialLinkageConfig(PartialLinkageMode.DISABLE, PartialLinkageLogLevel.ERROR)
-            UsePartialLinkage.Mode.DEFAULT -> PartialLinkageConfig(PartialLinkageMode.ENABLE, PartialLinkageLogLevel.DEFAULT)
-            UsePartialLinkage.Mode.ENABLED_WITH_ERROR -> PartialLinkageConfig(PartialLinkageMode.ENABLE, PartialLinkageLogLevel.ERROR)
+            UsePartialLinkage.Mode.DEFAULT -> PartialLinkageConfig.DEFAULT
+            UsePartialLinkage.Mode.SILENT -> PartialLinkageConfig(PartialLinkageLogLevel.SILENT)
+            UsePartialLinkage.Mode.INFO -> PartialLinkageConfig(PartialLinkageLogLevel.INFO)
+            UsePartialLinkage.Mode.WARNING -> PartialLinkageConfig(PartialLinkageLogLevel.WARNING)
+            UsePartialLinkage.Mode.ERROR -> PartialLinkageConfig(PartialLinkageLogLevel.ERROR)
         }
 
         return UsedPartialLinkageConfig(config)
@@ -630,7 +644,7 @@ object NativeTestSupport {
         )
     }
 
-    internal fun ExtensionContext.computeBlackBoxTestInstances(): NativeTestInstances<AbstractNativeBlackBoxTest> =
+    fun ExtensionContext.computeBlackBoxTestInstances(): NativeTestInstances<AbstractNativeBlackBoxTest> =
         NativeTestInstances(requiredTestInstances.allInstances)
 
     /*************** Test run settings (simplified) ***************/
@@ -680,7 +694,7 @@ object NativeTestSupport {
         } as TestRunProvider
 
     private fun createTestCaseGroupProvider(computedTestConfiguration: ComputedTestConfiguration): TestCaseGroupProvider {
-        val (testConfiguration: TestConfiguration, testConfigurationAnnotation: Annotation) = computedTestConfiguration
+        (val testConfiguration: TestConfiguration = configuration, val testConfigurationAnnotation: Annotation = annotation) = computedTestConfiguration
         val providerClass: KClass<out TestCaseGroupProvider> = testConfiguration.providerClass
 
         // Assumption: For simplicity’s sake TestCaseGroupProvider has just one constructor.

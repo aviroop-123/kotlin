@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.contracts
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.contracts.description.*
 import org.jetbrains.kotlin.contracts.description.expressions.*
@@ -32,6 +33,7 @@ import org.jetbrains.kotlin.storage.StorageManager
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.utils.addIfNotNull
 
+@K1Deprecation
 class ContractDeserializerImpl(
     private val configuration: DeserializationConfiguration,
     private val storageManager: StorageManager
@@ -96,6 +98,12 @@ class ContractDeserializerImpl(
                     else
                         EventOccurrencesRange.UNKNOWN
                     CallsEffectDeclaration(callable, invocationKind)
+                }
+
+                ProtoBuf.Effect.EffectType.RETURNS_RESULT_OF -> {
+                    val argument = proto.effectConstructorArgumentList.getOrNull(0) ?: return null
+                    val callable = extractVariable(argument) ?: return null
+                    ReturnsResultOfEffectDeclaration(callable)
                 }
             }
         }

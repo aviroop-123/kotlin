@@ -1,0 +1,177 @@
+/*
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ */
+
+package org.jetbrains.kotlin.gradle.plugin.abi.internal
+
+import org.gradle.api.Project
+import org.gradle.api.file.Directory
+import org.gradle.api.artifacts.ConfigurationContainer
+import org.gradle.api.file.ProjectLayout
+import org.gradle.api.file.RegularFile
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.TaskContainer
+import org.gradle.language.base.plugins.LifecycleBasePlugin
+import org.jetbrains.kotlin.compilerRunner.btapi.BuildSessionService
+import org.jetbrains.kotlin.gradle.dsl.abi.AbiValidationExtension
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.plugin.ABI_VALIDATION_COMPAT_CLASSPATH_CONFIGURATION_NAME
+import org.jetbrains.kotlin.gradle.plugin.BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME
+import org.jetbrains.kotlin.gradle.plugin.abi.internal.AbiValidationPaths.LEGACY_JVM_DUMP_EXTENSION
+import org.jetbrains.kotlin.gradle.plugin.abi.internal.AbiValidationPaths.LEGACY_KLIB_DUMP_EXTENSION
+import org.jetbrains.kotlin.gradle.tasks.abi.AbiToolsTask
+import org.jetbrains.kotlin.gradle.tasks.abi.KotlinAbiCheckTaskImpl
+import org.jetbrains.kotlin.gradle.tasks.abi.KotlinAbiDumpTaskImpl
+import org.jetbrains.kotlin.gradle.tasks.abi.KotlinAbiUpdateTask
+import org.jetbrains.kotlin.tooling.core.KotlinToolingVersion
+
+/**
+ * Configures the extension for Kotlin/JVM or Kotlin Android Gradle plugins.
+ */
+@ExperimentalAbiValidation
+internal fun AbiValidationExtensionImpl.configure(project: Project) {
+    referenceDumpDir.convention(project.layout.projectDirectory.dir(AbiValidationPaths.LEGACY_DEFAULT_REFERENCE_DUMP_DIR))
+    keepLocallyUnsupportedTargets.convention(true)
+}
+
+// Kotlin version where ABI validation was migrated to build tools API (BTA).
+private val KOTLIN_2_4_0_BETA2 = KotlinToolingVersion("2.4.0-Beta2")
+
+/**
+ * Configure [AbiToolsTask.buildToolsClasspath] to use either [BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME]
+ * or [ABI_VALIDATION_COMPAT_CLASSPATH_CONFIGURATION_NAME] classpath depending on a [compilerVersion].
+ *
+ * For [compilerVersion] prior [KOTLIN_2_4_0_BETA2] there is no ABI validation toolchain,
+ * so the latest 2.4.x toolchain will be used instead (it corresponds to [ABI_VALIDATION_COMPAT_CLASSPATH_CONFIGURATION_NAME]).
+ * For all other versions, the toolchain corresponding to [compilerVersion] will be used ([BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME]).
+ */
+private fun AbiToolsTask.configureClasspath(compilerVersion: Provider<String>, configurations: ConfigurationContainer) {
+    val actualBuildToolsClasspath = configurations.named(BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME)
+    val compatBuildToolsClasspath = configurations.named(ABI_VALIDATION_COMPAT_CLASSPATH_CONFIGURATION_NAME)
+    val configurationSelector =
+        compilerVersion.zip(compatBuildToolsClasspath) { providedCompilerVersion, providedCompatBuildToolsClasspath ->
+            val version = KotlinToolingVersion(providedCompilerVersion)
+            if (version < KOTLIN_2_4_0_BETA2) {
+                providedCompatBuildToolsClasspath
+            } else {
+                null
+            }
+        }.orElse(actualBuildToolsClasspath)
+    buildToolsClasspath.setFrom(configurationSelector)
+}
+
+/**
+ * Registers and preconfigures ABI validation's tasks.
+ */
+@ExperimentalAbiValidation
+internal fun AbiValidationExtension.registerTasks(
+    projectName: String,
+    tasks: TaskContainer,
+    layout: ProjectLayout,
+    buildSessionService: Provider<BuildSessionService>,
+    configurations: ConfigurationContainer,
+    compilerVersion: Provider<String>,
+) {
+    val klibFileName = "$projectName$LEGACY_KLIB_DUMP_EXTENSION"
+
+    val referenceDir = referenceDumpDir
+    val filters = filters
+    val dumpDir =
+        layout.buildDirectory.dir(AbiValidationPaths.ACTUAL_DUMP_DIR)
+
+    val dumpTaskProvider =
+        tasks.register(KotlinAbiDumpTaskImpl.NAME, KotlinAbiDumpTaskImpl::class.java) {
+            it.buildSessionService.convention(buildSessionService)
+            it.configureClasspath(compilerVersion, configurations)
+
+            it.dumpDir.convention(dumpDir)
+            it.referenceKlibDump.convention(referenceDir.map { dir -> dir.file(klibFileName) })
+            it.keepLocallyUnsupportedTargets.convention(true)
+
+            it.includedClasses.convention(filters.include.byNames)
+            it.includedAnnotatedWith.convention(filters.include.annotatedWith)
+            it.excludedClasses.convention(filters.exclude.byNames)
+            it.excludedAnnotatedWith.convention(filters.exclude.annotatedWith)
+
+            it.description = "Dumps the public Application Binary Interface (ABI) into files in the build directory."
+            // task should be hidden from the task list
+            it.group = null
+        }
+
+    val referenceFiles = dumpTaskProvider.map { task -> task.referenceDumps(referenceDir, projectName) }
+
+    val checkTaskProvider = tasks.register(KotlinAbiCheckTaskImpl.NAME, KotlinAbiCheckTaskImpl::class.java) {
+        it.buildSessionService.convention(buildSessionService)
+        it.configureClasspath(compilerVersion, configurations)
+
+        it.actualDir.convention(dumpTaskProvider.map { t -> t.dumpDir.get() })
+        it.referenceDir.convention(referenceDir)
+        it.referenceDumps.from(referenceFiles)
+
+        it.description = "Checks that the public Application Binary Interface (ABI) of the current project code matches" +
+                "the reference dump file"
+        it.group = LifecycleBasePlugin.VERIFICATION_GROUP
+    }
+
+    val updateTaskProvider = tasks.register(KotlinAbiUpdateTask.NAME, KotlinAbiUpdateTask::class.java) {
+        it.actualDir.convention(dumpTaskProvider.map { t -> t.dumpDir.get() })
+        it.referenceDir.convention(referenceDir)
+        it.referenceDumps.from(referenceFiles)
+
+        it.description = "Writes the public Application Binary Interface (ABI) of the current code to the reference dump file."
+        it.group = LifecycleBasePlugin.VERIFICATION_GROUP
+    }
+
+    /**
+     * Creating of the temporary tasks for backward compatibility with previous naming.
+     *
+     * Although BCV is still in an experimental state, some projects (for example, coroutines) use it,
+     * so it will be convenient if we implement a smooth migration method.
+     *
+     * Short deprecation cycle:
+     * - create tasks with old names and deprecation warnings (current state)
+     * - throw exception if tasks with old names are used
+     * - remove tasks with old names
+     */
+    val checkTaskName = checkTaskProvider.name
+    tasks.register("checkLegacyAbi") { task ->
+        task.dependsOn(checkTaskProvider)
+        task.doFirst {
+            val projectPath = it.path.substringBeforeLast(":")
+            it.logger.warn("Task ${it.path} is deprecated, use $projectPath:$checkTaskName instead")
+        }
+    }
+
+    val updateTaskName = updateTaskProvider.name
+    tasks.register("updateLegacyAbi") { task ->
+        task.dependsOn(updateTaskProvider)
+        task.doFirst {
+            val projectPath = it.path.substringBeforeLast(":")
+            it.logger.warn("Task ${it.path} is deprecated, use $projectPath:$updateTaskName instead")
+        }
+    }
+}
+
+private fun KotlinAbiDumpTaskImpl.referenceDumps(
+    referenceDir: Provider<Directory>,
+    projectName: String,
+): Provider<List<RegularFile>> {
+    val jvmDumpName = projectName + LEGACY_JVM_DUMP_EXTENSION
+    val klibDumpName = projectName + LEGACY_KLIB_DUMP_EXTENSION
+
+    return jvm.zip(referenceDir) { items, dir ->
+        val result = items.fold(mutableListOf<RegularFile>()) { acc, jvmTargetInfo ->
+            if (jvmTargetInfo.subdirectoryName.isEmpty()) {
+                acc.add(dir.file(jvmDumpName))
+            } else {
+                acc.add(dir.dir(jvmTargetInfo.subdirectoryName).file(jvmDumpName))
+            }
+            acc
+        }
+        // always include klib dump file. Because klib dump can be inferred even if there are no any available Klib targets.
+        // It can be skipped during check if this file does not exist
+        result.add(dir.file(klibDumpName))
+        result.toList()
+    }
+}

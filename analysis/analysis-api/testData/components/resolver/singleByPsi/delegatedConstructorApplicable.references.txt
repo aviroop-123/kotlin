@@ -1,3 +1,0 @@
-KtNameReferenceExpression(37,38): 'A'
-  KtSimpleNameReference:
-    (in A) constructor(x: kotlin.Int)

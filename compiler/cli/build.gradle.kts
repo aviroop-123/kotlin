@@ -1,18 +1,23 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("gradle-plugin-compiler-dependency-configuration")
 }
 
 dependencies {
     api(project(":compiler:util"))
     api(project(":compiler:cli-base"))
-    api(project(":compiler:frontend"))
-    api(project(":compiler:backend-common"))
+    implementation(project(":compiler:container"))
+    implementation(project(":compiler:frontend"))
+    implementation(project(":compiler:frontend.java"))
+    implementation(project(":compiler:frontend:cfg"))
+    implementation(project(":compiler:config.jvm"))
+    implementation(project(":core:descriptors"))
+    implementation(project(":core:descriptors.jvm"))
+    api(project(":compiler:ir.backend.common"))
     api(project(":compiler:backend"))
     implementation(project(":compiler:backend.jvm.entrypoint"))
-    api(project(":compiler:serialization"))
-    api(project(":compiler:plugin-api"))
+    implementation(project(":compiler:serialization"))
+    implementation(project(":analysis:light-classes-base"))
     api(commonDependency("org.fusesource.jansi", "jansi"))
     api(project(":compiler:fir:raw-fir:psi2fir"))
     api(project(":compiler:fir:resolve"))
@@ -28,19 +33,22 @@ dependencies {
     api(project(":compiler:fir:checkers:checkers.native"))
     api(project(":compiler:fir:checkers:checkers.wasm"))
     api(project(":compiler:fir:fir-serialization"))
-    api(project(":compiler:ir.inline"))
     api(project(":kotlin-util-io"))
+    implementation(project(":kotlin-build-common"))
+    implementation(project(":js:js.config"))
+    implementation(project(":native:native.config"))
+    implementation(project(":wasm:wasm.config"))
+    implementation(project(":wasm:wasm.frontend"))
 
     compileOnly(toolsJarApi())
     compileOnly(intellijCore())
     compileOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
+    compileOnly(commonDependency("org.jetbrains.intellij.deps:jdom:2.0.6"))
+    compileOnly(libs.kotlinx.coroutines.core.jvm)
 }
 
 sourceSets {
-    "main" {
-        projectDefault()
-        java.srcDirs("../builtins-serializer/src")
-    }
+    "main" { projectDefault() }
 }
 
 optInToExperimentalCompilerApi()

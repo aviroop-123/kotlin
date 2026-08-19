@@ -26,6 +26,9 @@ import org.jetbrains.kotlin.fir.types.isSuspendOrKSuspendFunctionType
 import org.jetbrains.kotlin.name.JvmStandardClassIds.SYNCHRONIZED_ANNOTATION_CLASS_ID
 
 object FirSynchronizedAnnotationChecker : FirFunctionChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirFunction) {
         val session = context.session
@@ -38,7 +41,7 @@ object FirSynchronizedAnnotationChecker : FirFunctionChecker(MppCheckerKind.Comm
         if (declaration.isSuspend ||
             (declaration as? FirAnonymousFunction)?.typeRef?.coneType?.isSuspendOrKSuspendFunctionType(session) == true
         ) {
-            reporter.reportOn(annotation.source, FirJvmErrors.SYNCHRONIZED_ON_SUSPEND)
+            reporter.reportOn(annotation.source, FirJvmErrors.SYNCHRONIZED_ON_SUSPEND_ERROR)
             return
         }
 

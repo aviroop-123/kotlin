@@ -101,13 +101,42 @@ class BuildFusStatisticsIT : KGPDaemonsBaseTest() {
                             1
                         )
 
-                        //from main project
+                        //from the main project
+                        assertOutputContainsExactlyTimes(
+                            "[KOTLIN] Initialize build service FlowActionBuildFusService${'$'}Inject",
+                            1
+                        )
+                    }
+                    // Since Gradle 9.0
+                    gradleVersion < GradleVersion.version(TestVersions.Gradle.G_9_4) -> {
+                        assertOutputContainsExactlyTimes(
+                            "class org.jetbrains.kotlin.gradle.plugin.statistics.KotlinBuildStatsBeanService_v2 is already instantiated in another classpath",
+                            1
+                        )
+                        assertOutputContainsExactlyTimes(
+                            "class org.jetbrains.kotlin.gradle.plugin.statistics.KotlinBuildStatsBeanService is already instantiated in another classpath",
+                            1
+                        )
+
+                        // Old service is not registered neither by main or buildSrc builds
+                        assertOutputContainsExactlyTimes(
+                            "[KOTLIN] Initialize BuildFusService${'$'}Inject",
+                            0
+                        )
+
+                        //from buildSrc project
                         assertOutputContainsExactlyTimes(
                             "[KOTLIN] Initialize FlowActionBuildFusService${'$'}Inject",
                             1
                         )
+
+                        //from main project
+                        assertOutputContainsExactlyTimes(
+                            "[KOTLIN] Initialize build service FlowActionBuildFusService${'$'}Inject",
+                            1
+                        )
                     }
-                    // Since Gradle 9.0 TBA
+                    // Since Gradle 9.4
                     else -> {
                         assertOutputContainsExactlyTimes(
                             "class org.jetbrains.kotlin.gradle.plugin.statistics.KotlinBuildStatsBeanService_v2 is already instantiated in another classpath",
@@ -124,9 +153,15 @@ class BuildFusStatisticsIT : KGPDaemonsBaseTest() {
                             0
                         )
 
-                        //from buildSrc and main project
+                        //from buildSrc project
                         assertOutputContainsExactlyTimes(
                             "[KOTLIN] Initialize FlowActionBuildFusService${'$'}Inject",
+                            0
+                        )
+
+                        //from main project
+                        assertOutputContainsExactlyTimes(
+                            "[KOTLIN] Initialize build service FlowActionBuildFusService${'$'}Inject",
                             2
                         )
                     }

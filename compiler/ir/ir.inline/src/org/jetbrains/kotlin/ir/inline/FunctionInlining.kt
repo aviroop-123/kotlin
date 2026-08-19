@@ -6,19 +6,18 @@
 package org.jetbrains.kotlin.ir.inline
 
 import org.jetbrains.kotlin.backend.common.*
-import org.jetbrains.kotlin.backend.common.ir.PreSerializationSymbols
+import org.jetbrains.kotlin.backend.common.lower.ArrayConstructorLowering
 import org.jetbrains.kotlin.backend.common.lower.at
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.builtins.StandardNames
-import org.jetbrains.kotlin.contracts.parsing.ContractsDslNames
+import org.jetbrains.kotlin.resolve.ContractsDslNames
 import org.jetbrains.kotlin.ir.IrElement
+import org.jetbrains.kotlin.ir.IrFileEntry
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.*
-import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
 import org.jetbrains.kotlin.ir.builders.at
-import org.jetbrains.kotlin.ir.builders.irBlock
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irTemporary
 import org.jetbrains.kotlin.ir.declarations.*
@@ -34,14 +33,36 @@ import org.jetbrains.kotlin.ir.visitors.*
 import org.jetbrains.kotlin.name.Name.identifier
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
+import java.util.ArrayDeque
 
-@PhaseDescription("FunctionInlining")
-class FunctionInlining(
+@PhasePrerequisites(
+    ArrayConstructorLowering::class,
+//    OuterThisInInlineFunctionsSpecialAccessorLowering::class // for public inline only
+//    InlineCallCycleCheckerLowering::class // only on the first stage
+)
+abstract class FunctionInlining(
     val context: LoweringContext,
     private val inlineFunctionResolver: InlineFunctionResolver,
 ) : IrTransformer<IrDeclaration>(), BodyLoweringPass {
+    private val fileEntriesStack = ArrayDeque<IrFileEntry>()
+
+    private inline fun <T> withFileEntry(newFileEntry: IrFileEntry, block: () -> T): T {
+        fileEntriesStack.addLast(newFileEntry)
+        val result = block()
+        fileEntriesStack.removeLast()
+        return result
+    }
+
     override fun lower(irBody: IrBody, container: IrDeclaration) {
-        irBody.accept(this, container)
+        withFileEntry(container.fileEntry) {
+            irBody.accept(this, container)
+        }
+    }
+
+    override fun visitInlinedFunctionBlock(inlinedBlock: IrInlinedFunctionBlock, data: IrDeclaration): IrExpression {
+        return withFileEntry(inlinedBlock.inlinedFunctionFileEntry) {
+            super.visitInlinedFunctionBlock(inlinedBlock, data)
+        }
     }
 
     override fun visitDeclaration(declaration: IrDeclarationBase, data: IrDeclaration): IrStatement {
@@ -56,10 +77,10 @@ class FunctionInlining(
     override fun visitFunctionAccess(expression: IrFunctionAccessExpression, data: IrDeclaration): IrExpression {
         expression.transformChildren(this, data)
 
-        val actualCallee = inlineFunctionResolver.getFunctionDeclarationToInline(expression) ?: return expression
-        if (expression is IrCall && PreSerializationSymbols.isTypeOfIntrinsic(actualCallee.symbol)) {
+        if (expression.isTypeOfIntrinsicCall()) {
             return expression
         }
+        val actualCallee = inlineFunctionResolver.getFunctionDeclarationToInline(expression) ?: return expression
         if (actualCallee.body == null) {
             return expression
         }
@@ -72,20 +93,26 @@ class FunctionInlining(
         }
 
         return CallInlining(
-            context,
-            data.file,
+            context = context,
+            currentFileEntry = fileEntriesStack.getLast(),
+            currentFile = data.file,
             parent = data as? IrDeclarationParent ?: data.parent
         ).inline(expression, actualCallee)
     }
 }
 
+/**
+ * @property currentFileEntry The effective [IrFileEntry]. Initially, it's the same as [IrFile.fileEntry].
+ *  But it's changed each time when we cross the [IrInlinedFunctionBlock] boundary.
+ * @property currentFile The currently processed [IrFile].
+ */
 private class CallInlining(
     private val context: LoweringContext,
+    private val currentFileEntry: IrFileEntry,
     private val currentFile: IrFile,
     private val parent: IrDeclarationParent
 ) {
     private val parents = (parent as? IrDeclaration)?.parentsWithSelf?.toSet() ?: setOf(parent)
-    private val elementsWithLocationToPatch = hashSetOf<IrGetValue>()
 
     // Callee can be different from callSite.symbol if resolver returned a non-trivial result.
     // For example, if it is a call of function from another module, callSite.symbol can be equal to lazy function,
@@ -97,13 +124,15 @@ private class CallInlining(
         inlineFunction(
             callSite = callSite,
             callee = callee,
-            inlinedFunctionSymbol = ((callee as? IrSimpleFunction)?.originalOfPreparedInlineFunctionCopy ?: callee).symbol
+            inlinedFunctionSymbol = ((callee as? IrSimpleFunction)?.originalOfPreparedInlineFunctionCopy ?: callee).symbol,
+            callee.fileEntry,
         ).patchDeclarationParents(parent)
 
     private fun inlineFunction(
         callSite: IrFunctionAccessExpression,
         callee: IrFunction,
         inlinedFunctionSymbol: IrFunctionSymbol?,
+        inlineFileEntry: IrFileEntry,
     ): IrExpression {
         val copiedCallee = run {
             val allTypeParameters = extractTypeParameters(callee)
@@ -115,7 +144,7 @@ private class CallInlining(
                 notAccessibleTypeParameters.filter { !it.isReified }.forEach { put(it.symbol, null) }
 
                 // Substitute reified type parameters with concrete type arguments
-                for ((index, typeArgument) in callSite.typeArguments.withIndex()) {
+                for ([index, typeArgument] in callSite.typeArguments.withIndex()) {
                     if (!callee.typeParameters[index].isReified || typeArgument == null) continue
                     put(callee.typeParameters[index].symbol, typeArgument)
                 }
@@ -128,7 +157,8 @@ private class CallInlining(
 
         val outerIrBuilder = context.createIrBuilder(copiedCallee.symbol, callSite.startOffset, callSite.endOffset)
 
-        val substituteMap = mutableMapOf<IrValueParameter, IrExpression>()
+        val parameterToTempVariable = mutableMapOf<IrValueParameterSymbol, IrValueSymbol>()
+        val parameterToLambda = mutableMapOf<IrValueParameterSymbol, IrRichCallableReference<*>>()
         val functionStatements = (copiedCallee.body as? IrBlockBody)?.statements
             ?: error("Body not found for function ${callee.render()}")
 
@@ -141,13 +171,15 @@ private class CallInlining(
                     inlinedFunctionEndOffset = callee.endOffset,
                     resultType = returnType,
                     inlinedFunctionSymbol = inlinedFunctionSymbol,
-                    inlinedFunctionFileEntry = callee.fileEntry,
+                    inlinedFunctionFileEntry = inlineFileEntry,
                     origin = null,
                 ) {
                     evaluateArguments(
                         callSiteBuilder = this@irBlockOrSingleExpression,
                         inlinedBlockBuilder = this@irInlinedFunctionBlock,
-                        callSite, copiedCallee, substituteMap
+                        callSite, copiedCallee,
+                        parameterToTempVariable,
+                        parameterToLambda,
                     )
                     +functionStatements
                     // Insert a return statement for the function that is supposed to return Unit
@@ -160,7 +192,7 @@ private class CallInlining(
                     }
                 }
                 val transformer = InlinePostprocessor(
-                    substituteMap, returnType, copiedCallee.symbol,
+                    parameterToTempVariable, parameterToLambda, returnType, copiedCallee.symbol,
                     returnableBlockSymbol
                 )
                 inlinedFunctionBlock.transformChildrenVoid(transformer)
@@ -180,7 +212,8 @@ private class CallInlining(
      * * Replace invoke calls on inlineable function parameters with recursive inlining
      */
     private inner class InlinePostprocessor(
-        val substituteMap: Map<IrValueParameter, IrExpression>,
+        val parameterToTempVariable: Map<IrValueParameterSymbol, IrValueSymbol>,
+        val parameterToLambda: Map<IrValueParameterSymbol, IrRichCallableReference<*>>,
         val returnType: IrType,
         val inlinedFunctionSymbol: IrFunctionSymbol,
         val returnableBlockSymbol: IrReturnableBlockSymbol,
@@ -207,16 +240,17 @@ private class CallInlining(
 
         override fun visitGetValue(expression: IrGetValue): IrExpression {
             val newExpression = super.visitGetValue(expression) as IrGetValue
-            val argument = substituteMap[newExpression.symbol.owner] ?: return newExpression
+            parameterToTempVariable[newExpression.symbol]?.let {
+                return IrGetValueImpl(newExpression.startOffset, newExpression.endOffset, it, newExpression.origin)
+            }
 
-            argument.transformChildrenVoid(this) // Default argument can contain subjects for substitution.
+            parameterToLambda[newExpression.symbol]?.let {
+                val copy = it.deepCopyWithSymbols()
+                copy.transformChildrenVoid()
+                return copy
+            }
 
-            return argument.deepCopyWithSymbols().apply {
-                if (argument is IrGetValue && argument in elementsWithLocationToPatch) {
-                    startOffset = newExpression.startOffset
-                    endOffset = newExpression.endOffset
-                }
-            }.doImplicitCastIfNeededTo(newExpression.type)
+            return newExpression
         }
 
         private fun IrCall.bindInlineReference(inlineReference: IrRichCallableReference<*>): IrCall {
@@ -246,12 +280,8 @@ private class CallInlining(
             // Here `isFunctionInvokeCall` guarantees that `expression` is call of `Function.invoke`.
             // So `expression.arguments.first()` is exactly dispatch receiver and not some other parameter.
             val dispatchReceiver = expression.arguments.firstOrNull()?.unwrapAdditionalImplicitCastsIfNeeded() as? IrGetValue
-            val parameterToInline = dispatchReceiver?.symbol?.owner as? IrValueParameter ?: return super.visitCall(expression)
-            val lambdaToInline = substituteMap[parameterToInline]
-            if (parameterToInline.isNoinline || lambdaToInline !is IrRichCallableReference<*>) {
-                return super.visitCall(expression)
-            }
-
+            val parameterSymbolToInline = dispatchReceiver?.symbol ?: return super.visitCall(expression)
+            val lambdaToInline = parameterToLambda[parameterSymbolToInline] ?: return super.visitCall(expression)
             val callToInline = expression.bindInlineReference(lambdaToInline)
 
             // Inline the lambda. Lambda parameters will be substituted with lambda arguments.
@@ -259,6 +289,7 @@ private class CallInlining(
                 callSite = callToInline,
                 callee = callToInline.symbol.owner,
                 inlinedFunctionSymbol = null,
+                currentFileEntry,
             )
 
             // Substitute lambda arguments with target function arguments.
@@ -271,7 +302,7 @@ private class CallInlining(
     // Contracts can appear only in K1 mode. In K2, they are dropped on the FIR2IR phase.
     private fun IrCall.isContractCall(): Boolean {
         return symbol.isBound && symbol.owner.annotations.any {
-            it.symbol.isBound && it.symbol.owner.parentAsClass.hasEqualFqName(ContractsDslNames.CONTRACTS_DSL_ANNOTATION_FQN)
+            it.isAnnotationWithEqualFqName(ContractsDslNames.CONTRACTS_DSL_ANNOTATION_FQN)
         }
     }
 
@@ -339,14 +370,15 @@ private class CallInlining(
 
     private fun evaluateArguments(
         callSiteBuilder: IrStatementsBuilder<*>,
-        inlinedBlockBuilder: IrStatementsBuilder<*>,
+        inlinedBlockBuilder: IrInlinedFunctionBlockBuilder,
         callSite: IrFunctionAccessExpression,
         callee: IrFunction,
-        substituteMap: MutableMap<IrValueParameter, IrExpression>
+        parameterToTempVariable: MutableMap<IrValueParameterSymbol, IrValueSymbol>,
+        parameterToLambda: MutableMap<IrValueParameterSymbol, IrRichCallableReference<*>>,
     ) {
-        for ((parameter, argument) in callee.parameters.zip(callSite.arguments)) {
+        for ([parameter, argument] in callee.parameters.zip(callSite.arguments)) {
             val isDefaultArg = argument == null && parameter.defaultValue != null
-            val variableInitializer = when {
+            val argumentValue = when {
                 argument != null -> argument
                 parameter.defaultValue != null -> parameter.defaultValue!!.expression
                 parameter.varargElementType != null -> callSiteBuilder.emptyVararg(parameter)
@@ -358,14 +390,14 @@ private class CallInlining(
              * For simplicity and to produce simpler IR we don't create temporaries for every immutable variable,
              * not only for those referring to inlinable lambdas.
              */
-            if (parameter.isInlineParameter() && variableInitializer is IrRichCallableReference<*>) {
+            if (parameter.isInlineParameter() && argumentValue is IrRichCallableReference<*>) {
                 val evaluationBuilder = if (isDefaultArg) inlinedBlockBuilder else callSiteBuilder
                 // If function reference has bound values, they need to be computed in advance, not at call-site
                 // So, we store them to local variables, if they are untrivial
-                substituteMap[parameter] = variableInitializer
-                for (index in variableInitializer.boundValues.indices) {
-                    val irExpression = variableInitializer.boundValues[index]
-                    val boundParameter = variableInitializer.invokeFunction.parameters[index]
+                parameterToLambda[parameter.symbol] = argumentValue
+                for (index in argumentValue.boundValues.indices) {
+                    val irExpression = argumentValue.boundValues[index]
+                    val boundParameter = argumentValue.invokeFunction.parameters[index]
                     val variableSymbol =
                         if (irExpression is IrGetValue && irExpression.symbol.owner.isImmutable && irExpression.type == boundParameter.type) {
                             irExpression.symbol
@@ -376,56 +408,49 @@ private class CallInlining(
                                 isMutable = false,
                             ).symbol
                         }
-                    variableInitializer.boundValues[index] = irGetValueWithoutLocation(variableSymbol)
+                    argumentValue.boundValues[index] = irGetValueWithoutLocation(variableSymbol)
                 }
                 continue
             }
             // inline parameters should never be stored to temporaries, as it would prevent their inlining
-            variableInitializer.tryGetLoadedInlineParameter()?.let {
-                substituteMap[parameter] = irGetValueWithoutLocation(it)
+            argumentValue.tryGetLoadedInlineParameter()?.let {
+                parameterToTempVariable[parameter.symbol] = it
                 continue
             }
 
-            fun IrBuilderWithScope.computeInitializer() = irBlock(resultType = parameter.type) {
-                +variableInitializer.doImplicitCastIfNeededTo(parameter.type)
-            }
+            val castedArgumentValue = argumentValue.doImplicitCastIfNeededTo(parameter.type)
 
             val valueForTmpVar = if (isDefaultArg) {
-                inlinedBlockBuilder
-                    .at(variableInitializer)
-                    .computeInitializer()
+                castedArgumentValue
             } else {
                 // This variable is required to trigger argument evaluation outside the scope of the inline function
                 val tempVarOutsideInlineBlock = callSiteBuilder
                     .at(UNDEFINED_OFFSET, UNDEFINED_OFFSET)
-                    .irTemporary(callSiteBuilder.computeInitializer())
+                    .irTemporary(castedArgumentValue)
                 inlinedBlockBuilder
                     .at(UNDEFINED_OFFSET, UNDEFINED_OFFSET)
                     .irGet(tempVarOutsideInlineBlock)
             }
 
-            val tempVarInsideInlineBlock = inlinedBlockBuilder.irTemporary(
-                value = valueForTmpVar,
-                origin = if (parameter.kind == IrParameterKind.ExtensionReceiver) {
-                    IrDeclarationOrigin.IR_TEMPORARY_VARIABLE_FOR_INLINED_EXTENSION_RECEIVER
-                } else {
-                    IrDeclarationOrigin.IR_TEMPORARY_VARIABLE_FOR_INLINED_PARAMETER
+            val tempVarInsideInlineBlock = inlinedBlockBuilder
+                .at(UNDEFINED_OFFSET, UNDEFINED_OFFSET)
+                .irTemporary(
+                    value = valueForTmpVar,
+                    origin = if (parameter.kind == IrParameterKind.ExtensionReceiver) {
+                        IrDeclarationOrigin.IR_TEMPORARY_VARIABLE_FOR_INLINED_EXTENSION_RECEIVER
+                    } else {
+                        IrDeclarationOrigin.IR_TEMPORARY_VARIABLE_FOR_INLINED_PARAMETER
+                    }
+                ).apply {
+                    name = identifier(parameter.name.asStringStripSpecialMarkers())
                 }
-            ).apply {
-                name = identifier(parameter.name.asStringStripSpecialMarkers())
-            }
 
-            substituteMap[parameter] = irGetValueWithoutLocation(tempVarInsideInlineBlock.symbol)
+            parameterToTempVariable[parameter.symbol] = tempVarInsideInlineBlock.symbol
         }
     }
 
-    private fun irGetValueWithoutLocation(
-        symbol: IrValueSymbol,
-        origin: IrStatementOrigin? = null,
-    ): IrGetValue {
-        return IrGetValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, symbol, origin).also {
-            elementsWithLocationToPatch += it
-        }
+    private fun irGetValueWithoutLocation(symbol: IrValueSymbol): IrGetValue {
+        return IrGetValueImpl(UNDEFINED_OFFSET, UNDEFINED_OFFSET, symbol, null)
     }
 }
 

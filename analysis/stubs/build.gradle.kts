@@ -1,8 +1,9 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-data-manager")
+    id("test-inputs-check")
 }
 
 dependencies {
@@ -30,12 +31,37 @@ sourceSets {
     "testFixtures" { projectDefault() }
 }
 
-projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5, defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_11_0)) {
-        workingDir = rootDir
+tasks.compileTestFixturesKotlin {
+    compilerOptions {
+        optIn.add("org.jetbrains.kotlin.analysis.api.KaImplementationDetail")
     }
+}
+
+tasks.compileTestKotlin {
+    compilerOptions {
+        optIn.add("org.jetbrains.kotlin.analysis.api.KaImplementationDetail")
+    }
+}
+
+projectTests {
+    testTask(jUnitMode = JUnitMode.JUnit5, defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_11_0))
+
+    testGenerator("org.jetbrains.kotlin.analysis.stubs.TestGeneratorKt")
 
     withJvmStdlibAndReflect()
+    withJsRuntime()
+    withStdlibCommon()
+    withTestJar()
+    withAnnotations()
+    withMockJdkRuntime()
+    withMockJdkAnnotationsJar()
+    withScriptRuntime()
+
+    @OptIn(KotlinCompilerDistUsage::class)
+    withDist()
+
+    testData(project.isolated, "testData")
+    testData(project(":compiler:psi:psi-impl").isolated, "testData/psi")
 }
 
 testsJar()

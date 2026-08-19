@@ -7,8 +7,10 @@ Resolved constructor:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isPrimary: true
     location: CLASS
     modality: FINAL
@@ -25,6 +27,7 @@ Resolved constructor:
     getContainingJvmClassName: test.MyClass
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: test.MyClass
 
 Original constructor if type aliased:
   null

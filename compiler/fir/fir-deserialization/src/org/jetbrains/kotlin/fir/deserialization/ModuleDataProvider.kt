@@ -13,6 +13,8 @@ abstract class ModuleDataProvider {
     abstract val regularDependenciesModuleData: FirModuleData
 
     abstract fun getModuleData(path: Path?): FirModuleData?
+
+    open fun getModuleDataPaths(moduleData: FirModuleData): Set<Path>? = null
 }
 
 class SingleModuleDataProvider(private val moduleData: FirModuleData) : ModuleDataProvider() {
@@ -41,7 +43,7 @@ class MultipleModuleDataProvider(
 
     override fun getModuleData(path: Path?): FirModuleData? {
         val normalizedPath = path?.normalize()
-        for ((session, filter) in moduleDataWithFilters.entries) {
+        for ([session, filter] in moduleDataWithFilters.entries) {
             if (filter.accepts(normalizedPath)) {
                 return session
             }

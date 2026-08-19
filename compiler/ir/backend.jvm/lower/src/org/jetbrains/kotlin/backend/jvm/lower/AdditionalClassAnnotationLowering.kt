@@ -6,7 +6,7 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.ClassLoweringPass
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.annotations.KotlinTarget
@@ -29,10 +29,7 @@ import java.lang.annotation.ElementType
  * Adds [java.lang.annotation.Documented], [java.lang.annotation.Retention], [java.lang.annotation.Target],
  * [java.lang.annotation.Repeatable] annotations to annotation classes.
  */
-@PhaseDescription(
-    name = "AdditionalClassAnnotation",
-    prerequisite = [/* RepeatedAnnotationLowering::class */]
-)
+@PhasePrerequisites(RepeatedAnnotationLowering::class)
 internal class AdditionalClassAnnotationLowering(private val context: JvmBackendContext) : ClassLoweringPass {
     private val symbols = context.symbols.javaAnnotations
     private val noNewJavaAnnotationTargets =
@@ -53,7 +50,7 @@ internal class AdditionalClassAnnotationLowering(private val context: JvmBackend
         ) return
 
         irClass.annotations +=
-            IrConstructorCallImpl.fromSymbolOwner(
+            IrAnnotationImpl.fromSymbolOwner(
                 UNDEFINED_OFFSET, UNDEFINED_OFFSET, symbols.documentedConstructor.returnType, symbols.documentedConstructor.symbol, 0
             )
     }
@@ -64,7 +61,7 @@ internal class AdditionalClassAnnotationLowering(private val context: JvmBackend
         val javaRetentionPolicy = kotlinRetentionPolicy?.let { symbols.annotationRetentionMap[it] } ?: symbols.rpRuntime
 
         irClass.annotations +=
-            IrConstructorCallImpl.fromSymbolOwner(
+            IrAnnotationImpl.fromSymbolOwner(
                 UNDEFINED_OFFSET, UNDEFINED_OFFSET, symbols.retentionConstructor.returnType, symbols.retentionConstructor.symbol, 0
             ).apply {
                 arguments[0] = IrGetEnumValueImpl(
@@ -95,7 +92,7 @@ internal class AdditionalClassAnnotationLowering(private val context: JvmBackend
         }
 
         irClass.annotations +=
-            IrConstructorCallImpl.fromSymbolOwner(
+            IrAnnotationImpl.fromSymbolOwner(
                 UNDEFINED_OFFSET, UNDEFINED_OFFSET, symbols.targetConstructor.returnType, symbols.targetConstructor.symbol, 0
             ).apply {
                 arguments[0] = vararg
@@ -123,7 +120,7 @@ internal class AdditionalClassAnnotationLowering(private val context: JvmBackend
             containerClass.symbol, containerClass.defaultType
         )
         irClass.annotations +=
-            IrConstructorCallImpl.fromSymbolOwner(
+            IrAnnotationImpl.fromSymbolOwner(
                 UNDEFINED_OFFSET, UNDEFINED_OFFSET, symbols.repeatableConstructor.returnType, symbols.repeatableConstructor.symbol, 0
             ).apply {
                 arguments[0] = containerReference

@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.sir.*
  */
 object Comparators {
     val stableExtensionComparator: Comparator<SirExtension> = compareBy { it.extendedType.swift }
-    val stableNamedComparator: Comparator<SirNamed> = compareBy { it.name }
+    val stableNamedComparator: Comparator<SirScopeDefiningElement> = compareBy { it.name }
     val stableVariableComparator: Comparator<SirVariable> = compareBy { it.name }
     val stableInitComparator: Comparator<SirInit> = compareBy(
         { it.parameters.size },
@@ -44,13 +44,22 @@ object Comparators {
             is SirFunctionBridge -> {
                 when (rhs) {
                     is SirFunctionBridge -> lhs.name.compareTo(rhs.name)
+                    is SirReverseFunctionBridge -> 1
                     is SirTypeBindingBridge -> 1
                 }
             }
             is SirTypeBindingBridge -> {
                 when (rhs) {
                     is SirFunctionBridge -> -1
+                    is SirReverseFunctionBridge -> -1
                     is SirTypeBindingBridge -> lhs.name.compareTo(rhs.name)
+                }
+            }
+            is SirReverseFunctionBridge -> {
+                when (rhs) {
+                    is SirFunctionBridge -> -1
+                    is SirTypeBindingBridge -> 1
+                    is SirReverseFunctionBridge -> lhs.name.compareTo(rhs.name)
                 }
             }
         }
@@ -61,11 +70,12 @@ object Comparators {
 
     private val SirType.swift
         get(): String = when (this) {
-            is SirExistentialType -> "Any" + protocols.count() + this.protocols.joinToString(separator = "_") { it.name }
+            is SirExistentialType -> "Any" + protocols.count() + this.protocols.joinToString(separator = "_") { it.first.name }
             is SirNominalType -> typeDeclaration.name
             is SirErrorType -> "SirErrorType"
             is SirUnsupportedType -> "SirUnsupportedType"
             is SirFunctionalType -> "SirFunctionalType"
+            is SirTupleType -> "SirTupleType"
         }
 
     private inline fun <T, reified R> Comparator<T>.thenComparing(comparator: Comparator<R>): Comparator<T> {

@@ -41,6 +41,9 @@ interface KotlinElementTypeProvider {
     val typeAliasType: KtStubElementType<out KotlinTypeAliasStub, KtTypeAlias>
     val classBodyType: KtStubElementType<out KotlinPlaceHolderStub<KtClassBody>, KtClassBody>
 
+    @KtExperimentalApi
+    val companionBlockType: KtStubElementType<out KotlinPlaceHolderStub<KtCompanionBlock>, KtCompanionBlock>
+
     // Initializers
     val classInitializerType: KtStubElementType<out KotlinPlaceHolderStub<KtClassInitializer>, KtClassInitializer>
     val scriptInitializerType: KtStubElementType<out KotlinPlaceHolderStub<KtScriptInitializer>, KtScriptInitializer>
@@ -48,18 +51,19 @@ interface KotlinElementTypeProvider {
     // Callables
     val functionType: KtStubElementType<out KotlinFunctionStub, KtNamedFunction>
     val propertyType: KtStubElementType<out KotlinPropertyStub, KtProperty>
-    val enumEntryType: KtStubElementType<out KotlinClassStub, KtClass>
+    val enumEntryType: KtStubElementType<out KotlinClassStub, KtEnumEntry>
     val primaryConstructorType: KtStubElementType<out KotlinConstructorStub<KtPrimaryConstructor>, KtPrimaryConstructor>
     val secondaryConstructorType: KtStubElementType<out KotlinConstructorStub<KtSecondaryConstructor>, KtSecondaryConstructor>
     val constructorCalleeType: KtStubElementType<out KotlinPlaceHolderStub<KtConstructorCalleeExpression>, KtConstructorCalleeExpression>
     val propertyAccessorType: KtStubElementType<out KotlinPropertyAccessorStub, KtPropertyAccessor>
     val backingFieldType: KtStubElementType<out KotlinBackingFieldStub, KtBackingField>
+    val destructuringDeclarationType: KtStubElementType<out KotlinDestructuringDeclarationStub, KtDestructuringDeclaration>
     val initializerListType: KtStubElementType<out KotlinPlaceHolderStub<KtInitializerList>, KtInitializerList>
 
     // Value parameters
     val valueParameterListType: KtStubElementType<out KotlinPlaceHolderStub<KtParameterList>, KtParameterList>
     val valueParameterType: KtStubElementType<out KotlinParameterStub, KtParameter>
-    val contextReceiverListType: KtStubElementType<out KotlinPlaceHolderStub<KtContextReceiverList>, KtContextReceiverList>
+    val contextParameterListType: KtStubElementType<out KotlinPlaceHolderStub<KtContextParameterList>, KtContextParameterList>
     val contextReceiverType: KtStubElementType<out KotlinContextReceiverStub, KtContextReceiver>
 
     // Type parameters

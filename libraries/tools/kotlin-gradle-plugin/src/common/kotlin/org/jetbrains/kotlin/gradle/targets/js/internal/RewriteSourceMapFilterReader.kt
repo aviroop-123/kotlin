@@ -9,7 +9,7 @@ import java.io.*
 import kotlin.math.min
 
 open class RewriteSourceMapFilterReader(
-    val input: Reader
+    val input: Reader,
 ) : FilterReader(input) {
     // This implementation works only when source map contents starts
     // with prolog `{"version":3,"file":"...","sources":[...],"sourcesContent":...`
@@ -24,7 +24,8 @@ open class RewriteSourceMapFilterReader(
     // All rest contents will be passed directly from [input].
 
     companion object {
-        internal const val PROLOG_END = "],\"sourcesContent\":"
+        internal const val SOURCES_CONTENT_PROLOG_END = "],\"sourcesContent\":"
+        internal const val NAMES_PROLOG_END = "],\"names\":"
         const val UNSUPPORTED_FORMAT_MESSAGE =
             "Unsupported format. Contents should starts with `{\"version\":3,\"file\":\"...\",\"sources\":[...],\"sourcesContent\":...`"
 
@@ -71,7 +72,10 @@ open class RewriteSourceMapFilterReader(
             // Like, one buffer ends with `],"sourc`, and the other starts with `esContent"`
             val prevEnd = jsonString.length
             jsonString.append(readBuffer, 0, lastRead)
-            jsonPrologPos = jsonString.indexOf(PROLOG_END, prevEnd - PROLOG_END.length)
+            val sourceContentPrologEndPos = jsonString.indexOf(SOURCES_CONTENT_PROLOG_END, prevEnd - SOURCES_CONTENT_PROLOG_END.length)
+            jsonPrologPos = if (sourceContentPrologEndPos == -1) {
+                jsonString.indexOf(NAMES_PROLOG_END, prevEnd - NAMES_PROLOG_END.length)
+            } else sourceContentPrologEndPos
             if (jsonPrologPos == -1) {
                 if (jsonString.length + lastRead > prologLimit) {
                     writeBackUnsupported(jsonString, "Too many sources or format is not supported")
@@ -86,6 +90,7 @@ open class RewriteSourceMapFilterReader(
 
         // parse json in prolog and write it back to bufferJsonWriter with transformed source paths
         val json = JsonReader(StringReader(jsonString.toString()))
+        var sourceRootSpecified = false
         try {
             json.beginObject()
             bufferJsonWriter.beginObject()
@@ -95,18 +100,24 @@ open class RewriteSourceMapFilterReader(
                 check(token == JsonToken.NAME) { "JSON key expected, but $token found" }
                 val key = json.nextName()
                 when (key) {
+                    "sourceRoot" -> {
+                        val srcSourceRootPath = transformString(json.nextString())
+                        bufferJsonWriter.name(key).value(srcSourceRootPath)
+                        sourceRootSpecified = true
+                    }
                     "sources" -> {
                         json.beginArray()
                         bufferJsonWriter.name("sources").beginArray()
                         while (json.peek() != JsonToken.END_ARRAY) {
                             val path = json.nextString()
-                            bufferJsonWriter.value(transformString(path))
+                            val transformed = if (sourceRootSpecified) path else transformString(path)
+                            bufferJsonWriter.value(transformed)
                         }
                         json.endArray()
                     }
                     "version" -> bufferJsonWriter.name(key).value(json.nextInt())
                     "file" -> bufferJsonWriter.name(key).value(json.nextString())
-                    "sourcesContent" -> break@reading
+                    "sourcesContent", "names" -> break@reading
                     else -> throw IllegalStateException("Unknown key \"$key\"")
                 }
             }
@@ -146,7 +157,11 @@ open class RewriteSourceMapFilterReader(
             .resolve(value)
             .normalize().absoluteFile
 
-        val transformedPath = sourceFileResolved.relativeToOrNull(File(targetSourceRoot))?.path ?: return sourceFileResolved.path
+        val transformedPath = sourceFileResolved
+            .takeIf { it.exists() }
+            ?.relativeToOrNull(File(targetSourceRoot))
+            ?.path
+            ?: return value
 
         return if (File.separatorChar == '\\') {
             transformedPath.replace('\\', '/')

@@ -34,17 +34,16 @@ object WasmNullExnRefType : WasmType("nullexnref", -0x0c) // Shorthand for (ref 
 data class WasmRefNullType(val heapType: WasmHeapType) : WasmType("ref null", -0x1D)
 data class WasmRefType(val heapType: WasmHeapType) : WasmType("ref", -0x1C)
 
-@Suppress("unused")
 object WasmI31Ref : WasmType("i31ref", -0x14)
-
-@Suppress("unused")
 object WasmStructRef : WasmType("structref", -0x15)
+object WasmArrayRef : WasmType("arrayref", -0x16)
 
 sealed class WasmHeapType {
-    data class Type(val type: WasmSymbolReadOnly<WasmTypeDeclaration>) : WasmHeapType() {
-        override fun toString(): String {
-            return "Type:$type"
-        }
+
+    sealed class Type : WasmHeapType() {
+        abstract class GcType : Type()
+        abstract class VTableType : Type()
+        abstract class FunctionType : Type()
     }
 
     sealed class Simple(val name: String, val code: Byte) : WasmHeapType() {
@@ -81,15 +80,3 @@ fun WasmType.getHeapType(): WasmHeapType =
         is WasmExternRef -> WasmHeapType.Simple.Extern
         else -> error("Unknown heap type for type $this")
     }
-
-fun WasmFunctionType.referencesTypeDeclarations(): Boolean =
-    parameterTypes.any { it.referencesTypeDeclaration() } or resultTypes.any { it.referencesTypeDeclaration() }
-
-fun WasmType.referencesTypeDeclaration(): Boolean {
-    val heapType = when (this) {
-        is WasmRefNullType -> getHeapType()
-        is WasmRefType -> getHeapType()
-        else -> return false
-    }
-    return heapType is WasmHeapType.Type
-}

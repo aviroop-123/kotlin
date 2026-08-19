@@ -21,6 +21,11 @@
     "userNanos": $UINT$,
     "cpuNanos": $UINT$
   },
+  "klibWritingStats": {
+    "nanos": $UINT$,
+    "userNanos": $UINT$,
+    "cpuNanos": $UINT$
+  },
   "irLoweringStats": {
     "nanos": $UINT$,
     "userNanos": $UINT$,
@@ -32,6 +37,8 @@
     "cpuNanos": $UINT$
   },
   "dynamicStats": [
+  ],
+  "klibElementStats": [
   ],
   "findJavaClassStats": {
     "count": 1,

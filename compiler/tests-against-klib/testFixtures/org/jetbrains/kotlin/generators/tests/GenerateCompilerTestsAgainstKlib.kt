@@ -6,14 +6,13 @@
 package org.jetbrains.kotlin.generators.tests
 
 import org.jetbrains.kotlin.codegen.ir.AbstractCompileKotlinAgainstKlibTest
-import org.jetbrains.kotlin.generators.impl.generateTestGroupSuite
+import org.jetbrains.kotlin.generators.dsl.junit4.generateTestGroupSuiteWithJUnit4
 import org.jetbrains.kotlin.test.TargetBackend
 
 fun main(args: Array<String>) {
-    System.setProperty("java.awt.headless", "true")
-
-    generateTestGroupSuite(args) {
-        testGroup("compiler/tests-against-klib/tests-gen", "compiler/testData") {
+    val testsRoot = args[0]
+    generateTestGroupSuiteWithJUnit4(args) {
+        testGroup(testsRoot, "compiler/testData") {
             testClass<AbstractCompileKotlinAgainstKlibTest> {
                 model("codegen/boxKlib", targetBackend = TargetBackend.JVM_IR)
             }

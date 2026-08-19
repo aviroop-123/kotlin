@@ -63,7 +63,7 @@ class IrFakeOverrideBuilder(
      */
     fun buildFakeOverridesForClass(clazz: IrClass, oldSignatures: Boolean) {
         strategy.inFile(clazz.fileOrNull) {
-            val (staticMembers, instanceMembers) =
+            val [staticMembers, instanceMembers] =
                 clazz.declarations.filterIsInstance<IrOverridableMember>().partition { it.isStaticMember }
 
             val supertypes = clazz.superTypes.filterNot { it is IrErrorType }
@@ -91,6 +91,11 @@ class IrFakeOverrideBuilder(
         supertypes: List<IrType>,
         isStaticJavaMembers: Boolean,
     ) {
+        // TODO KT-83545 Stop deserializing fake overrides
+        // Drop all deserialized `overridenSymbols` before FO recalculation from scratch
+        for (member in allFromCurrent) {
+            member.overriddenSymbols = emptyList()
+        }
         val allFromSuper = supertypes.flatMap { superType ->
             superType.classOrFail.owner.declarations
                 .filterIsInstanceAnd<IrOverridableMember> {
@@ -109,7 +114,7 @@ class IrFakeOverrideBuilder(
         val allFromSuperByName = allFromSuper.groupBy { it.override.name }
         val allFromCurrentByName = allFromCurrent.groupBy { it.name }
 
-        allFromSuperByName.forEach { (name, superMembers) ->
+        allFromSuperByName.forEach { [name, superMembers] ->
             val isIntersectionOverrideForbiddenByGenericClash: Boolean = when {
                 superMembers.size <= 1 -> false // fast-path. Not important in that case
                 !strategy.isGenericClashFromSameSupertypeAllowed -> false // workaround is disabled

@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -UNUSED_VARIABLE -NOTHING_TO_INLINE
-// SKIP_TXT
 // WITH_COROUTINES
 import kotlin.coroutines.*
 import kotlin.coroutines.intrinsics.*
@@ -21,7 +20,7 @@ inline fun test(noinline c: () -> Unit) {
         }
     }
     val l = { c() }
-    c.<!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>startCoroutine<!>(EmptyContinuation)
+    c.startCoroutine(EmptyContinuation)
 }
 
 suspend fun calculate() = "OK"

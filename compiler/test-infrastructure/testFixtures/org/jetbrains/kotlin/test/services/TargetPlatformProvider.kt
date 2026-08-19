@@ -5,8 +5,11 @@
 
 package org.jetbrains.kotlin.test.services
 
+import org.jetbrains.kotlin.cli.pipeline.metadata.MetadataConfigurationUpdater
 import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
+import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.METADATA_ONLY_COMPILATION
+import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.METADATA_TARGET_PLATFORMS
 import org.jetbrains.kotlin.test.model.TestModule
 
 /**
@@ -29,6 +32,19 @@ fun TestModule.targetPlatform(testServices: TestServices): TargetPlatform =
 class TargetPlatformProviderForCompilerTests(val testServices: TestServices) : TargetPlatformProvider() {
     override fun getTargetPlatform(module: TestModule): TargetPlatform {
         @OptIn(TestInfrastructureInternals::class)
-        return testServices.defaultsProvider.targetPlatform
+        return getMetadataTargetPlatformOrNull(module, testServices) ?: testServices.defaultsProvider.targetPlatform
     }
+}
+
+fun getMetadataTargetPlatformOrNull(module: TestModule, testServices: TestServices): TargetPlatform? {
+    val directives = module.directives
+
+    if (!module.isLeafModuleInMppGraph(testServices) || METADATA_ONLY_COMPILATION in directives) {
+        return MetadataConfigurationUpdater.computeTargetPlatformOrNull(
+            directives[METADATA_TARGET_PLATFORMS],
+            onUnknownPlatform = { error("Unknown target platform: $it") },
+        )
+    }
+
+    return null
 }

@@ -5,26 +5,24 @@
 
 package org.jetbrains.kotlin.konan.test.blackbox
 
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.konan.target.Family
 import org.jetbrains.kotlin.konan.test.blackbox.support.TestCase
 import org.jetbrains.kotlin.konan.test.blackbox.support.TestKind
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
-import org.jetbrains.kotlin.konan.test.blackbox.support.group.ClassicPipeline
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.ForcedNoopTestRunner
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Timeouts
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.testProcessExecutor
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.ClangDistribution
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.compileWithClang
+import org.jetbrains.kotlin.native.executors.EmulatorExecutor
 import org.jetbrains.kotlin.native.executors.runProcess
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import java.io.File
 import kotlin.test.assertEquals
-import kotlin.time.Duration.Companion.seconds
 
 @Tag("program-name")
-@ClassicPipeline()
 class ProgramNameTest : AbstractNativeSimpleTest() {
 
     @Test
@@ -32,6 +30,8 @@ class ProgramNameTest : AbstractNativeSimpleTest() {
         // The С part of the test relies on execv which is not available on tvOS and watchOS.
         Assumptions.assumeTrue(targets.testTarget.family != Family.TVOS)
         Assumptions.assumeTrue(targets.testTarget.family != Family.WATCHOS)
+        // execv seem to mess up the qemu's userspace emulation
+        Assumptions.assumeTrue(testRunSettings.testProcessExecutor !is EmulatorExecutor)
         // 1. Compile kotlinPrintEntryPoint.kt to kotlinPrintEntryPoint.kexe
 
         val kotlinCompilation = compileToExecutableInOneStage(
@@ -103,6 +103,6 @@ class ProgramNameTest : AbstractNativeSimpleTest() {
     }
 
     companion object {
-        private val sourceDir = File("native/native.tests/testData/programName")
+        private val sourceDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/programName")
     }
 }

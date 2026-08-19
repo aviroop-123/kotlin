@@ -5,15 +5,17 @@
 
 package org.jetbrains.kotlin.test.directives
 
+import org.jetbrains.kotlin.cli.pipeline.FrontendFilesForPluginsGenerationPipelinePhase
 import org.jetbrains.kotlin.config.InferenceLogsFormat
 import org.jetbrains.kotlin.test.FirParser
-import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
+import org.jetbrains.kotlin.test.builders.TestConfigurationBuilderBase
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives.FIR_PARSER
 import org.jetbrains.kotlin.test.directives.model.DirectiveApplicability.Global
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDumpHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirResolvedTypesVerifier
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirScopeDumpHandler
+import org.jetbrains.kotlin.test.frontend.fir.handlers.FirVFirDumpHandler
 
 object FirDiagnosticsDirectives : SimpleDirectivesContainer() {
     val DUMP_CFG by stringDirective(
@@ -42,6 +44,14 @@ object FirDiagnosticsDirectives : SimpleDirectivesContainer() {
         applicability = Global
     )
 
+    val EXPLICITLY_GENERATE_PLUGIN_FILES by directive(
+        description = """
+            Forces ${FirDumpHandler::class} and ${FirVFirDumpHandler::class} to generate files with top-level declarations from plugins.
+            In regular tests it's not needed, as these files are created by the ${FrontendFilesForPluginsGenerationPipelinePhase::class}.
+            However, Analysis API tests don't use CLI pipeline phases, so these files should be generated explicitly.
+        """.trimIndent()
+    )
+
     val DISABLE_FIR_DUMP_HANDLER by directive(
         description = """
             Completely disables ${FirDumpHandler::class}.
@@ -50,22 +60,10 @@ object FirDiagnosticsDirectives : SimpleDirectivesContainer() {
         """.trimIndent()
     )
 
-    val FIR_IDENTICAL by directive(
-        description = "Contents of fir test data file and FE 1.0 are identical",
-        applicability = Global
-    )
-
     val LATEST_LV_DIFFERENCE by directive(
         description = """
             Diagnostics differs between latest stable and latest language version
             Separate file for latest LV should be checked
-        """.trimIndent()
-    )
-
-    val TEST_ALONGSIDE_K1_TESTDATA by directive(
-        description = """
-            This directive indicates that the test is run on the testdata,
-            which is also used for K1 tests
         """.trimIndent()
     )
 
@@ -80,7 +78,7 @@ object FirDiagnosticsDirectives : SimpleDirectivesContainer() {
         description = "Defines which parser should be used for FIR compiler"
     )
 
-    val RENDER_DIAGNOSTICS_MESSAGES by directive(
+    val RENDER_DIAGNOSTIC_ARGUMENTS by directive(
         description = "Forces diagnostic arguments to be rendered"
     )
 
@@ -157,6 +155,14 @@ object FirDiagnosticsDirectives : SimpleDirectivesContainer() {
     val DISABLE_GENERATED_FIR_TAGS by directive(
         description = "Disables generating and checking for GENERATED_FIR_TAGS"
     )
+
+    val DISABLE_WITH_PARSER by enumDirective<FirParser>(
+        description = "Disables the test if it's analyzed with specified parser"
+    )
+
+    val HAS_CUSTOM_EXTENSION_FILES by directive(
+        description = "Some module files have custom extensions and shouldn't be filtered out by kt/kts check"
+    )
 }
 
 object DumpCfgOption {
@@ -164,7 +170,7 @@ object DumpCfgOption {
     const val FLOW = "FLOW"
 }
 
-fun TestConfigurationBuilder.configureFirParser(parser: FirParser) {
+fun TestConfigurationBuilderBase<*, *>.configureFirParser(parser: FirParser) {
     defaultDirectives {
         FIR_PARSER with parser
     }

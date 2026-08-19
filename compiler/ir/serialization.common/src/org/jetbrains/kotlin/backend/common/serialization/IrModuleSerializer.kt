@@ -19,7 +19,7 @@ abstract class IrModuleSerializer<Serializer : IrFileSerializer>(
     protected val settings: IrSerializationSettings,
     protected val diagnosticReporter: IrDiagnosticReporter,
 ) {
-    abstract fun createFileSerializer(): Serializer
+    abstract fun createFileSerializer(settings: IrSerializationSettings = this.settings): Serializer
 
     /**
      * Allows to skip [file] during serialization.
@@ -37,8 +37,7 @@ abstract class IrModuleSerializer<Serializer : IrFileSerializer>(
     }
 
     private fun serializePreparedInlinableFunctions(preparedInlineFunctionCopies: List<IrSimpleFunction>): SerializedIrFile {
-        val fileSerializer = createFileSerializer()
-        return fileSerializer.serializeIrFileWithPreparedInlineFunctions(preparedInlineFunctionCopies)
+        return createFileSerializer().serializeIrFileWithPreparedInlineFunctions(preparedInlineFunctionCopies)
     }
 
     fun serializedIrModule(module: IrModuleFragment): SerializedIrModule {

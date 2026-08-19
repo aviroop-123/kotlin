@@ -1,13 +1,10 @@
 /*
- * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.scripting.test
 
-import com.intellij.psi.PsiElementFinder
-import org.jetbrains.kotlin.asJava.finder.JavaElementFinder
-import org.jetbrains.kotlin.cli.jvm.compiler.unregisterFinders
 import org.jetbrains.kotlin.codeMetaInfo.model.CodeMetaInfo
 import org.jetbrains.kotlin.codeMetaInfo.renderConfigurations.AbstractCodeMetaInfoRenderConfiguration
 import org.jetbrains.kotlin.config.LanguageFeature
@@ -16,6 +13,7 @@ import org.jetbrains.kotlin.scripting.compiler.plugin.impl.ScriptDiagnosticsMess
 import org.jetbrains.kotlin.scripting.resolve.KtFileScriptSource
 import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.singleValue
 import org.jetbrains.kotlin.test.frontend.fir.FirModuleInfoProvider
@@ -31,7 +29,7 @@ data class ReplCompilationArtifact(
     val snippetSource: KtFileScriptSource,
     val compilationResult: ResultWithDiagnostics<LinkedSnippet<CompiledSnippet>>,
 ) : ResultingArtifact.Binary<ReplCompilationArtifact>() {
-    object Kind : ArtifactKind<ReplCompilationArtifact>("ReplCompilationArtifact")
+    object Kind : ArtifactKind<ReplCompilationArtifact>("ReplCompilationArtifact", CompilationStage.FIRST)
 
     override val kind: ArtifactKind<ReplCompilationArtifact> get() = Kind
 }
@@ -71,8 +69,6 @@ class FirReplCompilerFacade(
 
         val project = compilerConfigurationProvider.getProject(module)
 
-        PsiElementFinder.EP.getPoint(project).unregisterFinders<JavaElementFinder>()
-
         val parser = module.directives.singleValue(FirDiagnosticsDirectives.FIR_PARSER)
 
         require(parser == FirParser.Psi)
@@ -87,6 +83,9 @@ class FirReplCompilerFacade(
                         listOf(testServices.standardLibrariesPathProvider.runtimeJarForTests())
                     )
                     compilerOptions("-Xrender-internal-diagnostic-names=true")
+                    for (languageFeature in module.directives[LanguageSettingsDirectives.LANGUAGE]) {
+                        compilerOptions("-XXLanguage:$languageFeature")
+                    }
                 }
                 K2ReplCompiler(
                     K2ReplCompiler.createCompilationState(

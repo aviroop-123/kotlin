@@ -1,11 +1,10 @@
-// RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 interface Your
 
 class My {
     internal val x = object : Your {}
 
-    internal fun <!EXPOSED_FUNCTION_RETURN_TYPE!>foo<!>() = {
+    internal fun foo() = {
         class Local
         Local()
     }()

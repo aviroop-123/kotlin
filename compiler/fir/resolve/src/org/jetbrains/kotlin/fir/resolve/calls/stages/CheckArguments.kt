@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.declarations.isJavaOrEnhancement
+import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.toResolvedCallableSymbol
 import org.jetbrains.kotlin.fir.resolve.*
@@ -21,6 +22,7 @@ import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.calls.inference.isSubtypeConstraintCompatible
+import org.jetbrains.kotlin.types.model.anySuperTypeConstructor
 import org.jetbrains.kotlin.types.model.typeConstructor
 
 internal object CheckArguments : ResolutionStage() {
@@ -31,8 +33,14 @@ internal object CheckArguments : ResolutionStage() {
         val isInvokeFromExtensionFunctionType = candidate.isInvokeFromExtensionFunctionType
 
         val contextArgumentsOfInvoke = candidate.expectedContextParameterCountForInvoke ?: 0
-        for ((index, argument) in candidate.arguments.withIndex()) {
+        for ([index, argument] in candidate.arguments.withIndex()) {
             if (index < contextArgumentsOfInvoke) continue
+
+            val expression = argument.expression
+            if (expression.isInaccessibleAndInapplicable()) {
+                sink.reportDiagnostic(expression.toInaccessibleReceiverDiagnostic())
+            }
+
             val parameter = argumentMapping[argument]
             candidate.resolveArgument(
                 candidate.callInfo,
@@ -73,16 +81,16 @@ internal object CheckArguments : ResolutionStage() {
         val argument = atom.expression
         @OptIn(UnresolvedExpressionTypeAccess::class)
         argument.coneTypeOrNull.ensureResolvedTypeDeclaration(context.session)
-        val expectedType =
-            prepareExpectedType(context.session, callInfo, argument, parameter)
+        val expectedType = prepareExpectedType(callInfo, argument, parameter)
         ArgumentCheckingProcessor.resolveArgumentExpression(
-            this,
+            csBuilder,
             atom,
+            containingCallCandidate = this,
             expectedType,
             sink,
             context,
             isReceiver,
-            false
+            isDispatch = false,
         )
     }
 }
@@ -91,18 +99,20 @@ private val SAM_LOOKUP_NAME: Name = Name.special("<SAM-CONSTRUCTOR>")
 
 context(context: ResolutionContext)
 private fun Candidate.prepareExpectedType(
-    session: FirSession,
     callInfo: CallInfo,
     argument: FirExpression,
     parameter: FirValueParameter?,
 ): ConeKotlinType? {
     if (parameter == null) return null
-    val basicExpectedType = argument.getExpectedType(session, parameter/*, LanguageVersionSettings*/)
+    val basicExpectedType = argument.getExpectedType(context.session, parameter)
 
     val expectedType =
-        getExpectedTypeWithSAMConversion(session, argument, basicExpectedType)?.also {
-            session.lookupTracker?.let { lookupTracker ->
-                parameter.returnTypeRef.coneType.lowerBoundIfFlexible().classId?.takeIf { !it.isLocal }?.let { classId ->
+        getExpectedTypeWithSAMConversion(argument, basicExpectedType)?.also {
+            context.session.lookupTracker?.let { lookupTracker ->
+                parameter.returnTypeRef.coneType.classLikeLookupTagIfAny?.takeIf {
+                    it.toSymbol()?.isLocal == false
+                }?.let { lookupTag ->
+                    val classId = lookupTag.classId
                     lookupTracker.recordClassMemberLookup(
                         SAM_LOOKUP_NAME.asString(),
                         classId,
@@ -113,44 +123,40 @@ private fun Candidate.prepareExpectedType(
                 }
             }
         }
-            ?: getExpectedTypeWithImplicitIntegerCoercion(session, argument, parameter, basicExpectedType)
+            ?: getExpectedTypeWithImplicitIntegerCoercion(context.session, argument, parameter, basicExpectedType)
             ?: basicExpectedType
     return this.substitutor.substituteOrSelf(expectedType)
 }
 
 context(context: ResolutionContext)
 private fun Candidate.getExpectedTypeWithSAMConversion(
-    session: FirSession,
     argument: FirExpression,
     candidateExpectedType: ConeKotlinType,
 ): ConeKotlinType? {
-    if (candidateExpectedType.isSomeFunctionType(session)) return null
+    if (candidateExpectedType.isSomeFunctionType(context.session)) return null
 
-    val samConversionInfo = context.bodyResolveComponents.samResolver.getSamInfoForPossibleSamType(candidateExpectedType)
-        ?: return null
-    val expectedFunctionType = samConversionInfo.functionalType
+    val samConversionInfo =
+        context.bodyResolveComponents.samResolver.getSamInfoForPossibleSamType(candidateExpectedType)
+            ?: return null
 
-    if (!argument.shouldUseSamConversion(
-            session,
-            candidateExpectedType = candidateExpectedType,
-            expectedFunctionType = expectedFunctionType,
-            this,
-        )
-    ) {
+    if (!argument.shouldUseSamConversion(candidate = this, candidateExpectedType)) {
         return null
     }
 
     setSamConversionOfArgument(argument.unwrapArgument(), samConversionInfo)
-    return expectedFunctionType
+    return samConversionInfo.functionalType
 }
 
+context(context: ResolutionContext)
 private fun FirExpression.shouldUseSamConversion(
-    session: FirSession,
-    candidateExpectedType: ConeKotlinType,
-    expectedFunctionType: ConeKotlinType,
     candidate: Candidate,
+    candidateExpectedType: ConeKotlinType,
 ): Boolean {
     val unwrapped = unwrapArgument()
+
+    if (unwrapped is FirCollectionLiteral) {
+        return false
+    }
 
     // Always apply SAM conversion on lambdas and callable references
     if (unwrapped is FirAnonymousFunctionExpression || unwrapped is FirCallableReferenceAccess) {
@@ -158,45 +164,27 @@ private fun FirExpression.shouldUseSamConversion(
     }
 
     // Always apply SAM conversion on generic call with nested lambda like `run { {} }`
-    if (unwrapped.isCallWithGenericReturnTypeAndMatchingLambda(session)) {
+    if (unwrapped.isCallWithGenericReturnTypeAndMatchingLambda()) {
         return true
     }
 
     val expressionType = resolvedType
-    if (expressionType is ConeIntegerLiteralType) {
-        return false
-    }
-
     // Expression type is a subtype of expected type, no need for SAM conversion.
     val substitutedExpectedType = candidate.substitutor.substituteOrSelf(candidateExpectedType)
     if (candidate.csBuilder.isSubtypeConstraintCompatible(expressionType, substitutedExpectedType)) {
         return false
     }
 
-    if (expressionType.isSomeFunctionType(session)) {
-        return true
-    }
-
-    // If the expression type is compatible with the expected function type, apply SAM conversion
-    val substitutedExpectedFunctionType = candidate.substitutor.substituteOrSelf(expectedFunctionType)
-    if (candidate.csBuilder.isSubtypeConstraintCompatible(expressionType, substitutedExpectedFunctionType)) {
-        return true
-    }
-
-    // If the expected function type is a non-basic function type, check if the expression type is compatible with its basic version
-    // If yes, apply SAM conversion (with function kind conversion).
-    if (!substitutedExpectedFunctionType.isBasicFunctionOrKFunctionType(session)) {
-        val expectedFunctionTypeAsSimpleFunctionType = substitutedExpectedFunctionType
-            .lowerBoundIfFlexible()
-            // converts SuspendFunction/[Custom]Function -> Function
-            .customFunctionTypeToSimpleFunctionType(session)
-
-        if (candidate.csBuilder.isSubtypeConstraintCompatible(expressionType, expectedFunctionTypeAsSimpleFunctionType)) {
-            return true
+    // After the `if` above, we know that the argument type is anyway not a subtype of the original SAM type,
+    // thus if we proceed without the conversion, it would be an INAPPLICABLE candidate anyway.
+    // So we might return `true` here unconditionally, but we check if there's some hope for proper SAM conversion
+    // to report better diagnostics otherwise.
+    return context(context.typeContext) {
+        expressionType.anySuperTypeConstructor {
+            require(it is ConeKotlinType)
+            it.isSomeFunctionType(context.session)
         }
     }
-
-    return false
 }
 
 /**
@@ -208,7 +196,9 @@ private fun FirExpression.shouldUseSamConversion(
  *
  * In this case, we should treat it analogously to a simple lambda argument (`outerCall {}`) and apply SAM conversion.
  */
-private fun FirExpression.isCallWithGenericReturnTypeAndMatchingLambda(session: FirSession): Boolean {
+context(context: SessionHolder)
+private fun FirExpression.isCallWithGenericReturnTypeAndMatchingLambda(): Boolean {
+    val session = context.session
     val expressionType = resolvedType
     val postponedAtoms = namedReferenceWithCandidate()?.candidate?.postponedAtoms ?: return false
     return postponedAtoms.any {
@@ -221,7 +211,7 @@ private fun getExpectedTypeWithImplicitIntegerCoercion(
     session: FirSession,
     argument: FirExpression,
     parameter: FirValueParameter,
-    candidateExpectedType: ConeKotlinType
+    candidateExpectedType: ConeKotlinType,
 ): ConeKotlinType? {
     if (!session.languageVersionSettings.supportsFeature(LanguageFeature.ImplicitSignedToUnsignedIntegerConversion)) return null
 
@@ -249,6 +239,6 @@ private fun FirExpression.namedReferenceWithCandidate(): FirNamedReferenceWithCa
 
 context(context: ResolutionContext)
 private fun CheckerSink.markCandidateForCompatibilityResolve() {
-    if (LanguageFeature.DisableCompatibilityModeForNewInference.isEnabled()) return
+    if (disableCompatibilityModeForNewInference()) return
     reportDiagnostic(LowerPriorityToPreserveCompatibilityDiagnostic)
 }

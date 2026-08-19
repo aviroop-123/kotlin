@@ -18,11 +18,14 @@ import org.jetbrains.kotlin.fir.types.ConeDynamicType
 import org.jetbrains.kotlin.fir.types.resolvedType
 
 object FirJsDynamicDeclarationChecker : FirClassChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirClass) {
         val delegatedFields = declaration.delegateFieldsMap ?: return
 
-        for ((_, delegate) in delegatedFields) {
+        for ([_, delegate] in delegatedFields) {
             @OptIn(SymbolInternals::class)
             // Accessing fir here is ok, because it still
             // belongs to the current `declaration: FirClass`,

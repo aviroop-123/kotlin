@@ -1,23 +1,26 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.fir.session
 
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.fir.FirModuleData
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.FirProperty
+import org.jetbrains.kotlin.fir.declarations.utils.klibFileAnnotations
 import org.jetbrains.kotlin.fir.declarations.utils.klibSourceFile
 import org.jetbrains.kotlin.fir.deserialization.*
+import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.isNewPlaceForBodyGeneration
 import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.library.KotlinLibrary
-import org.jetbrains.kotlin.library.MetadataLibrary
+import org.jetbrains.kotlin.library.components.KlibMetadataComponent
 import org.jetbrains.kotlin.library.metadata.*
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.NameResolver
@@ -27,21 +30,22 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.protobuf.GeneratedMessageLite
 import org.jetbrains.kotlin.protobuf.GeneratedMessageLite.GeneratedExtension
-import org.jetbrains.kotlin.resolve.KlibCompilerDeserializationConfiguration
+import org.jetbrains.kotlin.resolve.CommonCompilerDeserializationConfiguration
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
 import org.jetbrains.kotlin.serialization.deserialization.getClassId
-import java.util.IdentityHashMap
+import java.util.*
 
-abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
+abstract class MetadataLibraryBasedSymbolProvider<L>(
     session: FirSession,
     moduleDataProvider: ModuleDataProvider,
     kotlinScopeProvider: FirKotlinScopeProvider,
     private val flexibleTypeFactory: FirTypeDeserializer.FlexibleTypeFactory,
     defaultDeserializationOrigin: FirDeclarationOrigin = FirDeclarationOrigin.Library,
+    protected val metadataProvider: (L) -> KlibMetadataComponent,
 ) : AbstractFirDeserializedSymbolProvider(
     session, moduleDataProvider, kotlinScopeProvider, defaultDeserializationOrigin, KlibMetadataSerializerProtocol
 ) {
-    private class MetadataLibraryPackagePartCacheDataExtra(val library: MetadataLibrary) : PackagePartsCacheData.Extra
+    private class MetadataLibraryPackagePartCacheDataExtra(val library: KotlinLibrary) : PackagePartsCacheData.Extra
 
     protected abstract fun moduleData(library: L): FirModuleData?
 
@@ -51,11 +55,18 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
 
     private val annotationDeserializer = KlibBasedAnnotationDeserializer(session)
     private val constDeserializer = FirConstDeserializer(KlibMetadataSerializerProtocol)
-    protected val deserializationConfiguration: KlibCompilerDeserializationConfiguration =
-        KlibCompilerDeserializationConfiguration(session.languageVersionSettings)
+    protected val deserializationConfiguration: CommonCompilerDeserializationConfiguration =
+        CommonCompilerDeserializationConfiguration(session.languageVersionSettings)
     private val cachedFragments: MutableMap<L, MutableMap<Pair<String, String>, ProtoBuf.PackageFragment>> = mutableMapOf()
     private val fragmentToNameResolver = IdentityHashMap<ProtoBuf.PackageFragment, NameResolver>()
     private val fragmentToKlibMetadataClassDataFinder = IdentityHashMap<ProtoBuf.PackageFragment, KlibMetadataClassDataFinder>()
+    private val fragmentToFileAnnotations = IdentityHashMap<ProtoBuf.PackageFragment, List<FirAnnotation>>()
+
+    private fun getFileAnnotations(fragment: ProtoBuf.PackageFragment, nameResolver: NameResolver): List<FirAnnotation> {
+        return fragmentToFileAnnotations.getOrPut(fragment) {
+            loadAnnotationsFromMetadata(session, fragment.fileAnnotationList, nameResolver, AnnotationUseSiteTarget.FILE)
+        }
+    }
 
     private fun getPackageFragment(
         resolvedLibrary: L, packageStringName: String, packageMetadataPart: String
@@ -63,7 +74,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
         return cachedFragments.getOrPut(resolvedLibrary) {
             mutableMapOf()
         }.getOrPut(packageStringName to packageMetadataPart) {
-            parsePackageFragment(resolvedLibrary.packageMetadata(packageStringName, packageMetadataPart))
+            parsePackageFragment(metadataProvider(resolvedLibrary).getPackageFragment(packageStringName, packageMetadataPart))
         }
     }
 
@@ -92,7 +103,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
 
             val moduleData = moduleData(resolvedLibrary) ?: return@flatMap emptyList()
 
-            resolvedLibrary.packageMetadataParts(packageStringName).map {
+            metadataProvider(resolvedLibrary).getPackageFragmentNames(packageStringName).map {
                 val fragment = getPackageFragment(resolvedLibrary, packageStringName, it)
 
                 val packageProto = fragment.`package`
@@ -106,9 +117,11 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
                         annotationDeserializer,
                         flexibleTypeFactory,
                         constDeserializer,
+                        kdocDeserializer,
                         createDeserializedContainerSource(resolvedLibrary, packageFqName),
                     ),
-                    MetadataLibraryPackagePartCacheDataExtra(resolvedLibrary)
+                    (resolvedLibrary as? KotlinLibrary)?.let(::MetadataLibraryPackagePartCacheDataExtra),
+                    fileAnnotations = getFileAnnotations(fragment, nameResolver),
                 )
             }
         }
@@ -147,6 +160,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
                     session,
                     moduleData,
                     annotationDeserializer,
+                    kdocDeserializer,
                     flexibleTypeFactory,
                     kotlinScopeProvider,
                     KlibMetadataSerializerProtocol,
@@ -164,6 +178,11 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
                 }
 
                 symbol.fir.isNewPlaceForBodyGeneration = isNewPlaceForBodyGeneration(classProto)
+
+                val fileAnnotations = getFileAnnotations(fragment, nameResolver)
+                if (fileAnnotations.isNotEmpty()) {
+                    symbol.fir.klibFileAnnotations = fileAnnotations
+                }
             }
         }
 
@@ -179,7 +198,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
         val librariesWithFragment = fragmentNamesInLibraries[packageStringName] ?: return
 
         for (resolvedLibrary in librariesWithFragment) {
-            for (packageMetadataPart in resolvedLibrary.packageMetadataParts(packageStringName)) {
+            for (packageMetadataPart in metadataProvider(resolvedLibrary).getPackageFragmentNames(packageStringName)) {
 
                 val fragment = getPackageFragment(resolvedLibrary, packageStringName, packageMetadataPart)
 
@@ -201,7 +220,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
     private fun <T : GeneratedMessageLite.ExtendableMessage<T>> loadKlibSourceFileExtensionOrNull(
         packagePart: PackagePartsCacheData, proto: T, sourceFileExtension: GeneratedExtension<T, Int>,
     ): DeserializedSourceFile? {
-        val library = (packagePart.extra as? MetadataLibraryPackagePartCacheDataExtra)?.library as? KotlinLibrary ?: return null
+        val library = (packagePart.extra as? MetadataLibraryPackagePartCacheDataExtra)?.library ?: return null
         return loadKlibSourceFileExtensionOrNull(library, packagePart.context.nameResolver, proto, sourceFileExtension)
     }
 

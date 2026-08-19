@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
+    id("require-explicit-types")
 }
 
 dependencies {
@@ -8,8 +8,6 @@ dependencies {
     implementation(project(":compiler:frontend.common"))
     implementation(project(":compiler:fir:resolve"))
     implementation(project(":compiler:fir:fir2ir"))
-    implementation(project(":compiler:ir.serialization.common"))
-    implementation(project(":compiler:ir.serialization.native"))
 }
 
 

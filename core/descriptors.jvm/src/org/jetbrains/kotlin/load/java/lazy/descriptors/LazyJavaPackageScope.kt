@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.load.java.lazy.descriptors
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
@@ -32,6 +33,7 @@ import org.jetbrains.kotlin.load.kotlin.findKotlinClass
 import org.jetbrains.kotlin.load.kotlin.header.KotlinClassHeader
 import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
@@ -39,6 +41,7 @@ import org.jetbrains.kotlin.storage.NullableLazyValue
 import org.jetbrains.kotlin.utils.alwaysTrue
 import java.util.*
 
+@K1Deprecation
 class LazyJavaPackageScope(
     c: LazyJavaResolverContext,
     private val jPackage: JavaPackage,
@@ -52,7 +55,6 @@ class LazyJavaPackageScope(
 
     private val metadataVersion: MetadataVersion
         get() = c.components.deserializedDescriptorResolver.components.configuration.metadataVersion
-
 
     private val classes =
         c.storageManager.createMemoizedFunctionWithNullableValues<FindClassRequest, ClassDescriptor> classByRequest@{ request ->
@@ -70,6 +72,7 @@ class LazyJavaPackageScope(
             val classId = kotlinBinaryClass?.classId
             // Nested/local classes can be found when running in CLI in case when request.name looks like 'Outer$Inner'
             // It happens because KotlinClassFinder searches through a file-based index that does not differ classes containing $-sign and nested ones
+            @OptIn(ClassIdBasedLocality::class)
             if (classId != null && (classId.isNestedClass || classId.isLocal)) return@classByRequest null
 
             when (val kotlinResult = resolveKotlinBinaryClass(kotlinBinaryClass)) {

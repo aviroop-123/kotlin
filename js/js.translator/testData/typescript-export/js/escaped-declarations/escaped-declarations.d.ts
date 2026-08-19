@@ -23,6 +23,8 @@ declare namespace JS_TESTS {
             constructor();
             get "invalid:name"(): number;
             set "invalid:name"(value: number);
+            get "\"contains \" symbol\""(): string;
+            "'contains both \" and ' symbols\""(): string;
         }
         namespace A2 {
             /** @deprecated $metadata$ is used for internal purposes, please don't use it in your code, because it can be removed at any moment */
@@ -62,6 +64,27 @@ declare namespace JS_TESTS {
                         private constructor();
                     }
                 }
+            }
+        }
+        abstract class FooEnum {
+            private constructor();
+            static get "-Escaped-Value-"(): foo.FooEnum & {
+                get name(): "-Escaped-Value-";
+                get ordinal(): 0;
+            };
+            static get "With.Dot"(): foo.FooEnum & {
+                get name(): "With.Dot";
+                get ordinal(): 1;
+            };
+            static values(): [typeof foo.FooEnum["-Escaped-Value-"], typeof foo.FooEnum["With.Dot"]];
+            static valueOf(value: string): foo.FooEnum;
+            get name(): "-Escaped-Value-" | "With.Dot";
+            get ordinal(): 0 | 1;
+        }
+        namespace FooEnum {
+            /** @deprecated $metadata$ is used for internal purposes, please don't use it in your code, because it can be removed at any moment */
+            namespace $metadata$ {
+                const constructor: abstract new () => FooEnum;
             }
         }
     }

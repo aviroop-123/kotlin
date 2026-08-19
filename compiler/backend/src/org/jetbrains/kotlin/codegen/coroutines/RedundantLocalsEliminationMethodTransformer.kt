@@ -5,14 +5,15 @@
 
 package org.jetbrains.kotlin.codegen.coroutines
 
+import org.jetbrains.kotlin.codegen.InsnSequence
 import org.jetbrains.kotlin.codegen.asSequence
 import org.jetbrains.kotlin.codegen.optimization.boxing.isUnitInstance
 import org.jetbrains.kotlin.codegen.optimization.common.FastMethodAnalyzer
+import org.jetbrains.kotlin.codegen.optimization.common.isMeaningful
 import org.jetbrains.kotlin.codegen.optimization.common.removeAll
 import org.jetbrains.kotlin.codegen.optimization.fixStack.top
 import org.jetbrains.kotlin.codegen.optimization.transformer.MethodTransformer
 import org.jetbrains.kotlin.resolve.jvm.AsmTypes
-import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.tree.AbstractInsnNode
 import org.jetbrains.org.objectweb.asm.tree.LabelNode
 import org.jetbrains.org.objectweb.asm.tree.MethodNode
@@ -23,8 +24,8 @@ import org.jetbrains.org.objectweb.asm.tree.analysis.Frame
 import java.util.*
 
 /**
- * This pass removes unused Unit values. These typically occur as a result of inlining and could end up spilling
- * into the continuation object or break tail-call elimination.
+ * This pass removes unused Unit values, as well as unreachable instructions and locals. These typically occur as a result of inlining
+ * and could end up spilling into the continuation object or break tail-call elimination.
  *
  * Concretely, we remove "GETSTATIC kotlin/Unit.INSTANCE" instructions if they are unused, or all uses are either
  * POP instructions, or ASTORE instructions to locals which are never read and are not named local variables.
@@ -36,14 +37,20 @@ internal class RedundantLocalsEliminationMethodTransformer(private val suspensio
         val interpreter = UnitSourceInterpreter(methodNode.localVariables?.mapTo(mutableSetOf()) { it.index } ?: setOf())
         val frames = interpreter.run(internalClassName, methodNode)
 
-        // Mark all unused instructions for deletion (except for labels which may be used in debug information)
+        val unreachableInstructions = methodNode.instructions.asSequence().zip(frames.asSequence())
+            .filter { [_, frame] -> frame == null }
+            .map { [insn, _] -> insn }
+            .toSet()
+
+        // delete LVT entries where all instructions meaningless or unreachable
+        deleteRedundantLocals(methodNode, unreachableInstructions)
+
+        // Mark all unused instructions for deletion (except for labels which are used in debug information)
         val toDelete = mutableSetOf<AbstractInsnNode>()
-        methodNode.instructions.asSequence().zip(frames.asSequence()).mapNotNullTo(toDelete) { (insn, frame) ->
-            insn.takeIf { frame == null && insn !is LabelNode }
-        }
+        toDelete.addAll(unreachableInstructions.filter { it !is LabelNode })
 
         // Mark all spillable "GETSTATIC kotlin/Unit.INSTANCE" instructions for deletion
-        for ((unit, uses) in interpreter.unitUsageInformation) {
+        for ([unit, uses] in interpreter.unitUsageInformation) {
             if (unit !in interpreter.unspillableUnitValues && unit !in suspensionPoints) {
                 toDelete += unit
                 toDelete += uses
@@ -51,6 +58,14 @@ internal class RedundantLocalsEliminationMethodTransformer(private val suspensio
         }
 
         methodNode.instructions.removeAll(toDelete)
+    }
+
+    private fun deleteRedundantLocals(methodNode: MethodNode, unreachableInstructions: Set<AbstractInsnNode>) {
+        fun isRedundantRange(start: AbstractInsnNode, end: AbstractInsnNode): Boolean =
+            InsnSequence(start, end).none { it.isMeaningful && !unreachableInstructions.contains(it) }
+
+        val localsToDelete = methodNode.localVariables?.filter { local -> isRedundantRange(local.start, local.end) }
+        localsToDelete?.let { methodNode.localVariables?.removeAll(it) }
     }
 }
 
@@ -65,7 +80,7 @@ private class UnitValue(val insns: Set<AbstractInsnNode>) : BasicValue(AsmTypes.
 
 // A specialized SourceInterpreter which only keeps track of the use sites for Unit values which are exclusively used as
 // arguments to POP and unused ASTORE instructions.
-private class UnitSourceInterpreter(private val localVariables: Set<Int>) : BasicInterpreter(Opcodes.API_VERSION) {
+private class UnitSourceInterpreter(private val localVariables: Set<Int>) : BasicInterpreter(API_VERSION) {
     // All unit values with visible use-sites.
     val unspillableUnitValues = mutableSetOf<AbstractInsnNode>()
 
@@ -87,8 +102,8 @@ private class UnitSourceInterpreter(private val localVariables: Set<Int>) : Basi
     fun run(internalClassName: String, methodNode: MethodNode): Array<Frame<BasicValue>?> {
         val frames = FastMethodAnalyzer<BasicValue>(internalClassName, methodNode, this).analyze()
         // The ASM analyzer does not visit POP instructions, so we do so here.
-        for ((insn, frame) in methodNode.instructions.asSequence().zip(frames.asSequence())) {
-            if (frame != null && insn.opcode == Opcodes.POP) {
+        for ([insn, frame] in methodNode.instructions.asSequence().zip(frames.asSequence())) {
+            if (frame != null && insn.opcode == POP) {
                 val value = frame.top()
                 if (value is UnitValue) {
                     collectUnitUsage(insn, value)
@@ -103,7 +118,7 @@ private class UnitSourceInterpreter(private val localVariables: Set<Int>) : Basi
 
     override fun copyOperation(insn: AbstractInsnNode, value: BasicValue?): BasicValue? {
         if (value is UnitValue) {
-            if (insn is VarInsnNode && insn.opcode == Opcodes.ASTORE && insn.`var` !in localVariables) {
+            if (insn is VarInsnNode && insn.opcode == ASTORE && insn.`var` !in localVariables) {
                 collectUnitUsage(insn, value)
                 // We track the stored value in case it is subsequently read.
                 return value

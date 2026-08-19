@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
-// FIR_IDENTICAL
 // ISSUE: KT-57092
 
 interface InterfaceWithDefault {

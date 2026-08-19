@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -9,11 +9,11 @@ import org.jetbrains.kotlin.analysis.api.KaNonPublicApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationList
-import org.jetbrains.kotlin.analysis.api.symbols.DebugSymbolRenderer
+import org.jetbrains.kotlin.analysis.api.symbols.KaDebugRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaAnnotatedSymbol
-import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.AnalysisApiFirScriptTestConfigurator
-import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.AnalysisApiFirSourceTestConfigurator
+import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.LLSourceLikeTestConfigurator
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
 import org.jetbrains.kotlin.analysis.test.framework.targets.getSingleTestTargetSymbolOfType
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrint
@@ -25,10 +25,7 @@ import org.jetbrains.kotlin.fir.renderer.FirErrorExpressionExtendedRenderer
 import org.jetbrains.kotlin.fir.renderer.FirRenderer
 import org.jetbrains.kotlin.fir.renderer.FirResolvePhaseRenderer
 import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.psi.KtAnnotated
-import org.jetbrains.kotlin.psi.KtDeclaration
-import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.StringDirective
@@ -49,7 +46,7 @@ abstract class AbstractLazyAnnotationsResolveTest : AbstractFirLazyDeclarationRe
 
     override fun doTestByMainFile(mainFile: KtFile, mainModule: KtTestModule, testServices: TestServices) {
         withResolutionFacade(mainFile) { resolutionFacade ->
-            val (firElement, _) = findFirDeclarationToResolve(mainFile, testServices, resolutionFacade)
+            val [firElement, _] = findFirDeclarationToResolve(mainFile, testServices, resolutionFacade)
             val psiElement = firElement.realPsi as? KtAnnotated
 
             // Dump FIR before any potential resolution
@@ -58,9 +55,13 @@ abstract class AbstractLazyAnnotationsResolveTest : AbstractFirLazyDeclarationRe
             analyzeForTest(mainFile) {
                 val symbol = when (psiElement) {
                     null if firElement is FirBackingField -> {
-                        val ktProperty = firElement.psi as KtProperty
-                        val propertySymbol = ktProperty.symbol as KaPropertySymbol
-                        propertySymbol.backingFieldSymbol!!
+                        val variableSymbol = when (val psi = firElement.psi) {
+                            is KtProperty -> psi.symbol as KaPropertySymbol
+                            is KtParameter -> (psi.symbol as KaValueParameterSymbol).generatedPrimaryConstructorProperty!!
+                            else -> error("Unexpected psi element: $psi")
+                        }
+
+                        variableSymbol.backingFieldSymbol!!
                     }
                     is KtFile -> psiElement.symbol
                     is KtDeclaration -> psiElement.symbol
@@ -107,12 +108,8 @@ abstract class AbstractLazyAnnotationsResolveTest : AbstractFirLazyDeclarationRe
     }
 }
 
-abstract class AbstractSourceLazyAnnotationsResolveTest : AbstractLazyAnnotationsResolveTest() {
-    override val configurator = AnalysisApiFirSourceTestConfigurator(analyseInDependentSession = false)
-}
-
-abstract class AbstractScriptLazyAnnotationsResolveTest : AbstractLazyAnnotationsResolveTest() {
-    override val configurator = AnalysisApiFirScriptTestConfigurator(analyseInDependentSession = false)
+abstract class AbstractSourceLikeLazyAnnotationsResolveTest : AbstractLazyAnnotationsResolveTest() {
+    override val configurator = LLSourceLikeTestConfigurator()
 }
 
 /**
@@ -169,7 +166,7 @@ private sealed class AnnotationQuery<O : Any> {
 
         sealed class AnnotationQuery : CollectionQuery<KaAnnotation>() {
             final override fun KaSession.renderElementOutput(element: KaAnnotation): String {
-                return DebugSymbolRenderer().renderAnnotationApplication(this, element)
+                return KaDebugRenderer().renderAnnotationApplication(this, element)
             }
 
             /**

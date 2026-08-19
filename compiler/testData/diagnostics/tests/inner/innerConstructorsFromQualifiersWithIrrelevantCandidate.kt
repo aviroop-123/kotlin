@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// SKIP_TXT
 // FILE: Outer.kt
 package abc
 class Outer {
@@ -13,16 +12,16 @@ class Outer {
 
         fun baz() {
             // Diagnostic here could be better (why can't I call the constructor above?)
-            Inner<!NO_VALUE_FOR_PARAMETER!>()<!>
-            Inner(<!CONSTANT_EXPECTED_TYPE_MISMATCH!>1<!>)
+            <!NO_VALUE_FOR_PARAMETER!>Inner<!>()
+            Inner(<!ARGUMENT_TYPE_MISMATCH!>1<!>)
             Inner("")
         }
     }
 }
 
 fun foo() {
-    Outer.Inner<!NO_VALUE_FOR_PARAMETER!>()<!>
-    Outer.Inner(<!CONSTANT_EXPECTED_TYPE_MISMATCH!>1<!>)
+    Outer.<!NO_VALUE_FOR_PARAMETER!>Inner<!>()
+    Outer.Inner(<!ARGUMENT_TYPE_MISMATCH!>1<!>)
     Outer.Inner("")
 }
 
@@ -32,8 +31,8 @@ import abc.Outer.Inner
 import abc.Outer.Companion.Inner
 
 fun bar() {
-    Inner<!NO_VALUE_FOR_PARAMETER!>()<!>
-    Inner(<!CONSTANT_EXPECTED_TYPE_MISMATCH!>1<!>)
+    <!NO_VALUE_FOR_PARAMETER!>Inner<!>()
+    Inner(<!ARGUMENT_TYPE_MISMATCH!>1<!>)
     Inner("")
 
     with(Outer()) {

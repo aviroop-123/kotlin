@@ -14,9 +14,18 @@ fun box(): String {
 // test.kt:6 box
 // test.kt:9 box
 
+// EXPECTATIONS NATIVE
+// test.kt:9 box
+// test.kt:6 box
+// test.kt:1 access$<get-a>$tTestKt
+// test.kt:4 <get-a>
+// test.kt:1 access$<get-a>$tTestKt
+// test.kt:6 box
+// test.kt:9 box
+// test.kt:10 box
+
 // EXPECTATIONS JS_IR
 // test.kt:9 box
-// test.kt:1 access$<get-a>$tTestKt
 
 // EXPECTATIONS WASM
 // test.kt:9 $box (11)

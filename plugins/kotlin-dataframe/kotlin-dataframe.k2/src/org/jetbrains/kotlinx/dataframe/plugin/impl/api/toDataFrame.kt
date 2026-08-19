@@ -2,6 +2,7 @@ package org.jetbrains.kotlinx.dataframe.plugin.impl.api
 
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.analysis.checkers.fullyExpandedClassId
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.hasAnnotation
 import org.jetbrains.kotlin.fir.declarations.utils.isEnumClass
@@ -11,17 +12,22 @@ import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirGetClassCall
 import org.jetbrains.kotlin.fir.expressions.FirVarargArgumentsExpression
+import org.jetbrains.kotlin.fir.isJavaRecord
+import org.jetbrains.kotlin.fir.isJavaRecordComponent
 import org.jetbrains.kotlin.fir.java.JavaTypeParameterStack
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaClass
 import org.jetbrains.kotlin.fir.java.resolveIfJavaType
 import org.jetbrains.kotlin.fir.references.toResolvedPropertySymbol
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
+import org.jetbrains.kotlin.fir.resolve.scope
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
+import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.approximateDeclarationType
+import org.jetbrains.kotlin.fir.scopes.CallableCopyTypeCalculator
 import org.jetbrains.kotlin.fir.scopes.collectAllFunctions
 import org.jetbrains.kotlin.fir.scopes.collectAllProperties
-import org.jetbrains.kotlin.fir.scopes.unsubstitutedScope
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
+import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
@@ -29,15 +35,22 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.name.StandardClassIds.List
+import org.jetbrains.kotlinx.dataframe.api.pathOf
+import org.jetbrains.kotlinx.dataframe.api.toDataFrameFromPairs
 import org.jetbrains.kotlinx.dataframe.codeGen.FieldKind
-import org.jetbrains.kotlinx.dataframe.plugin.classId
+import org.jetbrains.kotlinx.dataframe.columns.ColumnPath
+import org.jetbrains.kotlinx.dataframe.plugin.extensions.ColumnType
 import org.jetbrains.kotlinx.dataframe.plugin.extensions.KotlinTypeFacade
 import org.jetbrains.kotlinx.dataframe.plugin.extensions.wrap
+import org.jetbrains.kotlinx.dataframe.plugin.findSchemaArgument
+import org.jetbrains.kotlinx.dataframe.plugin.getSchema
 import org.jetbrains.kotlinx.dataframe.plugin.impl.*
 import org.jetbrains.kotlinx.dataframe.plugin.utils.Names
 import org.jetbrains.kotlinx.dataframe.plugin.utils.Names.DATA_ROW_CLASS_ID
 import org.jetbrains.kotlinx.dataframe.plugin.utils.Names.DATA_SCHEMA_CLASS_ID
 import org.jetbrains.kotlinx.dataframe.plugin.utils.Names.DF_CLASS_ID
+import org.jetbrains.kotlinx.dataframe.plugin.utils.isDataFrame
+import org.jetbrains.kotlinx.dataframe.plugin.utils.isDataRow
 import java.util.*
 
 class ToDataFrameDsl : AbstractSchemaModificationInterpreter() {
@@ -48,7 +61,7 @@ class ToDataFrameDsl : AbstractSchemaModificationInterpreter() {
     override fun Arguments.interpret(): PluginDataFrameSchema {
         val dsl = CreateDataFrameDslImplApproximation()
         body(dsl, mapOf("typeArg0" to Interpreter.Success(typeArg0)))
-        return PluginDataFrameSchema(dsl.columns)
+        return dsl.toPluginDataFrameSchema()
     }
 }
 
@@ -58,7 +71,7 @@ class ToDataFrame : AbstractSchemaModificationInterpreter() {
     val Arguments.typeArg0: ConeTypeProjection by arg(lens = Interpreter.Id)
 
     override fun Arguments.interpret(): PluginDataFrameSchema {
-        return toDataFrame(maxDepth.toInt(), typeArg0, TraverseConfiguration())
+        return toDataFrame(maxDepth.toInt(), typeArg0, TraverseConfigurationBuilder().build(session))
     }
 }
 
@@ -67,7 +80,7 @@ class ToDataFrameDefault : AbstractSchemaModificationInterpreter() {
     val Arguments.typeArg0: ConeTypeProjection by arg(lens = Interpreter.Id)
 
     override fun Arguments.interpret(): PluginDataFrameSchema {
-        return toDataFrame(DEFAULT_MAX_DEPTH, typeArg0, TraverseConfiguration())
+        return toDataFrame(DEFAULT_MAX_DEPTH, typeArg0, TraverseConfiguration.EMPTY)
     }
 }
 
@@ -77,7 +90,7 @@ class ToDataFrameColumn : AbstractSchemaModificationInterpreter() {
     val Arguments.columnName: String by arg()
 
     override fun Arguments.interpret(): PluginDataFrameSchema {
-        return PluginDataFrameSchema(listOf(simpleColumnOf(columnName, typeArg0.type)))
+        return PluginDataFrameSchema(listOf(simpleColumnOf(columnName, typeArg0.coneType)))
     }
 }
 
@@ -85,15 +98,15 @@ private const val DEFAULT_MAX_DEPTH = 0
 
 class Properties0 : AbstractInterpreter<Unit>() {
     val Arguments.dsl: CreateDataFrameDslImplApproximation by arg()
-    val Arguments.maxDepth: Int by arg()
+    val Arguments.maxDepth: Int by arg(defaultValue = Present(DEFAULT_MAX_DEPTH))
     val Arguments.body by dsl()
     val Arguments.typeArg0: ConeTypeProjection by arg(lens = Interpreter.Id)
 
     override fun Arguments.interpret() {
         dsl.configuration.maxDepth = maxDepth
-        body(dsl.configuration.traverseConfiguration, emptyMap())
-        val schema = toDataFrame(dsl.configuration.maxDepth, typeArg0, dsl.configuration.traverseConfiguration)
-        dsl.columns.addAll(schema.columns())
+        body(dsl.configuration.traverseConfigurationBuilder, emptyMap())
+        val schema = toDataFrame(dsl.configuration.maxDepth, typeArg0, dsl.configuration.traverseConfigurationBuilder.build(session))
+        dsl.columns.addAll(schema.columns().map { it.toPathToColPair() })
     }
 }
 
@@ -105,24 +118,96 @@ class ToDataFrameDslStringInvoke : AbstractInterpreter<Unit>() {
     override fun Arguments.interpret() {
         val addDsl = CreateDataFrameDslImplApproximation()
         builder(addDsl, emptyMap())
-        dsl.columns.add(SimpleColumnGroup(receiver, addDsl.columns))
+        dsl.columns.add(SimpleColumnGroup(receiver, addDsl.toPluginDataFrameSchema().columns()).toPathToColPair())
     }
+}
+
+class ToDataFrameDslIntoString : AbstractInterpreter<Unit>() {
+    val Arguments.dsl: CreateDataFrameDslImplApproximation by arg()
+    val Arguments.receiver: ColumnType by type()
+    val Arguments.name: String by arg()
+
+    override fun Arguments.interpret() {
+        val valuesType = extractBaseColumnValuesType(receiver.coneType) ?: session.builtinTypes.nullableAnyType.coneType
+        dsl.columns += simpleColumnOf(name, valuesType).toPathToColPair()
+    }
+}
+
+class ToDataFrameDslIntoPath : AbstractInterpreter<Unit>() {
+    val Arguments.dsl: CreateDataFrameDslImplApproximation by arg()
+    val Arguments.receiver: ColumnType by type()
+    val Arguments.path: ColumnPathApproximation by arg()
+
+    override fun Arguments.interpret() {
+        val valuesType = extractBaseColumnValuesType(receiver.coneType) ?: session.builtinTypes.nullableAnyType.coneType
+        dsl.columns += path.path to simpleColumnOf(path.name(), valuesType)
+    }
+}
+
+class ToDataFrameDslAdd : AbstractInterpreter<Unit>() {
+    val Arguments.dsl: CreateDataFrameDslImplApproximation by arg()
+    val Arguments.name: String by arg()
+    val Arguments.expression: ColumnType by type()
+
+    override fun Arguments.interpret() {
+        dsl.columns += simpleColumnOf(name, expression.coneType).toPathToColPair()
+    }
+}
+
+fun SimpleCol.toPathToColPair() = pathOf(name) to this
+
+class ToDataFrameFrom : AbstractInterpreter<Unit>() {
+    val Arguments.dsl: CreateDataFrameDslImplApproximation by arg()
+    val Arguments.receiver: String by arg()
+    val Arguments.expression: ColumnType by type()
+    override fun Arguments.interpret() {
+        dsl.columns += simpleColumnOf(receiver, expression.coneType).toPathToColPair()
+    }
+}
+
+class CreateDataFrameDslImplApproximation {
+    val configuration: CreateDataFrameConfiguration = CreateDataFrameConfiguration()
+    val columns: MutableList<Pair<ColumnPath, SimpleCol>> = mutableListOf()
+
+    fun toPluginDataFrameSchema() = columns.map { it.first to it.second.asDataColumn() }
+        .toDataFrameFromPairs<ConeTypesAdapter>()
+        .toPluginDataFrameSchema()
 }
 
 class CreateDataFrameConfiguration {
     var maxDepth = DEFAULT_MAX_DEPTH
-    var traverseConfiguration: TraverseConfiguration = TraverseConfiguration()
+    var traverseConfigurationBuilder: TraverseConfigurationBuilder = TraverseConfigurationBuilder()
 }
 
-class TraverseConfiguration {
+class TraverseConfigurationBuilder {
     val excludeProperties = mutableSetOf<FirCallableReferenceAccess>()
     val excludeClasses = mutableSetOf<FirGetClassCall>()
     val preserveClasses = mutableSetOf<FirGetClassCall>()
     val preserveProperties = mutableSetOf<FirCallableReferenceAccess>()
+
+    fun build(session: FirSession): TraverseConfiguration {
+        return TraverseConfiguration(
+            excludeProperties.mapNotNullTo(mutableSetOf()) { it.calleeReference.toResolvedPropertySymbol() },
+            excludeClasses.mapNotNullTo(mutableSetOf()) { it.argument.resolvedType.fullyExpandedClassId(session) },
+            preserveClasses.mapNotNullTo(mutableSetOf()) { it.argument.resolvedType.fullyExpandedClassId(session) },
+            preserveProperties.mapNotNullTo(mutableSetOf()) { it.calleeReference.toResolvedPropertySymbol() }
+        )
+    }
+}
+
+class TraverseConfiguration(
+    val excludes: Set<FirPropertySymbol>,
+    val excludeClasses: Set<ClassId>,
+    val preserveClasses: Set<ClassId>,
+    val preserveProperties: Set<FirPropertySymbol>,
+) {
+    companion object {
+        val EMPTY = TraverseConfiguration(emptySet(), emptySet(), emptySet(), emptySet())
+    }
 }
 
 class Preserve0 : AbstractInterpreter<Unit>() {
-    val Arguments.dsl: TraverseConfiguration by arg()
+    val Arguments.dsl: TraverseConfigurationBuilder by arg()
     val Arguments.classes: FirVarargArgumentsExpression by arg(lens = Interpreter.Id)
 
     override fun Arguments.interpret() {
@@ -131,7 +216,7 @@ class Preserve0 : AbstractInterpreter<Unit>() {
 }
 
 class Preserve1 : AbstractInterpreter<Unit>() {
-    val Arguments.dsl: TraverseConfiguration by arg()
+    val Arguments.dsl: TraverseConfigurationBuilder by arg()
     val Arguments.properties: FirVarargArgumentsExpression by arg(lens = Interpreter.Id)
 
     override fun Arguments.interpret() {
@@ -140,7 +225,7 @@ class Preserve1 : AbstractInterpreter<Unit>() {
 }
 
 class Exclude0 : AbstractInterpreter<Unit>() {
-    val Arguments.dsl: TraverseConfiguration by arg()
+    val Arguments.dsl: TraverseConfigurationBuilder by arg()
     val Arguments.classes: FirVarargArgumentsExpression by arg(lens = Interpreter.Id)
 
     override fun Arguments.interpret() {
@@ -149,7 +234,7 @@ class Exclude0 : AbstractInterpreter<Unit>() {
 }
 
 class Exclude1 : AbstractInterpreter<Unit>() {
-    val Arguments.dsl: TraverseConfiguration by arg()
+    val Arguments.dsl: TraverseConfigurationBuilder by arg()
     val Arguments.properties: FirVarargArgumentsExpression by arg(lens = Interpreter.Id)
 
     override fun Arguments.interpret() {
@@ -157,62 +242,34 @@ class Exclude1 : AbstractInterpreter<Unit>() {
     }
 }
 
-@Suppress("INVISIBLE_MEMBER")
-
 @OptIn(SymbolInternals::class)
 internal fun KotlinTypeFacade.toDataFrame(
     maxDepth: Int,
     arg: ConeTypeProjection,
     traverseConfiguration: TraverseConfiguration,
 ): PluginDataFrameSchema {
-    val excludes =
-        traverseConfiguration.excludeProperties.mapNotNullTo(mutableSetOf()) { it.calleeReference.toResolvedPropertySymbol() }
-    val excludedClasses = traverseConfiguration.excludeClasses.mapTo(mutableSetOf()) { it.argument.resolvedType }
-    val preserveClasses = traverseConfiguration.preserveClasses.mapNotNullTo(mutableSetOf()) { it.classId }
-    val preserveProperties =
-        traverseConfiguration.preserveProperties.mapNotNullTo(mutableSetOf()) { it.calleeReference.toResolvedPropertySymbol() }
+    val excludes = traverseConfiguration.excludes
+    val excludedClasses = traverseConfiguration.excludeClasses
+    val preserveClasses = traverseConfiguration.preserveClasses
+    val preserveProperties = traverseConfiguration.preserveProperties
 
     fun convert(classLike: ConeKotlinType, depth: Int, makeNullable: Boolean): List<SimpleCol> {
-        val symbol = classLike.toRegularClassSymbol(session) ?: return emptyList()
-        val scope = symbol.unsubstitutedScope(session, ScopeSession(), false, FirResolvePhase.STATUS)
-        val declarations = if (symbol.fir is FirJavaClass) {
-            scope
-                .collectAllFunctions()
-                .filter { !it.isStatic && it.valueParameterSymbols.isEmpty() && it.typeParameterSymbols.isEmpty() }
-                .mapNotNull { function ->
-                    val name = function.name.identifier
-                    if (name.startsWith("get") || name.startsWith("is")) {
-                        val propertyName = name
-                            .replaceFirst("get", "")
-                            .replaceFirst("is", "")
-                            .let {
-                                if (it.firstOrNull()?.isUpperCase() == true) {
-                                    it.replaceFirstChar { it.lowercase(Locale.getDefault()) }
-                                } else {
-                                    null
-                                }
-                            }
-                        propertyName?.let { function to it }
-                    } else {
-                        null
-                    }
-                }
-        } else {
-            scope
-                .collectAllProperties()
-                .filterIsInstance<FirPropertySymbol>()
-                .map {
-                    it to it.name.identifier
-                }
+        if (!classLike.canBeUnfolded(session)) {
+            return listOf(simpleColumnOf("value", classLike))
         }
 
-        return declarations
-            .filterNot { excludes.contains(it.first) }
-            .filterNot { excludedClasses.contains(it.first.resolvedReturnType) }
-            .filter { it.first.visibility == Visibilities.Public }
-            .map { (it, name) ->
-                var returnType = it.fir.returnTypeRef.resolveIfJavaType(session, JavaTypeParameterStack.EMPTY, null)
+        return classLike.properties(session)
+            .filterNot { excludes.contains(it.callable) }
+            .filterNot {
+                val classLikeType = it.callable.resolvedReturnType as? ConeClassLikeType
+                classLikeType?.fullyExpandedClassId(session) in excludedClasses
+            }
+            .filter { it.callable.visibility == Visibilities.Public }
+            .map { (val callable, val name = columnName) ->
+                var returnType = callable.fir.returnTypeRef.resolveIfJavaType(session, JavaTypeParameterStack.EMPTY, null)
                     .coneType.upperBoundIfFlexible()
+                    // result will be used to as a return type of property of a local dataframe type
+                    .approximateDeclarationType(Visibilities.Local, isLocal = true)
 
                 returnType = if (returnType is ConeTypeParameterType) {
                     if (returnType.canBeNull(session)) {
@@ -235,51 +292,62 @@ internal fun KotlinTypeFacade.toDataFrame(
 
                 val keepSubtree =
                     depth >= maxDepth && !fieldKind.shouldBeConvertedToColumnGroup && !fieldKind.shouldBeConvertedToFrameColumn
-                if (keepSubtree || returnType.isValueType(session) || returnType.classId in preserveClasses || it in preserveProperties) {
-                    SimpleDataColumn(
-                        name,
-                        TypeApproximation(
-                            returnType.withNullability(
-                                makeNullable,
-                                session.typeContext
+                val shouldCreateValueCol = keepSubtree
+                        || returnType.classId in preserveClasses
+                        || callable in preserveProperties
+                        || (!returnType.canBeUnfolded(session) && !fieldKind.shouldBeConvertedToColumnGroup && !fieldKind.shouldBeConvertedToFrameColumn)
+
+                when {
+                    shouldCreateValueCol -> {
+                        SimpleDataColumn(
+                            name,
+                            ColumnType(
+                                returnType.withNullability(
+                                    returnType.isMarkedNullable || makeNullable,
+                                    session.typeContext
+                                )
                             )
                         )
-                    )
-                } else if (
-                    returnType.isSubtypeOf(
-                        StandardClassIds.Iterable.constructClassLikeType(arrayOf(ConeStarProjection)),
-                        session
-                    ) ||
-                    returnType.isSubtypeOf(
-                        StandardClassIds.Iterable.constructClassLikeType(
-                            arrayOf(ConeStarProjection),
-                            isMarkedNullable = true
-                        ), session
-                    )
-                ) {
-                    val type: ConeKotlinType = when (val typeArgument = returnType.typeArguments[0]) {
-                        is ConeKotlinType -> typeArgument
-                        ConeStarProjection -> session.builtinTypes.nullableAnyType.coneType
-                        else -> session.builtinTypes.nullableAnyType.coneType
                     }
-                    if (type.isValueType(session)) {
-                        val columnType = List.constructClassLikeType(arrayOf(type), returnType.isMarkedNullable)
-                            .withNullability(makeNullable, session.typeContext)
-                            .wrap()
-                        SimpleDataColumn(name, columnType)
-                    } else {
-                        SimpleFrameColumn(name, convert(type, depth + 1, makeNullable = false))
+
+                    returnType.isDataRow() -> {
+                        val schema = returnType.findSchemaArgument(isTest)?.getSchema()
+                            ?: PluginDataFrameSchema.EMPTY
+                        val group = SimpleColumnGroup(name, schema.columns())
+                        if (!returnType.isMarkedNullable) {
+                            group
+                        } else {
+                            makeNullable(group)
+                        }
                     }
-                } else {
-                    SimpleColumnGroup(name, convert(returnType, depth + 1, returnType.isMarkedNullable || makeNullable))
+
+                    returnType.isDataFrame() && !returnType.isMarkedNullable -> {
+                        val schema = returnType.findSchemaArgument(isTest)?.getSchema()
+                            ?: PluginDataFrameSchema.EMPTY
+                        SimpleFrameColumn(name, schema.columns())
+                    }
+
+                    returnType.isIterable(session) -> {
+                        val type: ConeKotlinType = when (val typeArgument = returnType.typeArguments[0]) {
+                            is ConeKotlinType -> typeArgument
+                            ConeStarProjection -> session.builtinTypes.nullableAnyType.coneType
+                            else -> session.builtinTypes.nullableAnyType.coneType
+                        }
+                        if (type.isValueType(session)) {
+                            val columnType = List.constructClassLikeType(arrayOf(type), returnType.isMarkedNullable)
+                                .withNullability(makeNullable, session.typeContext)
+                                .wrap()
+                            SimpleDataColumn(name, columnType)
+                        } else {
+                            SimpleFrameColumn(name, convert(type, depth + 1, makeNullable = false))
+                        }
+                    }
+
+                    else -> {
+                        SimpleColumnGroup(name, convert(returnType, depth + 1, returnType.isMarkedNullable || makeNullable))
+                    }
                 }
             }
-    }
-
-    arg.type?.let { type ->
-        if (!type.canBeUnfolded(session)) {
-            return PluginDataFrameSchema(listOf(simpleColumnOf("value", type)))
-        }
     }
 
     return when {
@@ -295,6 +363,23 @@ internal fun KotlinTypeFacade.toDataFrame(
         }
     }
 }
+
+private fun ConeKotlinType.isIterable(session: FirSession): Boolean =
+    isSubtypeOf(
+        StandardClassIds.Iterable.constructClassLikeType(
+            typeArguments = arrayOf(ConeStarProjection),
+            isMarkedNullable = false,
+        ),
+        session
+    ) || isSubtypeOf(
+        StandardClassIds.Iterable.constructClassLikeType(
+            typeArguments = arrayOf(ConeStarProjection),
+            isMarkedNullable = true,
+        ),
+        session
+    )
+
+private data class ToDataFrameProperty(val callable: FirCallableSymbol<*>, val columnName: String)
 
 fun ConeKotlinType.canBeUnfolded(session: FirSession): Boolean =
     !isValueType(session) && hasProperties(session)
@@ -313,6 +398,7 @@ private fun ConeKotlinType.isValueType(session: FirSession) =
         Names.LOCAL_DATE_CLASS_ID,
         Names.LOCAL_DATE_TIME_CLASS_ID,
         Names.INSTANT_CLASS_ID,
+        Names.STDLIB_INSTANT_CLASS_ID,
         Names.DATE_TIME_PERIOD_CLASS_ID,
         Names.DATE_TIME_UNIT_CLASS_ID,
         Names.TIME_ZONE_CLASS_ID
@@ -329,25 +415,66 @@ private fun ConeKotlinType.isValueType(session: FirSession) =
                 Names.TEMPORAL_AMOUNT_CLASS_ID.constructClassLikeType(emptyArray(), isMarkedNullable = true), session
             )
 
-
 private fun ConeKotlinType.hasProperties(session: FirSession): Boolean {
-    val symbol = this.toRegularClassSymbol(session) as? FirClassSymbol<*> ?: return false
-    val scope = symbol.unsubstitutedScope(
+    return properties(session).isNotEmpty()
+}
+
+private fun ConeKotlinType.properties(session: FirSession): List<ToDataFrameProperty> {
+    val symbol = this.toRegularClassSymbol(session) as? FirClassSymbol<*> ?: return emptyList()
+    val scope = scope(
         session,
         ScopeSession(),
-        withForcedTypeCalculator = false,
-        memberRequiredPhase = null
-    )
+        CallableCopyTypeCalculator.DoNothing,
+        FirResolvePhase.STATUS
+    ) ?: return emptyList()
 
-    return scope.collectAllProperties().any { it.visibility == Visibilities.Public } ||
-            scope.collectAllFunctions().any { it.visibility == Visibilities.Public && it.isGetterLike() }
+    @OptIn(SymbolInternals::class)
+    symbol.fir.let { firClass ->
+        if (firClass is FirJavaClass && firClass.isJavaRecord == true) {
+            return scope.collectAllFunctions()
+                .filter { it.fir.isJavaRecordComponent == true }
+                .map { ToDataFrameProperty(it, it.name.identifier) }
+        }
+    }
+
+    return scope.collectAllProperties()
+        .filterIsInstance<FirPropertySymbol>()
+        .filter { it.visibility == Visibilities.Public }
+        .map { ToDataFrameProperty(it, it.name.identifier) }
+        .ifEmpty {
+            scope.collectAllFunctions()
+                .filter {
+                    it.visibility == Visibilities.Public && it.isGetterLike()
+                }
+                .mapNotNull { function ->
+                    function.toDataFramePropertyOrNull()
+                }
+        }
 }
 
 private fun FirNamedFunctionSymbol.isGetterLike(): Boolean {
     val functionName = this.name.asString()
     return (functionName.startsWith("get") || functionName.startsWith("is")) &&
+            !this.isStatic &&
             this.valueParameterSymbols.isEmpty() &&
             this.typeParameterSymbols.isEmpty()
+}
+
+private fun FirNamedFunctionSymbol.toDataFramePropertyOrNull(): ToDataFrameProperty? {
+    val identifier = name.identifier
+    val columnName = when {
+        identifier.startsWith("get") -> identifier.replaceFirst("get", "")
+        identifier.startsWith("is") -> identifier.replaceFirst("is", "")
+        else -> return null
+    }.let {
+        if (it.firstOrNull()?.isUpperCase() == true) {
+            it.replaceFirstChar { it.lowercase(Locale.getDefault()) }
+        } else {
+            return null
+        }
+    }
+
+    return ToDataFrameProperty(callable = this, columnName)
 }
 
 // org.jetbrains.kotlinx.dataframe.codeGen.getFieldKind
@@ -361,18 +488,3 @@ private fun ConeKotlinType.getFieldKind(session: FirSession) = FieldKind.of(
 
 private fun ConeKotlinType?.hasAnnotation(id: ClassId, session: FirSession) =
     this?.toSymbol(session)?.hasAnnotation(id, session) == true
-
-
-class CreateDataFrameDslImplApproximation {
-    val configuration: CreateDataFrameConfiguration = CreateDataFrameConfiguration()
-    val columns: MutableList<SimpleCol> = mutableListOf()
-}
-
-class ToDataFrameFrom : AbstractInterpreter<Unit>() {
-    val Arguments.dsl: CreateDataFrameDslImplApproximation by arg()
-    val Arguments.receiver: String by arg()
-    val Arguments.expression: TypeApproximation by type()
-    override fun Arguments.interpret() {
-        dsl.columns += simpleColumnOf(receiver, expression.type)
-    }
-}

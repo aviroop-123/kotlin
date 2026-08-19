@@ -1,3 +1,0 @@
-KtNameReferenceExpression(45,48): 'jvm'
-  KtSimpleNameReference:
-    package kotlin.jvm

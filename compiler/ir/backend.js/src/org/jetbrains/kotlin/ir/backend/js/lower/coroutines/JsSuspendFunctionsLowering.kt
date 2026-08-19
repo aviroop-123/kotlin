@@ -19,7 +19,8 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.backend.js.JsCommonBackendContext
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
-import org.jetbrains.kotlin.backend.common.lower.WebCallableReferenceLowering
+import org.jetbrains.kotlin.ir.backend.js.lower.WebCallableReferenceLowering
+import org.jetbrains.kotlin.ir.backend.js.utils.compileSuspendAsJsGenerator
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
@@ -31,7 +32,6 @@ import org.jetbrains.kotlin.ir.symbols.IrVariableSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.isUnit
 import org.jetbrains.kotlin.ir.util.addChild
-import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.isSuspend
 import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.ir.util.parentClassOrNull
@@ -48,22 +48,25 @@ import org.jetbrains.kotlin.utils.addToStdlib.assertedCast
 class JsSuspendFunctionsLowering(
     ctx: JsCommonBackendContext
 ) : AbstractSuspendFunctionsLowering<JsCommonBackendContext>(ctx), BodyLoweringPass {
-    private val coroutineSymbols = ctx.symbols.coroutineSymbols
-
-    private val coroutineImplExceptionPropertyGetter = coroutineSymbols.coroutineImplExceptionPropertyGetter
-    private val coroutineImplExceptionPropertySetter = coroutineSymbols.coroutineImplExceptionPropertySetter
-    private val coroutineImplExceptionStatePropertyGetter = coroutineSymbols.coroutineImplExceptionStatePropertyGetter
-    private val coroutineImplExceptionStatePropertySetter = coroutineSymbols.coroutineImplExceptionStatePropertySetter
-    private val coroutineImplLabelPropertySetter = coroutineSymbols.coroutineImplLabelPropertySetter
-    private val coroutineImplLabelPropertyGetter = coroutineSymbols.coroutineImplLabelPropertyGetter
-    private val coroutineImplResultSymbolGetter = coroutineSymbols.coroutineImplResultSymbolGetter
-    private val coroutineImplResultSymbolSetter = coroutineSymbols.coroutineImplResultSymbolSetter
+    private val coroutineImplExceptionPropertyGetter = ctx.symbols.coroutineImplExceptionPropertyGetter.owner
+    private val coroutineImplExceptionPropertySetter = ctx.symbols.coroutineImplExceptionPropertySetter.owner
+    private val coroutineImplExceptionStatePropertyGetter = ctx.symbols.coroutineImplExceptionStatePropertyGetter.owner
+    private val coroutineImplExceptionStatePropertySetter = ctx.symbols.coroutineImplExceptionStatePropertySetter.owner
+    private val coroutineImplLabelPropertySetter = ctx.symbols.coroutineImplLabelPropertySetter.owner
+    private val coroutineImplLabelPropertyGetter = ctx.symbols.coroutineImplLabelPropertyGetter.owner
+    private val coroutineImplResultSymbolGetter = ctx.symbols.coroutineImplResultSymbolGetter.owner
+    private val coroutineImplResultSymbolSetter = ctx.symbols.coroutineImplResultSymbolSetter.owner
 
     override val stateMachineMethodName = Name.identifier("doResume")
 
     override fun getCoroutineBaseClass(function: IrFunction) = context.symbols.coroutineImpl
 
     override fun nameForCoroutineClass(function: IrFunction) = "${function.name}COROUTINE\$".synthesizedName
+
+    override fun lower(irModule: IrModuleFragment) {
+        if (context.compileSuspendAsJsGenerator) return
+        super.lower(irModule)
+    }
 
     override fun lower(irBody: IrBody, container: IrDeclaration) {
         if (container is IrSimpleFunction && container.isSuspend) {
@@ -100,6 +103,28 @@ class JsSuspendFunctionsLowering(
         }
     }
 
+    /**
+     * For the delegating type of suspend functions we just compile them as a regular function (not generator), so it doesn't break semantic.
+     * For the following Kotlin code:
+     * ```kotlin
+     * suspend fun bar() = 42
+     * suspend fun foo() = bar()
+     * ```
+     *
+     * Instead of
+     * ```javascript
+     * function* foo() {
+     *   return yield* bar()
+     * }
+     * ```
+     *
+     * We generate the following, so it minimizes the output size:
+     * ```javascript
+     * function foo() {
+     *   return bar()
+     * }
+     * ```
+     */
     private fun removeReturnIfSuspendedCallAndSimplifyDelegatingCall(irFunction: IrFunction, delegatingCall: IrCall) {
         val returnValue =
             if (delegatingCall.isReturnIfSuspendedCall(context))
@@ -253,7 +278,7 @@ class JsSuspendFunctionsLowering(
                 return if (expression.returnTargetSymbol != simplifiedFunction.symbol)
                     expression
                 else
-                    JsIrBuilder.buildReturn(stateMachineFunction.symbol, expression.value, expression.type)
+                    JsIrBuilder.buildReturn(stateMachineFunction.symbol, expression.value, context.irBuiltIns.nothingType)
             }
         })
 
@@ -325,7 +350,7 @@ class JsSuspendFunctionsLowering(
 
         return irComposite(resultType = expectedType) {
             val tmp = createTmpVariable(delegatingCall, irType = functionReturnType)
-            val coroutineSuspended = irCall(coroutineSymbols.coroutineSuspendedGetter)
+            val coroutineSuspended = irCall(this@JsSuspendFunctionsLowering.context.symbols.coroutineSuspendedGetter)
             val condition = irEqeqeq(irGet(tmp), coroutineSuspended)
             +irIfThen(context.irBuiltIns.unitType, condition, irReturn(irGet(tmp)))
             +irImplicitCast(irGet(tmp), expectedType)
@@ -360,7 +385,8 @@ internal fun getSuspendFunctionKind(
     context: CommonBackendContext,
     function: IrSimpleFunction,
     body: IrBody,
-    includeSuspendLambda: Boolean = true
+    includeSuspendLambda: Boolean = true,
+    suspensionIntrinsic: IrSimpleFunctionSymbol? = null
 ): SuspendFunctionKind {
 
     fun IrSimpleFunction.isSuspendLambda() =
@@ -377,7 +403,7 @@ internal fun getSuspendFunctionKind(
 
         override fun visitCall(expression: IrCall) {
             expression.acceptChildrenVoid(this)
-            if (expression.isSuspend)
+            if (expression.isSuspend || expression.symbol == suspensionIntrinsic)
                 ++numberOfSuspendCalls
         }
     })

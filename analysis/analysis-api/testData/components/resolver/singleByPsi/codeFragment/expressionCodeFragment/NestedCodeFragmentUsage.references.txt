@@ -1,3 +1,0 @@
-KtNameReferenceExpression(160,163): 'bar'
-  KtSimpleNameReference:
-    (in <local>: <no name>) fun bar()

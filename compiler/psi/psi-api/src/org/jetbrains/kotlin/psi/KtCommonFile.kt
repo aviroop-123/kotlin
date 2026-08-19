@@ -12,7 +12,6 @@ import com.intellij.psi.*
 import com.intellij.psi.stubs.StubElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.ArrayFactory
-import com.intellij.util.FileContentUtilCore
 import com.intellij.util.IncorrectOperationException
 import org.jetbrains.kotlin.KtStubBasedElementTypes
 import org.jetbrains.kotlin.idea.KotlinFileType
@@ -78,14 +77,13 @@ open class KtCommonFile(viewProvider: FileViewProvider, val isCompiled: Boolean)
 
     var packageFqName: FqName
         get() = greenStub?.getPackageFqName() ?: packageDirective?.fqName ?: FqName.ROOT
+        @Deprecated(
+            "Use setPackageFqName(value) instead",
+            ReplaceWith("this.setPackageFqName(value)", "org.jetbrains.kotlin.idea.base.psi.setPackageFqName"),
+        )
+        @OptIn(KtNonPublicApi::class)
         set(value) {
-            val packageDirective = packageDirective
-            if (packageDirective != null) {
-                packageDirective.fqName = value
-            } else {
-                val newPackageDirective = KtPsiFactory(project).createPackageDirectiveIfNeeded(value) ?: return
-                addAfter(newPackageDirective, null)
-            }
+            KtPsiMutationService.getInstance().setPackageFqName(this, value)
         }
 
     @Deprecated("Use 'packageFqName' property instead", ReplaceWith("packageFqName"))
@@ -162,6 +160,7 @@ open class KtCommonFile(viewProvider: FileViewProvider, val isCompiled: Boolean)
         val stub = greenStub
         if (stub != null) {
             for (stubElement in stub.childrenStubs) {
+                @Suppress("DEPRECATION") // KT-78356
                 val stubType = stubElement.stubType
                 when (stubType) {
                     // Required element found
@@ -205,6 +204,7 @@ open class KtCommonFile(viewProvider: FileViewProvider, val isCompiled: Boolean)
     ): P? {
         val stub = greenStub
         if (stub != null) {
+            @Suppress("DEPRECATION") // KT-78356
             val importListStub = stub.findChildStubByType(elementType)
             return importListStub?.psi
         }
@@ -247,7 +247,9 @@ open class KtCommonFile(viewProvider: FileViewProvider, val isCompiled: Boolean)
     override fun getStub(): KotlinFileStub? = super.getStub()?.let { it as KotlinFileStub }
 
     protected open val greenStub: KotlinFileStub?
-        get() = super.getGreenStub()?.let { it as KotlinFileStub }
+        get() =
+            @Suppress("DEPRECATION") // KT-78356
+            super.getGreenStub()?.let { it as KotlinFileStub }
 
     override fun clearCaches() {
         @Suppress("RemoveExplicitSuperQualifier")
@@ -305,17 +307,16 @@ open class KtCommonFile(viewProvider: FileViewProvider, val isCompiled: Boolean)
     override fun getAnnotationEntries(): List<KtAnnotationEntry> =
         fileAnnotationList?.annotationEntries ?: emptyList()
 
+    @OptIn(KtNonPublicApi::class)
     @Throws(IncorrectOperationException::class)
-    override fun setName(name: String): PsiElement {
-        val result = super.setName(name)
-        val willBeScript = name.endsWith(KotlinFileType.SCRIPT_EXTENSION)
-        if (isScript() != willBeScript) {
-            FileContentUtilCore.reparseFiles(listOfNotNull(virtualFile))
-        }
-        return result
-    }
+    override fun setName(name: String): PsiElement = KtPsiMutationService.getInstance().setCommonFileName(this, name)
 
     override fun getPsiOrParent(): KtElement = this
+
+    @KtNonPublicApi
+    override fun rawDelete() {
+        super.delete()
+    }
 
     @Suppress("unused") //keep for compatibility with potential plugins
     fun shouldChangeModificationCount(@Suppress("UNUSED_PARAMETER") place: PsiElement): Boolean {
@@ -328,6 +329,7 @@ private fun KtImportList.computeHasImportAlias(): Boolean {
     val stub = greenStub
     if (stub != null) {
         return stub.childrenStubs.any {
+            @Suppress("DEPRECATION") // KT-78356
             it is KotlinImportDirectiveStub && it.findChildStubByType(KtStubBasedElementTypes.IMPORT_ALIAS) != null
         }
     }

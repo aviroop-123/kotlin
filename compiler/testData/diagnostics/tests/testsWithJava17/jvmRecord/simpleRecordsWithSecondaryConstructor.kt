@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// LANGUAGE: +JvmRecordSupport
 // FULL_JDK_17
 
 // FILE: MyRecord.java

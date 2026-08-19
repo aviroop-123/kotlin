@@ -1,0 +1,5 @@
+KDocName(31,33): 'AA'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /E.AA
+    ]

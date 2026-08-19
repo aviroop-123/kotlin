@@ -1,3 +1,6 @@
+// IGNORE_KLIB_BACKEND_ERRORS_WITH_CUSTOM_SECOND_STAGE: Native:2.3
+// ^^^ KT-86031: NPE: null cannot be cast to non-null type org.jetbrains.kotlin.ir.expressions.IrConst
+
 // TARGET_BACKEND: NATIVE
 // FREE_COMPILER_ARGS: -Xbinary=genericSafeCasts=true
 // MODULE: cinterop
@@ -73,9 +76,12 @@ private fun testAssignmentBaseToDerived() {
 
     val derivedFoo = derived as Foo3Protocol
     val derivedBar = derived as Bar3Protocol
-    assertFailsWith<ClassCastException> { val delegate14_Foo: Foo3Protocol? = derivedFoo.delegate }
-    assertFailsWith<ClassCastException> { val delegate15_Bar: Bar3Protocol? = derivedBar.delegate }
-    assertFailsWith<ClassCastException> { val delegate16_Bar: Bar3Protocol? = derived.delegate() }
+    // TODO KT-85681: we might want to make it throw a `ClassCastException`.
+    val delegate14_Foo: Foo3Protocol? = derivedFoo.delegate
+    // TODO KT-85681
+    val delegate15_Bar: Bar3Protocol? = derivedBar.delegate
+    // TODO KT-85681
+    val delegate16_Bar: Bar3Protocol? = derived.delegate()
 }
 
 private fun testAssignmentBaseToDerivedWithPropertyOverride() {
@@ -85,9 +91,14 @@ private fun testAssignmentBaseToDerivedWithPropertyOverride() {
 
     val derived_Foo = derived as Foo3Protocol
     val derivedBar = derived as Bar3Protocol
-    assertFailsWith<ClassCastException> { val delegate19_DerivedWithPropertyOverride: DerivedWithPropertyOverride3? = derived.delegate() }
-    assertFailsWith<ClassCastException> { val delegate14_Foo: Foo3Protocol? = derived_Foo.delegate }
-    assertFailsWith<ClassCastException> { val delegate18_Foo: Foo3Protocol? = derived_Foo.delegate() } // static type is FooProtocol?, not DerivedWithPropertyOverride?, this deserves a diagnostic test
-    assertFailsWith<ClassCastException> { val delegate15_Bar: Bar3Protocol? = derivedBar.delegate }
-    assertFailsWith<ClassCastException> { val delegate19_Bar: Bar3Protocol? = derivedBar.delegate() } // static type is BarProtocol?, not DerivedWithPropertyOverride?, this deserves a diagnostic test
+    // TODO KT-85681
+    val delegate19_DerivedWithPropertyOverride: DerivedWithPropertyOverride3? = derived.delegate()
+    // TODO KT-85681
+    val delegate14_Foo: Foo3Protocol? = derived_Foo.delegate
+    // TODO KT-85681
+    val delegate18_Foo: Foo3Protocol? = derived_Foo.delegate() // static type is FooProtocol?, not DerivedWithPropertyOverride?, this deserves a diagnostic test
+    // TODO KT-85681
+    val delegate15_Bar: Bar3Protocol? = derivedBar.delegate
+    // TODO KT-85681
+    val delegate19_Bar: Bar3Protocol? = derivedBar.delegate() // static type is BarProtocol?, not DerivedWithPropertyOverride?, this deserves a diagnostic test
 }

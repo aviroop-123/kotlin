@@ -119,6 +119,9 @@ abstract class IrTransformer<in D> : IrVisitor<IrElement, D>(), @Suppress("DEPRE
     override fun visitConstructorCall(expression: IrConstructorCall, data: D): IrElement =
         visitFunctionAccess(expression, data)
 
+    override fun visitAnnotation(expression: IrAnnotation, data: D): IrElement =
+        visitConstructorCall(expression, data)
+
     override fun visitSingletonReference(expression: IrGetSingletonValue, data: D): IrExpression =
         visitDeclarationReference(expression, data)
 

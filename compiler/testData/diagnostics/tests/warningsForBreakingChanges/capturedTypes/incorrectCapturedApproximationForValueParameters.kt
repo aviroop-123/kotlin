@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // ISSUE: KT-49404
-// SKIP_TXT
 
 // FILE: A.java
 public class A<T> implements WithExtension<T> {
@@ -22,17 +21,17 @@ class B<E> : WithExtension<E> {
 fun withInvStar(i: Inv<*>.() -> Unit) {}
 
 fun bar1(a: A<in Any>, i: Inv<*>) {
-    a.foo(<!TYPE_MISMATCH_WARNING_FOR_INCORRECT_CAPTURE_APPROXIMATION!>i<!>)
+    a.foo(<!ARGUMENT_TYPE_MISMATCH!>i<!>)
 }
 
 fun bar2(b: B<in Any>, i: Inv<*>) {
-    b.foo(<!TYPE_MISMATCH!>i<!>)
+    b.foo(<!ARGUMENT_TYPE_MISMATCH!>i<!>)
 }
 
 fun A<in Any>.bar3(i: Inv<*>) {
-    <!RECEIVER_TYPE_MISMATCH_WARNING_FOR_INCORRECT_CAPTURE_APPROXIMATION!>i<!>.ext()
+    i.<!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>ext<!>()
     withInvStar {
-        <!RECEIVER_TYPE_MISMATCH_WARNING_FOR_INCORRECT_CAPTURE_APPROXIMATION!>ext<!>()
+        <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>ext<!>()
     }
 }
 

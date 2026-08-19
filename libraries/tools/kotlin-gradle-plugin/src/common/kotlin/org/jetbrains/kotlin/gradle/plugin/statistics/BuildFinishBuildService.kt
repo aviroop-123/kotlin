@@ -13,47 +13,63 @@ import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
+import org.gradle.tooling.events.FinishEvent
+import org.gradle.tooling.events.OperationCompletionListener
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.fus.BuildUidService
 import org.jetbrains.kotlin.gradle.logging.Errors
 import org.jetbrains.kotlin.gradle.logging.GradleKotlinLogger
+import org.jetbrains.kotlin.gradle.logging.kotlinDebug
 import org.jetbrains.kotlin.gradle.logging.reportToIde
+import org.jetbrains.kotlin.gradle.plugin.BuildEventsListenerRegistryHolder
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.utils.kotlinErrorsDir
 import org.jetbrains.kotlin.statistics.fileloggers.MetricsContainer
+import org.jetbrains.kotlin.statistics.fileloggers.MetricsContainer.Companion.addMetricFromFusKotlinProfileFile
+import org.jetbrains.kotlin.statistics.fileloggers.MetricsContainer.Companion.createValidateAndAnonymizeCopy
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.String
 
-internal abstract class BuildFinishBuildService : BuildService<BuildFinishBuildService.Parameters>, AutoCloseable {
+internal abstract class BuildFinishBuildService : BuildService<BuildFinishBuildService.Parameters>, AutoCloseable,
+    OperationCompletionListener {
     protected val buildId = parameters.buildId.get()
     private val log = Logging.getLogger(this.javaClass)
     private val errorWasReported = AtomicBoolean(false)
+
+    init {
+        log.kotlinDebug("Initialize build service $serviceName: class \"${this.javaClass.simpleName}\", build \"$buildId\"")
+    }
 
     interface Parameters : BuildServiceParameters {
         val buildId: Property<String>
         val fusReportDirectory: Property<File>
         val kotlinVersion: Property<String>
         val errorDirs: ListProperty<File>
+        val collectAllFusReportsIntoOne: Property<Boolean>
     }
 
     companion object {
         private val serviceName =
             "${BuildFinishBuildService::class.java.canonicalName}_${BuildFinishBuildService::class.java.classLoader.hashCode()}"
 
-        fun registerIfAbsent(project: Project, buildUidService: Provider<BuildUidService>, kotlinPluginVersion: String) {
+        fun registerIfAbsent(
+            project: Project,
+            buildUidService: Provider<BuildUidService>,
+            kotlinPluginVersion: String,
+        ): Provider<BuildFinishBuildService>? {
             if (!project.buildServiceShouldBeCreated) {
-                return
+                return null
             }
 
-            if (project.gradle.sharedServices.registrations.findByName(serviceName) != null) {
-                return
+            project.gradle.sharedServices.registrations.findByName(serviceName)?.let {
+                @Suppress("UNCHECKED_CAST")
+                return (it.service as Provider<BuildFinishBuildService>)
             }
 
             val reportDir = project.getFusDirectoryFromPropertyService()
-            val useFlowAction = GradleVersion.current().baseVersion >= GradleVersion.version("8.1")
+            val collectAllFusReportsIntoOne = GradleVersion.current().baseVersion >= GradleVersion.version("8.1")
 
-            project.gradle.sharedServices.registerIfAbsent(serviceName, BuildFinishBuildService::class.java) { spec ->
+            val service = project.gradle.sharedServices.registerIfAbsent(serviceName, BuildFinishBuildService::class.java) { spec ->
                 spec.parameters.buildId.value(buildUidService.map { it.buildId }).disallowChanges()
                 spec.parameters.fusReportDirectory.value(reportDir).disallowChanges()
                 spec.parameters.errorDirs.add(project.kotlinErrorsDir)
@@ -62,11 +78,13 @@ internal abstract class BuildFinishBuildService : BuildService<BuildFinishBuildS
                 }
                 spec.parameters.errorDirs.disallowChanges()
                 spec.parameters.kotlinVersion.value(kotlinPluginVersion).disallowChanges()
-            }.get()
-
-            if (useFlowAction) { //otherwise CloseActionBuildFusService.close() will aggregate fus metrics into single file
-                BuildFinishFlowProviderManager.getInstance(project).subscribeForBuildResults()
+                spec.parameters.collectAllFusReportsIntoOne.value(collectAllFusReportsIntoOne).disallowChanges()
             }
+
+            // Gradle < 8.1: ensure BuildFinishBuildService is created at the same time as BuildFusService to ensure the same buildId is used
+            BuildEventsListenerRegistryHolder.getInstance(project).listenerRegistry.onTaskCompletion(service)
+
+            return service
         }
 
         internal fun collectAllFusReportsIntoOne(
@@ -76,21 +94,18 @@ internal abstract class BuildFinishBuildService : BuildService<BuildFinishBuildS
             log: Logger,
         ): Errors {
             try {
-                val metricContainer = MetricsContainer()
+                val metricContainer = MetricsContainer.createMetricsContainerForProfileFile()
 
-                fusReportDirectory.listFiles()
-                    .filter { it.name.startsWith(buildUid) && (it.name.endsWith("plugin-profile") || it.name.endsWith("kotlin-profile")) }
-                    .forEach {
-                        MetricsContainer.readFromFile(it) {
-                            metricContainer.populateFromMetricsContainer(it)
-                        }
+                fusReportDirectory.findFusFilesByBuildId(buildUid)
+                    ?.forEach {
+                        metricContainer.addMetricFromFusKotlinProfileFile(it)
                     }
 
                 val fusFile = fusReportDirectory.resolve("$buildUid.profile")
                 fusFile.writer().buffered().use {
                     it.appendLine("Build: $buildUid")
                     it.appendLine("Kotlin version: $kotlinVersion")
-                    metricContainer.flush(it)
+                    metricContainer.createValidateAndAnonymizeCopy().flush(it)
                 }
 
                 if (!fusReportDirectory.resolve("$buildUid.finish-profile").createNewFile()) {
@@ -105,10 +120,21 @@ internal abstract class BuildFinishBuildService : BuildService<BuildFinishBuildS
             log.debug("Single fus file was created for build $buildUid ")
             return emptyList()
         }
+
+        internal fun File.findFusFilesByBuildId(buildUid: String): List<File>? = listFiles()
+            ?.sortedWith(compareBy({ it.lastModified() }, { it.name }))
+            ?.filter { it.name.startsWith(buildUid) && (it.name.endsWith("plugin-profile") || it.name.endsWith("kotlin-profile")) }
+    }
+
+    override fun onFinish(p0: FinishEvent?) {
+        //Do nothing
     }
 
     override fun close() {
-        log.debug("Build service $serviceName closed for build $buildId")
+        log.kotlinDebug("Close build service $serviceName: class \"${this.javaClass.simpleName}\", build \"$buildId\"")
+        if (parameters.collectAllFusReportsIntoOne.get()) {
+            collectAllFusReportsIntoOne()
+        }
     }
 
     private fun File.errorFile() = resolve("errors-$buildId-${System.currentTimeMillis()}.log")

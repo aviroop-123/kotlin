@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 description = "Printer for SIR"
@@ -17,7 +17,7 @@ dependencies {
 
     implementation(project(":core:util.runtime"))
 
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.junit.jupiter.api)
 
@@ -30,15 +30,11 @@ sourceSets {
     "test" { projectDefault() }
 }
 
-val testDataDir = projectDir.resolve("testData")
-
 projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5) {
-        inputs.dir(testDataDir)
-    }
-}
+    testData(isolated, "testData")
 
-testsJar()
+    testTask(jUnitMode = JUnitMode.JUnit5)
+}
 
 publish()
 

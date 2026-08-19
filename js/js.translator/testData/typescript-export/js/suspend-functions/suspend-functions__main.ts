@@ -9,11 +9,19 @@ import sumNullable = JS_TESTS.foo.sumNullable
 import defaultParameters = JS_TESTS.foo.defaultParameters
 import generic1 = JS_TESTS.foo.generic1
 import generic2 = JS_TESTS.foo.generic2
+import generic3 = JS_TESTS.foo.generic3
 import genericWithConstraint = JS_TESTS.foo.genericWithConstraint
 import acceptTest = JS_TESTS.foo.acceptTest
 import generateOneMoreChildOfTest = JS_TESTS.foo.generateOneMoreChildOfTest;
 import ExportedChild = JS_TESTS.foo.ExportedChild;
 import acceptExportedChild = JS_TESTS.foo.acceptExportedChild;
+import inlineFun = JS_TESTS.foo.inlineFun;
+import inlineChain = JS_TESTS.foo.inlineChain;
+import suspendExtensionFun = JS_TESTS.foo.suspendExtensionFun;
+import suspendFunWithContext = JS_TESTS.foo.suspendFunWithContext;
+import WithSuspendExtensionFunAndContext = JS_TESTS.foo.WithSuspendExtensionFunAndContext;
+import acceptHolderOfSum = JS_TESTS.foo.acceptHolderOfSum;
+import acceptHolderOfParentSuspendFun1 = JS_TESTS.foo.acceptHolderOfParentSuspendFun1;
 
 function assert(condition: boolean) {
     if (!condition) {
@@ -33,10 +41,13 @@ async function box(): Promise<string> {
     assert(await defaultParameters("test", 20, "custom") === "test20custom");
     assert(await generic1("string") === "string");
     assert(await generic2<string>(null));
+    assert(await generic3<number, string, boolean, (p0: number) => number, any>(42, "42", true, x => x) == null);
     assert(await genericWithConstraint("constrained") === "constrained");
 
     const test = new Test();
     await acceptTest(test);
+    await acceptHolderOfSum(test);
+
     assert(await test.sum(1, 2) === 3);
     assert(await test.varargInt(new Int32Array([1, 2, 3])) === 3);
     assert(await test.varargNullableInt([1, null, 3]) === 3);
@@ -47,9 +58,21 @@ async function box(): Promise<string> {
     assert(await test.generic1("string") === "string");
     assert(await test.generic2<string>(null));
     assert(await test.genericWithConstraint("constrained") === "constrained");
+    assert(await test.generic3<number, string, boolean, (p0: number) => number, any>(42, "42", true, x => x) == null);
+    assert(await test.genericWithConstraint("constrained") === "constrained");
+
+
+    assert(await inlineFun(42, x => x) == 42);
+    assert(await inlineChain(42) == 42);
+    assert(await suspendExtensionFun(42) == 42);
+    assert(await suspendFunWithContext(42) == 42);
+    const withSuspendExtensionFunAndContext = new WithSuspendExtensionFunAndContext();
+    assert(await withSuspendExtensionFunAndContext.suspendFun(4, 2) == 6);
 
     const testChild = new TestChild();
     await acceptTest(testChild);
+    await acceptHolderOfSum(testChild);
+
     assert(await testChild.varargInt(new Int32Array([1, 2, 3])) === 5);
     assert(await testChild.sumNullable(null, null) === 2);
     const testChildResult = await testChild.generic3<number, string, boolean, number, string>(1, "test", true, 1.0);
@@ -57,6 +80,8 @@ async function box(): Promise<string> {
 
     const anotherTestChild = generateOneMoreChildOfTest()
     await acceptTest(anotherTestChild);
+    await acceptHolderOfSum(anotherTestChild);
+
     assert(await anotherTestChild.sum(1, 2) === 42);
     assert(await anotherTestChild.varargNullableInt([1, null, 3]) === 43);
     assert(await anotherTestChild.sumNullable(null, null) === 44);
@@ -75,6 +100,11 @@ async function box(): Promise<string> {
         override async generic2<T>(x: T | null | undefined): Promise<boolean> {
             return false
         }
+
+        // override method that originally is defined inside Kotlin interface
+        override async sum(x: number, y: number): Promise<number> {
+            return await super.sum(x, y) + 50
+        }
     }
 
     const typeScriptTest = new TypeScriptTest();
@@ -82,20 +112,32 @@ async function box(): Promise<string> {
     assert(await typeScriptTest.defaultParameters("test") === "OK");
     assert(!(await typeScriptTest.generic2<string>(null)));
 
-    await acceptTest(new TypeScriptTest())
+    await acceptTest(typeScriptTest)
+    await acceptHolderOfSum(typeScriptTest);
 
     const exportedChild = new ExportedChild()
     await acceptExportedChild(exportedChild)
+    await acceptHolderOfParentSuspendFun1(exportedChild)
+
+    assert(await exportedChild.parentSuspendFun1() === "NotExportedParent 1");
+    assert(await exportedChild.parentSuspendFun1("Test") === "NotExportedParent Test");
     assert(await exportedChild.childSuspendFun() === "ExportedChild");
 
     class TypeScriptExportedChild extends ExportedChild {
         override async childSuspendFun(): Promise<string> {
             return "TypeScriptChild"
         }
+        override async parentSuspendFun1(value: string = ""): Promise<string> {
+            return value + "TypeScriptSuspendFun1"
+        }
     }
 
     const typeScriptChild = new TypeScriptExportedChild()
     await acceptExportedChild(typeScriptChild)
+    await acceptHolderOfParentSuspendFun1(typeScriptChild)
+
+    assert(await typeScriptChild.parentSuspendFun1() === "TypeScriptSuspendFun1");
+    assert(await typeScriptChild.parentSuspendFun1("Test") === "TestTypeScriptSuspendFun1");
     assert(await typeScriptChild.childSuspendFun() === "TypeScriptChild");
 
     return "OK";

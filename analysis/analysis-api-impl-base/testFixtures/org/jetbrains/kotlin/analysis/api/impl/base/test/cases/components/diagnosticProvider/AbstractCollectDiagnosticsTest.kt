@@ -12,7 +12,6 @@ import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaDiagnosticWithPsi
 import org.jetbrains.kotlin.analysis.test.framework.base.AbstractAnalysisApiBasedTest
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.ktTestModuleStructure
-import org.jetbrains.kotlin.analysis.test.framework.test.configurators.FrontendKind
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils.getLineAndColumnRangeInPsiFile
 import org.jetbrains.kotlin.diagnostics.PsiDiagnosticUtils.offsetToLineAndColumn
 import org.jetbrains.kotlin.psi.KtElement
@@ -80,23 +79,22 @@ abstract class AbstractCollectDiagnosticsTest : AbstractAnalysisApiBasedTest() {
 
         testServices.assertions.assertEqualsToTestOutputFile(actual)
 
-        if (configurator.frontendKind == FrontendKind.Fir) {
-            // The suppression has to be applied once for all files. If we check the suppression per file, some checks will not fail,
-            // and fail the test with a message that the suppression is not needed.
-            testServices.moduleStructure.allDirectives.suppressIf(
-                suppressionDirective = Directives.SUPPRESS_INDIVIDUAL_DIAGNOSTICS_CHECK,
-                filter = { it is AssertionError },
-                action = {
-                    for (preparedFile in preparedFiles) {
-                        val ktFile = preparedFile.ktFile
-                        analyzeForTest(ktFile) {
-                            val diagnosticsFromFile = collectFileDiagnostics(ktFile)
-                            checkDiagnosticsFromElements(ktFile, diagnosticsFromFile)
-                        }
+        // The suppression has to be applied once for all files. If we check the suppression per file, some checks will not fail,
+        // and fail the test with a message that the suppression is not needed.
+        testServices.moduleStructure.allDirectives.suppressIf(
+            suppressionDirective = Directives.SUPPRESS_INDIVIDUAL_DIAGNOSTICS_CHECK,
+            filter = { it is AssertionError },
+            action = {
+                for (preparedFile in preparedFiles) {
+                    val ktFile = preparedFile.ktFile
+                    analyzeForTest(ktFile) {
+                        val diagnosticsFromFile = collectFileDiagnostics(ktFile)
+                        checkDiagnosticsFromElements(ktFile, diagnosticsFromFile)
+                        checkDiagnosticsFromSequence(ktFile, diagnosticsFromFile)
                     }
                 }
-            )
-        }
+            }
+        )
     }
 
     private fun KaSession.collectFileDiagnostics(ktFile: KtFile): List<DiagnosticKey> =
@@ -140,7 +138,7 @@ abstract class AbstractCollectDiagnosticsTest : AbstractAnalysisApiBasedTest() {
             ktFile.accept(object : KtTreeVisitorVoid() {
                 override fun visitKtElement(element: KtElement) {
                     element
-                        .diagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS)
+                        .directDiagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS)
                         .mapTo(this@buildList) { it.getDiagnosticKey() }
 
                     super.visitKtElement(element)
@@ -152,6 +150,17 @@ abstract class AbstractCollectDiagnosticsTest : AbstractAnalysisApiBasedTest() {
             diagnosticsFromFile,
             diagnosticsFromElements,
             "diagnostics collected from files should be the same as those collected from individual PSI elements."
+        )
+    }
+
+    private fun KaSession.checkDiagnosticsFromSequence(ktFile: KtFile, diagnosticsFromFile: List<DiagnosticKey>) {
+        assertEquals(
+            diagnosticsFromFile,
+            ktFile.diagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS)
+                .map { it.getDiagnosticKey() }
+                .sorted()
+                .toList(),
+            "diagnostics collected via diagnostics() should be the same as those collected from collectDiagnostics()."
         )
     }
 

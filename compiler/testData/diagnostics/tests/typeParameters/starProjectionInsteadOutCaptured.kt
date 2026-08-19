@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// SKIP_TXT
 interface A
 interface B<X : A>
 interface C<E : A, F : B<E>>

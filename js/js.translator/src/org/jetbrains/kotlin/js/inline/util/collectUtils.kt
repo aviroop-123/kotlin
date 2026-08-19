@@ -62,7 +62,7 @@ fun collectDefinedNames(scope: JsNode, skipLabelsAndCatches: Boolean): Set<JsNam
             if (initializer != null) {
                 accept(initializer)
             }
-            names += x.name
+            names += x.assignable.names
         }
 
         override fun visitExpressionStatement(x: JsExpressionStatement) {
@@ -85,7 +85,7 @@ fun collectDefinedNames(scope: JsNode, skipLabelsAndCatches: Boolean): Set<JsNam
 
         override fun visitCatch(x: JsCatch) {
             if (!skipLabelsAndCatches) {
-                names += x.parameter.name
+                names += x.parameter.assignable.names
             }
             super.visitCatch(x)
         }
@@ -98,9 +98,9 @@ fun collectDefinedNames(scope: JsNode, skipLabelsAndCatches: Boolean): Set<JsNam
     return names
 }
 
-fun JsFunction.collectFreeVariables() = collectUsedNames(body) - collectDefinedNames(body) - parameters.map { it.name }
+fun JsFunction.collectFreeVariables() = collectUsedNames(body) - collectDefinedNames(body) - parameters.mapNotNull { it.name }.toSet()
 
-fun JsFunction.collectLocalVariables(skipLabelsAndCatches: Boolean = false) = collectDefinedNames(body, skipLabelsAndCatches) + parameters.map { it.name }
+fun JsFunction.collectLocalVariables(skipLabelsAndCatches: Boolean = false) = collectDefinedNames(body, skipLabelsAndCatches) + parameters.mapNotNull { it.name }.toSet()
 
 fun collectNamedFunctions(scope: JsNode) = collectNamedFunctionsAndMetadata(scope).mapValues { it.value.first.function }
 
@@ -111,11 +111,11 @@ private fun collectNamedFunctionsAndMetadata(scope: JsNode): Map<JsName, Pair<Fu
         override fun visitBinaryExpression(x: JsBinaryOperation) {
             val assignment = JsAstUtils.decomposeAssignment(x)
             if (assignment != null) {
-                val (left, right) = assignment
+                val [left, right] = assignment
                 if (left is JsNameRef) {
                     val name = left.name
                     if (name != null) {
-                        extractFunction(right)?.let { (function, wrapper) ->
+                        extractFunction(right)?.let { (val function, val wrapper = wrapperBody) ->
                             namedFunctions[name] = Pair(FunctionWithWrapper(function, wrapper), right)
                         }
                     }
@@ -125,9 +125,9 @@ private fun collectNamedFunctionsAndMetadata(scope: JsNode): Map<JsName, Pair<Fu
         }
 
         override fun visit(x: JsVars.JsVar) {
-            val initializer = x.initExpression
             val name = x.name
-            if (initializer != null && name != null) {
+            val initializer = x.initExpression
+            if (name != null && initializer != null) {
                 extractFunction(initializer)?.let { function ->
                     namedFunctions[name] = Pair(function, initializer)
                 }

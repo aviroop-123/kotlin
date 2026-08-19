@@ -93,7 +93,7 @@ abstract class BridgesConstruction(private val context: JsCommonBackendContext) 
         // bridges will be generated there
         if (function.modality == Modality.ABSTRACT) return null
 
-        val (bridgesDfsRoots, implementedDfsRoots) =
+        val [bridgesDfsRoots, implementedDfsRoots] =
             if (function.isRealOrOverridesInterface) function.overriddenSymbols to emptyList()
             else function.overriddenSymbols.partition { it.owner.modality == Modality.ABSTRACT }
 
@@ -119,12 +119,12 @@ abstract class BridgesConstruction(private val context: JsCommonBackendContext) 
 
         if (bridgesToGenerate.isEmpty()) return null
 
-        val (specialOverride: IrSimpleFunction?, specialOverrideInfo) =
+        val [specialOverride: IrSimpleFunction?, specialOverrideInfo] =
             specialBridgeMethods.findSpecialWithOverride(function) ?: Pair(null, null)
         val specialOverrideSignature = specialOverride?.let(::getFunctionSignature)
 
         val result = mutableListOf<IrDeclaration>()
-        for ((bridgeSignature, bridgeMethod) in bridgesToGenerate) {
+        for ([bridgeSignature, bridgeMethod] in bridgesToGenerate) {
             result += createBridge(
                 function = function,
                 bridge = bridgeMethod,
@@ -215,7 +215,14 @@ abstract class BridgesConstruction(private val context: JsCommonBackendContext) 
         if (bridge.isEffectivelyExternal()) {
             valueParametersToCopy = valueParametersToCopy.takeWhile { it.varargElementType == null }
         }
-        parameters = parameters memoryOptimizedPlus valueParametersToCopy.map { p -> p.copyTo(this, type = p.type.substitute(substitutionMap)) }
+        parameters = parameters memoryOptimizedPlus valueParametersToCopy.map { p ->
+            p.copyTo(
+                startOffset = UNDEFINED_OFFSET, // The offsets must be UNDEFINED because the bridge could come from another file
+                endOffset = UNDEFINED_OFFSET,
+                irFunction = this,
+                type = p.type.substitute(substitutionMap)
+            )
+        }
     }
 
     abstract fun getBridgeOrigin(bridge: IrSimpleFunction): IrDeclarationOrigin

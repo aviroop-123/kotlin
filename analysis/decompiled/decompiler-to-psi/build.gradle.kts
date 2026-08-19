@@ -1,8 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
-    id("project-tests-convention")
 }
 
 dependencies {
@@ -21,25 +19,10 @@ dependencies {
     testFixturesApi(testFixtures(project(":compiler:tests-common-new")))
     testFixturesApi(testFixtures(project(":analysis:decompiled:decompiler-to-file-stubs")))
     testFixturesApi(libs.junit.jupiter.api)
-    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 sourceSets {
     "main" { projectDefault() }
-    "test" {
-        projectDefault()
-        generatedTestDir()
-    }
+    "test" { none() }
     "testFixtures" { projectDefault() }
 }
-
-projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5) {
-        dependsOn(":dist")
-        workingDir = rootDir
-    }
-
-    withJvmStdlibAndReflect()
-}
-
-testsJar()

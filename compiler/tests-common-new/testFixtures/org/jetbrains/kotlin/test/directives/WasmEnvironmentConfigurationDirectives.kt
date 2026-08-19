@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.test.directives
 
 import org.jetbrains.kotlin.test.directives.model.DirectiveApplicability
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
+import org.jetbrains.kotlin.test.utils.wasmIgnoreForParser
 
 object WasmEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
     val RUN_UNIT_TESTS by directive(
@@ -21,8 +22,26 @@ object WasmEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
         description = "Generate wasm with the updated EH proposal turned on",
     )
 
+    val USE_OLD_EXCEPTION_HANDLING_PROPOSAL by directive(
+        description = "Generate wasm using the old EH proposal",
+    )
+
+    @OptIn(SensitiveDirectiveAPI::class)
+    val WASM_IGNORE_FOR by valueDirective(
+        description = """
+            Ignore test failure in specified (Wasm) environment.
+            Multiple conditions in one directive entry are combined with AND, separated by ' '
+            (e.g. 'mode=multi-module os=windows'). Use separate `WASM_IGNORE_FOR` lines for OR semantics.""".trimIndent(),
+        splitValuesOnSpaces = false,
+        parser = ::wasmIgnoreForParser
+    )
+
     val WASM_NO_JS_TAG by directive(
         description = "Don't use WebAssembly.JSTag for throwing and catching exceptions",
+    )
+
+    val WASM_INTERNAL_LOCAL_VARIABLE_PREFIX by stringDirective(
+        description = "Prefix to use for internally generated local variables",
     )
 
     val WASM_DISABLE_FQNAME_IN_KCLASS by directive(
@@ -38,6 +57,11 @@ object WasmEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
     )
 
     val PATH_TO_ROOT_OUTPUT_DIR by stringDirective(
+        description = "Specify the path to output directory, where all artifacts will be stored",
+        applicability = DirectiveApplicability.Global
+    )
+
+    val PATH_TO_NODE_DIR by stringDirective(
         description = "Specify the path to output directory, where all artifacts will be stored",
         applicability = DirectiveApplicability.Global
     )
@@ -69,6 +93,14 @@ object WasmEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
 
     val RUN_THIRD_PARTY_OPTIMIZER by directive(
         description = "Also run third-party optimizer (for now, only binaryen is supported) after the main compilation",
+    )
+
+    val WASM_DISABLE_ARRAY_RANGE_CHECKS by directive(
+        description = "Disable array range checks for this test (default is enabled)",
+    )
+
+    val WASM_DISABLE_ARRAY_RANGE_CHECKS_SAFE_ELIMINATION by directive(
+        description = "Disable bounds check elimination for provably-safe array accesses in for-loops",
     )
 
     val CHECK_TYPESCRIPT_DECLARATIONS by directive(

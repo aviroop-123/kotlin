@@ -20,7 +20,7 @@ abstract class AbstractImplementationPrinter<Implementation, Element, Field>(
               Field : AbstractField<Field> {
 
 
-    protected abstract val implementationOptInAnnotation: ClassRef<*>
+    protected abstract val implementationOptInAnnotation: PrintableAnnotation
 
     protected abstract fun getPureAbstractElementType(implementation: Implementation): ClassRef<*>
 
@@ -51,7 +51,7 @@ abstract class AbstractImplementationPrinter<Implementation, Element, Field>(
                     }
                 }
             }.ifNotEmpty {
-                println("@OptIn(", joinToString { "${it.render()}::class" }, ")")
+                println("@OptIn(", joinToString { it.asClassRefString }, ")")
             }
 
             if (!implementation.isPublic) {
@@ -68,13 +68,14 @@ abstract class AbstractImplementationPrinter<Implementation, Element, Field>(
             val fieldPrinter = makeFieldPrinter(this)
 
             val additionalConstructorParameters = additionalConstructorParameters(implementation)
+            val fieldsInConstructor = implementation.fieldsInConstructor.filter { it.doPrint }
             if (!isInterface &&
                 !isAbstract &&
-                (implementation.fieldsInConstructor.isNotEmpty() || additionalConstructorParameters.isNotEmpty())
+                (fieldsInConstructor.isNotEmpty() || additionalConstructorParameters.isNotEmpty())
             ) {
                 var printConstructor = false
                 if (implementation.isPublic && implementation.isConstructorPublic && implementation.putImplementationOptInInConstructor) {
-                    print(" @", implementationOptInAnnotation.render())
+                    print(" " + implementationOptInAnnotation.render())
                     printConstructor = true
                 }
                 if (implementation.isPublic && !implementation.isConstructorPublic) {
@@ -91,7 +92,7 @@ abstract class AbstractImplementationPrinter<Implementation, Element, Field>(
                     for (parameter in additionalConstructorParameters) {
                         println(parameter.render(this), ",")
                     }
-                    implementation.fieldsInConstructor
+                    fieldsInConstructor
                         .reorderFieldsIfNecessary(implementation.constructorParameterOrderOverride)
                         .forEachIndexed { _, field ->
                             if (field.isParameter) {
@@ -114,7 +115,7 @@ abstract class AbstractImplementationPrinter<Implementation, Element, Field>(
                 withIndent {
                     val fields = if (isInterface || isAbstract) implementation.allFields
                     else implementation.fieldsInBody
-                    fields.forEachIndexed { index, field ->
+                    fields.filter { it.doPrint }.forEachIndexed { index, field ->
                         if (index > 0 && separateFieldsWithBlankLine) {
                             println()
                         }

@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 
 fun <X, Y> foo(): (X) -> Y = TODO()
 

@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_EXPRESSION -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_PARAMETER -UNUSED_VARIABLE -UNUSED_VALUE -VARIABLE_WITH_REDUNDANT_INITIALIZER
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (NEGATIVE)
@@ -15,9 +14,9 @@
  * ISSUES: KT-22996
  */
 fun case_1(x: Number?): Long? {
-    if (x is Long?) return <!DEBUG_INFO_SMARTCAST!>x<!>
-    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Number?")!>x<!>
-    return <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Number?")!>x<!><!UNSAFE_CALL!>.<!>toLong()
+    if (x is Long?) return x
+    <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Number")!>x<!>
+    return <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Number")!>x<!>.toLong()
 }
 
 /*
@@ -25,5 +24,5 @@ fun case_1(x: Number?): Long? {
  * ISSUES: KT-22997
  */
 fun case_2(x: Number?): Long? {
-    if (x == null || x is Long) return <!TYPE_MISMATCH!>x<!> else return 0L
+    if (x == null || x is Long) return x else return 0L
 }

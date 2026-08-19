@@ -3,6 +3,7 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 // TARGET_BACKEND: NATIVE
+// LANGUAGE: +EnumEntries
 // MODULE: cinterop
 // FILE: cenums.def
 ---
@@ -13,7 +14,6 @@ enum E {
 // MODULE: main(cinterop)
 // FILE: main.kt
 
-// LANGUAGE: +EnumEntries
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 
 import cenums.*

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,14 +8,7 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.api.targets
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.FirDesignation
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
-import org.jetbrains.kotlin.fir.declarations.FirAnonymousInitializer
-import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirClassLikeDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirConstructor
-import org.jetbrains.kotlin.fir.declarations.FirDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirFile
-import org.jetbrains.kotlin.fir.declarations.FirRegularClass
-import org.jetbrains.kotlin.fir.declarations.FirScript
+import org.jetbrains.kotlin.fir.declarations.*
 
 /**
  * [target] element and optionally its subgraph to be lazily resolved by LL FIR lazy resolver.
@@ -73,6 +66,7 @@ internal sealed class LLFirResolveTarget(val designation: FirDesignation) {
             when (val declaration = pathIterator.next()) {
                 is FirRegularClass -> visitor.withRegularClass(declaration) { goToTarget(pathIterator, visitor) }
                 is FirScript -> visitor.withScript(declaration) { goToTarget(pathIterator, visitor) }
+                is FirReplSnippet -> visitor.withReplSnippet(declaration) { goToTarget(pathIterator, visitor) }
                 is FirFile -> visitor.withFile(declaration) { goToTarget(pathIterator, visitor) }
                 else -> errorWithFirSpecificEntries(
                     "Unexpected declaration in path: ${declaration::class.simpleName}",
@@ -112,6 +106,7 @@ internal sealed class LLFirResolveTarget(val designation: FirDesignation) {
                     is FirFile -> it.name
                     is FirRegularClass -> it.name
                     is FirScript -> it.name
+                    is FirReplSnippet -> it.name
                     else -> errorWithFirSpecificEntries("Unsupported path declaration: ${it::class.simpleName}", fir = it)
                 }
             }
@@ -131,6 +126,7 @@ internal sealed class LLFirResolveTarget(val designation: FirDesignation) {
         is FirAnonymousInitializer -> ("<init-block>")
         is FirFile -> fir.name
         is FirScript -> fir.name.asString()
+        is FirReplSnippet -> fir.name.asString()
         else -> "???"
     }
 }

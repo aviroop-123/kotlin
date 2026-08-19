@@ -5,66 +5,51 @@
 
 package org.jetbrains.kotlin.test
 
-import org.jetbrains.kotlin.generators.TestGroup.TestClass
-import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
+import org.jetbrains.kotlin.generators.dsl.TestGroup.TestClass
+import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil.canFreezeIDE
 import org.jetbrains.kotlin.spec.utils.tasks.detectDirsWithTestsMapFileOnly
-import org.jetbrains.kotlin.test.runners.AbstractFirLightTreeDiagnosticTestSpec
-import org.jetbrains.kotlin.test.runners.AbstractFirLightTreeDiagnosticsWithLatestLanguageVersionTest
-import org.jetbrains.kotlin.test.runners.AbstractFirLightTreeDiagnosticsWithoutAliasExpansionTest
-import org.jetbrains.kotlin.test.runners.AbstractFirLightTreeWithActualizerDiagnosticsWithLatestLanguageVersionTest
-import org.jetbrains.kotlin.test.runners.AbstractFirLoadCompiledJvmWithAnnotationsInMetadataKotlinTest
-import org.jetbrains.kotlin.test.runners.AbstractFirLoadK1CompiledJvmKotlinTest
-import org.jetbrains.kotlin.test.runners.AbstractFirLoadK2CompiledJvmKotlinTest
-import org.jetbrains.kotlin.test.runners.AbstractFirPsiDiagnosticTestSpec
-import org.jetbrains.kotlin.test.runners.AbstractFirPsiForeignAnnotationsCompiledJavaTest
-import org.jetbrains.kotlin.test.runners.AbstractFirPsiForeignAnnotationsCompiledJavaWithPsiClassReadingTest
-import org.jetbrains.kotlin.test.runners.AbstractFirPsiForeignAnnotationsSourceJavaTest
-import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticLightTreeTest
-import org.jetbrains.kotlin.test.runners.AbstractPhasedJvmDiagnosticPsiTest
+import org.jetbrains.kotlin.test.runners.*
 import org.jetbrains.kotlin.test.utils.CUSTOM_TEST_DATA_EXTENSION_PATTERN
 import java.io.File
 
 fun main(args: Array<String>) {
     val mainClassName = TestGeneratorUtil.getMainClassName()
     val excludedCustomTestdataPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN
+    val testRoot = args[0]
 
     generateTestGroupSuiteWithJUnit5(args, mainClassName) {
-        testGroup(testsRoot = "compiler/fir/analysis-tests/tests-gen", testDataRoot = "compiler/testData") {
+        testGroup(testRoot, testDataRoot = "compiler/testData") {
             testClass<AbstractFirLightTreeWithActualizerDiagnosticsWithLatestLanguageVersionTest>(suiteTestClassName = "FirOldFrontendMPPDiagnosticsWithLightTreeWithLatestLanguageVersionTestGenerated") {
                 model("diagnostics/tests/multiplatform", pattern = "^(.*)\\.kts?$", excludedPattern = excludedCustomTestdataPattern)
             }
 
-            fun model(allowKts: Boolean, onlyTypealiases: Boolean = false): TestClass.() -> Unit = {
-                val pattern = when (allowKts) {
-                    true -> TestGeneratorUtil.KT_OR_KTS
-                    false -> TestGeneratorUtil.KT
+            run {
+                val init: TestClass.() -> Unit = {
+                    model(
+                        "diagnostics/tests", pattern = TestGeneratorUtil.KT,
+                        excludeDirsRecursively = listOf("multiplatform", "jvm"),
+                        excludedPattern = excludedCustomTestdataPattern,
+                    )
+                    model(
+                        "diagnostics/testsWithStdLib",
+                        excludedPattern = excludedCustomTestdataPattern,
+                    )
                 }
-                model(
-                    "diagnostics/tests", pattern = pattern,
-                    excludeDirsRecursively = listOf("multiplatform"),
-                    excludedPattern = excludedCustomTestdataPattern,
-                    skipSpecificFile = skipSpecificFileForFirDiagnosticTest(onlyTypealiases),
-                    skipTestAllFilesCheck = onlyTypealiases
+
+                testClass<AbstractFirLightTreeDiagnosticsWithLatestLanguageVersionTest>(
+                    init = init
                 )
-                model(
-                    "diagnostics/testsWithStdLib",
-                    excludedPattern = excludedCustomTestdataPattern,
-                    skipSpecificFile = skipSpecificFileForFirDiagnosticTest(onlyTypealiases),
-                    skipTestAllFilesCheck = onlyTypealiases
+
+                testClass<AbstractFirLightTreeDiagnosticsWithLanguageFeatureDisabledTest>(
+                    init = init
+                )
+
+                testClass<AbstractFirLightTreeDiagnosticsWithoutAliasExpansionTest>(
+                    init = init
                 )
             }
-
-            testClass<AbstractFirLightTreeDiagnosticsWithLatestLanguageVersionTest>(
-                suiteTestClassName = "FirLightTreeOldFrontendDiagnosticsWithLatestLanguageVersionTestGenerated",
-                init = model(allowKts = false)
-            )
-
-            testClass<AbstractFirLightTreeDiagnosticsWithoutAliasExpansionTest>(
-                suiteTestClassName = "FirLightTreeOldFrontendDiagnosticsWithoutAliasExpansionTestGenerated",
-                init = model(allowKts = false, onlyTypealiases = true)
-            )
 
             testClass<AbstractFirPsiForeignAnnotationsSourceJavaTest>(
                 suiteTestClassName = "FirPsiOldFrontendForeignAnnotationsSourceJavaTestGenerated"
@@ -93,14 +78,13 @@ fun main(args: Array<String>) {
                 model("diagnostics/foreignAnnotationsTests/java8Tests", excludedPattern = excludedCustomTestdataPattern)
                 model("diagnostics/foreignAnnotationsTests/java11Tests", excludedPattern = excludedCustomTestdataPattern)
             }
+
+            testClass<AbstractMetadataDiagnosticTest> {
+                model("diagnostics/metadataDiagnosticTests", excludedPattern = excludedCustomTestdataPattern)
+            }
         }
 
-        testGroup("compiler/fir/analysis-tests/tests-gen", "compiler/testData") {
-            testClass<AbstractFirLoadK1CompiledJvmKotlinTest> {
-                model("loadJava/compiledKotlin", extension = "kt")
-                model("loadJava/compiledKotlinWithStdlib", extension = "kt")
-            }
-
+        testGroup(testRoot, "compiler/testData") {
             testClass<AbstractFirLoadK2CompiledJvmKotlinTest> {
                 model("loadJava/compiledKotlin", extension = "kt")
                 model("loadJava/compiledKotlinWithStdlib", extension = "kt")
@@ -112,40 +96,12 @@ fun main(args: Array<String>) {
             }
         }
 
-        testGroup("compiler/fir/analysis-tests/tests-gen", "compiler/fir/analysis-tests/testData") {
-            fun model(allowKts: Boolean, onlyTypealiases: Boolean = false): TestClass.() -> Unit = {
-                val relativeRootPaths = listOf(
-                    "resolve",
-                    "resolveWithStdlib",
-                )
-                val pattern = when (allowKts) {
-                    true -> TestGeneratorUtil.KT_OR_KTS_WITHOUT_DOTS_IN_NAME
-                    false -> TestGeneratorUtil.KT_WITHOUT_DOTS_IN_NAME
-                }
-
-                for (path in relativeRootPaths) {
-                    model(
-                        path,
-                        pattern = pattern.canFreezeIDE,
-                        skipSpecificFile = skipSpecificFileForFirDiagnosticTest(onlyTypealiases),
-                        skipTestAllFilesCheck = onlyTypealiases
-                    )
-                }
-            }
-
-            testClass<AbstractFirLightTreeDiagnosticsWithLatestLanguageVersionTest>(init = model(allowKts = false))
-            testClass<AbstractFirLightTreeDiagnosticsWithoutAliasExpansionTest>(init = model(allowKts = false, onlyTypealiases = true))
-        }
-
-        testGroup("compiler/fir/analysis-tests/tests-gen", "compiler/") {
+        testGroup(testRoot, "compiler/") {
             fun TestClass.phasedModel(allowKts: Boolean, excludeDirsRecursively: List<String> = emptyList()) {
                 val relativeRootPaths = listOf(
                     "testData/diagnostics/tests",
                     "testData/diagnostics/testsWithAnyBackend",
                     "testData/diagnostics/testsWithStdLib",
-                    "testData/diagnostics/jvmIntegration",
-                    "fir/analysis-tests/testData/resolve",
-                    "fir/analysis-tests/testData/resolveWithStdlib",
                 )
                 val pattern = when (allowKts) {
                     true -> TestGeneratorUtil.KT_OR_KTS
@@ -171,7 +127,13 @@ fun main(args: Array<String>) {
             }
         }
 
-        testGroup(testsRoot = "compiler/fir/analysis-tests/tests-gen", testDataRoot = "compiler/tests-spec/testData") {
+        testGroup(testRoot, "compiler/testData/diagnostics/tests/contextSensitiveResolutionUsingExpectedType") {
+            testClass<AbstractPhasedJvmDiagnosticPsiWithContextSensitiveEnabledTest> {
+                model("ideHint", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
+            }
+        }
+
+        testGroup(testRoot, testDataRoot = "compiler/tests-spec/testData") {
             testClass<AbstractFirPsiDiagnosticTestSpec> {
                 model(
                     "diagnostics",
@@ -186,17 +148,6 @@ fun main(args: Array<String>) {
                     excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN
                 )
             }
-        }
-    }
-}
-
-private fun skipSpecificFileForFirDiagnosticTest(onlyTypealiases: Boolean): (File) -> Boolean {
-    return when (onlyTypealiases) {
-        true -> {
-            { !it.readText().contains("typealias") }
-        }
-        false -> {
-            { false }
         }
     }
 }

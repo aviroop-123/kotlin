@@ -7,16 +7,11 @@ package org.jetbrains.kotlin.fir.resolve.calls
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.fakeElement
-import org.jetbrains.kotlin.fir.expressions.FirExpression
-import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
-import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
-import org.jetbrains.kotlin.fir.expressions.builder.buildPropertyAccessExpression
-import org.jetbrains.kotlin.fir.expressions.builder.buildSmartCastExpression
-import org.jetbrains.kotlin.fir.expressions.unwrapSmartcastExpression
+import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.expressions.builder.*
 import org.jetbrains.kotlin.fir.references.builder.buildResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.toResolvedSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirThisOwnerSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
@@ -36,16 +31,20 @@ import org.jetbrains.kotlin.types.SmartcastStability
  *
  * See the KDoc of [ReceiverValue] for further details.
  */
-sealed class ImplicitValue<S>(
+sealed class ImplicitValue<S : FirBasedSymbol<*>>(
     type: ConeKotlinType,
     val originalType: ConeKotlinType,
     protected val mutable: Boolean,
-) where S : FirThisOwnerSymbol<*>, S : FirBasedSymbol<*> {
+) {
     abstract val boundSymbol: S
 
     var type: ConeKotlinType = type
         private set
 
+    /**
+     * Every expression type produced by the implementations (in addition to [FirSmartCastExpression])
+     * must be handled in [copyImplicitValueExpression].
+     */
     protected abstract fun computeOriginalExpression(): FirExpression
 
     /**
@@ -114,6 +113,16 @@ sealed class ImplicitValue<S>(
     abstract fun createSnapshot(keepMutable: Boolean): ImplicitValue<S>
 }
 
+fun FirExpression.copyImplicitValueExpression(): FirExpression {
+    return when (this) {
+        is FirPropertyAccessExpression -> buildPropertyAccessExpressionCopy(this) {}
+        is FirThisReceiverExpression -> buildThisReceiverExpressionCopy(this) {}
+        is FirInaccessibleReceiverExpression -> buildInaccessibleReceiverExpressionCopy(this) {}
+        is FirSmartCastExpression -> buildSmartCastExpressionCopy(this) {}
+        else -> error("Unexpected expression type '${this.javaClass.simpleName}'")
+    }
+}
+
 class ImplicitContextParameterValue private constructor(
     override val boundSymbol: FirValueParameterSymbol,
     type: ConeKotlinType,
@@ -124,8 +133,10 @@ class ImplicitContextParameterValue private constructor(
             : this(boundSymbol, type, originalType = type, mutable = true)
 
     override fun computeOriginalExpression(): FirExpression = buildPropertyAccessExpression {
-        source = boundSymbol.source?.fakeElement(KtFakeSourceElementKind.ImplicitContextParameterArgument)
+        val fakeSource = boundSymbol.source?.fakeElement(KtFakeSourceElementKind.ImplicitContextParameterArgument)
+        source = fakeSource
         calleeReference = buildResolvedNamedReference {
+            source = fakeSource
             name = boundSymbol.name
             resolvedSymbol = boundSymbol
         }

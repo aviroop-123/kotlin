@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.lower.LocalDeclarationPopupLowering
 import org.jetbrains.kotlin.backend.common.lower.LocalDeclarationsLowering
 import org.jetbrains.kotlin.backend.common.lower.VisibilityPolicy
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.common.runOnFilePostfix
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
@@ -23,7 +22,9 @@ import org.jetbrains.kotlin.ir.util.isInlineParameter
 import org.jetbrains.kotlin.ir.util.isOriginallyLocalDeclaration
 import org.jetbrains.kotlin.ir.util.render
 import org.jetbrains.kotlin.ir.util.setDeclarationsParent
-import org.jetbrains.kotlin.ir.visitors.*
+import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
+import org.jetbrains.kotlin.ir.visitors.IrTransformer
+import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
 /**
  * Extracts local classes from inline lambdas.
@@ -37,7 +38,6 @@ import org.jetbrains.kotlin.ir.visitors.*
  *    are copied. But the compiler could optimize the usage of some local classes and not copy them.
  *    So in this case all local classes MIGHT BE COPIED.
  */
-@PhaseDescription("LocalClassesInInlineLambdasLowering")
 class LocalClassesInInlineLambdasLowering(val context: LoweringContext) : BodyLoweringPass {
     override fun lower(irFile: IrFile) {
         runOnFilePostfix(irFile)
@@ -83,7 +83,7 @@ class LocalClassesInInlineLambdasLowering(val context: LoweringContext) : BodyLo
                          * so that's when we will change their visibility to private.
                          */
                         override fun forClass(declaration: IrClass, inInlineFunctionScope: Boolean) = declaration.visibility
-                        override fun forSimpleFunction(declaration: IrSimpleFunction, ownerIsLocal: Boolean) = declaration.visibility
+                        override fun forSimpleFunction(declaration: IrSimpleFunction) = declaration.visibility
                     },
                     // Lambdas cannot introduce new type parameters to the scope, which means that all the captured type parameters
                     // are also present in the inline lambda's parent declaration,
@@ -146,12 +146,11 @@ class LocalClassesInInlineLambdasLowering(val context: LoweringContext) : BodyLo
                              * }
                              */
                             val delegate = declaration.delegate
-                                ?: error("Local delegated property ${declaration.render()} has not delegate")
 
                             declaration.delegate = null
                             localDeclarationsToPopUp += declaration
 
-                            return delegate
+                            return delegate ?: IrCompositeImpl(declaration.startOffset, declaration.endOffset, context.irBuiltIns.unitType)
                         }
 
                         override fun visitRichFunctionReference(expression: IrRichFunctionReference): IrExpression {

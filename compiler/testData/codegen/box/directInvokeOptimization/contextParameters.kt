@@ -1,7 +1,6 @@
 // LANGUAGE: +ContextParameters
 // CHECK_BYTECODE_TEXT
 // WITH_STDLIB
-// IGNORE_BACKEND_K1: ANY
 
 context(x: Int)
 fun Int.f(y: Int): Int {

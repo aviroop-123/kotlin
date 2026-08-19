@@ -11,8 +11,12 @@ KaValueParameterSymbol:
       compilerVisibility: Private
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
+      isNotDefault: false
       isVal: false
       location: PROPERTY
       modality: FINAL
@@ -33,6 +37,7 @@ KaValueParameterSymbol:
       getContainingJvmClassName: pack.Impl
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     callableId: pack/Impl.bar
     compilerVisibility: Public
     contextParameters: []
@@ -44,8 +49,10 @@ KaValueParameterSymbol:
       contextReceivers: []
       hasStableParameterNames: true
       isActual: false
+      isCompanion: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isInline: false
       isNotDefault: false
       isOverride: true
@@ -67,13 +74,15 @@ KaValueParameterSymbol:
       getContainingJvmClassName: pack.Impl
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     hasBackingField: true
     hasGetter: true
     hasSetter: true
     initializer: KaNonConstantInitializerValue(override var bar: Int)
     isActual: false
+    isCompanion: false
     isConst: false
-    isDelegatedProperty: false
+    isDelegated: false
     isExpect: false
     isExtension: false
     isExternal: false
@@ -98,8 +107,10 @@ KaValueParameterSymbol:
       contextReceivers: []
       hasStableParameterNames: true
       isActual: false
+      isCompanion: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isInline: false
       isNotDefault: false
       isOverride: false
@@ -112,11 +123,15 @@ KaValueParameterSymbol:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -135,6 +150,7 @@ KaValueParameterSymbol:
         getContainingJvmClassName: null
         getContainingModule: KaSourceModule "Sources of main"
         deprecationStatus: null
+        importableFqName: null
       receiverParameter: null
       returnType: KaUsualClassType:
         annotations: []
@@ -147,11 +163,15 @@ KaValueParameterSymbol:
           compilerVisibility: Public
           contextReceivers: []
           generatedPrimaryConstructorProperty: null
+          hasDeclaredDefaultValue: false
           hasDefaultValue: false
           isActual: false
+          isCompanion: false
           isCrossinline: false
+          isDelegated: false
           isExpect: false
           isExtension: false
+          isExternal: false
           isImplicitLambdaParameter: false
           isNoinline: false
           isVal: true
@@ -170,6 +190,7 @@ KaValueParameterSymbol:
           getContainingJvmClassName: null
           getContainingModule: KaSourceModule "Sources of main"
           deprecationStatus: null
+          importableFqName: null
       ]
       visibility: PUBLIC
       getDispatchReceiver(): KaUsualClassType:
@@ -180,6 +201,7 @@ KaValueParameterSymbol:
       getContainingJvmClassName: pack.Impl
       getContainingModule: KaSourceModule "Sources of main"
       deprecationStatus: null
+      importableFqName: null
     typeParameters: []
     visibility: PUBLIC
     getDispatchReceiver(): KaUsualClassType:
@@ -190,16 +212,19 @@ KaValueParameterSymbol:
     getContainingJvmClassName: pack.Impl
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
-    getterDeprecationStatus: null
     javaGetterName: getBar
     javaSetterName: setBar
-    setterDeprecationStatus: null
     isInline: false
+    importableFqName: null
+  hasDeclaredDefaultValue: false
   hasDefaultValue: false
   isActual: false
+  isCompanion: false
   isCrossinline: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isImplicitLambdaParameter: false
   isNoinline: false
   isVal: true
@@ -218,3 +243,4 @@ KaValueParameterSymbol:
   getContainingJvmClassName: pack.Impl
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

@@ -1,3 +1,0 @@
-KDocName(26,28): 'aa'
-  KDocReference:
-    (in C) fun aa()

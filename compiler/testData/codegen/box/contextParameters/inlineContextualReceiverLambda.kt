@@ -1,6 +1,5 @@
 // ISSUE: KT-51960
 // LANGUAGE: +ContextParameters
-// IGNORE_BACKEND_K1: ANY
 
 class Context
 class Extended

@@ -1,17 +1,16 @@
 import gradle.GradlePluginVariant
+import gradle.commonSourceSetName
 import org.gradle.api.Project
 import org.gradle.api.attributes.Usage
 import org.gradle.api.internal.project.ProjectInternal
-import org.gradle.api.plugins.ExtraPropertiesExtension
-import org.gradle.kotlin.dsl.get
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.project
 import org.gradle.testfixtures.ProjectBuilder
 import org.jetbrains.dokka.gradle.AbstractDokkaLeafTask
 import org.jetbrains.dokka.gradle.GradleDokkaSourceSetBuilder
-import org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask
 import org.jetbrains.kotlin.gradle.plugin.extraProperties
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -89,20 +88,27 @@ class GradlePluginTests {
             ),
         )
 
-        assertEquals(
-            listOf(
-                listOf("producerPlugin", "build", "classes", "java", "common"),
-                listOf("producerPlugin", "build", "classes", "kotlin", "common"),
-                listOf("producerPluginDependency", "build", "classes", "java", "common"),
-                listOf("producerPluginDependency", "build", "classes", "kotlin", "common"),
-            ),
-            consumerPlugin.actualCompilationClasspath(
-                variantSourceSetName = "common",
-                dependencyPathsToCheck = dependencyPathsToCheck,
-            )
+        val actualCompilationClasspath = consumerPlugin.actualCompilationClasspath(
+            variantSourceSetName = commonSourceSetName,
+            dependencyPathsToCheck = dependencyPathsToCheck,
         )
+
+        listOf(
+            listOf("producerPlugin", "build", "classes", "java", "common"),
+            listOf("producerPlugin", "build", "classes", "kotlin", "common"),
+            listOf("producerPluginDependency", "build", "classes", "java", "common"),
+            listOf("producerPluginDependency", "build", "classes", "kotlin", "common"),
+        ).forEachIndexed { index, expected ->
+            assertEquals(
+                expected,
+                actualCompilationClasspath[index],
+                "Expected $expected is not equal to actual ${actualCompilationClasspath[index]}.\n" +
+                        "All actual are: ${actualCompilationClasspath.joinToString(separator = "\n")}"
+            )
+        }
     }
 
+    @Disabled("KTI-2926: kotlin-build-helpers does not support configuring the state via extra properties")
     @Test
     fun `gradle variant source sets - dokka generation doesn't see main source set in variant source sets`() {
         val root = createFakeKotlinRoot()
@@ -151,13 +157,15 @@ class GradlePluginTests {
     private fun Project.actualCompilationClasspath(
         variantSourceSetName: String,
         dependencyPathsToCheck: List<Path>,
-    ) = sourceSets.getByName(variantSourceSetName).compileClasspath.files.map { it.toPath() }.mapNotNull { compilationPath ->
-        val subprojectPath = dependencyPathsToCheck.firstOrNull { compilationPath.startsWith(it) }
-        if (subprojectPath == null) {
-            return@mapNotNull null
+    ) = sourceSets.getByName(variantSourceSetName).compileClasspath.files
+        .map { it.toPath() }
+        .mapNotNull { compilationPath ->
+            val subprojectPath = dependencyPathsToCheck.firstOrNull { compilationPath.startsWith(it) }
+            if (subprojectPath == null) {
+                return@mapNotNull null
+            }
+            compilationPath.drop(subprojectPath.count() - 1).map { it.pathString }
         }
-        compilationPath.drop(subprojectPath.count() - 1).map { it.pathString }
-    }
 
     private fun createKotlinSubproject(named: String, root: Project): ProjectInternal = ProjectBuilder.builder()
         .also {
@@ -174,6 +182,8 @@ class GradlePluginTests {
             it.withProjectDir(workingDir)
         }.build()
         root.extraProperties.set("buildNumber", "1.0")
+        root.extraProperties.set("projectsDependingOnStableStdlib", emptyArray<String>())
+        root.extraProperties.set("kotlinApiVersionForProjectsDependingOnStableStdlib", emptyArray<String>())
         root.tasks.register("mvnInstall")
 
         createKotlinSubproject("kotlin-gradle-plugin-api", root).also {

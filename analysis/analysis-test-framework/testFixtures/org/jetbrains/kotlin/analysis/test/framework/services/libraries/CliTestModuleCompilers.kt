@@ -1,35 +1,24 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.test.framework.services.libraries
 
-import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
-import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
-import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
-import org.jetbrains.kotlin.cli.common.arguments.K2MetadataCompilerArguments
-import org.jetbrains.kotlin.cli.common.arguments.cliArgument
+import org.jetbrains.kotlin.cli.common.arguments.*
 import org.jetbrains.kotlin.cli.jvm.config.jvmClasspathRoots
-import org.jetbrains.kotlin.cli.metadata.KotlinMetadataCompiler
 import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.JvmTarget
-import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.platform.isCommon
 import org.jetbrains.kotlin.platform.isJs
 import org.jetbrains.kotlin.platform.jvm.isJvm
-import org.jetbrains.kotlin.test.CompilerTestUtil
 import org.jetbrains.kotlin.test.MockLibraryUtil
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives
 import org.jetbrains.kotlin.test.directives.model.singleOrZeroValue
 import org.jetbrains.kotlin.test.model.TestFile
 import org.jetbrains.kotlin.test.model.TestModule
-import org.jetbrains.kotlin.test.services.TestServices
-import org.jetbrains.kotlin.test.services.compilerConfigurationProvider
-import org.jetbrains.kotlin.test.services.sourceFileProvider
-import org.jetbrains.kotlin.test.services.standardLibrariesPathProvider
-import org.jetbrains.kotlin.test.services.targetPlatform
+import org.jetbrains.kotlin.test.services.*
 import org.jetbrains.kotlin.test.util.KtTestUtil
 import java.io.ByteArrayInputStream
 import java.nio.file.Path
@@ -37,13 +26,7 @@ import java.util.jar.Attributes
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.div
-import kotlin.io.path.exists
-import kotlin.io.path.nameWithoutExtension
-import kotlin.io.path.notExists
-import kotlin.io.path.outputStream
-import kotlin.io.path.pathString
+import kotlin.io.path.*
 
 abstract class CliTestModuleCompiler : TestModuleCompiler() {
     protected abstract fun buildPlatformCompilerOptions(module: TestModule, testServices: TestServices): List<String>
@@ -58,7 +41,8 @@ abstract class CliTestModuleCompiler : TestModuleCompiler() {
     protected abstract fun libraryOutputPath(inputPath: Path, libraryName: String): Path
 
     override fun compile(
-        tmpDir: Path,
+        sourcesTempDirectory: Path,
+        commonSourcesTempDirectory: Path?,
         module: TestModule,
         libraryName: String,
         dependencyBinaryRoots: Collection<Path>,
@@ -69,10 +53,10 @@ abstract class CliTestModuleCompiler : TestModuleCompiler() {
                 || (allowedLibraryPlatforms.isNotEmpty() && module.targetPlatform(testServices) !in allowedLibraryPlatforms)
 
         val library = try {
-            val outputPath = libraryOutputPath(tmpDir, libraryName)
+            val outputPath = libraryOutputPath(sourcesTempDirectory, libraryName)
             doCompile(
-                tmpDir,
-                buildCompilerOptions(module, testServices),
+                sourcesTempDirectory,
+                buildCompilerOptions(module, testServices, commonSourcesTempDirectory),
                 outputPath,
                 buildExtraClasspath(module, dependencyBinaryRoots, testServices)
             )
@@ -117,9 +101,14 @@ abstract class CliTestModuleCompiler : TestModuleCompiler() {
 
     protected open fun buildPlatformExtraClasspath(module: TestModule, testServices: TestServices): List<String> = emptyList()
 
-    private fun buildCompilerOptions(module: TestModule, testServices: TestServices): List<String> = buildList {
+    private fun buildCompilerOptions(
+        module: TestModule,
+        testServices: TestServices,
+        commonSourcesTempDirectory: Path?,
+    ): List<String> = buildList {
         addAll(buildCommonCompilerOptions(module))
         addAll(buildPlatformCompilerOptions(module, testServices))
+        addAll(buildCommonSourcesCompilerOptions(commonSourcesTempDirectory))
     }
 
     private fun buildCommonCompilerOptions(module: TestModule): List<String> = buildList {
@@ -140,6 +129,19 @@ abstract class CliTestModuleCompiler : TestModuleCompiler() {
         }
 
         addAll(module.directives[Directives.COMPILER_ARGUMENTS])
+    }
+
+    private fun buildCommonSourcesCompilerOptions(commonSourcesTempDirectory: Path?): List<String> {
+        if (commonSourcesTempDirectory == null) {
+            return emptyList()
+        }
+
+        val commonSourcesPathString = commonSourcesTempDirectory.absolutePathString()
+
+        return listOf(
+            "-Xcommon-sources=$commonSourcesPathString",
+            commonSourcesPathString // Also add common sources directly, as a free parameter
+        )
     }
 
     private fun addFileToJar(path: String, text: String, jarOutputStream: JarOutputStream) {
@@ -167,7 +169,10 @@ object JvmJarTestModuleCompiler : CliTestModuleCompiler() {
 
             addAll(listOf(K2JVMCompilerArguments::jdkHome.cliArgument, jdkHome.toString()))
         }
-        add("-XXLanguage:-${LanguageFeature.SkipStandaloneScriptsInSourceRoots.name}")
+
+        if (LanguageSettingsDirectives.JVM_EXPOSE_BOXED in module.directives) {
+            add(K2JVMCompilerArguments::jvmExposeBoxed.cliArgument)
+        }
     }
 
     override fun doCompile(
@@ -180,7 +185,7 @@ object JvmJarTestModuleCompiler : CliTestModuleCompiler() {
             sourcesPath = sourcesPath.absolutePathString(),
             contentDir = sourcesPath.toFile(),
             jarName = libraryOutputPath.nameWithoutExtension,
-            extraOptions = buildList<String> {
+            extraOptions = buildList {
                 addAll(options)
             },
             useJava11 = true,
@@ -189,7 +194,7 @@ object JvmJarTestModuleCompiler : CliTestModuleCompiler() {
     }
 
     override fun buildPlatformExtraClasspath(module: TestModule, testServices: TestServices): List<String> = buildList {
-        val compilerConfiguration = testServices.compilerConfigurationProvider.getCompilerConfiguration(module)
+        val compilerConfiguration = testServices.compilerConfigurationProvider.getCompilerConfiguration(module, CompilationStage.FIRST)
         for (file in compilerConfiguration.jvmClasspathRoots) {
             add(file.absolutePath)
         }
@@ -214,10 +219,10 @@ object JsKlibTestModuleCompiler : CliTestModuleCompiler() {
         val commands = buildList {
             add(K2JSCompilerArguments::moduleName.cliArgument); add(libraryOutputPath.nameWithoutExtension)
             add(K2JSCompilerArguments::outputDir.cliArgument); add(libraryOutputPath.parent.absolutePathString())
-            add(K2JSCompilerArguments::irProduceKlibFile.cliArgument)
             sourceFiles.mapTo(this) { it.absolutePath }
             addAll(options)
         }
+
         MockLibraryUtil.runJsCompiler(commands)
     }
 
@@ -226,6 +231,18 @@ object JsKlibTestModuleCompiler : CliTestModuleCompiler() {
 }
 
 object MetadataKlibDirTestModuleCompiler : CliTestModuleCompiler() {
+    override fun compile(
+        sourcesTempDirectory: Path,
+        commonSourcesTempDirectory: Path?,
+        module: TestModule,
+        libraryName: String,
+        dependencyBinaryRoots: Collection<Path>,
+        testServices: TestServices
+    ): Path {
+        check(commonSourcesTempDirectory == null) { "Dependent common sources aren't empty for a common module" }
+        return super.compile(sourcesTempDirectory, null, module, libraryName, dependencyBinaryRoots, testServices)
+    }
+
     override fun buildPlatformCompilerOptions(
         module: TestModule,
         testServices: TestServices,
@@ -241,16 +258,18 @@ object MetadataKlibDirTestModuleCompiler : CliTestModuleCompiler() {
     ) {
         val sourceFiles = sourcesPath.toFile().walkBottomUp()
 
-        CompilerTestUtil.executeCompilerAssertSuccessful(
-            KotlinMetadataCompiler(), buildList {
-                addAll(sourceFiles.mapTo(this) { it.absolutePath })
-                add(K2MetadataCompilerArguments::destination.cliArgument); add(libraryOutputPath.absolutePathString())
-                add(K2MetadataCompilerArguments::moduleName.cliArgument); add(libraryOutputPath.nameWithoutExtension)
-                add(K2MetadataCompilerArguments::classpath.cliArgument)
-                addAll(listOf(ForTestCompileRuntime.stdlibCommonForTests().absolutePath) + extraClasspath)
-                addAll(options)
-            }
-        )
+        val commands = buildList<String> {
+            addAll(sourceFiles.mapTo(this) { it.absolutePath })
+            add(K2MetadataCompilerArguments::destination.cliArgument); add(libraryOutputPath.absolutePathString())
+            add(K2MetadataCompilerArguments::moduleName.cliArgument); add(libraryOutputPath.nameWithoutExtension)
+            // JS and Wasm platforms is excluded to allow inheritance from functional types and initializers in external declarations
+            add("${K2MetadataCompilerArguments::targetPlatform.cliArgument}=JVM,Native")
+            add(K2MetadataCompilerArguments::classpath.cliArgument)
+            addAll(listOf(ForTestCompileRuntime.stdlibCommonForTests().absolutePath) + extraClasspath)
+            addAll(options)
+        }
+
+        MockLibraryUtil.runMetadataCompiler(commands)
     }
 
     override fun libraryOutputPath(inputPath: Path, libraryName: String): Path =
@@ -264,13 +283,21 @@ object MetadataKlibDirTestModuleCompiler : CliTestModuleCompiler() {
  */
 object DispatchingTestModuleCompiler : TestModuleCompiler() {
     override fun compile(
-        tmpDir: Path,
+        sourcesTempDirectory: Path,
+        commonSourcesTempDirectory: Path?,
         module: TestModule,
         libraryName: String,
         dependencyBinaryRoots: Collection<Path>,
         testServices: TestServices
     ): Path {
-        return getCompiler(module, testServices).compile(tmpDir, module, libraryName, dependencyBinaryRoots, testServices)
+        return getCompiler(module, testServices).compile(
+            sourcesTempDirectory,
+            commonSourcesTempDirectory,
+            module,
+            libraryName,
+            dependencyBinaryRoots,
+            testServices
+        )
     }
 
     override fun compileSources(files: List<TestFile>, module: TestModule, testServices: TestServices): Path {

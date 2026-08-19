@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (NEGATIVE)
@@ -17,8 +16,8 @@
 fun case_1(x: Any) {
     if (x is Interface1) {
         if (x is Interface2) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("Interface1 & Interface2 & kotlin.Any")!>x<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("Interface1 & Interface2 & kotlin.Any")!>x<!>.<!OVERLOAD_RESOLUTION_AMBIGUITY!>itest00<!>()
+            <!DEBUG_INFO_EXPRESSION_TYPE("Interface1 & Interface2")!>x<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("Interface1 & Interface2")!>x<!>.itest00()
         }
     }
 }
@@ -30,8 +29,8 @@ fun case_1(x: Any) {
 fun case_2(x: Any) {
     if (x is Interface2) {
         if (x is Interface1) {
-            <!DEBUG_INFO_EXPRESSION_TYPE("Interface1 & Interface2 & kotlin.Any")!>x<!>
-            <!DEBUG_INFO_EXPRESSION_TYPE("Interface1 & Interface2 & kotlin.Any")!>x<!>.<!OVERLOAD_RESOLUTION_AMBIGUITY!>itest00000<!>()
+            <!DEBUG_INFO_EXPRESSION_TYPE("Interface2 & Interface1")!>x<!>
+            <!DEBUG_INFO_EXPRESSION_TYPE("Interface2 & Interface1")!>x<!>.itest00000()
         }
     }
 }

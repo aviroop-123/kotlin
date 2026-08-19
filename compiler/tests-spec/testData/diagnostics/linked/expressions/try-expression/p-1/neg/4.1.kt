@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 // COMPARE_WITH_LIGHT_TREE
 
 /*
@@ -23,8 +22,8 @@ fun case1() {
         throwException()
     } catch (e: ExcA) {
     } finally {
-    } <!UNRESOLVED_REFERENCE!>catch<!> (<!UNRESOLVED_REFERENCE!>e<!><!SYNTAX!><!SYNTAX!><!>: ExcB)<!> <!UNUSED_LAMBDA_EXPRESSION!>{
-    }<!>
+    } <!UNRESOLVED_REFERENCE!>catch<!> (<!UNRESOLVED_REFERENCE!>e<!><!SYNTAX!><!SYNTAX!><!>: ExcB)<!> {
+    }
 }
 
 // TESTCASE NUMBER: 2
@@ -34,7 +33,7 @@ fun case2() {
         throwException()
     } catch (e: ExcB) {
     } finally
-<!SYNTAX!><!>}<!SYNTAX!><!>
+<!SYNTAX!><!>}<!SYNTAX{PSI}!><!>
 
 // TESTCASE NUMBER: 3
 
@@ -43,37 +42,3 @@ fun case3() {
         throwException()
     } finally
 <!SYNTAX!><!>}<!SYNTAX!><!>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

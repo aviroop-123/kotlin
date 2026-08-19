@@ -9,14 +9,15 @@ import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.*
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.CompilerConfigurationKey
+import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.container.StorageComponentContainer
 import org.jetbrains.kotlin.container.useInstance
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.extensions.StorageComponentContainerContributor
-import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
-import org.jetbrains.kotlin.noarg.NoArgConfigurationKeys.ANNOTATION
-import org.jetbrains.kotlin.noarg.NoArgConfigurationKeys.INVOKE_INITIALIZERS
-import org.jetbrains.kotlin.noarg.NoArgConfigurationKeys.PRESET
+import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
+import org.jetbrains.kotlin.noarg.NoArgConfigurationKeys.NOARG_ANNOTATION
+import org.jetbrains.kotlin.noarg.NoArgConfigurationKeys.NOARG_INVOKE_INITIALIZERS
+import org.jetbrains.kotlin.noarg.NoArgConfigurationKeys.NOARG_PRESET
 import org.jetbrains.kotlin.noarg.NoArgPluginNames.ANNOTATION_OPTION_NAME
 import org.jetbrains.kotlin.noarg.NoArgPluginNames.INVOKE_INITIALIZERS_OPTION_NAME
 import org.jetbrains.kotlin.noarg.NoArgPluginNames.PLUGIN_ID
@@ -27,14 +28,11 @@ import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.jvm.isJvm
 
 object NoArgConfigurationKeys {
-    val ANNOTATION: CompilerConfigurationKey<List<String>> =
-        CompilerConfigurationKey.create("annotation qualified name")
+    val NOARG_ANNOTATION: CompilerConfigurationKey<List<String>> = CompilerConfigurationKey.create("NOARG_ANNOTATION")
+    val NOARG_PRESET: CompilerConfigurationKey<List<String>> = CompilerConfigurationKey.create("NOARG_PRESET")
 
-    val PRESET: CompilerConfigurationKey<List<String>> = CompilerConfigurationKey.create("annotation preset")
-
-    val INVOKE_INITIALIZERS: CompilerConfigurationKey<Boolean> = CompilerConfigurationKey.create(
-        "invoke instance initializers in a no-arg constructor"
-    )
+    // Invoke instance initializers in a no-arg constructor.
+    val NOARG_INVOKE_INITIALIZERS: CompilerConfigurationKey<Boolean> = CompilerConfigurationKey.create("NOARG_INVOKE_INITIALIZERS")
 }
 
 class NoArgCommandLineProcessor : CommandLineProcessor {
@@ -60,9 +58,9 @@ class NoArgCommandLineProcessor : CommandLineProcessor {
     override val pluginOptions = listOf(ANNOTATION_OPTION, PRESET_OPTION, INVOKE_INITIALIZERS_OPTION)
 
     override fun processOption(option: AbstractCliOption, value: String, configuration: CompilerConfiguration) = when (option) {
-        ANNOTATION_OPTION -> configuration.appendList(ANNOTATION, value)
-        PRESET_OPTION -> configuration.appendList(PRESET, value)
-        INVOKE_INITIALIZERS_OPTION -> configuration.put(INVOKE_INITIALIZERS, value == "true")
+        ANNOTATION_OPTION -> configuration.appendList(NOARG_ANNOTATION, value)
+        PRESET_OPTION -> configuration.appendList(NOARG_PRESET, value)
+        INVOKE_INITIALIZERS_OPTION -> configuration.put(NOARG_INVOKE_INITIALIZERS, value == "true")
         else -> throw CliOptionProcessingException("Unknown option: ${option.optionName}")
     }
 }
@@ -74,24 +72,32 @@ class NoArgComponentRegistrar : CompilerPluginRegistrar() {
         get() = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
-        val annotations = configuration.get(ANNOTATION).orEmpty().toMutableList()
-        configuration.get(PRESET)?.forEach { preset ->
+        val annotations = configuration.get(NOARG_ANNOTATION).orEmpty().toMutableList()
+        configuration.get(NOARG_PRESET)?.forEach { preset ->
             SUPPORTED_PRESETS[preset]?.let { annotations += it }
         }
         if (annotations.isNotEmpty()) {
-            registerNoArgComponents(this, annotations, configuration.getBoolean(INVOKE_INITIALIZERS))
+            registerNoArgComponents(this, configuration, annotations, configuration.getBoolean(NOARG_INVOKE_INITIALIZERS))
         }
     }
 
     companion object {
         fun registerNoArgComponents(
             extensionStorage: ExtensionStorage,
+            configuration: CompilerConfiguration,
             annotations: List<String>,
             invokeInitializers: Boolean
         ): Unit = with(extensionStorage) {
             StorageComponentContainerContributor.registerExtension(CliNoArgComponentContainerContributor(annotations, useIr = true))
-            FirExtensionRegistrarAdapter.registerExtension(FirNoArgExtensionRegistrar(annotations))
-            IrGenerationExtension.registerExtension(NoArgIrGenerationExtension(annotations, invokeInitializers))
+            FirExtensionRegistrar.registerExtension(FirNoArgExtensionRegistrar(annotations))
+
+            val irExtension = if (configuration.languageVersionSettings.languageVersion.usesK2) {
+                NoArgConstructorBodyIrGenerationExtension(annotations, invokeInitializers)
+            } else {
+                NoArgFullConstructorIrGenerationExtension(annotations, invokeInitializers)
+            }
+
+            IrGenerationExtension.registerExtension(irExtension)
         }
     }
 }

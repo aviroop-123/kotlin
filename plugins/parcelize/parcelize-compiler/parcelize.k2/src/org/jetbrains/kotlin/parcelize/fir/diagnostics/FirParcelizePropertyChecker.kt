@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.parcelize.fir.diagnostics
 
 import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.descriptors.isEnumClass
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
@@ -113,7 +112,11 @@ class FirParcelizePropertyChecker(private val parcelizeAnnotations: List<ClassId
         inDataClass: Boolean = false
     ): Set<ConeKotlinType> {
         val session = context.session
-        if (type.hasParcelerAnnotation(session) || type in customParcelerTypes) {
+        if (
+            type.hasParcelerAnnotation(session) ||
+            type in customParcelerTypes ||
+            (type.isMarkedNullable && type.withNullability(nullable = false, session.typeContext) in customParcelerTypes)
+        ) {
             return emptySet()
         }
 
@@ -147,7 +150,7 @@ class FirParcelizePropertyChecker(private val parcelizeAnnotations: List<ClassId
             if (properties.any { !it.isVisible(context) } || symbol.primaryConstructorIfAny(session)?.isVisible(context) != true) {
                 return setOf(type)
             }
-            val typeMapping = symbol.typeParameterSymbols.zip(type.typeArguments).mapNotNull { (parameter, arg) ->
+            val typeMapping = symbol.typeParameterSymbols.zip(type.typeArguments).mapNotNull { [parameter, arg] ->
                 when (arg) {
                     is ConeKotlinType -> parameter to arg
                     is ConeKotlinTypeProjectionOut -> parameter to arg.type
@@ -222,9 +225,7 @@ class FirParcelizePropertyChecker(private val parcelizeAnnotations: List<ClassId
 
     private fun List<FirAnnotation>.hasIgnoredOnParcel(session: FirSession): Boolean {
         return this.any {
-            if (it.fqName(session) !in IGNORED_ON_PARCEL_FQ_NAMES) return@any false
-            val target = it.useSiteTarget
-            target == null || target == AnnotationUseSiteTarget.PROPERTY || target == AnnotationUseSiteTarget.PROPERTY_GETTER
+            it.fqName(session) in IGNORED_ON_PARCEL_FQ_NAMES
         }
     }
 

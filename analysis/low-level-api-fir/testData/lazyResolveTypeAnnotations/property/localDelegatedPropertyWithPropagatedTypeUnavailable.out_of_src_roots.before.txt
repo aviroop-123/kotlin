@@ -40,7 +40,7 @@ FILE: [ResolvedTo(IMPORTS)] localDelegatedPropertyWithPropagatedTypeUnavailable.
         private final const [ResolvedTo(STATUS)] val constant: <implicit> = LAZY_EXPRESSION
             private [ResolvedTo(STATUS)] [ContainingClassKey=Obj] get(): <implicit>
 
-        public final [ResolvedTo(CONTRACTS)] fun explicitType(): R|@R|foo/Anno|(LAZY_EXPRESSION)  kotlin/collections/List<@R|foo/Anno|(LAZY_EXPRESSION)  kotlin/collections/Collection<@R|foo/Anno|(LAZY_EXPRESSION)  kotlin/String>>| { LAZY_BLOCK }
+        public final [ResolvedTo(STATUS)] fun explicitType(): R|@R|foo/Anno|(LAZY_EXPRESSION)  kotlin/collections/List<@R|foo/Anno|(LAZY_EXPRESSION)  kotlin/collections/Collection<@R|foo/Anno|(LAZY_EXPRESSION)  kotlin/String>>| { LAZY_BLOCK }
 
     }
     public final [ResolvedTo(BODY_RESOLVE)] fun resolveMe(): R|kotlin/Unit| {
@@ -48,4 +48,8 @@ FILE: [ResolvedTo(IMPORTS)] localDelegatedPropertyWithPropagatedTypeUnavailable.
             ^ Q|foo/Obj|.R|foo/Obj.explicitType|()
         }
         )
+            local [ResolvedTo(BODY_RESOLVE)] get(): <ERROR TYPE REF: Unresolved name: getValue> {
+                ^ D|<local>/localProperty|.<Unresolved name: getValue>#(Null(null), ::R|<local>/localProperty|)
+            }
+
     }

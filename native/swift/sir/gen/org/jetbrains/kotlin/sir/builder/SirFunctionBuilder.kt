@@ -23,10 +23,12 @@ class SirFunctionBuilder {
     val bridges: MutableList<SirBridge> = mutableListOf()
     var body: SirFunctionBody? = null
     var errorType: SirType = SirType.never
+    var isAsync: Boolean = false
     var isOverride: Boolean = false
     var isInstance: Boolean = true
     var modality: SirModality = SirModality.UNSPECIFIED
     lateinit var name: String
+    var contextParameter: SirParameter? = null
     var extensionReceiverParameter: SirParameter? = null
     val parameters: MutableList<SirParameter> = mutableListOf()
     lateinit var returnType: SirType
@@ -41,10 +43,12 @@ class SirFunctionBuilder {
             bridges,
             body,
             errorType,
+            isAsync,
             isOverride,
             isInstance,
             modality,
             name,
+            contextParameter,
             extensionReceiverParameter,
             parameters,
             returnType,
@@ -75,10 +79,12 @@ inline fun buildFunctionCopy(original: SirFunction, init: SirFunctionBuilder.() 
     copyBuilder.bridges.addAll(original.bridges)
     copyBuilder.body = original.body
     copyBuilder.errorType = original.errorType
+    copyBuilder.isAsync = original.isAsync
     copyBuilder.isOverride = original.isOverride
     copyBuilder.isInstance = original.isInstance
     copyBuilder.modality = original.modality
     copyBuilder.name = original.name
+    copyBuilder.contextParameter = original.contextParameter
     copyBuilder.extensionReceiverParameter = original.extensionReceiverParameter
     copyBuilder.parameters.addAll(original.parameters)
     copyBuilder.returnType = original.returnType

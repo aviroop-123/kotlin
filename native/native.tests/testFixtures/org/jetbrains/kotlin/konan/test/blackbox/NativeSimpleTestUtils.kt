@@ -15,7 +15,6 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestExecutable
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Binaries
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.KotlinNativeTargets
-import org.jetbrains.kotlin.konan.test.blackbox.support.settings.PipelineType
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Settings
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Timeouts
 import org.jetbrains.kotlin.konan.test.blackbox.support.util.DEFAULT_MODULE_NAME
@@ -66,11 +65,17 @@ internal class LibraryBuilder(
     targetSrc: String,
     dependencies: List<TestCompilationDependency<*>>
 ) : ArtifactBuilder<TestCompilationArtifact.KLIB>(test, rootDir, targetSrc, dependencies) {
+    private val freeCompilerArgs = mutableListOf<String>()
+
+    operator fun String.unaryPlus() {
+        freeCompilerArgs.add(this)
+    }
+
     override fun build(sourcesDir: File, outputDir: File, dependencies: List<TestCompilationDependency<*>>) =
         test.compileToLibrary(
             sourcesDir,
             outputDir,
-            freeCompilerArgs = TestCompilerArgs.EMPTY,
+            freeCompilerArgs = if (freeCompilerArgs.isEmpty()) TestCompilerArgs.EMPTY else TestCompilerArgs(freeCompilerArgs),
             dependencies
         )
 }
@@ -142,29 +147,15 @@ fun AbstractNativeSimpleTest.cinteropToLibrary(
     outputDir: File,
     freeCompilerArgs: TestCompilerArgs
 ): TestCompilationResult<out TestCompilationArtifact.KLIB> {
-    val args = freeCompilerArgs + cinteropModulesCachePathArguments(freeCompilerArgs.cinteropArgs, outputDir)
-    val testCase: TestCase = generateCInteropTestCaseFromSingleDefFile(defFile, args)
+    val testCase: TestCase = generateCInteropTestCaseFromSingleDefFile(defFile, freeCompilerArgs)
     return CInteropCompilation(
         settings = testRunSettings,
-        freeCompilerArgs = args,
+        freeCompilerArgs = freeCompilerArgs,
         defFile = testCase.modules.single().files.single().location,
         dependencies = emptyList(),
         expectedArtifact = getLibraryArtifact(testCase, outputDir)
     ).result
 }
-
-private fun cinteropModulesCachePathArguments(
-    cinteropArgs: List<String>,
-    outputDir: File,
-) = if (cinteropArgs.contains("-fmodules") && cinteropArgs.none { it.startsWith(FMODULES_CACHE_PATH_EQ) }) {
-    // Don't reuse the system-wide module cache to make the test run more predictably.
-    // See e.g. https://youtrack.jetbrains.com/issue/KT-68254.
-    TestCInteropArgs("-compiler-option", "$FMODULES_CACHE_PATH_EQ$outputDir/modulesCachePath")
-} else {
-    TestCompilerArgs.EMPTY
-}
-
-private const val FMODULES_CACHE_PATH_EQ = "-fmodules-cache-path="
 
 internal class CompiledExecutable(
     val testCase: TestCase,
@@ -202,11 +193,12 @@ fun AbstractNativeSimpleTest.compileToExecutableInOneStage(testCase: TestCase, v
 internal fun AbstractNativeSimpleTest.compileToStaticCache(
     klib: TestCompilationArtifact.KLIB,
     cacheDir: File,
-    vararg dependencies: TestCompilationArtifact.KLIBStaticCache
+    vararg dependencies: TestCompilationArtifact.KLIBStaticCache,
+    freeCompilerArgs: TestCompilerArgs = TestCompilerArgs.EMPTY,
 ): TestCompilationArtifact.KLIBStaticCache {
     val compilation = StaticCacheCompilation(
         settings = testRunSettings,
-        freeCompilerArgs = TestCompilerArgs.EMPTY,
+        freeCompilerArgs = freeCompilerArgs,
         StaticCacheCompilation.Options.Regular,
         dependencies = buildList {
             this += klib.asLibraryDependency()
@@ -358,20 +350,14 @@ private fun AbstractNativeSimpleTest.getExecutableArtifact() =
 private fun directiveValues(testDataFileContents: String, directive: String) =
     InTextDirectivesUtils.findListWithPrefixes(testDataFileContents, "// $directive: ")
 
-fun AbstractNativeSimpleTest.muteTestIfNecessary(testDataFile: File) = muteTestIfNecessary(FileUtil.loadFile(testDataFile))
-internal fun AbstractNativeSimpleTest.muteTestIfNecessary(testDataFileContents: String) {
-    val pipelineType = testRunSettings.get<PipelineType>()
-    val mutedWhenValues = directiveValues(testDataFileContents, TestDirectives.MUTED_WHEN.name)
-    Assumptions.assumeFalse(mutedWhenValues.any { it == pipelineType.mutedOption.name })
-}
-
-internal fun AbstractNativeSimpleTest.firIdentical(testDataFile: File) =
-     InTextDirectivesUtils.isDirectiveDefined(FileUtil.loadFile(testDataFile), TestDirectives.FIR_IDENTICAL.name)
+fun AbstractNativeSimpleTest.muteTestIfNecessary(testDataFile: File) =
+    Assumptions.assumeFalse(InTextDirectivesUtils.isDirectiveDefined(FileUtil.loadFile(testDataFile), TestDirectives.MUTED.name))
 
 internal fun AbstractNativeSimpleTest.freeCompilerArgs(testDataFile: File) = freeCompilerArgs(FileUtil.loadFile(testDataFile))
 internal fun AbstractNativeSimpleTest.freeCompilerArgs(testDataFileContents: String) =
     directiveValues(testDataFileContents, TestDirectives.FREE_COMPILER_ARGS.name)
 
+context(test: AbstractNativeSimpleTest)
 internal fun TestCompilationResult<*>.toOutput(): String {
     check(this is TestCompilationResult.ImmediateResult<*>) { this }
     val loggedData = this.loggedData
@@ -379,10 +365,11 @@ internal fun TestCompilationResult<*>.toOutput(): String {
     return normalizeOutput(loggedData.toolOutput, loggedData.exitCode)
 }
 
+context(test: AbstractNativeSimpleTest)
 private fun normalizeOutput(output: String, exitCode: ExitCode): String {
     val dir = "native/native.tests/testData/compilerOutput/"
     return AbstractCliTest.getNormalizedCompilerOutput(
-        output,
+        output.replace(test.buildDir.path, $$"$BUILD_DIR$"),
         exitCode,
         dir,
         dir

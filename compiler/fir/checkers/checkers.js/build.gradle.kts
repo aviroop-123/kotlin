@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("generated-sources")
+    id("require-explicit-types")
 }
 
 dependencies {
@@ -10,9 +10,8 @@ dependencies {
     api(project(":compiler:fir:checkers"))
     api(project(":compiler:fir:checkers:checkers.web.common"))
 
-    // FE checks for modules use ModuleKind
-    // This dependency can be removed when we stop supporting PLAIN and UMD module systems
-    implementation(project(":js:js.serializer"))
+    implementation(project(":compiler:fir:diagnostic-renderers"))
+    implementation(project(":js:js.config"))
 
     /*
      * We can't remove this dependency until we use

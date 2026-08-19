@@ -15,7 +15,6 @@ object JvmDeclarationCheckers : DeclarationCheckers() {
             FirJvmNameChecker,
             FirJvmExposeBoxedChecker,
             FirJvmDefaultChecker,
-            FirJvmFunctionDelegateMemberNameClashChecker,
             FirJvmStaticChecker,
             FirRepeatableAnnotationChecker,
             FirJvmInvalidAndDangerousCharactersChecker,
@@ -48,6 +47,11 @@ object JvmDeclarationCheckers : DeclarationCheckers() {
             FirJvmConflictsChecker,
         )
 
+    override val callableDeclarationCheckers: Set<FirCallableDeclarationChecker>
+        get() = setOf(
+            FirJvmFunctionDelegateMemberNameClashChecker,
+        )
+
     override val propertyCheckers: Set<FirPropertyChecker>
         get() = setOf(
             FirJvmFieldApplicabilityChecker,
@@ -60,6 +64,7 @@ object JvmDeclarationCheckers : DeclarationCheckers() {
             FirSynchronizedAnnotationChecker,
             FirOverloadsChecker,
             FirJvmThrowsChecker,
+            FirJvmVersionOverloadsChecker,
         )
 
     override val typeParameterCheckers: Set<FirTypeParameterChecker>
@@ -67,7 +72,7 @@ object JvmDeclarationCheckers : DeclarationCheckers() {
             FirUpperBoundsChecker,
         )
 
-    override val simpleFunctionCheckers: Set<FirSimpleFunctionChecker>
+    override val namedFunctionCheckers: Set<FirNamedFunctionChecker>
         get() = setOf(
             FirAccidentalOverrideClashChecker,
         )

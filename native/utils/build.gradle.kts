@@ -1,28 +1,31 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
+    id("java-test-fixtures")
 }
 
 description = "Kotlin/Native utils"
 
 dependencies {
     val coreDepsVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation.get()
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:$coreDepsVersion")
+    compileOnly(kotlin("stdlib", coreDepsVersion))
     api(project(":kotlin-util-io"))
     api(project(":kotlin-util-klib"))
     api(platform(project(":kotlin-gradle-plugins-bom")))
 
-    testImplementation(libs.junit4)
-    testImplementation(kotlinStdlib())
+    testImplementation(kotlin("stdlib", coreDepsVersion))
     testImplementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
-    testApi(platform(libs.junit.bom))
+    testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+
+    testFixturesApi(testFixtures(project(":kotlin-util-klib")))
 }
 
 sourceSets {
     "main" { projectDefault() }
     "test" { projectDefault() }
+    "testFixtures" { projectDefault() }
 }
 
 configureKotlinCompileTasksGradleCompatibility()

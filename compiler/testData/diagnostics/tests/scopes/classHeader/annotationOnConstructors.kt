@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // RUN_PIPELINE_TILL: FRONTEND
 // DIAGNOSTICS: -UNUSED_PARAMETER
 
@@ -25,8 +24,8 @@ class A
         Companion.CONST,
         Nested.CONST,
         Interface.CONST,
-        <!UNRESOLVED_REFERENCE!>a<!>,
-        <!UNRESOLVED_REFERENCE!>b<!>()
+        <!INSTANCE_ACCESS_BEFORE_SUPER_CALL, NON_CONST_VAL_USED_IN_CONSTANT_EXPRESSION!>a<!>,
+        <!ANNOTATION_ARGUMENT_MUST_BE_CONST!><!INSTANCE_ACCESS_BEFORE_SUPER_CALL!>b<!>()<!>
 )
 constructor() {
 
@@ -38,8 +37,8 @@ constructor() {
             Companion.CONST,
             Nested.CONST,
             Interface.CONST,
-            <!UNRESOLVED_REFERENCE!>a<!>,
-            <!UNRESOLVED_REFERENCE!>b<!>()
+            <!INSTANCE_ACCESS_BEFORE_SUPER_CALL, NON_CONST_VAL_USED_IN_CONSTANT_EXPRESSION!>a<!>,
+            <!ANNOTATION_ARGUMENT_MUST_BE_CONST!><!INSTANCE_ACCESS_BEFORE_SUPER_CALL!>b<!>()<!>
     )
     constructor(dummy: Int) : this()
 

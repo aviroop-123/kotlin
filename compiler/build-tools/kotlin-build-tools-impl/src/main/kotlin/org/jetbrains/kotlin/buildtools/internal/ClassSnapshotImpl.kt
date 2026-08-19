@@ -8,6 +8,20 @@ package org.jetbrains.kotlin.buildtools.internal
 import org.jetbrains.kotlin.buildtools.api.jvm.AccessibleClassSnapshot
 import org.jetbrains.kotlin.buildtools.api.jvm.InaccessibleClassSnapshot
 
-internal class AccessibleClassSnapshotImpl(override val classAbiHash: Long) : AccessibleClassSnapshot
+internal class AccessibleClassSnapshotImpl(override val classAbiHash: Long) : AccessibleClassSnapshot {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is AccessibleClassSnapshot) return false
+        return classAbiHash == other.classAbiHash
+    }
 
-internal object InaccessibleClassSnapshotImpl : InaccessibleClassSnapshot
+    override fun hashCode(): Int = classAbiHash.hashCode()
+
+    override fun toString(): String = "AccessibleClassSnapshot(classAbiHash=$classAbiHash)"
+}
+
+internal object InaccessibleClassSnapshotImpl : InaccessibleClassSnapshot {
+    override fun equals(other: Any?): Boolean = other is InaccessibleClassSnapshot
+    override fun hashCode(): Int = 0
+    override fun toString(): String = "InaccessibleClassSnapshot"
+}

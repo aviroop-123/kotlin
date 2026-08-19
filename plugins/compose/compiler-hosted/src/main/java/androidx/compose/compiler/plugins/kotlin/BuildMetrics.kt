@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.util.fileOrNull
 import org.jetbrains.kotlin.ir.util.fqNameForIrSerialization
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
@@ -62,7 +63,6 @@ interface FunctionMetrics {
 
     fun recordParameter(
         declaration: IrValueParameter,
-        type: IrType,
         stability: Stability,
         default: IrExpression?,
         defaultStatic: Boolean,
@@ -188,7 +188,6 @@ object EmptyFunctionMetrics : FunctionMetrics {
 
     override fun recordParameter(
         declaration: IrValueParameter,
-        type: IrType,
         stability: Stability,
         default: IrExpression?,
         defaultStatic: Boolean,
@@ -214,7 +213,7 @@ object EmptyFunctionMetrics : FunctionMetrics {
 class ModuleMetricsImpl(
     var name: String,
     val featureFlags: FeatureFlags,
-    val stabilityOf: (IrType) -> Stability,
+    val stabilityOf: (IrType, fileContainingDependent: IrFile?) -> Stability,
 ) : ModuleMetrics {
     private var skippableComposables = 0
     private var restartableComposables = 0
@@ -275,7 +274,7 @@ class ModuleMetricsImpl(
                 }
                 if (field.name == ComposeNames.StabilityFlag) continue
                 append("  ")
-                val fieldStability = stabilityOf(field.type)
+                val fieldStability = stabilityOf(field.type, field.fileOrNull)
                 append(fieldStability.simpleHumanReadable())
                 append(if (isVar) " var " else " val ")
                 append(field.name.asString())
@@ -505,7 +504,6 @@ class FunctionMetricsImpl(
 
     private class Param(
         val declaration: IrValueParameter,
-        val type: IrType,
         val stability: Stability,
         val default: IrExpression?,
         val defaultStatic: Boolean,
@@ -519,7 +517,7 @@ class FunctionMetricsImpl(
             }
             append(declaration.name.asString())
             append(": ")
-            append(src.printType(type))
+            append(src.printType(declaration.type))
             if (default != null) {
                 append(" = ")
                 if (defaultStatic) append("@static ")
@@ -567,7 +565,6 @@ class FunctionMetricsImpl(
 
     override fun recordParameter(
         declaration: IrValueParameter,
-        type: IrType,
         stability: Stability,
         default: IrExpression?,
         defaultStatic: Boolean,
@@ -576,7 +573,6 @@ class FunctionMetricsImpl(
         parameters.add(
             Param(
                 declaration,
-                type,
                 stability,
                 default,
                 defaultStatic,

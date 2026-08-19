@@ -31,16 +31,13 @@ class IrSymbolDeserializer(
 ) {
     /** The deserialized symbols of declarations belonging only to the current file, [libraryFile]. */
     val deserializedSymbolsWithOwnersInCurrentFile: Map<IdSignature, IrSymbol>
-        get() = _deserializedSymbolsWithOwnersInCurrentFile
+        field = hashMapOf()
 
-    /** The deserialized symbols of declarations belonging only to the current file, [libraryFile]. */
-    private val _deserializedSymbolsWithOwnersInCurrentFile: MutableMap<IdSignature, IrSymbol> = hashMapOf()
-
-    private val symbolCache = HashMap<Long, IrSymbol>()
+    private val symbolCache = HashMap<Int, IrSymbol>()
 
     /** Deserializes a symbol known to belong to the current file, [libraryFile]. */
     fun deserializeSymbolWithOwnerInCurrentFile(signature: IdSignature, symbolKind: BinarySymbolData.SymbolKind): IrSymbol {
-        return _deserializedSymbolsWithOwnersInCurrentFile.getOrPut(signature) {
+        return deserializedSymbolsWithOwnersInCurrentFile.getOrPut(signature) {
             referenceDeserializedSymbol(symbolKind, signature)
         }
     }
@@ -54,7 +51,7 @@ class IrSymbolDeserializer(
         val signature = deserializeIdSignature(symbolData.signatureId)
         val symbol = deserializeSymbolWithOwnerInCurrentFile(signature, symbolData.kind)
 
-        symbolCache[code] = symbol
+        symbolCache[symbolData.signatureId] = symbol
 
         return symbol to signature
     }
@@ -64,8 +61,8 @@ class IrSymbolDeserializer(
      * or belongs to another file (e.g., a symbol in a [IrMemberAccessExpression] being deserialized right now).
      */
     fun deserializeSymbolWithOwnerMaybeInOtherFile(code: Long): IrSymbol {
-        return symbolCache.getOrPut(code) {
-            val symbolData = parseSymbolData(code)
+        val symbolData = parseSymbolData(code)
+        return symbolCache.getOrPut(symbolData.signatureId) {
             val signature = deserializeIdSignature(symbolData.signatureId)
             deserializeSymbolWithOwnerMaybeInOtherFile(signature, symbolData.kind)
         }
@@ -73,7 +70,7 @@ class IrSymbolDeserializer(
 
     private fun deserializeSymbolWithOwnerMaybeInOtherFile(signature: IdSignature, symbolKind: BinarySymbolData.SymbolKind): IrSymbol {
         if (!signature.isPubliclyVisible) {
-            return _deserializedSymbolsWithOwnersInCurrentFile.getOrPut(signature) {
+            return deserializedSymbolsWithOwnersInCurrentFile.getOrPut(signature) {
                 if (signature.hasTopLevel) {
                     enqueueLocalTopLevelDeclaration(signature.topLevelSignature())
                 }
@@ -92,7 +89,7 @@ class IrSymbolDeserializer(
 
     /** Notify [IrSymbolDeserializer] about a known symbol that belongs to the current file, [libraryFile]. */
     fun referenceLocalIrSymbol(symbol: IrSymbol, signature: IdSignature) {
-        _deserializedSymbolsWithOwnersInCurrentFile.put(signature, symbol)
+        deserializedSymbolsWithOwnersInCurrentFile.put(signature, symbol)
     }
 
     fun referenceSimpleFunctionByLocalSignature(signature: IdSignature): IrSimpleFunctionSymbol =

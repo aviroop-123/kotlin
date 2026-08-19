@@ -74,8 +74,8 @@ class FirSpecificTypeResolverTransformer(
         withBareTypes(allowed = false) {
             typeRef.transformChildren(this, data)
         }
-        val (resolvedType, diagnostic, isContextSensitiveResolved) = resolveType(typeRef, data, expandTypeAliases)
-        return transformType(typeRef, resolvedType, diagnostic, data, isContextSensitiveResolved)
+        (val resolvedType = type, val diagnostic, val resolvedSymbolOrigin) = resolveType(typeRef, data, expandTypeAliases)
+        return transformType(typeRef, resolvedType, diagnostic, data, resolvedSymbolOrigin)
     }
 
     @OptIn(PrivateForInline::class)
@@ -257,7 +257,7 @@ class FirSpecificTypeResolverTransformer(
                 source = typeRef.source
             }
 
-            val (resolvedType, diagnostic) = withBareTypes { resolveType(typeRefToTry, data) }
+            (val resolvedType = type, val diagnostic) = withBareTypes { resolveType(typeRefToTry, data) }
             if (resolvedType is ConeErrorType || diagnostic != null) continue
 
             return buildResolvedTypeRef {

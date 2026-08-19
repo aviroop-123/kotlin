@@ -1,0 +1,66 @@
+KtFile: 'annotationsWithoutCall.kt'
+  null
+
+KtPackageDirective(0,11): 'package one'
+  null
+
+KtNameReferenceExpression(8,11): 'one'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      one
+    ]
+
+KtImportList(11,11): ''
+  null
+
+KtClass(13,34): 'annotation class Anno'
+  null
+
+KtDeclarationModifierList(13,23): 'annotation'
+  null
+
+KtNamedFunction(36,54): '@Anno'
+  null
+
+KtDeclarationModifierList(36,41): '@Anno'
+  null
+
+KtAnnotationEntry(36,41): '@Anno'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): one.Anno
+    ]
+
+KtConstructorCalleeExpression(37,41): 'Anno'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      <constructor>(): one.Anno
+    ]
+
+KtTypeReference(37,41): 'Anno'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      one/Anno
+    ]
+
+KtUserType(37,41): 'Anno'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      one/Anno
+    ]
+
+KtNameReferenceExpression(37,41): 'Anno'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      one/Anno
+    ]
+
+KtParameterList(49,51): '()'
+  null
+
+KtBlockExpression(52,54): '{}'
+  null

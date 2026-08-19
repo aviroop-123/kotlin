@@ -47,6 +47,14 @@ class ComposedExpressionCheckers(val predicate: (FirCheckerWithMppKind) -> Boole
         get() = _returnExpressionCheckers
     override val blockCheckers: Set<FirBlockChecker>
         get() = _blockCheckers
+    override val replDeclarationReferenceCheckers: Set<FirReplDeclarationReferenceChecker>
+        get() = _replDeclarationReferenceCheckers
+    override val replPropertyInitializerCheckers: Set<FirReplPropertyInitializerChecker>
+        get() = _replPropertyInitializerCheckers
+    override val replPropertyDelegateCheckers: Set<FirReplPropertyDelegateChecker>
+        get() = _replPropertyDelegateCheckers
+    override val replExpressionReferenceCheckers: Set<FirReplExpressionReferenceChecker>
+        get() = _replExpressionReferenceCheckers
     override val annotationCheckers: Set<FirAnnotationChecker>
         get() = _annotationCheckers
     override val annotationCallCheckers: Set<FirAnnotationCallChecker>
@@ -81,8 +89,8 @@ class ComposedExpressionCheckers(val predicate: (FirCheckerWithMppKind) -> Boole
         get() = _throwExpressionCheckers
     override val doWhileLoopCheckers: Set<FirDoWhileLoopChecker>
         get() = _doWhileLoopCheckers
-    override val arrayLiteralCheckers: Set<FirArrayLiteralChecker>
-        get() = _arrayLiteralCheckers
+    override val collectionLiteralCheckers: Set<FirCollectionLiteralChecker>
+        get() = _collectionLiteralCheckers
     override val classReferenceExpressionCheckers: Set<FirClassReferenceExpressionChecker>
         get() = _classReferenceExpressionCheckers
     override val inaccessibleReceiverCheckers: Set<FirInaccessibleReceiverChecker>
@@ -103,6 +111,10 @@ class ComposedExpressionCheckers(val predicate: (FirCheckerWithMppKind) -> Boole
     private val _booleanOperatorExpressionCheckers: MutableSet<FirBooleanOperatorExpressionChecker> = mutableSetOf()
     private val _returnExpressionCheckers: MutableSet<FirReturnExpressionChecker> = mutableSetOf()
     private val _blockCheckers: MutableSet<FirBlockChecker> = mutableSetOf()
+    private val _replDeclarationReferenceCheckers: MutableSet<FirReplDeclarationReferenceChecker> = mutableSetOf()
+    private val _replPropertyInitializerCheckers: MutableSet<FirReplPropertyInitializerChecker> = mutableSetOf()
+    private val _replPropertyDelegateCheckers: MutableSet<FirReplPropertyDelegateChecker> = mutableSetOf()
+    private val _replExpressionReferenceCheckers: MutableSet<FirReplExpressionReferenceChecker> = mutableSetOf()
     private val _annotationCheckers: MutableSet<FirAnnotationChecker> = mutableSetOf()
     private val _annotationCallCheckers: MutableSet<FirAnnotationCallChecker> = mutableSetOf()
     private val _checkNotNullCallCheckers: MutableSet<FirCheckNotNullCallChecker> = mutableSetOf()
@@ -120,7 +132,7 @@ class ComposedExpressionCheckers(val predicate: (FirCheckerWithMppKind) -> Boole
     private val _whileLoopCheckers: MutableSet<FirWhileLoopChecker> = mutableSetOf()
     private val _throwExpressionCheckers: MutableSet<FirThrowExpressionChecker> = mutableSetOf()
     private val _doWhileLoopCheckers: MutableSet<FirDoWhileLoopChecker> = mutableSetOf()
-    private val _arrayLiteralCheckers: MutableSet<FirArrayLiteralChecker> = mutableSetOf()
+    private val _collectionLiteralCheckers: MutableSet<FirCollectionLiteralChecker> = mutableSetOf()
     private val _classReferenceExpressionCheckers: MutableSet<FirClassReferenceExpressionChecker> = mutableSetOf()
     private val _inaccessibleReceiverCheckers: MutableSet<FirInaccessibleReceiverChecker> = mutableSetOf()
 
@@ -141,6 +153,10 @@ class ComposedExpressionCheckers(val predicate: (FirCheckerWithMppKind) -> Boole
         checkers.booleanOperatorExpressionCheckers.filterTo(_booleanOperatorExpressionCheckers, predicate)
         checkers.returnExpressionCheckers.filterTo(_returnExpressionCheckers, predicate)
         checkers.blockCheckers.filterTo(_blockCheckers, predicate)
+        checkers.replDeclarationReferenceCheckers.filterTo(_replDeclarationReferenceCheckers, predicate)
+        checkers.replPropertyInitializerCheckers.filterTo(_replPropertyInitializerCheckers, predicate)
+        checkers.replPropertyDelegateCheckers.filterTo(_replPropertyDelegateCheckers, predicate)
+        checkers.replExpressionReferenceCheckers.filterTo(_replExpressionReferenceCheckers, predicate)
         checkers.annotationCheckers.filterTo(_annotationCheckers, predicate)
         checkers.annotationCallCheckers.filterTo(_annotationCallCheckers, predicate)
         checkers.checkNotNullCallCheckers.filterTo(_checkNotNullCallCheckers, predicate)
@@ -158,7 +174,7 @@ class ComposedExpressionCheckers(val predicate: (FirCheckerWithMppKind) -> Boole
         checkers.whileLoopCheckers.filterTo(_whileLoopCheckers, predicate)
         checkers.throwExpressionCheckers.filterTo(_throwExpressionCheckers, predicate)
         checkers.doWhileLoopCheckers.filterTo(_doWhileLoopCheckers, predicate)
-        checkers.arrayLiteralCheckers.filterTo(_arrayLiteralCheckers, predicate)
+        checkers.collectionLiteralCheckers.filterTo(_collectionLiteralCheckers, predicate)
         checkers.classReferenceExpressionCheckers.filterTo(_classReferenceExpressionCheckers, predicate)
         checkers.inaccessibleReceiverCheckers.filterTo(_inaccessibleReceiverCheckers, predicate)
     }

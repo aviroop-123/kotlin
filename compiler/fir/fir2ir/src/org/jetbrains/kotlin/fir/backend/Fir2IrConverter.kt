@@ -9,22 +9,23 @@ import com.intellij.util.containers.MultiMap
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtPsiSourceFileLinesMapping
 import org.jetbrains.kotlin.KtSourceFileLinesMappingFromLineStartOffsets
-import org.jetbrains.kotlin.backend.common.CommonBackendErrors
 import org.jetbrains.kotlin.backend.common.fileForTopLevelPluginDeclarations
 import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.FullValueClassRepresentation
+import org.jetbrains.kotlin.descriptors.InlineClassRepresentation
+import org.jetbrains.kotlin.descriptors.JvmInlineMultiFieldValueClassRepresentation
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.backend.generators.addDeclarationToParent
 import org.jetbrains.kotlin.fir.backend.generators.setParent
 import org.jetbrains.kotlin.fir.backend.utils.createFilesWithBuiltinsSyntheticDeclarationsIfNeeded
-import org.jetbrains.kotlin.fir.backend.utils.createFilesWithGeneratedDeclarations
 import org.jetbrains.kotlin.fir.backend.utils.unsubstitutedScope
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.classId
 import org.jetbrains.kotlin.fir.declarations.utils.correspondingValueParameterFromPrimaryConstructor
-import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.declarations.utils.isSynthetic
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
 import org.jetbrains.kotlin.fir.expressions.FirExpression
@@ -33,35 +34,28 @@ import org.jetbrains.kotlin.fir.extensions.declarationGenerators
 import org.jetbrains.kotlin.fir.extensions.extensionService
 import org.jetbrains.kotlin.fir.extensions.generatedMembers
 import org.jetbrains.kotlin.fir.extensions.generatedNestedClassifiers
-import org.jetbrains.kotlin.fir.java.javaElementFinder
 import org.jetbrains.kotlin.fir.references.toResolvedValueParameterSymbol
 import org.jetbrains.kotlin.fir.scopes.processAllFunctions
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.lazyDeclarationResolver
+import org.jetbrains.kotlin.fir.types.isNothingOrNullableNothing
 import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.types.toRegularClassSymbol
-import org.jetbrains.kotlin.ir.IrBuiltIns
-import org.jetbrains.kotlin.ir.KtDiagnosticReporterWithImplicitIrBasedContext
 import org.jetbrains.kotlin.ir.PsiIrFileEntry
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrModuleFragmentImpl
-import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.impl.IrDelegatingConstructorCallImplWithShape
-import org.jetbrains.kotlin.ir.interpreter.IrInterpreter
-import org.jetbrains.kotlin.ir.interpreter.IrInterpreterConfiguration
-import org.jetbrains.kotlin.ir.interpreter.IrInterpreterEnvironment
-import org.jetbrains.kotlin.ir.interpreter.checker.EvaluationMode
-import org.jetbrains.kotlin.ir.interpreter.transformer.transformConst
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.symbols.impl.IrConstructorSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.NaiveSourceBasedFileEntryImpl
 import org.jetbrains.kotlin.ir.util.defaultType
-import org.jetbrains.kotlin.ir.util.fileOrNull
-import org.jetbrains.kotlin.ir.util.sourceElement
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.psi.KtFile
@@ -160,6 +154,7 @@ class Fir2IrConverter(
         for (declaration in file.declarations) {
             when (declaration) {
                 is FirRegularClass -> registerClassAndNestedClasses(declaration, irFile)
+                is FirReplSnippet -> registerClassAndNestedClasses(declaration.snippetClass, irFile)
                 is FirCodeFragment -> classifierStorage.createAndCacheCodeFragmentClass(declaration, irFile)
                 else -> {}
             }
@@ -172,9 +167,8 @@ class Fir2IrConverter(
         file.declarations.forEach {
             when (it) {
                 is FirRegularClass -> processClassAndNestedClassHeaders(it)
-                is FirTypeAlias -> {
-                    classifierStorage.createAndCacheIrTypeAlias(it, irFile)
-                }
+                is FirReplSnippet -> processClassAndNestedClassHeaders(it.snippetClass)
+                is FirTypeAlias -> classifierStorage.createAndCacheIrTypeAlias(it, irFile)
                 else -> {}
             }
         }
@@ -234,10 +228,6 @@ class Fir2IrConverter(
             }
         }
 
-        // `irClass` is a source class and definitely is not a lazy class
-        @OptIn(UnsafeDuringIrConstructionAPI::class)
-        irClass.declarations.addAll(classifierStorage.getFieldsWithContextReceiversForClass(irClass, klass))
-
         val irConstructor = klass.primaryConstructorIfAny(session)?.let {
             declarationStorage.createAndCacheIrConstructor(it.fir, { irClass }, isLocal = klass.isLocal)
         }
@@ -254,17 +244,16 @@ class Fir2IrConverter(
         // Add synthetic members *before* fake override generations.
         // Otherwise, redundant members, e.g., synthetic toString _and_ fake override toString, will be added.
         if (klass is FirRegularClass && irConstructor != null && (irClass.isValue || irClass.isData)) {
-            declarationStorage.enterScope(irConstructor.symbol)
-            if (irClass.isSingleFieldValueClass) {
-                allDeclarations += dataClassMembersGenerator.generateSingleFieldValueClassMembers(klass, irClass)
+            declarationStorage.withScope(irConstructor.symbol) {
+                allDeclarations += when (irClass.valueClassRepresentation) {
+                    is InlineClassRepresentation -> dataClassMembersGenerator.generateSingleFieldValueClassMembers(klass, irClass)
+                    is JvmInlineMultiFieldValueClassRepresentation -> dataClassMembersGenerator.generateMultiFieldValueClassMembers(klass, irClass)
+                    is FullValueClassRepresentation if irClass.modality != Modality.ABSTRACT && irClass.modality != Modality.SEALED ->
+                        dataClassMembersGenerator.generateFullValueClassMembers(klass, irClass)
+                    else if irClass.isData -> dataClassMembersGenerator.generateDataClassMembers(klass, irClass)
+                    else -> emptyList()
+                }
             }
-            if (irClass.isMultiFieldValueClass) {
-                allDeclarations += dataClassMembersGenerator.generateMultiFieldValueClassMembers(klass, irClass)
-            }
-            if (irClass.isData) {
-                allDeclarations += dataClassMembersGenerator.generateDataClassMembers(klass, irClass)
-            }
-            declarationStorage.leaveScope(irConstructor.symbol)
         }
         return irClass
     }
@@ -307,9 +296,6 @@ class Fir2IrConverter(
         }
 
         IrSimpleFunctionSymbolImpl().let { irSymbol ->
-            val lastStatement = codeFragment.block.statements.lastOrNull()
-            val returnType = (lastStatement as? FirExpression)?.resolvedType?.toIrType() ?: builtins.unitType
-
             IrFactoryImpl.createSimpleFunction(
                 UNDEFINED_OFFSET, UNDEFINED_OFFSET,
                 IrDeclarationOrigin.DEFINED,
@@ -317,7 +303,7 @@ class Fir2IrConverter(
                 DescriptorVisibilities.PUBLIC,
                 isInline = false,
                 isExpect = false,
-                returnType,
+                computeCodeFragmentReturnType(codeFragment),
                 Modality.FINAL,
                 irSymbol,
                 isTailrec = false,
@@ -354,6 +340,21 @@ class Fir2IrConverter(
 
         declarationStorage.leaveScope(irClass.symbol)
         return irClass
+    }
+
+    private fun computeCodeFragmentReturnType(codeFragment: FirCodeFragment): IrType {
+        val lastStatement = codeFragment.block.statements.lastOrNull()
+        if (lastStatement is FirExpression) {
+            val lastStatementType = lastStatement.resolvedType
+            if (lastStatementType.isNothingOrNullableNothing) {
+                // Unless the last statement type is explicitly 'Unit', treat code fragments like they have a return value.
+                return builtins.anyType.makeNullable()
+            }
+
+            return lastStatementType.toIrType()
+        }
+
+        return builtins.unitType
     }
 
     // `irClass` is a source class and definitely is not a lazy class
@@ -487,8 +488,10 @@ class Fir2IrConverter(
                 val irSnippet = declarationStorage.createIrReplSnippet(declaration)
                 addDeclarationToParentIfNeeded(irSnippet)
                 irSnippet.parent = parent
+
+                processMemberDeclaration(declaration.snippetClass, containingClass, parent, delegateFieldToPropertyMap)
             }
-            is FirSimpleFunction -> {
+            is FirNamedFunction -> {
                 declarationStorage.createAndCacheIrFunction(declaration, parent, isLocal = isInLocalClass)
             }
             is FirProperty -> {
@@ -575,13 +578,13 @@ class Fir2IrConverter(
             val needProcessMember = when (scriptDeclaration) {
                 is FirAnonymousInitializer -> false // processed later
                 is FirProperty -> {
-                    !scriptDeclaration.isLocal &&
+                    scriptDeclaration.symbol is FirRegularPropertySymbol &&
                             // '_' DD element
                             (scriptDeclaration.name != SpecialNames.UNDERSCORE_FOR_UNUSED_VAR ||
                                     scriptDeclaration.destructuringDeclarationContainerVariable == null)
                 }
                 is FirClassLikeDeclaration -> !scriptDeclaration.isLocal
-                is FirSimpleFunction -> !scriptDeclaration.isLocal
+                is FirNamedFunction -> scriptDeclaration.status.visibility != Visibilities.Local
                 else -> true
             }
             if (needProcessMember) {
@@ -601,71 +604,6 @@ class Fir2IrConverter(
     }
 
     companion object {
-        // TODO: move to compiler/fir/entrypoint/src/org/jetbrains/kotlin/fir/pipeline/convertToIr.kt (KT-64201)
-        fun evaluateConstants(irModuleFragment: IrModuleFragment, components: Fir2IrComponents, irBuiltIns: IrBuiltIns) {
-            val fir2IrConfiguration = components.configuration
-            val firModuleDescriptor = irModuleFragment.descriptor as? FirModuleDescriptor
-            val targetPlatform = firModuleDescriptor?.platform
-            val languageVersionSettings = firModuleDescriptor?.session?.languageVersionSettings ?: return
-            val intrinsicConstEvaluation = languageVersionSettings.supportsFeature(LanguageFeature.IntrinsicConstEvaluation)
-
-            val configuration = IrInterpreterConfiguration(
-                platform = targetPlatform,
-                printOnlyExceptionMessage = true,
-            )
-
-            val interpreter = IrInterpreter(IrInterpreterEnvironment(irBuiltIns, configuration))
-            val mode = if (intrinsicConstEvaluation) EvaluationMode.OnlyIntrinsicConst() else EvaluationMode.OnlyBuiltins
-
-            components.session.javaElementFinder?.propertyEvaluator = { it.evaluate(components, interpreter, mode) }
-
-            val ktDiagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(
-                fir2IrConfiguration.diagnosticReporter, languageVersionSettings
-            )
-            irModuleFragment.files.forEach {
-                it.transformConst(
-                    it,
-                    interpreter,
-                    mode,
-                    fir2IrConfiguration.evaluatedConstTracker,
-                    fir2IrConfiguration.inlineConstTracker,
-                    onError = { irFile, element, error ->
-                        // We are using exactly this overload of `at` to eliminate differences between PSI and LightTree render
-                        ktDiagnosticReporter.at(element.sourceElement(), element, irFile)
-                            .report(CommonBackendErrors.EVALUATION_ERROR, error.description)
-                    }
-                )
-            }
-        }
-
-        private fun FirProperty.evaluate(components: Fir2IrComponents, interpreter: IrInterpreter, mode: EvaluationMode): String? {
-            @OptIn(UnsafeDuringIrConstructionAPI::class)
-            val irProperty = components.declarationStorage.getCachedIrPropertySymbol(
-                property = this, fakeOverrideOwnerLookupTag = null
-            )?.owner ?: return null
-
-            fun IrProperty.tryToGetConst(): IrConst? = (backingField?.initializer?.expression as? IrConst)
-            fun IrConst.asString(): String {
-                return when (val constVal = value) {
-                    is Char -> constVal.code.toString()
-                    is String -> "\"$constVal\""
-                    else -> constVal.toString()
-                }
-            }
-            irProperty.tryToGetConst()?.let { return it.asString() }
-
-            val irFile = irProperty.fileOrNull ?: return null
-            // Note: can't evaluate all expressions in given file, because we can accidentally get recursive processing and
-            // second call of `Fir2IrLazyField.initializer` will return null
-            val evaluated = irProperty.transformConst(
-                irFile, interpreter, mode,
-                evaluatedConstTracker = components.configuration.evaluatedConstTracker,
-                inlineConstTracker = components.configuration.inlineConstTracker,
-            )
-
-            return (evaluated as? IrProperty)?.tryToGetConst()?.asString()
-        }
-
         fun generateIrModuleFragment(components: Fir2IrComponentsStorage, firFiles: List<FirFile>): IrModuleFragmentImpl {
             val session = components.session
 
@@ -676,9 +614,12 @@ class Fir2IrConverter(
             val allFirFiles = buildList {
                 addAll(session.createFilesWithBuiltinsSyntheticDeclarationsIfNeeded())
                 addAll(firFiles)
-                val generatedFiles = session.createFilesWithGeneratedDeclarations()
-                addAll(generatedFiles)
-                generatedFiles.forEach { components.firProvider.recordFile(it) }
+            }
+
+            for (firFile in firFiles) {
+                if (firFile.origin == FirDeclarationOrigin.Synthetic.PluginFile) {
+                    components.firProvider.recordFile(firFile)
+                }
             }
 
             components.converter.runSourcesConversion(allFirFiles, irModuleFragment, components.fir2IrVisitor)

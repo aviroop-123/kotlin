@@ -1,7 +1,5 @@
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER
 // JSR305_GLOBAL_REPORT: strict
-// RENDER_PACKAGE: test
 
 // FILE: spr/Nullable.java
 package spr;

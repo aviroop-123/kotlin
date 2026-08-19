@@ -138,7 +138,7 @@ private fun Project.registerSwiftExportRun(
     val outputs = layout.buildDirectory.dir("SwiftExport/${target.name}/$configuration")
     val files = outputs.map { it.dir("files") }
     val serializedModules = outputs.map { it.dir("modules").file("${swiftApiModuleName.get()}.json") }
-    val configurationProvider = provider { LazyResolvedConfiguration(exportConfiguration) }
+    val configurationProvider = provider { LazyResolvedConfigurationWithArtifacts(exportConfiguration) }
 
     return locateOrRegisterTask<SwiftExportTask>(swiftExportTaskName) { task ->
         task.description = "Run $taskNamePrefix Swift Export process"
@@ -186,8 +186,9 @@ private fun registerSwiftExportCompilationAndGetBinary(
         SwiftExportConstants.SWIFT_EXPORT_COMPILATION,
         invokeWhenCreated = { swiftExportCompilation ->
             swiftExportCompilation.associateWith(mainCompilation)
+
             swiftExportCompilation.defaultSourceSet.kotlin.srcDir(swiftExportTask.map {
-                it.parameters.outputPath.getFile()
+                it.parameters.outputPath.getFile().parentFile
             })
 
             swiftExportCompilation.compileTaskProvider.configure {

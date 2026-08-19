@@ -29,7 +29,8 @@ sealed class FirDeclarationOrigin(
 
     sealed class Synthetic(generatedAnyMethod: Boolean = false) : FirDeclarationOrigin(generatedAnyMethod = generatedAnyMethod) {
         object DataClassMember : Synthetic(generatedAnyMethod = true)
-        object ValueClassMember : Synthetic(generatedAnyMethod = true)
+        object BasicValueClassMember : Synthetic(generatedAnyMethod = true)
+        object FullValueClassMember : Synthetic(generatedAnyMethod = true)
         object JavaProperty : Synthetic()
         object DelegateField : Synthetic()
         object PluginFile : Synthetic()
@@ -41,6 +42,10 @@ sealed class FirDeclarationOrigin(
         object ScriptTopLevelDestructuringDeclarationContainer : Synthetic()
         object FakeHiddenInPreparationForNewJdk : Synthetic()
         object ImplicitWhenSubject : Synthetic()
+
+        // REPL synthetic constructs.
+        object ReplContainerClass : Synthetic()
+        object ReplEvalFunction : Synthetic()
     }
 
     object DynamicScope : FirDeclarationOrigin()

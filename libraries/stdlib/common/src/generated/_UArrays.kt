@@ -1,10 +1,11 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 @file:kotlin.jvm.JvmMultifileClass
 @file:kotlin.jvm.JvmName("UArraysKt")
+@file:Suppress("REDUNDANT_CALL_OF_CONVERSION_METHOD")
 @file:kotlin.jvm.JvmPackageName("kotlin.collections.unsigned")
 
 package kotlin.collections
@@ -737,6 +738,8 @@ public inline fun UShortArray.firstOrNull(predicate: (UShort) -> Boolean): UShor
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Arrays.Usage.getOrElse
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -750,6 +753,8 @@ public inline fun UIntArray.getOrElse(index: Int, defaultValue: (Int) -> UInt): 
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Arrays.Usage.getOrElse
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -763,6 +768,8 @@ public inline fun ULongArray.getOrElse(index: Int, defaultValue: (Int) -> ULong)
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Arrays.Usage.getOrElse
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -776,6 +783,8 @@ public inline fun UByteArray.getOrElse(index: Int, defaultValue: (Int) -> UByte)
 
 /**
  * Returns an element at the given [index] or the result of calling the [defaultValue] function if the [index] is out of bounds of this array.
+ * 
+ * @sample samples.collections.Arrays.Usage.getOrElse
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2744,6 +2753,486 @@ public inline fun UShortArray.takeWhile(predicate: (UShort) -> Boolean): List<US
 }
 
 /**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUIntArraySamples.isSorted
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UIntArray.isSorted(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] > this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedULongArraySamples.isSorted
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun ULongArray.isSorted(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] > this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUByteArraySamples.isSorted
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UByteArray.isSorted(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] > this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUShortArraySamples.isSorted
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UShortArray.isSorted(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] > this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is less than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the [selector] value of the preceding element is not greater than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedUIntArraySamples.isSortedBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> UIntArray.isSortedBy(selector: (UInt) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) > 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is less than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the [selector] value of the preceding element is not greater than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedULongArraySamples.isSortedBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> ULongArray.isSortedBy(selector: (ULong) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) > 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is less than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the [selector] value of the preceding element is not greater than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedUByteArraySamples.isSortedBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> UByteArray.isSortedBy(selector: (UByte) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) > 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is less than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the [selector] value of the preceding element is not greater than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedUShortArraySamples.isSortedBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> UShortArray.isSortedBy(selector: (UShort) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) > 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is greater than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted in descending order if for each pair
+ * of adjacent elements the [selector] value of the preceding element is not less
+ * than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedUIntArraySamples.isSortedByDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> UIntArray.isSortedByDescending(selector: (UInt) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) < 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is greater than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted in descending order if for each pair
+ * of adjacent elements the [selector] value of the preceding element is not less
+ * than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedULongArraySamples.isSortedByDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> ULongArray.isSortedByDescending(selector: (ULong) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) < 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is greater than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted in descending order if for each pair
+ * of adjacent elements the [selector] value of the preceding element is not less
+ * than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedUByteArraySamples.isSortedByDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> UByteArray.isSortedByDescending(selector: (UByte) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) < 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array yields a [selector] value
+ * that is greater than or equal to the [selector] value of the following element
+ * according to the natural sort order of the selector values.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The [selector] values of adjacent elements are compared sequentially using [compareValues],
+ * and the array is considered sorted in descending order if for each pair
+ * of adjacent elements the [selector] value of the preceding element is not less
+ * than that of the following one.
+ * 
+ * If the [selector] returns `null` for an element, the `null` value is treated as less than any non-null value.
+ * 
+ * @sample samples.generated.issorted.IsSortedUShortArraySamples.isSortedByDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public inline fun <R : Comparable<R>> UShortArray.isSortedByDescending(selector: (UShort) -> R?): Boolean {
+    if (size < 2) return true
+    var previousValue = selector(this[0])
+    for (i in 1..lastIndex) {
+        val currentValue = selector(this[i])
+        if (compareValues(previousValue, currentValue) < 0) return false
+        previousValue = currentValue
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is greater than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted in descending order if for each
+ * pair of adjacent elements the preceding element is not less than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUIntArraySamples.isSortedDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UIntArray.isSortedDescending(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] < this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is greater than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted in descending order if for each
+ * pair of adjacent elements the preceding element is not less than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedULongArraySamples.isSortedDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun ULongArray.isSortedDescending(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] < this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is greater than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted in descending order if for each
+ * pair of adjacent elements the preceding element is not less than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUByteArraySamples.isSortedDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UByteArray.isSortedDescending(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] < this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is greater than or equal
+ * to the following element according to their natural sort order.
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially,
+ * and the array is considered sorted in descending order if for each
+ * pair of adjacent elements the preceding element is not less than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUShortArraySamples.isSortedDescending
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UShortArray.isSortedDescending(): Boolean {
+    for (i in 1..lastIndex) {
+        if (this[i - 1] < this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to the specified [comparator].
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially using [Comparator.compare],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUIntArraySamples.isSortedWith
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UIntArray.isSortedWith(comparator: Comparator<in UInt>): Boolean {
+    for (i in 1..lastIndex) {
+        if (comparator.compare(this[i - 1], this[i]) > 0) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to the specified [comparator].
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially using [Comparator.compare],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedULongArraySamples.isSortedWith
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun ULongArray.isSortedWith(comparator: Comparator<in ULong>): Boolean {
+    for (i in 1..lastIndex) {
+        if (comparator.compare(this[i - 1], this[i]) > 0) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to the specified [comparator].
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially using [Comparator.compare],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUByteArraySamples.isSortedWith
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UByteArray.isSortedWith(comparator: Comparator<in UByte>): Boolean {
+    for (i in 1..lastIndex) {
+        if (comparator.compare(this[i - 1], this[i]) > 0) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if each element in the array is less than or equal
+ * to the following element according to the specified [comparator].
+ * 
+ * Returns `true` if the array has fewer than two elements.
+ * 
+ * The elements are compared sequentially using [Comparator.compare],
+ * and the array is considered sorted if for each pair of adjacent elements
+ * the preceding element is not greater than the following one.
+ * 
+ * @sample samples.generated.issorted.IsSortedUShortArraySamples.isSortedWith
+ */
+@SinceKotlin("2.4")
+@ExperimentalUnsignedTypes
+public fun UShortArray.isSortedWith(comparator: Comparator<in UShort>): Boolean {
+    for (i in 1..lastIndex) {
+        if (comparator.compare(this[i - 1], this[i]) > 0) return false
+    }
+    return true
+}
+
+/**
  * Reverses elements in the array in-place.
  */
 @SinceKotlin("1.3")
@@ -2849,6 +3338,8 @@ public inline fun UShortArray.reverse(fromIndex: Int, toIndex: Int): Unit {
 
 /**
  * Returns a list with elements in reversed order.
+ * 
+ * Use [reversedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2861,6 +3352,8 @@ public fun UIntArray.reversed(): List<UInt> {
 
 /**
  * Returns a list with elements in reversed order.
+ * 
+ * Use [reversedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2873,6 +3366,8 @@ public fun ULongArray.reversed(): List<ULong> {
 
 /**
  * Returns a list with elements in reversed order.
+ * 
+ * Use [reversedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2885,6 +3380,8 @@ public fun UByteArray.reversed(): List<UByte> {
 
 /**
  * Returns a list with elements in reversed order.
+ * 
+ * Use [reversedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2897,6 +3394,8 @@ public fun UShortArray.reversed(): List<UShort> {
 
 /**
  * Returns an array with elements of this array in reversed order.
+ * 
+ * Use [reversed][kotlin.collections.reversed] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2907,6 +3406,8 @@ public inline fun UIntArray.reversedArray(): UIntArray {
 
 /**
  * Returns an array with elements of this array in reversed order.
+ * 
+ * Use [reversed][kotlin.collections.reversed] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2917,6 +3418,8 @@ public inline fun ULongArray.reversedArray(): ULongArray {
 
 /**
  * Returns an array with elements of this array in reversed order.
+ * 
+ * Use [reversed][kotlin.collections.reversed] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -2927,6 +3430,8 @@ public inline fun UByteArray.reversedArray(): UByteArray {
 
 /**
  * Returns an array with elements of this array in reversed order.
+ * 
+ * Use [reversed][kotlin.collections.reversed] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3085,6 +3590,8 @@ public fun UShortArray.sortDescending(): Unit {
 
 /**
  * Returns a list of all elements sorted according to their natural sort order.
+ * 
+ * Use [sortedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3094,6 +3601,8 @@ public fun UIntArray.sorted(): List<UInt> {
 
 /**
  * Returns a list of all elements sorted according to their natural sort order.
+ * 
+ * Use [sortedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3103,6 +3612,8 @@ public fun ULongArray.sorted(): List<ULong> {
 
 /**
  * Returns a list of all elements sorted according to their natural sort order.
+ * 
+ * Use [sortedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3112,6 +3623,8 @@ public fun UByteArray.sorted(): List<UByte> {
 
 /**
  * Returns a list of all elements sorted according to their natural sort order.
+ * 
+ * Use [sortedArray] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3121,6 +3634,8 @@ public fun UShortArray.sorted(): List<UShort> {
 
 /**
  * Returns an array with all elements of this array sorted according to their natural sort order.
+ * 
+ * Use [sorted] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3131,6 +3646,8 @@ public fun UIntArray.sortedArray(): UIntArray {
 
 /**
  * Returns an array with all elements of this array sorted according to their natural sort order.
+ * 
+ * Use [sorted] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3141,6 +3658,8 @@ public fun ULongArray.sortedArray(): ULongArray {
 
 /**
  * Returns an array with all elements of this array sorted according to their natural sort order.
+ * 
+ * Use [sorted] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3151,6 +3670,8 @@ public fun UByteArray.sortedArray(): UByteArray {
 
 /**
  * Returns an array with all elements of this array sorted according to their natural sort order.
+ * 
+ * Use [sorted] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3161,6 +3682,8 @@ public fun UShortArray.sortedArray(): UShortArray {
 
 /**
  * Returns an array with all elements of this array sorted descending according to their natural sort order.
+ * 
+ * Use [sortedDescending] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3171,6 +3694,8 @@ public fun UIntArray.sortedArrayDescending(): UIntArray {
 
 /**
  * Returns an array with all elements of this array sorted descending according to their natural sort order.
+ * 
+ * Use [sortedDescending] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3181,6 +3706,8 @@ public fun ULongArray.sortedArrayDescending(): ULongArray {
 
 /**
  * Returns an array with all elements of this array sorted descending according to their natural sort order.
+ * 
+ * Use [sortedDescending] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3191,6 +3718,8 @@ public fun UByteArray.sortedArrayDescending(): UByteArray {
 
 /**
  * Returns an array with all elements of this array sorted descending according to their natural sort order.
+ * 
+ * Use [sortedDescending] if you need to get the result in a list.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3201,6 +3730,8 @@ public fun UShortArray.sortedArrayDescending(): UShortArray {
 
 /**
  * Returns a list of all elements sorted descending according to their natural sort order.
+ * 
+ * Use [sortedArrayDescending] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3210,6 +3741,8 @@ public fun UIntArray.sortedDescending(): List<UInt> {
 
 /**
  * Returns a list of all elements sorted descending according to their natural sort order.
+ * 
+ * Use [sortedArrayDescending] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3219,6 +3752,8 @@ public fun ULongArray.sortedDescending(): List<ULong> {
 
 /**
  * Returns a list of all elements sorted descending according to their natural sort order.
+ * 
+ * Use [sortedArrayDescending] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -3228,6 +3763,8 @@ public fun UByteArray.sortedDescending(): List<UByte> {
 
 /**
  * Returns a list of all elements sorted descending according to their natural sort order.
+ * 
+ * Use [sortedArrayDescending] if you need to get the result in an array.
  */
 @SinceKotlin("1.3")
 @ExperimentalUnsignedTypes
@@ -5500,6 +6037,218 @@ public inline fun UByteArray.all(predicate: (UByte) -> Boolean): Boolean {
 @kotlin.internal.InlineOnly
 public inline fun UShortArray.all(predicate: (UShort) -> Boolean): Boolean {
     for (element in this) if (!predicate(element)) return false
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array are equal to each other.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The elements are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal if the first element equals
+ * every subsequent element.
+ * 
+ * @sample samples.generated.allequal.AllEqualUIntArraySamples.allEqual
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public fun UIntArray.allEqual(): Boolean {
+    if (size < 2) return true
+    val first = this[0]
+    for (i in 1..lastIndex) {
+        if (first != this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array are equal to each other.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The elements are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal if the first element equals
+ * every subsequent element.
+ * 
+ * @sample samples.generated.allequal.AllEqualULongArraySamples.allEqual
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public fun ULongArray.allEqual(): Boolean {
+    if (size < 2) return true
+    val first = this[0]
+    for (i in 1..lastIndex) {
+        if (first != this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array are equal to each other.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The elements are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal if the first element equals
+ * every subsequent element.
+ * 
+ * @sample samples.generated.allequal.AllEqualUByteArraySamples.allEqual
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public fun UByteArray.allEqual(): Boolean {
+    if (size < 2) return true
+    val first = this[0]
+    for (i in 1..lastIndex) {
+        if (first != this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array are equal to each other.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The elements are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal if the first element equals
+ * every subsequent element.
+ * 
+ * @sample samples.generated.allequal.AllEqualUShortArraySamples.allEqual
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public fun UShortArray.allEqual(): Boolean {
+    if (size < 2) return true
+    val first = this[0]
+    for (i in 1..lastIndex) {
+        if (first != this[i]) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array yield the same value
+ * produced by the given [selector] function.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The [selector] values are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal by the [selector] value if the [selector]
+ * value of the first element equals the [selector] value of every subsequent element.
+ * 
+ * For selector values of floating-point types (`Double`, `Float`), `NaN` is considered equal to `NaN`,
+ * and `-0.0` is considered not equal to `0.0`, consistent with [Double.equals] and [Float.equals].
+ * 
+ * @sample samples.generated.allequal.AllEqualUIntArraySamples.allEqualBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public inline fun <K> UIntArray.allEqualBy(selector: (UInt) -> K): Boolean {
+    if (size < 2) return true
+    val firstKey = selector(this[0])
+    for (i in 1..lastIndex) {
+        val key = selector(this[i])
+        // Workaround for KT-86678 (revert in KT-86680): `==` on boxed Double/Float is wrong for NaN on Native.
+        val equal = firstKey?.equals(key) ?: (key == null)
+        if (!equal) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array yield the same value
+ * produced by the given [selector] function.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The [selector] values are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal by the [selector] value if the [selector]
+ * value of the first element equals the [selector] value of every subsequent element.
+ * 
+ * For selector values of floating-point types (`Double`, `Float`), `NaN` is considered equal to `NaN`,
+ * and `-0.0` is considered not equal to `0.0`, consistent with [Double.equals] and [Float.equals].
+ * 
+ * @sample samples.generated.allequal.AllEqualULongArraySamples.allEqualBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public inline fun <K> ULongArray.allEqualBy(selector: (ULong) -> K): Boolean {
+    if (size < 2) return true
+    val firstKey = selector(this[0])
+    for (i in 1..lastIndex) {
+        val key = selector(this[i])
+        // Workaround for KT-86678 (revert in KT-86680): `==` on boxed Double/Float is wrong for NaN on Native.
+        val equal = firstKey?.equals(key) ?: (key == null)
+        if (!equal) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array yield the same value
+ * produced by the given [selector] function.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The [selector] values are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal by the [selector] value if the [selector]
+ * value of the first element equals the [selector] value of every subsequent element.
+ * 
+ * For selector values of floating-point types (`Double`, `Float`), `NaN` is considered equal to `NaN`,
+ * and `-0.0` is considered not equal to `0.0`, consistent with [Double.equals] and [Float.equals].
+ * 
+ * @sample samples.generated.allequal.AllEqualUByteArraySamples.allEqualBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public inline fun <K> UByteArray.allEqualBy(selector: (UByte) -> K): Boolean {
+    if (size < 2) return true
+    val firstKey = selector(this[0])
+    for (i in 1..lastIndex) {
+        val key = selector(this[i])
+        // Workaround for KT-86678 (revert in KT-86680): `==` on boxed Double/Float is wrong for NaN on Native.
+        val equal = firstKey?.equals(key) ?: (key == null)
+        if (!equal) return false
+    }
+    return true
+}
+
+/**
+ * Returns `true` if all elements in the array yield the same value
+ * produced by the given [selector] function.
+ * 
+ * Returns `true` for an empty array.
+ * 
+ * The [selector] values are compared sequentially using structural equality (`==`),
+ * and all elements are considered equal by the [selector] value if the [selector]
+ * value of the first element equals the [selector] value of every subsequent element.
+ * 
+ * For selector values of floating-point types (`Double`, `Float`), `NaN` is considered equal to `NaN`,
+ * and `-0.0` is considered not equal to `0.0`, consistent with [Double.equals] and [Float.equals].
+ * 
+ * @sample samples.generated.allequal.AllEqualUShortArraySamples.allEqualBy
+ */
+@SinceKotlin("2.4")
+@ExperimentalStdlibApi
+@ExperimentalUnsignedTypes
+public inline fun <K> UShortArray.allEqualBy(selector: (UShort) -> K): Boolean {
+    if (size < 2) return true
+    val firstKey = selector(this[0])
+    for (i in 1..lastIndex) {
+        val key = selector(this[i])
+        // Workaround for KT-86678 (revert in KT-86680): `==` on boxed Double/Float is wrong for NaN on Native.
+        val equal = firstKey?.equals(key) ?: (key == null)
+        if (!equal) return false
+    }
     return true
 }
 

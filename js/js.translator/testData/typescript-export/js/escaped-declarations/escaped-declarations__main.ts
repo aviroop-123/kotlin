@@ -3,6 +3,7 @@ import A1 = JS_TESTS.foo.A1;
 import A2 = JS_TESTS.foo.A2;
 import A3 = JS_TESTS.foo.A3;
 import A4 = JS_TESTS.foo.A4;
+import FooEnum = JS_TESTS.foo.FooEnum;
 
 function assert(condition: boolean) {
     if (!condition) {
@@ -25,6 +26,8 @@ function box(): string {
     assert(new A1(10, 20)["second.value"] === 20);
 
     assert(new A2()["invalid:name"] === 42);
+    assert(new A2()['"contains \" symbol"'] === "OK");
+    assert(new A2()[`'contains both \" and \' symbols"`]() === "OK");
 
     const a3 = new A3()
     assert(a3.invalid_args_name_sum(10, 20) === 30);
@@ -32,6 +35,9 @@ function box(): string {
 
     assert(A4.Companion["@invalid+name@"] == 23);
     assert(A4.Companion["^)run.something.weird^("]() === ")_(");
+
+    assert(FooEnum.values().indexOf(FooEnum["-Escaped-Value-"]) == 0)
+    assert(FooEnum.values().indexOf(FooEnum["With.Dot"]) == 1)
 
     return "OK";
 }

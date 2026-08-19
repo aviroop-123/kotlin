@@ -29,7 +29,7 @@ inline fun patchManifestAsMap(
     transform(mutableProperties)
 
     Properties().apply {
-        for ((key, value) in mutableProperties) {
+        for ([key, value] in mutableProperties) {
             this[key] = value
         }
         manifestFile.outputStream().use { store(it, null) }
@@ -54,54 +54,4 @@ fun patchManifestToBumpAbiVersion(
     patchManifest(assertions, klibDir) { key, value ->
         if (key == KLIB_PROPERTY_ABI_VERSION) newAbiVersion.toString() else value
     }
-}
-
-fun assertCompilerOutputHasKlibResolverIssue(
-    assertions: Assertions,
-    compilerOutput: String,
-    missingLibrary: String,
-    baseDir: File,
-    prefixPatterns: List<(missingLibraryPath: String) -> String>
-) {
-    assertions.assertTrue(prefixPatterns.isNotEmpty())
-
-    val baseDirPath = baseDir.absolutePath
-    val missingLibraryPath = missingLibrary.replace('/', File.separatorChar).replace('\\', File.separatorChar)
-
-    val lines = compilerOutput.lineSequence()
-        .filter(String::isNotBlank)
-        .map { it.replace(baseDirPath, "<path>") }
-        .toList()
-
-    fun assertHasLineWithPrefix(prefix: String) {
-        if (lines.none { it.startsWith(prefix) }) {
-            assertions.fail {
-                buildString {
-                    appendLine("No line starting with prefix found: $prefix")
-                    appendLine("Lines inspected (${lines.size}):")
-                    lines.forEach(::appendLine)
-                }
-            }
-        }
-    }
-
-    prefixPatterns.forEach { prefixPattern ->
-        val prefix = prefixPattern(missingLibraryPath)
-        assertHasLineWithPrefix(prefix)
-    }
-}
-
-fun assertCompilerOutputHasKlibResolverIncompatibleAbiMessages(
-    assertions: Assertions,
-    compilerOutput: String,
-    missingLibrary: String,
-    baseDir: File
-) {
-    assertCompilerOutputHasKlibResolverIssue(
-        assertions, compilerOutput, missingLibrary, baseDir,
-        listOf(
-            { "error: KLIB resolver: Could not find \"<path>$it\"" },
-            { "warning: KLIB resolver: Skipping '<path>$it' having incompatible ABI version" },
-        )
-    )
 }

@@ -21,11 +21,12 @@ import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+import org.jetbrains.kotlin.config.MessageCollectorAccess
 import org.jetbrains.kotlin.config.messageCollector
 import org.jetbrains.kotlin.script.loadScriptingPlugin
 import org.jetbrains.kotlin.scripting.configuration.ScriptingConfigurationKeys
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
-import org.jetbrains.kotlin.scripting.resolve.KotlinScriptDefinitionFromAnnotatedTemplate
+import org.jetbrains.kotlin.scripting.definitions.ScriptEvaluationConfigurationFromHostConfiguration
 import org.jetbrains.kotlin.test.ConfigurationKind
 import org.jetbrains.kotlin.test.TestJdkKind
 import org.jetbrains.kotlin.test.util.KtTestUtil
@@ -36,15 +37,30 @@ import kotlin.script.templates.ScriptTemplateDefinition
 
 class ScriptGenTest : CodegenTestCase() {
     companion object {
+        @Suppress("DEPRECATION")
         private val FIB_SCRIPT_DEFINITION =
-            ScriptDefinition.FromLegacy(
+            ScriptDefinition.FromConfigurations(
                 defaultJvmScriptingHostConfiguration,
-                KotlinScriptDefinitionFromAnnotatedTemplate(ScriptWithIntParam::class)
+                org.jetbrains.kotlin.scripting.definitions.ScriptCompilationConfigurationFromLegacyTemplate(
+                    defaultJvmScriptingHostConfiguration,
+                    ScriptWithIntParam::class
+                ),
+                ScriptEvaluationConfigurationFromHostConfiguration(
+                    defaultJvmScriptingHostConfiguration
+                )
             )
+
+        @Suppress("DEPRECATION")
         private val NO_PARAM_SCRIPT_DEFINITION =
-            ScriptDefinition.FromLegacy(
+            ScriptDefinition.FromConfigurations(
                 defaultJvmScriptingHostConfiguration,
-                KotlinScriptDefinitionFromAnnotatedTemplate(Any::class)
+                org.jetbrains.kotlin.scripting.definitions.ScriptCompilationConfigurationFromLegacyTemplate(
+                    defaultJvmScriptingHostConfiguration,
+                    Any::class
+                ),
+                ScriptEvaluationConfigurationFromHostConfiguration(
+                    defaultJvmScriptingHostConfiguration
+                )
             )
     }
 
@@ -127,11 +143,12 @@ class ScriptGenTest : CodegenTestCase() {
         val configuration = createConfiguration(
             ConfigurationKind.ALL, TestJdkKind.FULL_JDK, additionalDependencies, emptyList(), emptyList()
         ).apply {
+            @OptIn(MessageCollectorAccess::class) // write access
             messageCollector = PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
             add(ScriptingConfigurationKeys.SCRIPT_DEFINITIONS, FIB_SCRIPT_DEFINITION)
             add(ScriptingConfigurationKeys.SCRIPT_DEFINITIONS, NO_PARAM_SCRIPT_DEFINITION)
 
-            addKotlinSourceRoots(sourcePaths.map { "${KtTestUtil.getTestDataPathBase()}/codegen/$it" })
+            addKotlinSourceRoots(sourcePaths.map { KtTestUtil.getTestDataFileLocatedInCompilerTestData("codegen/$it").path })
         }
         loadScriptingPlugin(configuration, testRootDisposable)
 

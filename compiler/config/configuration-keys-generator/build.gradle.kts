@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     application
 }
 
@@ -9,10 +8,14 @@ dependencies {
     implementation(project(":generators:tree-generator-common"))
     implementation(project(":compiler:fir:tree:tree-generator"))
     implementation(project(":compiler:config"))
+    implementation(project(":compiler:config.jvm"))
     implementation(project(":compiler:ir.backend.common"))
     implementation(project(":compiler:cli-base"))
-    implementation(project(":js:js.frontend"))
+    implementation(project(":core:language.targets.jvm"))
+    implementation(project(":js:js.config"))
+    implementation(project(":wasm:wasm.config"))
     implementation(project(":kotlin-util-klib"))
+    implementation(project(":native:kotlin-native-utils"))
     implementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
 
     /*

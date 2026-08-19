@@ -5,8 +5,10 @@ KaPropertyGetterSymbol:
   contextReceivers: []
   hasStableParameterNames: true
   isActual: false
+  isCompanion: false
   isExpect: false
   isExtension: false
+  isExternal: false
   isInline: false
   isNotDefault: true
   isOverride: false
@@ -31,3 +33,4 @@ KaPropertyGetterSymbol:
   getContainingJvmClassName: TypeAnnotationsOnPropertyGetterReturnTypeKt
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

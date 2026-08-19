@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import plugins.KotlinBuildPublishingPlugin.Companion.ADHOC_COMPONENT_NAME
 
 plugins {
@@ -7,6 +5,8 @@ plugins {
     `java-test-fixtures`
     `maven-publish`
     id("org.jetbrains.kotlinx.binary-compatibility-validator")
+    id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 configureKotlinCompileTasksGradleCompatibility()
@@ -17,14 +17,16 @@ kotlin.sourceSets.configureEach {
 
 dependencies {
     val coreDepsVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation.get()
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:$coreDepsVersion")
+    compileOnly(kotlin("stdlib", coreDepsVersion))
     api(project(":kotlin-tooling-core"))
     api(project(":kotlin-gradle-plugin-annotations"))
     testImplementation(gradleApi())
     testImplementation(gradleKotlinDsl())
     testImplementation(project(":kotlin-gradle-plugin"))
     testImplementation(project(":kotlin-gradle-plugin-idea-proto"))
-    testImplementation(kotlinTest("junit"))
+    testImplementation(kotlin("stdlib", coreDepsVersion))
+    testImplementation(kotlin("test-junit5", coreDepsVersion))
+    testImplementation(libs.junit.jupiter.params)
 
     testImplementation("org.reflections:reflections:0.10.2") {
         because("Tests on the object graph are performed. This library will find implementations of interfaces at runtime")
@@ -34,7 +36,8 @@ dependencies {
     testFixturesImplementation(gradleKotlinDsl())
     testFixturesImplementation(project(":kotlin-tooling-core"))
     testFixturesImplementation(project(":kotlin-gradle-plugin-idea-proto"))
-    testFixturesImplementation(kotlinTest()) // no test annotations, only assertions are needed
+    testFixturesImplementation(kotlin("stdlib", coreDepsVersion))
+    testFixturesImplementation(kotlin("test", coreDepsVersion)) // no test annotations, only assertions are needed
 }
 
 
@@ -75,27 +78,6 @@ tasks {
     }
 }
 
-//region Setup: Backwards compatibility tests
-
-run {
-    val compatibilityTestClasspath by configurations.creating {
-        isCanBeResolved = true
-        isCanBeConsumed = false
-        attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
-        attributes.attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
-    }
-
-    dependencies {
-        compatibilityTestClasspath(project(":kotlin-gradle-plugin-idea-for-compatibility-tests"))
-    }
-
-    tasks.test {
-        dependsOnKotlinGradlePluginInstall()
-        dependsOn(compatibilityTestClasspath)
-        val conf: FileCollection = compatibilityTestClasspath
-        inputs.files(conf)
-        doFirst { systemProperty("compatibilityTestClasspath", conf.files.joinToString(";") { it.absolutePath }) }
-    }
+projectTests {
+    testTask(jUnitMode = JUnitMode.JUnit5)
 }
-
-//endregion

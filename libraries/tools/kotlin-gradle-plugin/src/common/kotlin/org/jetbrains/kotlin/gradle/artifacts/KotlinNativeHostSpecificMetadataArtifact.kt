@@ -5,11 +5,11 @@
 
 package org.jetbrains.kotlin.gradle.artifacts
 
-import org.gradle.api.artifacts.Dependency
 import org.gradle.api.attributes.Usage
 import org.gradle.api.plugins.BasePlugin
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.plugin.KotlinPluginLifecycle.Stage.AfterFinaliseDsl
+import org.jetbrains.kotlin.gradle.plugin.addToAssemble
 import org.jetbrains.kotlin.gradle.plugin.launch
 import org.jetbrains.kotlin.gradle.plugin.launchInStage
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -28,15 +28,15 @@ internal val KotlinNativeHostSpecificMetadataArtifact = KotlinTargetArtifact { t
     if (target !is KotlinNativeTarget) return@KotlinTargetArtifact
     val project = target.project
 
-    target.project.configurations.createConsumable(target.hostSpecificMetadataElementsConfigurationName).also { configuration ->
-        configuration.extendsFrom(*apiElements.extendsFrom.toTypedArray())
+    target.project.configurations.createConsumable(target.hostSpecificMetadataElementsConfigurationName) {
+        extendsFrom(*apiElements.extendsFrom.toTypedArray())
 
         target.project.launchInStage(AfterFinaliseDsl) {
             apiElements.copyAttributesTo(
                 target.project.providers,
-                dest = configuration.attributes
+                dest = attributes
             )
-            configuration.attributes.attribute(
+            attributes.attribute(
                 Usage.USAGE_ATTRIBUTE,
                 target.project.usageByName(KotlinUsages.KOTLIN_METADATA)
             )
@@ -73,8 +73,11 @@ internal val KotlinNativeHostSpecificMetadataArtifact = KotlinTargetArtifact { t
             }
         }
     }
-    project.artifacts.add(Dependency.ARCHIVES_CONFIGURATION, hostSpecificMetadataJar)
+
+    project.addToAssemble(hostSpecificMetadataJar)
+
     project.artifacts.add(target.hostSpecificMetadataElementsConfigurationName, hostSpecificMetadataJar) { artifact ->
         artifact.classifier = "metadata"
+        artifact.builtBy(hostSpecificMetadataJar)
     }
 }

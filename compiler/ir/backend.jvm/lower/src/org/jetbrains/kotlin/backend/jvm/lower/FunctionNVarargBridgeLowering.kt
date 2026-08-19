@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.lower.at
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
 import org.jetbrains.kotlin.backend.common.lower.irIfThen
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.createJvmIrBuilder
 import org.jetbrains.kotlin.backend.jvm.ir.irArray
@@ -25,9 +25,11 @@ import org.jetbrains.kotlin.ir.builders.declarations.addFunction
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
+import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
+import org.jetbrains.kotlin.name.JvmStandardClassIds
 import org.jetbrains.kotlin.name.Name
 
 /**
@@ -37,17 +39,21 @@ import org.jetbrains.kotlin.name.Name
  * from the generic FunctionN class which has a vararg `invoke` method. This phase adds a bridge method for such large arity functions,
  * which checks the number of arguments dynamically.
  */
-@PhaseDescription(name = "FunctionBridgePhase")
+@PhasePrerequisites(JvmInlineClassLowering::class) // BigArity functions with inline classes should already be exposed
 internal class FunctionNVarargBridgeLowering(val context: JvmBackendContext) :
     FileLoweringPass, IrElementTransformerVoidWithContext() {
     override fun lower(irFile: IrFile) = irFile.transformChildrenVoid(this)
 
+    private fun IrFunctionSymbol.isOneOfFunctionalTypesInvoke() : Boolean {
+        if (owner.name.asString() != "invoke") return false
+        val classSymbol = owner.parentClassOrNull?.defaultType ?: return false
+        return classSymbol.isFunctionOrKFunction() || classSymbol.isSuspendFunctionOrKFunction()
+    }
+
     // Change calls to big arity invoke functions to vararg calls.
     override fun visitFunctionAccess(expression: IrFunctionAccessExpression): IrExpression {
         if (expression.nonDispatchArguments.size < BuiltInFunctionArity.BIG_ARITY ||
-            !(expression.symbol.owner.parentAsClass.defaultType.isFunctionOrKFunction() ||
-                    expression.symbol.owner.parentAsClass.defaultType.isSuspendFunctionOrKFunction()) ||
-            expression.symbol.owner.name.asString() != "invoke"
+            !expression.symbol.isOneOfFunctionalTypesInvoke()
         ) return super.visitFunctionAccess(expression)
 
         return context.createJvmIrBuilder(currentScope!!).run {
@@ -57,7 +63,7 @@ internal class FunctionNVarargBridgeLowering(val context: JvmBackendContext) :
                     expression.dispatchReceiver!!.transformVoid(),
                     this@FunctionNVarargBridgeLowering.context.symbols.functionN.defaultType
                 )
-                arguments[1] = irArray(irSymbols.array.typeWith(context.irBuiltIns.anyNType)) {
+                arguments[1] = irArray(context.irBuiltIns.arrayClass.typeWith(context.irBuiltIns.anyNType)) {
                     for (argument in expression.nonDispatchArguments) {
                         +argument!!.transformVoid()
                     }
@@ -89,6 +95,8 @@ internal class FunctionNVarargBridgeLowering(val context: JvmBackendContext) :
 
             // Add vararg invoke bridge
             val invokeFunction = declaration.functions.single { function ->
+                if (function.hasAnnotation(JvmStandardClassIds.JVM_EXPOSE_BOXED_ANNOTATION_CLASS_ID)) return@single false
+
                 val overridesInvoke = function.overriddenSymbols.any { symbol ->
                     symbol.owner.name.asString() == "invoke"
                 }

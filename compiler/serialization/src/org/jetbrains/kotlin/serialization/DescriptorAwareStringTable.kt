@@ -5,14 +5,18 @@
 
 package org.jetbrains.kotlin.serialization
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.ClassifierDescriptorWithTypeParameters
 import org.jetbrains.kotlin.metadata.serialization.StringTable
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.resolve.descriptorUtil.classId
 import org.jetbrains.kotlin.types.error.ErrorUtils
 
+@K1Deprecation
 interface DescriptorAwareStringTable : StringTable {
+    @OptIn(ClassIdBasedLocality::class)
     fun getQualifiedClassNameIndex(classId: ClassId): Int =
         getQualifiedClassNameIndex(classId.asString(), classId.isLocal)
 

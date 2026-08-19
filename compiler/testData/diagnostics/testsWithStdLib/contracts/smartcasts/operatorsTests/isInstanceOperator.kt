@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +AllowContractsForCustomFunctions +UseReturnsEffect
 // OPT_IN: kotlin.contracts.ExperimentalContracts
 // DIAGNOSTICS: -INVISIBLE_REFERENCE -INVISIBLE_MEMBER
 
@@ -27,7 +26,7 @@ fun testSimple(x: Any?) {
     x.<!UNRESOLVED_REFERENCE!>length<!>
 
     if (isString(x)) {
-        <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        x.length
     }
     else {
         x.<!UNRESOLVED_REFERENCE!>length<!>
@@ -37,7 +36,7 @@ fun testSimple(x: Any?) {
 fun testSpilling(x: Any?) {
     x.<!UNRESOLVED_REFERENCE!>length<!>
 
-    if (isString(x)) <!DEBUG_INFO_SMARTCAST!>x<!>.length
+    if (isString(x)) x.length
 
     x.<!UNRESOLVED_REFERENCE!>length<!>
 }
@@ -47,14 +46,14 @@ fun testInversion(x: Any?) {
         x.<!UNRESOLVED_REFERENCE!>length<!>
     }
     else {
-        <!DEBUG_INFO_SMARTCAST!>x<!>.length
+        x.length
     }
 }
 
 fun testInversionSpilling(x: Any?) {
     x.<!UNRESOLVED_REFERENCE!>length<!>
 
-    if (notIsString(x)) else <!DEBUG_INFO_SMARTCAST!>x<!>.length
+    if (notIsString(x)) else x.length
 
     x.<!UNRESOLVED_REFERENCE!>length<!>
 }

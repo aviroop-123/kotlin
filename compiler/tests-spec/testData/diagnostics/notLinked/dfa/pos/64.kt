@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_EXPRESSION -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_PARAMETER -UNUSED_VARIABLE -UNUSED_VALUE -VARIABLE_WITH_REDUNDANT_INITIALIZER
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS NOT LINKED SPEC TEST (POSITIVE)
@@ -25,7 +24,7 @@ class Case1<T> {
             x = getT()
         }
         <!DEBUG_INFO_EXPRESSION_TYPE("T?")!>x<!>
-        return <!TYPE_MISMATCH!>x<!>
+        return <!RETURN_TYPE_MISMATCH!>x<!>
     }
 }
 
@@ -39,9 +38,9 @@ class Case2 {
         if (x == null) {
             x = getInt()
         }
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int?")!>x<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int?"), DEBUG_INFO_SMARTCAST!>x<!>.equals(10)
-        return <!DEBUG_INFO_SMARTCAST!>x<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>x<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>x<!>.equals(10)
+        return x
     }
 }
 
@@ -58,7 +57,7 @@ class Case3<T> {
         var x = getTN()
         x = x ?: getT()
         <!DEBUG_INFO_EXPRESSION_TYPE("T?")!>x<!>
-        return <!TYPE_MISMATCH!>x<!>
+        return <!RETURN_TYPE_MISMATCH!>x<!>
     }
 }
 
@@ -70,9 +69,9 @@ class Case4 {
     fun get(): Int {
         var x = getIntN()
         x = x ?: getInt()
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int?")!>x<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int?"), DEBUG_INFO_SMARTCAST!>x<!>.equals(10)
-        return <!DEBUG_INFO_SMARTCAST!>x<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>x<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>x<!>.equals(10)
+        return x
     }
 }
 
@@ -84,8 +83,8 @@ class Case5<T> {
     fun get(): T {
         var x = getTN()
         x = if (x == null) getT() else x
-        <!DEBUG_INFO_EXPRESSION_TYPE("T & T?")!>x<!>
-        return <!DEBUG_INFO_SMARTCAST!>x<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("T")!>x<!>
+        return x
     }
 }
 
@@ -97,8 +96,8 @@ class Case6 {
     fun get(): Int {
         var x = getIntN()
         x = if (x == null) getInt() else x
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int?")!>x<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int & kotlin.Int?"), DEBUG_INFO_SMARTCAST!>x<!>.equals(10)
-        return <!DEBUG_INFO_SMARTCAST!>x<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>x<!>
+        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Int")!>x<!>.equals(10)
+        return x
     }
 }

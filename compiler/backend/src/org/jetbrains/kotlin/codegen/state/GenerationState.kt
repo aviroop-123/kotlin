@@ -8,21 +8,21 @@ package org.jetbrains.kotlin.codegen.state
 import com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.codegen.*
 import org.jetbrains.kotlin.codegen.extensions.ClassFileFactoryFinalizerExtension
+import org.jetbrains.kotlin.codegen.extensions.ClassGeneratorExtensionAdapter
 import org.jetbrains.kotlin.codegen.inline.GlobalInlineContext
 import org.jetbrains.kotlin.codegen.inline.InlineCache
 import org.jetbrains.kotlin.codegen.optimization.OptimizationClassBuilderFactory
 import org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings
+import org.jetbrains.kotlin.compiler.plugin.getCompilerExtensions
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.incrementalCompilationComponents
-import org.jetbrains.kotlin.config.messageCollector
 import org.jetbrains.kotlin.config.moduleName
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.VariableDescriptorWithAccessors
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
-import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory
-import org.jetbrains.kotlin.diagnostics.DiagnosticSink
+import org.jetbrains.kotlin.diagnostics.impl.DiagnosticsCollectorImpl
 import org.jetbrains.kotlin.load.kotlin.incremental.components.IncrementalCache
 import org.jetbrains.kotlin.modules.TargetId
 import org.jetbrains.kotlin.psi.KtClassOrObject
@@ -30,10 +30,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.DelegatingBindingTrace
-import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
-import org.jetbrains.kotlin.resolve.deprecation.DeprecationSettings
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOrigin
-import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeApproximator
 import org.jetbrains.org.objectweb.asm.Type
@@ -53,7 +50,7 @@ class GenerationState(
     compiledCodeProvider: CompiledCodeProvider = CompiledCodeProvider.Empty
 ) {
     val diagnosticReporter: DiagnosticReporter =
-        diagnosticReporter ?: DiagnosticReporterFactory.createReporter(configuration.messageCollector)
+        diagnosticReporter ?: DiagnosticsCollectorImpl()
 
     abstract class GenerateClassFilter {
         abstract fun shouldGenerateClass(processingClassOrObject: KtClassOrObject): Boolean
@@ -73,10 +70,6 @@ class GenerationState(
         components.getIncrementalCache(targetId)
     }
 
-    val deprecationProvider = DeprecationResolver(
-        LockBasedStorageManager.NO_LOCKS, config.languageVersionSettings, DeprecationSettings.Default
-    )
-
     val moduleName: String = moduleName ?: JvmCodegenUtil.getModuleName(module)
     val classBuilderMode: ClassBuilderMode = builderFactory.classBuilderMode
     val bindingTrace: BindingTrace = DelegatingBindingTrace(BindingContext.EMPTY, "trace in GenerationState")
@@ -90,40 +83,40 @@ class GenerationState(
             this
         ).let {
             loadClassBuilderInterceptors().fold(it) { classBuilderFactory: ClassBuilderFactory, extension ->
-                extension.interceptClassBuilderFactory(classBuilderFactory, BindingContext.EMPTY, DiagnosticSink.DO_NOTHING)
+                extension.interceptClassBuilderFactory(classBuilderFactory)
             }
         },
-        ClassFileFactoryFinalizerExtension.getInstances(project),
+        configuration.getCompilerExtensions(ClassFileFactoryFinalizerExtension),
     )
 
     val globalSerializationBindings = JvmSerializationBindings()
     lateinit var mapInlineClass: (ClassDescriptor) -> Type
 
     class MultiFieldValueClassUnboxInfo(val unboxedTypesAndMethodNamesAndFieldNames: List<Triple<Type, String, String>>) {
-        val unboxedTypes = unboxedTypesAndMethodNamesAndFieldNames.map { (type, _, _) -> type }
-        val unboxedMethodNames = unboxedTypesAndMethodNamesAndFieldNames.map { (_, methodName, _) -> methodName }
+        val unboxedTypes = unboxedTypesAndMethodNamesAndFieldNames.map { [type, _, _] -> type }
+        val unboxedMethodNames = unboxedTypesAndMethodNamesAndFieldNames.map { [_, methodName, _] -> methodName }
     }
 
     var multiFieldValueClassUnboxInfo: (ClassDescriptor) -> MultiFieldValueClassUnboxInfo? = { null }
 
-    lateinit var reportDuplicateClassNameError: (JvmDeclarationOrigin, String, String) -> Unit
+    lateinit var reportDuplicateClassNameError: (JvmDeclarationOrigin, String, JvmDeclarationOrigin) -> Unit
 
     val typeApproximator: TypeApproximator = TypeApproximator(module.builtIns, config.languageVersionSettings)
 
     val newFragmentCaptureParameters: MutableList<Triple<String, KotlinType, DeclarationDescriptor>> = mutableListOf()
 
-    @Suppress("UNCHECKED_CAST", "DEPRECATION_ERROR")
-    private fun loadClassBuilderInterceptors(): List<org.jetbrains.kotlin.codegen.extensions.ClassBuilderInterceptorExtension> {
+    @Suppress("UNCHECKED_CAST")
+    private fun loadClassBuilderInterceptors(): List<ClassGeneratorExtensionAdapter> {
         val adapted = try {
             // Using Class.forName here because we're in the old JVM backend, and we need to load extensions declared in the JVM IR backend.
             Class.forName("org.jetbrains.kotlin.backend.jvm.extensions.ClassBuilderExtensionAdapter")
-                .getDeclaredMethod("getExtensions", Project::class.java)
-                .invoke(null, project) as List<org.jetbrains.kotlin.codegen.extensions.ClassBuilderInterceptorExtension>
+                .getDeclaredMethod("getExtensions", CompilerConfiguration::class.java)
+                .invoke(null, configuration) as List<ClassGeneratorExtensionAdapter>
         } catch (e: InvocationTargetException) {
             // Unwrap and rethrow any exception that happens. It's important e.g. in case of ProcessCanceledException.
             throw e.targetException
         }
 
-        return org.jetbrains.kotlin.codegen.extensions.ClassBuilderInterceptorExtension.getInstances(project) + adapted
+        return adapted
     }
 }

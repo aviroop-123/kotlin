@@ -32,7 +32,6 @@ import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension
 import org.jetbrains.kotlin.gradle.tasks.dependsOn
 import org.jetbrains.kotlin.gradle.utils.archivesName
 import org.jetbrains.kotlin.gradle.utils.domainObjectSet
-import org.jetbrains.kotlin.gradle.utils.relativeOrAbsolute
 import org.jetbrains.kotlin.gradle.utils.withType
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toLowerCaseAsciiOnly
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootPlugin.Companion.kotlinNodeJsRootExtension as wasmKotlinNodeJsRootExtension
@@ -178,26 +177,30 @@ class WebpackConfigurator(private val subTarget: KotlinJsIrSubTarget) : SubTarge
                         npmProject.dist.zip(npmProject.dir) { distDirectory, dir ->
                             KotlinWebpackConfig.DevServer(
                                 open = true,
-                                static = mutableListOf(
-                                    distDirectory.asFile.normalize().relativeOrAbsolute(dir.asFile),
-                                    resourcesDir.relativeOrAbsolute(dir.asFile),
-                                ).apply {
-                                    if (mode == KotlinJsBinaryMode.DEVELOPMENT) {
-                                        add(rootDir.relativeOrAbsolute(dir.asFile))
-                                    }
-                                },
                                 client = KotlinWebpackConfig.DevServer.Client(
                                     KotlinWebpackConfig.DevServer.Client.Overlay(
                                         errors = true,
                                         warnings = false
                                     )
                                 )
-                            )
+                            ).apply {
+                                static(distDirectory.asFile.normalize().relativeTo(dir.asFile).invariantSeparatorsPath)
+                                static(resourcesDir.normalize().relativeTo(dir.asFile).invariantSeparatorsPath)
+
+                                if (mode == KotlinJsBinaryMode.DEVELOPMENT) {
+                                    static(
+                                        rootDir.normalize().relativeTo(dir.asFile).invariantSeparatorsPath
+                                    )
+                                }
+                            }
                         }
                     )
 
                     task.watchOptions = KotlinWebpackConfig.WatchOptions(
-                        ignored = arrayOf("*.kt")
+                        ignored = arrayOf(
+                            "**/node_modules",
+                            "**/*.kt"
+                        )
                     )
 
 

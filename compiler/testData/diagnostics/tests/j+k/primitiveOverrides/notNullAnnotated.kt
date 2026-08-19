@@ -1,5 +1,4 @@
-// RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // FILE: A.java
 import org.jetbrains.annotations.*;
 
@@ -19,8 +18,8 @@ public class B extends A {
 
 fun foo(b: B) {
     // See KT-9182
-    b.<!OVERLOAD_RESOLUTION_AMBIGUITY!>foo<!>(1)
-    b.<!OVERLOAD_RESOLUTION_AMBIGUITY!>bar<!>(2.0)
+    b.foo(1)
+    b.bar(2.0)
 }
 
 /* GENERATED_FIR_TAGS: functionDeclaration, integerLiteral, javaType */

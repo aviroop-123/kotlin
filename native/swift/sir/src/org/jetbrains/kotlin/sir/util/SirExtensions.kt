@@ -42,6 +42,9 @@ val SirSubscript.accessors: List<SirAccessor>
         setter,
     )
 
+val SirEnum.cases: List<SirEnumCase>
+    get() = declarations.filterIsInstance<SirEnumCase>()
+
 val SirParameter.name: String? get() = parameterName ?: argumentName
 
 val SirType.isVoid: Boolean get() = this is SirNominalType && this.typeDeclaration == SirSwiftModule.void
@@ -58,8 +61,12 @@ fun <T : SirDeclaration> SirMutableDeclarationContainer.addChild(producer: () ->
 
 val SirType.swiftName
     get(): String = when (this) {
-        is SirExistentialType -> protocols.takeIf { it.isNotEmpty() }?.joinToString(prefix = "any ", separator = " & ") { it.swiftFqName }
-            ?: "Any"
+        is SirExistentialType -> protocols.takeIf {
+            it.isNotEmpty()
+        }?.joinToString(prefix = "any ", separator = " & ") { [protocol, typeArguments] ->
+            val typeArguments = typeArguments.takeIf { it.isNotEmpty() }
+            "${protocol.swiftFqName}${typeArguments?.joinToString(prefix = "<", postfix = ">", separator = ",") { it.swiftName } ?: ""}"
+        } ?: "Any"
         is SirNominalType -> listOfNotNull(
             parent?.swiftName?.let { "$it." },
             typeDeclaration.swiftFqName,
@@ -67,19 +74,59 @@ val SirType.swiftName
         ).joinToString("")
         is SirErrorType -> "ERROR_TYPE"
         is SirUnsupportedType -> "Swift.Never"
-        is SirFunctionalType -> "(${parameterTypes.joinToString { it.swiftName }}) -> ${returnType.swiftName}"
+        is SirFunctionalType -> {
+            val parameters = buildList {
+                contextType?.let(::add)
+                addAll(parameterTypes)
+            }.joinToString { it.annotatedSwiftName }
+            val async = " async".takeIf { isAsync } ?: ""
+            val throws = when (errorType) {
+                SirType.never -> ""
+                SirType.any -> " throws"
+                else -> " throws(${errorType.swiftName})"
+            }
+            val returnType = returnType.swiftName
+            "($parameters)$async$throws -> $returnType"
+        }
+        is SirTupleType -> "(${types.joinToString { [name, type] -> "${name?.let { "$it: " } ?: ""}${type.swiftName}" }})"
     }
+
+val SirType.annotatedSwiftName
+    get(): String = (this.attributes.map {
+        assert(it.arguments.isNullOrEmpty()) { "Rendering swift attributes with arguments is not supported" }
+        "@${it.identifier.swiftIdentifier}${it.arguments?.let { "()" } ?: ""}"
+    } + this.swiftName).joinToString(" ")
+
+fun SirAttribute.renderAsSwiftSourceLine(): String {
+    val rendered = arguments?.joinToString(prefix = "(", postfix = ")") { arg ->
+        val value = when (val expr = arg.expression) {
+            is SirExpression.Raw -> expr.raw
+            is SirExpression.StringLiteral -> expr.value.swiftStringLiteral
+        }
+        arg.name?.let { "${it.swiftIdentifier}: $value" } ?: value
+    }
+    return "@${identifier.swiftIdentifier}${rendered.orEmpty()}"
+}
 
 val SirDeclaration.swiftParentNamePrefix: String?
     get() = this.parent.swiftFqNameOrNull
 
 val SirDeclarationParent.swiftFqNameOrNull: String?
-    get() = (this as? SirNamedDeclaration)?.swiftFqName
-        ?: ((this as? SirNamed)?.name?.swiftSanitizedName)
+    get() = (this as? SirScopeDefiningDeclaration)?.swiftFqName
+        ?: ((this as? SirScopeDefiningElement)?.name?.swiftSanitizedName)
         ?: ((this as? SirExtension)?.extendedType?.swiftName)
 
-val SirNamedDeclaration.swiftFqName: String
+val SirScopeDefiningDeclaration.swiftFqName: String
     get() = swiftParentNamePrefix?.let { "$it.${name.swiftSanitizedName.swiftIdentifier}" } ?: name.swiftSanitizedName.swiftIdentifier
+
+val SirNominalType.isValueType: Boolean
+    get() = when (typeDeclaration) {
+        is SirEnum -> true
+        is SirStruct -> true
+        is SirProtocol -> false
+        is SirClass -> false
+        is SirTypealias -> (typeDeclaration.expandedType as? SirNominalType)?.isValueType == true
+    }
 
 val SirFunction.swiftFqName: String
     get() = swiftParentNamePrefix?.let { "$it.${name.swiftSanitizedName}" } ?: name.swiftSanitizedName
@@ -101,20 +148,47 @@ fun SirDeclaration.conflictsWith(other: SirDeclaration): Boolean = when (this) {
                 && this.errorType == other.errorType
                 && this.parameters == other.parameters
         is SirVariable -> this.name == other.name && this.isInstance == other.isInstance && this.isConfusable
-        is SirNamedDeclaration -> this.name == other.name && this.isInstance.not()
+        is SirScopeDefiningDeclaration -> this.name == other.name && this.isInstance.not()
         else -> false
     }
     is SirVariable -> when (other) {
         is SirFunction -> this.name == other.name && this.isInstance == other.isInstance && other.isConfusable
         is SirVariable -> this.name == other.name && this.isInstance == other.isInstance
-        is SirNamedDeclaration -> this.name == other.name && this.isInstance.not()
+        is SirScopeDefiningDeclaration -> this.name == other.name && this.isInstance.not()
         else -> false
     }
-    is SirNamedDeclaration -> when (other) {
+    is SirScopeDefiningDeclaration -> when (other) {
         is SirFunction -> this.name == other.name && other.isInstance.not()
         is SirVariable -> this.name == other.name && other.isInstance.not()
-        is SirNamedDeclaration -> this.name == other.name
+        is SirScopeDefiningDeclaration -> this.name == other.name
         else -> false
     }
     else -> false
+}
+
+val SirDeclaration.isUnavailable: Boolean get() = attributes.any { it is SirAttribute.Available && it.unavailable }
+
+val SirType.unavailableTypes: List<SirType>
+    get() = when (this) {
+        is SirNominalType -> listOfNotNull(this.takeIf { typeDeclaration.isUnavailable }) + typeArguments.flatMap { it.unavailableTypes }
+        is SirExistentialType -> protocols.mapNotNull { [protocol, _] ->
+            protocol.takeIf { it.isUnavailable }?.let(::SirNominalType)
+        } + protocols.flatMap { [_, types] -> types.flatMap { it.unavailableTypes } }
+        is SirTupleType -> types.flatMap { it.second.unavailableTypes }
+        is SirFunctionalType -> (contextTypes + parameterTypes + errorType + returnType).flatMap { it.unavailableTypes }
+        is SirUnsupportedType -> listOf(this)
+        is SirErrorType -> emptyList()
+    }
+
+inline fun MutableList<SirAttribute>.replaceOrAddPropagatedUnavailability(unavailableTypes: () -> List<SirType>) {
+    if (this.any { it is SirAttribute.Available && it.unavailable }) return
+    val unavailableTypes = unavailableTypes()
+    if (unavailableTypes.isEmpty()) return
+    val message = if (unavailableTypes.any { it is SirUnsupportedType }) {
+        "Declaration uses unsupported types"
+    } else {
+        unavailableTypes.joinToString(prefix = "Unavailable type(s): ") { it.swiftName }
+    }
+    removeAll { it is SirAttribute.Available }
+    add(SirAttribute.Available(message, unavailable = true))
 }

@@ -1,18 +1,14 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.api.components
 
-import org.jetbrains.kotlin.analysis.api.KaContextParameterApi
-import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.KaIdeApi
-import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
-import org.jetbrains.kotlin.analysis.api.KaK1Unsupported
+import org.jetbrains.kotlin.analysis.api.*
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeOwner
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeToken
-import org.jetbrains.kotlin.analysis.api.lifetime.validityAsserted
+import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
 import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaSubstitutor
 import org.jetbrains.kotlin.psi.KtExpression
@@ -20,7 +16,8 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 
 @KaIdeApi
-@SubclassOptInRequired(KaImplementationDetail::class)
+@KaSessionComponentImplementationDetail
+@SubclassOptInRequired(KaSessionComponentImplementationDetail::class)
 public interface KaCompletionCandidateChecker : KaSessionComponent {
     /**
      * Returns an extension applicability checker for the given context [nameExpression].
@@ -34,11 +31,10 @@ public interface KaCompletionCandidateChecker : KaSessionComponent {
      * @param explicitReceiver A receiver expression, if available (also from the in-memory copy of [originalFile]).
      */
     @KaIdeApi
-    @KaK1Unsupported
     public fun createExtensionCandidateChecker(
         originalFile: KtFile,
         nameExpression: KtSimpleNameExpression,
-        explicitReceiver: KtExpression?
+        explicitReceiver: KtExpression?,
     ): KaCompletionExtensionCandidateChecker
 }
 
@@ -74,10 +70,13 @@ public sealed class KaExtensionApplicabilityResult : KaLifetimeOwner {
     public class ApplicableAsExtensionCallable(
         substitutor: KaSubstitutor,
         receiverCastRequired: Boolean,
-        override val token: KaLifetimeToken
+        override val token: KaLifetimeToken,
     ) : Applicable() {
-        override val substitutor: KaSubstitutor by validityAsserted(substitutor)
-        override val receiverCastRequired: Boolean by validityAsserted(receiverCastRequired)
+        private val backingSubstitutor: KaSubstitutor = substitutor
+        private val backingReceiverCastRequired: Boolean = receiverCastRequired
+
+        override val substitutor: KaSubstitutor get() = withValidityAssertion { backingSubstitutor }
+        override val receiverCastRequired: Boolean get() = withValidityAssertion { backingReceiverCastRequired }
     }
 
     @KaIdeApi
@@ -85,29 +84,47 @@ public sealed class KaExtensionApplicabilityResult : KaLifetimeOwner {
     public class ApplicableAsFunctionalVariableCall(
         substitutor: KaSubstitutor,
         receiverCastRequired: Boolean,
-        override val token: KaLifetimeToken
+        override val token: KaLifetimeToken,
     ) : Applicable() {
-        override val substitutor: KaSubstitutor by validityAsserted(substitutor)
-        override val receiverCastRequired: Boolean by validityAsserted(receiverCastRequired)
+        private val backingSubstitutor: KaSubstitutor = substitutor
+        private val backingReceiverCastRequired: Boolean = receiverCastRequired
+
+        override val substitutor: KaSubstitutor get() = withValidityAssertion { backingSubstitutor }
+        override val receiverCastRequired: Boolean get() = withValidityAssertion { backingReceiverCastRequired }
     }
 
     @KaIdeApi
     @KaExperimentalApi
     public class NonApplicable(
-        override val token: KaLifetimeToken
+        override val token: KaLifetimeToken,
     ) : KaExtensionApplicabilityResult()
 }
 
 /**
- * @see KaCompletionCandidateChecker.createExtensionCandidateChecker
+ * Returns an extension applicability checker for the given context [nameExpression].
+ * The function is meant to only be used for providing auto-completion for Kotlin in IntelliJ IDEA.
+ *
+ * The returned checker does not cache the results for individual callable candidates.
+ *
+ * @param originalFile The file being edited.
+ * @param nameExpression The expression under the caret in an in-memory copy of [originalFile]
+ *     with a placeholder identifier inserted. Also see `CompletionUtilCore.DUMMY_IDENTIFIER` in IntelliJ IDEA.
+ * @param explicitReceiver A receiver expression, if available (also from the in-memory copy of [originalFile]).
  */
-@KaContextParameterApi
+// Auto-generated bridge. DO NOT EDIT MANUALLY!
 @KaIdeApi
-context(context: KaCompletionCandidateChecker)
+@KaContextParameterApi
+context(session: KaSession)
 public fun createExtensionCandidateChecker(
     originalFile: KtFile,
     nameExpression: KtSimpleNameExpression,
-    explicitReceiver: KtExpression?
+    explicitReceiver: KtExpression?,
 ): KaCompletionExtensionCandidateChecker {
-    return with(context) { createExtensionCandidateChecker(originalFile, nameExpression, explicitReceiver) }
+    return with(session) {
+        createExtensionCandidateChecker(
+            originalFile = originalFile,
+            nameExpression = nameExpression,
+            explicitReceiver = explicitReceiver,
+        )
+    }
 }

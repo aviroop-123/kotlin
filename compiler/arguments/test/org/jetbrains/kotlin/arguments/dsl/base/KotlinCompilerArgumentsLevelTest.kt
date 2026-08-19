@@ -6,23 +6,13 @@
 package org.jetbrains.kotlin.arguments.dsl.base
 
 import org.jetbrains.kotlin.arguments.dsl.types.BooleanType
+import org.jetbrains.kotlin.cli.common.arguments.Argument
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class KotlinCompilerArgumentsLevelTest {
-
-    @Test
-    fun shouldRejectMergingLevelsWithDifferentNames() {
-        val level1 by compilerArgumentsLevel("one") {}
-        val level2 by compilerArgumentsLevel("two") {}
-
-        assertFailsWith<IllegalArgumentException>(
-            message = "Names for compiler arguments level should be the same! We are trying to merge one with two"
-        ) {
-            level1.mergeWith(level2)
-        }
-    }
 
     @Test
     fun shouldMergeCompilerArguments() {
@@ -94,6 +84,22 @@ class KotlinCompilerArgumentsLevelTest {
         assertEquals(2, merged.nestedLevels.size)
         assertEquals(1, merged.nestedLevels.first().arguments.size)
         assertEquals(1, merged.nestedLevels.last().arguments.size)
+    }
+
+    @Test
+    fun delimiterConstantNamesShouldMatchArgumentDelimiterFields() {
+        val delimiterFieldNames = Argument.Delimiters::class.java.declaredFields
+            .map { it.name }
+            .toSet()
+
+        for (delimiter in KotlinCompilerArgument.Delimiter.entries) {
+            assertTrue(
+                actual = delimiter.constantName in delimiterFieldNames,
+                message = "Delimiter.${delimiter.name}.constantName = '${delimiter.constantName}' " +
+                        "does not match any field in Argument.Delimiters. " +
+                        "Available fields: $delimiterFieldNames"
+            )
+        }
     }
 
     private fun stubCompilerArgument(

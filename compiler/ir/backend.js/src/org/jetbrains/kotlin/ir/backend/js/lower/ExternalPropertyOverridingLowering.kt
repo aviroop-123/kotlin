@@ -7,6 +7,8 @@ package org.jetbrains.kotlin.ir.backend.js.lower
 
 import org.jetbrains.kotlin.backend.common.DeclarationTransformer
 import org.jetbrains.kotlin.backend.common.compilationException
+import org.jetbrains.kotlin.backend.common.lower.InitializersLowering
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
@@ -28,7 +30,7 @@ import org.jetbrains.kotlin.ir.visitors.IrTransformer
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.filterIsInstanceAnd
 
-val EXTERNAL_SUPER_ACCESSORS_ORIGIN by IrDeclarationOriginImpl
+val EXTERNAL_SUPER_ACCESSORS_ORIGIN by IrDeclarationOriginImpl.Regular
 
 /**
  * The lowering saves external properties access with the super qualifier
@@ -75,6 +77,7 @@ val EXTERNAL_SUPER_ACCESSORS_ORIGIN by IrDeclarationOriginImpl
  * It helps all the following classes to be recompiled without knowledge if they are in a hierarchy with an external class or not,
  * so we can re-compile only a single class instead of the whole hierarchy.
  */
+@PhasePrerequisites(PrimaryConstructorLowering::class, JsInitializersLowering::class)
 class ExternalPropertyOverridingLowering(private val context: JsIrBackendContext) : DeclarationTransformer {
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
         if (declaration !is IrClass || declaration.isInterface) return null
@@ -118,7 +121,7 @@ class ExternalPropertyOverridingLowering(private val context: JsIrBackendContext
             .statements
             .addAll(positionInConstructorForAccessors, declaredSuperVariableAndFields.map { it.value })
 
-        declaredSuperVariableAndFields.forEach { (variable, field) ->
+        declaredSuperVariableAndFields.forEach { (val variable = value, val field) ->
             if (field == null) return@forEach
             externalPropertyAccessorsTransformer.primaryConstructorBody.statements.add(
                 JsIrBuilder.buildSetField(
@@ -135,7 +138,7 @@ class ExternalPropertyOverridingLowering(private val context: JsIrBackendContext
 
             val accessExpression = with(externalPropertyAccessorsTransformer) { it.createExternalSuperFieldAccess() } ?: return@forEach
             externalPropertyAccessorsTransformer.primaryConstructorBody.statements.add(
-                JsIrBuilder.buildCall(context.intrinsics.jsDelete).apply { arguments[0] = accessExpression }
+                JsIrBuilder.buildCall(context.symbols.jsDelete).apply { arguments[0] = accessExpression }
             )
         }
 

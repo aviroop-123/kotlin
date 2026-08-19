@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.fir.analysis.collectors
 import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContextForProvider
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirDestructuringDeclarationChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.createInlineFunctionBodyContext
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.createInlinableParameterContext
 import org.jetbrains.kotlin.fir.analysis.checkers.extra.createLambdaBodyContext
@@ -21,7 +22,6 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirContractCallBlock
 import org.jetbrains.kotlin.fir.shouldSuppressInlineContextAt
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.ConeErrorType
 import org.jetbrains.kotlin.fir.types.FirErrorTypeRef
@@ -84,6 +84,12 @@ abstract class AbstractDiagnosticCollectorVisitor(
         visitJump(continueExpression)
     }
 
+    override fun visitReplSnippet(replSnippet: FirReplSnippet, data: Nothing?) {
+        withAnnotationContainer(replSnippet) {
+            visitWithDeclaration(replSnippet)
+        }
+    }
+
     override fun visitRegularClass(regularClass: FirRegularClass, data: Nothing?) {
         withAnnotationContainer(regularClass) {
             visitWithDeclaration(regularClass)
@@ -106,10 +112,10 @@ abstract class AbstractDiagnosticCollectorVisitor(
         }
     }
 
-    override fun visitSimpleFunction(simpleFunction: FirSimpleFunction, data: Nothing?) {
-        withAnnotationContainer(simpleFunction) {
-            withInlineFunctionBodyIfApplicable(simpleFunction, simpleFunction.isInline) {
-                visitWithDeclaration(simpleFunction)
+    override fun visitNamedFunction(namedFunction: FirNamedFunction, data: Nothing?) {
+        withAnnotationContainer(namedFunction) {
+            withInlineFunctionBodyIfApplicable(namedFunction, namedFunction.isInline) {
+                visitWithDeclaration(namedFunction)
             }
         }
     }
@@ -143,7 +149,7 @@ abstract class AbstractDiagnosticCollectorVisitor(
     }
 
     override fun visitProperty(property: FirProperty, data: Nothing?) {
-        withPotentialPropertyFromPrimaryConstructor(property) {
+        withAdditionalSuppresses(property) {
             withAnnotationContainer(property) {
                 visitWithDeclaration(property)
             }
@@ -468,12 +474,15 @@ abstract class AbstractDiagnosticCollectorVisitor(
         }
     }
 
-    @OptIn(PrivateForInline::class)
-    inline fun <R> withPotentialPropertyFromPrimaryConstructor(property: FirProperty, block: () -> R): R {
+    @OptIn(PrivateForInline::class, SymbolInternals::class)
+    inline fun <R> withAdditionalSuppresses(property: FirProperty, block: () -> R): R {
         val existingContext = context
         property.correspondingValueParameterFromPrimaryConstructor?.let {
             it.lazyResolveToPhase(FirResolvePhase.ANNOTATION_ARGUMENTS)
-            @OptIn(SymbolInternals::class)
+            addSuppressedDiagnosticsToContext(it.fir)
+        }
+        FirDestructuringDeclarationChecker.getDestructuringVariableIfEntry(property)?.let {
+            it.lazyResolveToPhase(FirResolvePhase.ANNOTATION_ARGUMENTS)
             addSuppressedDiagnosticsToContext(it.fir)
         }
         return try {

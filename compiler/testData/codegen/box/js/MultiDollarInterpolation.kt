@@ -2,7 +2,6 @@
 
 // TARGET_BACKEND: JS_IR
 
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-69062
 
 const val decrement = "result--;"

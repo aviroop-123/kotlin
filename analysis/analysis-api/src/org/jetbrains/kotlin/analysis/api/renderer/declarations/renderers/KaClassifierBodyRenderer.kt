@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.KaSpi
 import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaDeclarationRenderer
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
@@ -14,6 +15,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.markers.KaDeclarationContainerS
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrintWithSettingsFrom
 
+@KaSpi
 @KaExperimentalApi
 public interface KaClassifierBodyRenderer {
     public fun renderBody(
@@ -60,6 +62,7 @@ public interface KaClassifierBodyRenderer {
     }
 }
 
+@KaSpi
 @KaExperimentalApi
 public abstract class KaClassifierBodyWithMembersRenderer : KaClassifierBodyRenderer {
     public abstract fun renderEmptyBodyForEmptyMemberScope(symbol: KaDeclarationContainerSymbol): Boolean
@@ -85,7 +88,7 @@ public abstract class KaClassifierBodyWithMembersRenderer : KaClassifierBodyRend
 
         printer.withIndentInBraces {
             var previous: KaDeclarationSymbol? = null
-            for ((member, rendered) in membersToPrint) {
+            for ([member, rendered] in membersToPrint) {
                 if (previous != null) {
                     printer.append(declarationRenderer.codeStyle.getSeparatorBetweenMembers(analysisSession, previous, member))
                 }

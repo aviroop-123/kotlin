@@ -4,8 +4,12 @@ KaBackingFieldSymbol:
   compilerVisibility: Private
   contextReceivers: []
   isActual: false
+  isCompanion: false
+  isDelegated: false
   isExpect: false
   isExtension: false
+  isExternal: false
+  isNotDefault: false
   isVal: true
   location: PROPERTY
   modality: FINAL
@@ -29,3 +33,4 @@ KaBackingFieldSymbol:
   getContainingJvmClassName: TypeAnnotationOnBackingFieldKt
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  importableFqName: null

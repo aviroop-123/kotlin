@@ -14,14 +14,15 @@ import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.specs.Spec
 import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.util.PatternFilterable
 import org.gradle.api.tasks.util.PatternSet
 import org.gradle.work.DisableCachingByDefault
 import org.jetbrains.kotlin.build.DEFAULT_KOTLIN_SOURCE_FILES_EXTENSIONS
 import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporter
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.BuildPerformanceMetric
+import org.jetbrains.kotlin.build.report.metrics.BuildTimeMetric
 import org.jetbrains.kotlin.cli.common.arguments.CommonToolArguments
 import org.jetbrains.kotlin.gradle.internal.*
 import org.jetbrains.kotlin.gradle.internal.tasks.TaskWithLocalState
@@ -118,7 +119,7 @@ abstract class AbstractKotlinCompileTool<T : CommonToolArguments> @Inject constr
     }
 
     @get:Internal
-    final override val metrics: Property<BuildMetricsReporter<GradleBuildTime, GradleBuildPerformanceMetric>> = project.objects
+    final override val metrics: Property<BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>> = project.objects
         .property(GradleBuildMetricsReporter())
 
     /**
@@ -132,6 +133,9 @@ abstract class AbstractKotlinCompileTool<T : CommonToolArguments> @Inject constr
 
     @get:Internal
     internal abstract val runViaBuildToolsApi: Property<Boolean>
+
+    @get:Input
+    internal abstract val generateCompilerRefIndex: Property<Boolean>
 
     protected fun validateCompilerClasspath() {
         // Note that the check triggers configuration resolution

@@ -7,14 +7,14 @@ package org.jetbrains.kotlin.kmp.infra
 
 import com.intellij.lang.LighterASTNode
 import com.intellij.lang.PsiBuilderFactory
-import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.Disposable
 import com.intellij.psi.tree.IFileElementType
 import com.intellij.util.diff.FlyweightCapableTreeStructure
 import org.jetbrains.kotlin.K1Deprecation
+import org.jetbrains.kotlin.cli.create
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.kmp.FullParserTestsWithLightTree
 import org.jetbrains.kotlin.kmp.parser.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KotlinLexer
 import org.jetbrains.kotlin.parsing.KotlinLightParser
@@ -22,14 +22,13 @@ import org.jetbrains.kotlin.parsing.KotlinParserDefinition
 import org.jetbrains.kotlin.util.getChildren
 
 // Normally LightTree eagerly parses blocks and lambdas but ignores KDoc
-class LightTreeTestParser() : AbstractTestParser<LighterASTNode>(ParseMode.NoKDoc) {
-    companion object {
-        private val disposable = Disposer.newDisposable("Disposable for the ${FullParserTestsWithLightTree::class.simpleName}")
-
+class LightTreeTestParser(disposable: Disposable) : AbstractTestParser<LighterASTNode>(ParseMode.NoKDoc) {
+    init {
         @OptIn(K1Deprecation::class)
-        val environment = KotlinCoreEnvironment.createForTests(disposable, CompilerConfiguration.EMPTY, EnvironmentConfigFiles.JVM_CONFIG_FILES)
-        private val builderFactoryInstance: PsiBuilderFactory = PsiBuilderFactory.getInstance()
+        KotlinCoreEnvironment.createForTests(disposable, CompilerConfiguration.create(), EnvironmentConfigFiles.JVM_CONFIG_FILES)
     }
+
+    private val builderFactoryInstance: PsiBuilderFactory = PsiBuilderFactory.getInstance()
 
     override fun parse(
         fileName: String,

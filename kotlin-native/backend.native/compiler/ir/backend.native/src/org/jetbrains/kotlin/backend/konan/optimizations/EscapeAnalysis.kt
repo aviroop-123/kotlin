@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.backend.konan.DirectedGraphMultiNode
 import org.jetbrains.kotlin.backend.konan.ir.annotations.Escapes
 import org.jetbrains.kotlin.backend.konan.ir.annotations.PointsTo
 import org.jetbrains.kotlin.backend.konan.ir.annotations.PointsToKind
+import org.jetbrains.kotlin.backend.konan.ir.hasFinalizer
 import org.jetbrains.kotlin.backend.konan.ir.isBuiltInOperator
 import org.jetbrains.kotlin.backend.konan.llvm.Lifetime
 import org.jetbrains.kotlin.backend.konan.logMultiple
@@ -349,16 +350,15 @@ internal object EscapeAnalysis {
             val lifetimes: MutableMap<IrElement, Lifetime>,
             val propagateExiledToHeapObjects: Boolean
     ) {
-
-        private val symbols = context.symbols
-        private val throwable = symbols.throwable.owner
+        private val irBuiltIns = context.irBuiltIns
+        private val throwable = irBuiltIns.throwableClass.owner
 
         val escapeAnalysisResults = mutableMapOf<DataFlowIR.FunctionSymbol.Declared, FunctionEscapeAnalysisResult>()
 
         fun analyze() {
             context.logMultiple {
                 +"CALL GRAPH"
-                callGraph.directEdges.forEach { (t, u) ->
+                callGraph.directEdges.forEach { [t, u] ->
                     +"    FUN $t"
                     u.callSites.forEach {
                         val label = when {
@@ -506,7 +506,7 @@ internal object EscapeAnalysis {
                 pointsToGraphs = analyzeComponentPessimistically(callGraph, multiNode)
             }
 
-            pointsToGraphs.forEach { (function, graph) ->
+            pointsToGraphs.forEach { [function, graph] ->
                 val eaResult = escapeAnalysisResults[function]!!
                 stats.totalEAResultSize += eaResult.numberOfDrains + eaResult.escapes.size + eaResult.pointsTo.edges.size
 
@@ -642,15 +642,15 @@ internal object EscapeAnalysis {
         private val pointerSize = generationState.runtime.pointerSize
 
         private fun arrayItemSizeOf(irClass: IrClass): Int? = when (irClass.symbol) {
-            symbols.array -> pointerSize
-            symbols.booleanArray -> 1
-            symbols.byteArray -> 1
-            symbols.charArray -> 2
-            symbols.shortArray -> 2
-            symbols.intArray -> 4
-            symbols.floatArray -> 4
-            symbols.longArray -> 8
-            symbols.doubleArray -> 8
+            irBuiltIns.arrayClass -> pointerSize
+            irBuiltIns.booleanArray -> 1
+            irBuiltIns.byteArray -> 1
+            irBuiltIns.charArray -> 2
+            irBuiltIns.shortArray -> 2
+            irBuiltIns.intArray -> 4
+            irBuiltIns.floatArray -> 4
+            irBuiltIns.longArray -> 8
+            irBuiltIns.doubleArray -> 8
             else -> null
         }
 
@@ -897,7 +897,7 @@ internal object EscapeAnalysis {
                     }
                 }
 
-                val nothing = moduleDFG.symbolTable.mapClassReferenceType(context.symbols.nothing.owner)
+                val nothing = moduleDFG.symbolTable.mapClassReferenceType(context.irBuiltIns.nothingClass.owner)
                 body.forEachNonScopeNode { node ->
                     when (node) {
                         is DataFlowIR.Node.FieldWrite -> {
@@ -1060,7 +1060,7 @@ internal object EscapeAnalysis {
                 val calleeDrains = Array(calleeEscapeAnalysisResult.numberOfDrains) { newNode() }
 
                 fun mapNode(compressedNode: CompressedPointsToGraph.Node): Pair<DataFlowIR.Node?, PointsToGraphNode?> {
-                    val (arg, rootNode) = when (val kind = compressedNode.kind) {
+                    val [arg, rootNode] = when (val kind = compressedNode.kind) {
                         CompressedPointsToGraph.NodeKind.Return -> arguments.last() to nodes[arguments.last()]
                         is CompressedPointsToGraph.NodeKind.Param -> arguments[kind.index] to nodes[arguments[kind.index]]
                         is CompressedPointsToGraph.NodeKind.Drain -> null to calleeDrains[kind.index]
@@ -1079,7 +1079,7 @@ internal object EscapeAnalysis {
                 }
 
                 calleeEscapeAnalysisResult.escapes.forEach { escapingNode ->
-                    val (arg, node) = mapNode(escapingNode)
+                    val [arg, node] = mapNode(escapingNode)
                     if (node == null) {
                         context.log { "WARNING: There is no node ${nodeToString(arg!!)}" }
                         return@forEach
@@ -1089,12 +1089,12 @@ internal object EscapeAnalysis {
                 }
 
                 calleeEscapeAnalysisResult.pointsTo.edges.forEach { edge ->
-                    val (fromArg, fromNode) = mapNode(edge.from)
+                    val [fromArg, fromNode] = mapNode(edge.from)
                     if (fromNode == null) {
                         context.log { "WARNING: There is no node ${nodeToString(fromArg!!)}" }
                         return@forEach
                     }
-                    val (toArg, toNode) = mapNode(edge.to)
+                    val [toArg, toNode] = mapNode(edge.to)
                     if (toNode == null) {
                         context.log { "WARNING: There is no node ${nodeToString(toArg!!)}" }
                         return@forEach
@@ -1130,7 +1130,7 @@ internal object EscapeAnalysis {
                  * Let us call nodes that will be part of the result "interesting", and, obviously,
                  * "interesting drains" - drains that are going to be in the result.
                  */
-                val (numberOfDrains, nodeIds) = paintInterestingNodes()
+                val [numberOfDrains, nodeIds] = paintInterestingNodes()
 
                 logDigraph(true, { nodeIds[it] != null }, { nodeIds[it].toString() })
 
@@ -1435,7 +1435,7 @@ internal object EscapeAnalysis {
                 fun addAdditionalEscapeOrigins(escapingNodes: List<PointsToGraphNode>, direction: EdgeDirection) {
                     escapingNodes
                             .groupBy { it.drain }
-                            .forEach { (drain, nodes) ->
+                            .forEach { [drain, nodes] ->
                                 val tempNode = newNode()
                                 nodeIds[tempNode] = drainFactory()
                                 tempNode.drain = drain
@@ -1649,7 +1649,7 @@ internal object EscapeAnalysis {
                 // TODO: To a setting?
                 val allowedToAlloc = 65536
                 val stackArrayCandidates = mutableListOf<ArrayStaticAllocation>()
-                for ((node, ptgNode) in nodes) {
+                for ([node, ptgNode] in nodes) {
                     if (node.ir == null) continue
 
                     val computedLifetime = lifetimeOf(node)
@@ -1679,8 +1679,12 @@ internal object EscapeAnalysis {
                         }
                     }
 
+                    val isAllocOfFinalizedClass = node is DataFlowIR.Node.Alloc && node.type.irClass?.hasFinalizer == true
+                    if (lifetime == Lifetime.STACK && isAllocOfFinalizedClass)
+                        lifetime = Lifetime.GLOBAL
+
                     if (lifetime != computedLifetime) {
-                        if (propagateExiledToHeapObjects && node is DataFlowIR.Node.Alloc) {
+                        if (node is DataFlowIR.Node.Alloc && (propagateExiledToHeapObjects || isAllocOfFinalizedClass)) {
                             context.log { "Forcing node ${nodeToString(node)} to escape" }
                             escapeOrigins += ptgNode
                             propagateEscapeOrigin(ptgNode)
@@ -1692,7 +1696,7 @@ internal object EscapeAnalysis {
 
                 stackArrayCandidates.sortBy { it.sizeInBytes }
                 var remainedToAlloc = allowedToAlloc
-                for ((ptgNode, irClass, length, sizeInBytes) in stackArrayCandidates) {
+                for ((val ptgNode = node, val irClass, val length, val sizeInBytes) in stackArrayCandidates) {
                     if (lifetimeOf(ptgNode) != Lifetime.STACK) continue
                     if (sizeInBytes <= remainedToAlloc) {
                         remainedToAlloc -= sizeInBytes
@@ -1700,7 +1704,7 @@ internal object EscapeAnalysis {
                     } else {
                         remainedToAlloc = 0
                         // Do not exile primitive arrays - they ain't reference no object.
-                        if (irClass.symbol == symbols.array && propagateExiledToHeapObjects) {
+                        if (irClass.symbol == irBuiltIns.arrayClass && propagateExiledToHeapObjects) {
                             context.log { "Forcing node ${nodeToString(ptgNode.node!!)} to escape" }
                             escapeOrigins += ptgNode
                             propagateEscapeOrigin(ptgNode)
@@ -1798,10 +1802,7 @@ internal object EscapeAnalysis {
         try {
             InterproceduralAnalysis(context, generationState, callGraph,
                     moduleDFG, lifetimes,
-                    // The GC must be careful not to scan exiled objects, that have already became dead,
-                    // as they may reference other already destroyed stack-allocated objects.
-                    // TODO somehow tag these object, so that GC could handle them properly.
-                    propagateExiledToHeapObjects = context.config.gc == GC.CONCURRENT_MARK_AND_SWEEP
+                    propagateExiledToHeapObjects = context.config.escapeAnalysisPropagateExiledToHeapObjects
             ).analyze()
         } catch (t: Throwable) {
             val extraUserInfo =

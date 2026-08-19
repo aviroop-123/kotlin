@@ -5,19 +5,19 @@
 
 package org.jetbrains.kotlin.nativeDistribution
 
+import bootstrapKotlinVersion
 import org.gradle.api.Project
-import org.gradle.api.Transformer
-import org.gradle.api.file.Directory
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.FileCollection
-import org.gradle.api.file.RegularFile
-import org.gradle.api.model.ObjectFactory
-import org.gradle.api.provider.Property
+import org.gradle.api.file.*
 import org.gradle.api.provider.Provider
-import org.gradle.api.specs.Spec
+import org.gradle.api.tasks.Sync
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.PlatformInfo
+import org.jetbrains.kotlin.konan.util.ArchiveType.TAR_GZ
+import org.jetbrains.kotlin.konan.util.ArchiveType.ZIP
 import org.jetbrains.kotlin.kotlinNativeDist
-import java.util.function.BiFunction
+import java.security.MessageDigest
+import kotlin.io.path.inputStream
 
 /**
  * Describes distribution of Native compiler rooted at [root].
@@ -54,6 +54,12 @@ class NativeDistribution(val root: Directory) {
      */
     val cachesRoot: Directory
         get() = root.dir("klib/cache")
+
+    /**
+     * Root directory for compiler acaches for the specific [target].
+     */
+    fun cachesRoot(target: String): Directory =
+            cachesRoot.dir("${target}-gSTATIC-system")
 
     /**
      * Directory with distribution sources.
@@ -139,7 +145,8 @@ class NativeDistribution(val root: Directory) {
     /**
      * Static compiler cache of library [name] for a specific [target].
      */
-    fun cache(name: String, target: String): Directory = cachesRoot.dir("${target}-gSTATIC-system/${name}-cache")
+    fun cache(name: String, target: String, perFile: Boolean): Directory =
+            cachesRoot(target).dir(cacheDirectoryName(name, perFile))
 
     /**
      * Archive with stdlib sources.
@@ -156,7 +163,7 @@ class NativeDistribution(val root: Directory) {
     /**
      * Static compiler cache of standard library for a specific [target].
      */
-    fun stdlibCache(target: String): Directory = cache(name = "stdlib", target)
+    fun stdlibCache(target: String): Directory = cache("stdlib", target, perFile = true)
 
     /**
      * Fingerprint of the contents of [compilerJars] and [nativeLibs].
@@ -165,76 +172,23 @@ class NativeDistribution(val root: Directory) {
         get() = root.file("konan/compiler.fingerprint")
 
     /**
+     * Fingerprint of the contents of the entire distribution.
+     */
+    val distributionFingerprint: RegularFile
+        get() = root.file("distribution.fingerprint")
+
+    /**
      * Fingerprint of [runtime] contents for [target].
      */
     fun runtimeFingerprint(target: String) = root.file("konan/targets/$target/runtime.fingerprint")
+
+    companion object {
+        fun cacheDirectoryName(name: String, perFile: Boolean) =
+                "${name}-${if (perFile) "per-file-cache" else "cache"}"
+    }
 }
 
-/**
- * Represents a configurable [NativeDistribution] location.
- *
- * This [Property] can be used as a task input or as a parameter in [WorkParameters][org.gradle.workers.WorkParameters]:
- * it's compatible with Gradle serialization (serializes into the root directory of the distribution).
- *
- * Can be created with [ObjectFactory.nativeDistributionProperty].
- */
-// `DirectoryProperty` is magically serializable by Gradle (not via java serialization), while `Directory` is not serializable at all.
-// So, it's essential to have a separate `NativeDistributionProperty`, because regular `Property<NativeDistribution>` wouldn't get serialized.
-// And it's also essential for `NativeDistributionProperty` to be a `value class` around `DirectoryProperty`, so for java reflection
-// (and, consequently, for Gradle serialization) `NativeDistributionProperty` would look exactly like `DirectoryProperty`.
-@JvmInline
-value class NativeDistributionProperty internal constructor(private val directoryProperty: DirectoryProperty) : Property<NativeDistribution> {
-    private inline fun <T : Any?> fwd(f: DirectoryProperty.() -> T) = directoryProperty.f()
-    private inline fun <T : Any?> fwdNullable(value: NativeDistribution?, f: DirectoryProperty.(Directory?) -> T) = directoryProperty.f(value?.root)
-
-    private inline fun <T : Any?> fwd(value: NativeDistribution, f: DirectoryProperty.(Directory) -> T) = directoryProperty.f(value.root)
-    private inline fun <T : Any?> fwd(provider: Provider<out NativeDistribution?>, f: DirectoryProperty.(Provider<out Directory?>) -> T) = directoryProperty.f(provider.map { it.root })
-
-    private fun ret(value: Directory): NativeDistribution = NativeDistribution(value)
-    private fun retNullable(value: Directory?): NativeDistribution? = value?.let(::NativeDistribution)
-    private fun ret(provider: Provider<Directory>): Provider<NativeDistribution> = provider.map(::NativeDistribution)
-    private fun ret(property: Property<Directory>): Property<NativeDistribution> = NativeDistributionProperty(property as DirectoryProperty)
-    private fun ret(property: DirectoryProperty): NativeDistributionProperty = NativeDistributionProperty(property)
-
-    override fun set(value: NativeDistribution?) = fwdNullable(value, DirectoryProperty::set)
-    override fun set(provider: Provider<out NativeDistribution?>) = fwd(provider, DirectoryProperty::set)
-    override fun value(value: NativeDistribution?) = ret(fwdNullable(value, DirectoryProperty::value))
-    override fun value(provider: Provider<out NativeDistribution?>) = ret(fwd(provider, DirectoryProperty::value))
-    override fun unset() = ret(fwd(DirectoryProperty::unset))
-    override fun convention(value: NativeDistribution?) = ret(fwdNullable(value, DirectoryProperty::convention))
-    override fun convention(provider: Provider<out NativeDistribution?>) = ret(fwd(provider, DirectoryProperty::convention))
-    override fun unsetConvention() = ret(fwd(DirectoryProperty::unsetConvention))
-    override fun finalizeValue() = fwd(DirectoryProperty::finalizeValue)
-    override fun get() = ret(fwd(DirectoryProperty::get))
-    override fun getOrNull() = retNullable(fwd(DirectoryProperty::getOrNull))
-    override fun getOrElse(defaultValue: NativeDistribution) = ret(fwd(defaultValue, DirectoryProperty::getOrElse))
-    override fun isPresent(): Boolean = fwd(DirectoryProperty::isPresent)
-    override fun orElse(value: NativeDistribution) = ret(fwd(value, DirectoryProperty::orElse))
-    override fun orElse(provider: Provider<out NativeDistribution?>) = ret(fwd(provider, DirectoryProperty::orElse))
-    override fun finalizeValueOnRead() = fwd(DirectoryProperty::finalizeValueOnRead)
-    override fun disallowChanges() = fwd(DirectoryProperty::disallowChanges)
-    override fun disallowUnsafeRead() = fwd(DirectoryProperty::disallowUnsafeRead)
-
-    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
-    override fun forUseAtConfigurationTime() = ret(fwd(DirectoryProperty::forUseAtConfigurationTime))
-
-    override fun <S : Any?> map(transformer: Transformer<out S?, in NativeDistribution>): Provider<S> = directoryProperty.map {
-        transformer.transform(NativeDistribution(it))
-    }
-
-    override fun filter(spec: Spec<in NativeDistribution>): Provider<NativeDistribution> = ret(directoryProperty.filter { spec.isSatisfiedBy(NativeDistribution(it)) })
-
-    override fun <S : Any?> flatMap(transformer: Transformer<out Provider<out S?>?, in NativeDistribution>): Provider<S> = directoryProperty.flatMap {
-        transformer.transform(NativeDistribution(it))
-    }
-
-    override fun <U : Any?, R : Any?> zip(right: Provider<U?>, combiner: BiFunction<in NativeDistribution, in U, out R?>): Provider<R> = directoryProperty.zip<U, R>(right) { lhs, rhs -> combiner.apply(ret(lhs), rhs) }
-}
-
-/**
- * Creates a new [NativeDistributionProperty]. The property has no initial value.
- */
-fun ObjectFactory.nativeDistributionProperty() = NativeDistributionProperty(directoryProperty())
+fun DirectoryProperty.asNativeDistribution(): Provider<NativeDistribution> = this.map(::NativeDistribution)
 
 /**
  * Get the default Native distribution location.
@@ -246,3 +200,66 @@ fun ObjectFactory.nativeDistributionProperty() = NativeDistributionProperty(dire
 //       and sometimes incompatible with Gradle isolation mechanisms.
 val Project.nativeDistribution: Provider<NativeDistribution>
     get() = layout.dir(provider { kotlinNativeDist }).map { NativeDistribution(it) }
+
+
+/**
+ * Get released Native distribution of [version].
+ */
+fun Project.registerNativeReleasedDistribution(version: String): Provider<NativeDistribution> {
+    val configuration = releasedNativeDistributionConfiguration(version)
+    val distributionFiles = configuration.incoming.files
+    val targetDirectory = layout.buildDirectory.dir("nativeDistributionV$version")
+
+    /*
+    Setup a 'sync' task to unpack the native distribution archive.
+    We're using a sync into the build directory in favor of any artifact transform, because this native
+    distribution is ment to used, as is, for further builds. Such builds might store files within the distribution
+    which would violate Gradle invariants for artifact transforms (which are ment to stay immutable).
+     */
+    val syncTaskName = "syncNativeDistributionV$version"
+    val syncTask = if (syncTaskName !in tasks.names) tasks.register<Sync>(syncTaskName) {
+        from(project.files({
+            distributionFiles.map { archive ->
+                when {
+                    archive.path.endsWith("." + TAR_GZ.fileExtension) -> tarTree(archive)
+                    archive.path.endsWith("." + ZIP.fileExtension) -> zipTree(archive)
+                    else -> error("Unsupported archive type: $archive")
+                }
+            }
+        }).builtBy(distributionFiles)) {
+            eachFile {
+                relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray())
+            }
+            includeEmptyDirs = false
+        }
+        into(targetDirectory)
+
+        /*
+        Create distribution hash
+        */
+        doLast {
+            val digest = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(1024 * 8)
+            distributionFiles.sorted().forEach { file ->
+                digest.update(file.name.encodeToByteArray())
+                file.toPath().inputStream().buffered().use { inputStream ->
+                    while (true) {
+                        val read = inputStream.read(buffer)
+                        if (read < 0) break
+                        digest.update(buffer, 0, read)
+                    }
+                }
+            }
+            val distributionHash = digest.digest().toHexString()
+            NativeDistribution(targetDirectory.get()).distributionFingerprint.asFile.writeText(distributionHash)
+        }
+    } else tasks.named<Sync>(syncTaskName)
+
+    return syncTask.map { NativeDistribution(project.layout.buildDirectory.dir("nativeDistributionV$version").get()) }
+}
+
+/**
+ * Get Native bootstrap distribution.
+ */
+fun Project.registerNativeBootstrapDistribution(): Provider<NativeDistribution> =
+        registerNativeReleasedDistribution(bootstrapKotlinVersion)

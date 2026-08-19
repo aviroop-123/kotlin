@@ -1,0 +1,122 @@
+/**
+ * public final class A : kotlin/Any {
+ *
+ *   // signature: <init>()V
+ *   public constructor()
+ *
+ *   // signature: compBlockFun(Ljava/lang/String;)Ljava/lang/String;
+ *   @kotlin/jvm/JvmOverloads
+ *   public final static fun compBlockFun(k: kotlin/String (* = ... *)): kotlin/String
+ *
+ *   // field: compBlockVal:Ljava/lang/String;
+ *   // getter: getCompBlockVal()Ljava/lang/String;
+ *   public final static val compBlockVal: kotlin/String
+ *     public final get
+ *
+ *   // module name: main
+ * }
+ */
+@kotlin.Metadata()
+public final class A {
+    @org.jetbrains.annotations.NotNull()
+    private static final java.lang.String compBlockVal = "compBlockVal";
+
+    public A() {
+        super();
+    }
+
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String getCompBlockVal() {
+        return null;
+    }
+
+    @kotlin.jvm.JvmOverloads()
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String compBlockFun() {
+        return null;
+    }
+
+    @kotlin.jvm.JvmOverloads()
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String compBlockFun(@org.jetbrains.annotations.NotNull()
+    java.lang.String k) {
+        return null;
+    }
+}
+
+////////////////////
+
+
+public class J {
+}
+
+////////////////////
+
+
+/**
+ * package {
+ *
+ *   // signature: compExtFun(Ljava/lang/String;)Ljava/lang/String;
+ *   @kotlin/jvm/JvmOverloads
+ *   public final static fun A.compExtFun(k: kotlin/String (* = ... *)): kotlin/String
+ *
+ *   // signature: compExtFunJ(Ljava/lang/String;)Ljava/lang/String;
+ *   @kotlin/jvm/JvmOverloads
+ *   public final static fun J.compExtFunJ(k: kotlin/String (* = ... *)): kotlin/String
+ *
+ *   // field: compExtVal:Ljava/lang/String;
+ *   // getter: getCompExtVal()Ljava/lang/String;
+ *   public final static val A.compExtVal: kotlin/String (* = ... *)
+ *     public final get
+ *
+ *   // field: compExtValJ:Ljava/lang/String;
+ *   // getter: getCompExtValJ()Ljava/lang/String;
+ *   public final static val J.compExtValJ: kotlin/String (* = ... *)
+ *     public final get
+ *
+ *   // module name: main
+ * }
+ */
+@kotlin.Metadata()
+public final class KKt {
+    @org.jetbrains.annotations.NotNull()
+    private static final java.lang.String compExtVal = "compExtVal";
+    @org.jetbrains.annotations.NotNull()
+    private static final java.lang.String compExtValJ = "compExtValJ";
+
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String getCompExtVal() {
+        return null;
+    }
+
+    @kotlin.jvm.JvmOverloads()
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String compExtFun() {
+        return null;
+    }
+
+    @kotlin.jvm.JvmOverloads()
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String compExtFun(@org.jetbrains.annotations.NotNull()
+    java.lang.String k) {
+        return null;
+    }
+
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String getCompExtValJ() {
+        return null;
+    }
+
+    @kotlin.jvm.JvmOverloads()
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String compExtFunJ() {
+        return null;
+    }
+
+    @kotlin.jvm.JvmOverloads()
+    @org.jetbrains.annotations.NotNull()
+    public static final java.lang.String compExtFunJ(@org.jetbrains.annotations.NotNull()
+    java.lang.String k) {
+        return null;
+    }
+}

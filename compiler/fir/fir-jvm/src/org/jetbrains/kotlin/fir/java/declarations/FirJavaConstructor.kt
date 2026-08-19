@@ -82,6 +82,9 @@ class FirJavaConstructor @FirImplementationDetail constructor(
     override val contextParameters: List<FirValueParameter>
         get() = emptyList()
 
+    override val isLocal: Boolean
+        get() = false
+
     internal fun withTypeParameterBoundsResolveLock(f: () -> Unit) {
         // TODO: KT-68587
         typeParameterBoundsResolveLock.withLock(f)
@@ -191,7 +194,6 @@ class FirJavaConstructor @FirImplementationDetail constructor(
 
 @FirBuilderDsl
 class FirJavaConstructorBuilder : FirConstructorBuilder() {
-    var isInner: Boolean by Delegates.notNull()
     var isPrimary: Boolean by Delegates.notNull()
     var isFromSource: Boolean by Delegates.notNull()
     var annotationList: FirJavaAnnotationList = FirEmptyJavaAnnotationList

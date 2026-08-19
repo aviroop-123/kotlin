@@ -3,19 +3,24 @@
  * that can be found in the LICENSE file.
  */
 
+import org.jetbrains.kotlin.PlatformInfo
+import org.jetbrains.kotlin.dependencies.NativeDependenciesExtension
 import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanCacheTask
 import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanInteropTask
-import org.jetbrains.kotlin.PlatformInfo
 import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.konan.util.*
 import org.jetbrains.kotlin.nativeDistribution.nativeDistribution
+import org.jetbrains.kotlin.nativeDistribution.registerNativeBootstrapDistribution
 import org.jetbrains.kotlin.platformLibs.*
 import org.jetbrains.kotlin.platformManager
 import org.jetbrains.kotlin.utils.capitalized
+import org.jetbrains.kotlin.utils.reproducibilityCompilerFlags
+import org.jetbrains.kotlin.utils.reproducibilityRootsMap
 
 plugins {
     id("base")
     id("platform-manager")
+    id("native-dependencies")
 }
 
 // region: Util functions.
@@ -56,6 +61,7 @@ val updateDefFileTasksPerFamily = if (HostManager.hostIsMac) {
     emptyMap()
 }
 
+val nativeBootstrapDistribution = registerNativeBootstrapDistribution()
 
 enabledTargets(platformManager).forEach { target ->
     val targetName = target.visibleName
@@ -73,9 +79,14 @@ enabledTargets(platformManager).forEach { target ->
 
             updateDefFileTasksPerFamily[target.family]?.let { dependsOn(it) }
 
-            // Requires Native distribution with compiler JARs and stdlib klib.
-            this.compilerDistribution.set(nativeDistribution)
-            dependsOn(":kotlin-native:distStdlib")
+            if (kotlinBuildProperties.buildPlatformLibsByBootstrapCompiler) {
+                this.compilerDistributionRoot.set(nativeBootstrapDistribution.map { it.root })
+            } else {
+                // Requires Native distribution with compiler JARs and stdlib klib.
+                this.compilerDistributionRoot.set(nativeDistribution.map { it.root })
+                dependsOn(":kotlin-native:distCompiler")
+                dependsOn(":kotlin-native:distStdlib")
+            }
 
             this.target.set(targetName)
             this.outputDirectory.set(
@@ -85,12 +96,20 @@ enabledTargets(platformManager).forEach { target ->
             df.config.depends.forEach { defName ->
                 this.klibFiles.from(tasks.named(interopTaskName(defFileToLibName(targetName, defName), targetName)))
             }
+
+            val nativeDependenciesExtension = project.extensions.getByType<NativeDependenciesExtension>()
+            val reproducibilityCompilerFlags = reproducibilityCompilerFlags(project, nativeDependenciesExtension).flatMap {
+                listOf("-compiler-option", it)
+            }.toTypedArray()
+
             this.extraOpts.addAll(
                     "-Xpurge-user-libs",
                     "-Xshort-module-name", df.name,
                     "-Xdisable-experimental-annotation",
                     "-no-default-libs",
                     "-no-endorsed-libs",
+                    "-Xccall-mode", "indirect", // Default is `-Xccall-mode both`, but platform libs use `indirect` for now. See KT-82062.
+                    *reproducibilityCompilerFlags,
             )
             if (target.family.isAppleFamily) {
                 // Platform Libraries for Apple targets use modules. Use shared cache for them.
@@ -124,7 +143,7 @@ enabledTargets(platformManager).forEach { target ->
                 val dist = nativeDistribution
 
                 // Requires Native distribution with stdlib klib and its cache for `targetName`.
-                this.compilerDistribution.set(dist)
+                this.compilerDistributionRoot.set(dist.map { it.root })
                 dependsOn(":kotlin-native:${targetName}CrossDist")
                 // Make sure the cache clean-up has happened, so this task can safely write into the shared cache folder
                 mustRunAfter(":kotlin-native:distInvalidateStaleCaches")
@@ -138,7 +157,8 @@ enabledTargets(platformManager).forEach { target ->
 
                 this.klib.fileProvider(libTask.map { it.outputs.files.singleFile })
                 this.target.set(targetName)
-                this.outputDirectory.set(dist.map { it.cache(name = artifactName, target = targetName) })
+                this.cacheDirectory.set(dist.map { it.cachesRoot(targetName) })
+                this.cacheName.set(artifactName)
 
                 usesService(cachePlatformLibsSemaphore)
             }

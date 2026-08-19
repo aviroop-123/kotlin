@@ -7,10 +7,12 @@ package org.jetbrains.kotlin.test.builders
 
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives.ALLOW_MULTIPLE_API_VERSIONS_SETTING
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 import org.jetbrains.kotlin.test.directives.model.singleOrZeroValue
 import org.jetbrains.kotlin.test.services.AbstractEnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.DefaultsDsl
+import org.jetbrains.kotlin.test.checkTestInfrastructure
 import org.jetbrains.kotlin.test.util.parseLanguageFeature
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
 
@@ -42,7 +44,11 @@ class LanguageVersionSettingsBuilder {
     }
 
     fun <T> withFlag(flag: AnalysisFlag<T>, value: T) {
-        analysisFlags[flag] = value
+        if (value == flag.defaultValue) {
+            analysisFlags.remove(flag)
+        } else {
+            analysisFlags[flag] = value
+        }
     }
 
     fun configureUsingDirectives(
@@ -50,7 +56,11 @@ class LanguageVersionSettingsBuilder {
         environmentConfigurators: List<AbstractEnvironmentConfigurator>,
         useK2: Boolean
     ) {
-        val apiVersion = directives.singleOrZeroValue(LanguageSettingsDirectives.API_VERSION)
+        val apiVersion = if (ALLOW_MULTIPLE_API_VERSIONS_SETTING in directives) {
+            directives[LanguageSettingsDirectives.API_VERSION].lastOrNull()
+        } else {
+            directives.singleOrZeroValue(LanguageSettingsDirectives.API_VERSION)
+        }
         if (apiVersion != null) {
             this.apiVersion = apiVersion
             val languageVersion = maxOf(LanguageVersion.LATEST_STABLE, LanguageVersion.fromVersionString(apiVersion.versionString)!!)
@@ -62,30 +72,29 @@ class LanguageVersionSettingsBuilder {
         val allowDangerousLanguageVersionTesting =
             directives.contains(LanguageSettingsDirectives.ALLOW_DANGEROUS_LANGUAGE_VERSION_TESTING)
         if (languageVersionDirective != null) {
-            if (!allowDangerousLanguageVersionTesting) {
-                error(
-                    """
-                        The LANGUAGE_VERSION directive is prone to limiting test to a specific language version,
-                        which will become obsolete at some point and the test won't check things like feature
-                        intersection with newer releases.
+            checkTestInfrastructure(allowDangerousLanguageVersionTesting) {
+                """
+                    The LANGUAGE_VERSION directive is prone to limiting test to a specific language version,
+                    which will become obsolete at some point and the test won't check things like feature
+                    intersection with newer releases.
 
-                        For language feature testing, use `// LANGUAGE: [+-]FeatureName` directive instead,
-                        where FeatureName is an entry of the enum `LanguageFeature`
+                    For language feature testing, use `// LANGUAGE: [+-]FeatureName` directive instead,
+                    where FeatureName is an entry of the enum `LanguageFeature`
 
-                        If you are really sure you need to pin language versions, use the LANGUAGE_VERSION
-                        directive in combination with the ALLOW_DANGEROUS_LANGUAGE_VERSION_TESTING directive.
-                    """.trimIndent()
-                )
+                    If you are really sure you need to pin language versions, use the LANGUAGE_VERSION
+                    directive in combination with the ALLOW_DANGEROUS_LANGUAGE_VERSION_TESTING directive.
+                """.trimIndent()
             }
             languageVersion = languageVersionDirective
-            if (languageVersion < LanguageVersion.fromVersionString(this.apiVersion.versionString)!!) {
-                error(
-                    """
-                        Language version must be larger than or equal to the API version.
-                        Language version: '$languageVersion'.
-                        API version: '$apiVersion'.
-                    """.trimIndent()
-                )
+            checkTestInfrastructure(
+                ALLOW_MULTIPLE_API_VERSIONS_SETTING in directives ||
+                        languageVersion >= LanguageVersion.fromVersionString(this.apiVersion.versionString)!!
+            ) {
+                """
+                    Language version must be larger than or equal to the API version.
+                    Language version: '$languageVersion'.
+                    API version: '$apiVersion'.
+                """.trimIndent()
             }
         }
         when {
@@ -105,12 +114,14 @@ class LanguageVersionSettingsBuilder {
             analysisFlag(AnalysisFlags.dontWarnOnErrorSuppression, trueOrNull(LanguageSettingsDirectives.DONT_WARN_ON_ERROR_SUPPRESSION in directives)),
             analysisFlag(AnalysisFlags.stdlibCompilation, trueOrNull(LanguageSettingsDirectives.STDLIB_COMPILATION in directives)),
             analysisFlag(AnalysisFlags.lenientMode, trueOrNull(LanguageSettingsDirectives.LENIENT_MODE in directives)),
+            analysisFlag(AnalysisFlags.headerMode, trueOrNull(LanguageSettingsDirectives.HEADER_MODE in directives)),
+            analysisFlag(AnalysisFlags.ideMode, trueOrNull(LanguageSettingsDirectives.IDE_MODE in directives)),
 
             analysisFlag(JvmAnalysisFlags.jvmDefaultMode, directives.singleOrZeroValue(LanguageSettingsDirectives.JVM_DEFAULT_MODE)),
             analysisFlag(JvmAnalysisFlags.inheritMultifileParts, trueOrNull(LanguageSettingsDirectives.INHERIT_MULTIFILE_PARTS in directives)),
             analysisFlag(JvmAnalysisFlags.sanitizeParentheses, trueOrNull(LanguageSettingsDirectives.SANITIZE_PARENTHESES in directives)),
             analysisFlag(JvmAnalysisFlags.enableJvmPreview, trueOrNull(LanguageSettingsDirectives.ENABLE_JVM_PREVIEW in directives)),
-            analysisFlag(JvmAnalysisFlags.expectBuiltinsAsPartOfStdlib, trueOrNull(LanguageSettingsDirectives.EXPECT_BUILTINS_AS_PART_OF_STDLIB in directives)),
+            analysisFlag(JvmAnalysisFlags.implicitJvmExposeBoxed, trueOrNull(LanguageSettingsDirectives.JVM_EXPOSE_BOXED in directives)),
 
             analysisFlag(AnalysisFlags.explicitApiVersion, trueOrNull(apiVersion != null)),
         )
@@ -118,12 +129,21 @@ class LanguageVersionSettingsBuilder {
         analysisFlags.forEach { withFlag(it.first, it.second) }
 
         environmentConfigurators.forEach {
-            it.provideAdditionalAnalysisFlags(directives, languageVersion).entries.forEach { (flag, value) ->
+            it.provideAdditionalAnalysisFlags(directives, languageVersion).entries.forEach { [flag, value] ->
                 withFlag(flag, value)
             }
         }
 
         directives[LanguageSettingsDirectives.LANGUAGE].forEach { parseLanguageFeature(it) }
+
+        directives[LanguageSettingsDirectives.LANGUAGE_FEATURE_TOGGLED].forEach {
+            specificFeatures[it] = if (directives.contains(LanguageSettingsDirectives.TESTED_LANGUAGE_FEATURE_DISABLED)) {
+                LanguageFeature.State.DISABLED
+            } else {
+                LanguageFeature.State.ENABLED
+            }
+        }
+
         if (LanguageSettingsDirectives.PROGRESSIVE_MODE in directives) {
             for (feature in LanguageFeature.entries.filter { it.actuallyEnabledInProgressiveMode }) {
                 if (feature.sinceVersion!! <= languageVersion) continue
@@ -135,7 +155,7 @@ class LanguageVersionSettingsBuilder {
     }
 
     private fun parseLanguageFeature(featureString: String) {
-        val (feature, mode) = featureString.parseLanguageFeature()
+        val [feature, mode] = featureString.parseLanguageFeature()
         specificFeatures[feature] = mode
     }
 

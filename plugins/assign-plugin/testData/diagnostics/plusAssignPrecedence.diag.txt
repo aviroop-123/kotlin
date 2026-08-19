@@ -1,17 +1,7 @@
-/plusAssignPrecedence.kt:96:19: error: unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
-public operator fun String?.plus(other: Any?): String defined in kotlin
-    task.valInput += "K"
-                  ^^
-/plusAssignPrecedence.kt:97:19: error: unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
-public operator fun String?.plus(other: Any?): String defined in kotlin
-    task.varInput += "K"
-                  ^^
-/plusAssignPrecedence.kt:99:5: error: val cannot be reassigned
-    task.valInputWithPlus += "K"
-    ^^^^^^^^^^^^^^^^^^^^^
-/plusAssignPrecedence.kt:101:40: error: assignment operators ambiguity: 
-public final operator fun plus(v: String): StringPropertyWithPlusAndPlusAssign defined in StringPropertyWithPlusAndPlusAssign
-public final operator fun plusAssign(v: String): Unit defined in StringPropertyWithPlusAndPlusAssign
-    task.varInputWithPlusAndPlusAssign += "K"
-                                       ^^
+/plusAssignPrecedence.kt:96:19: error: Unresolved reference 'plusAssign' on receiver of type 'StringProperty'.
 
+/plusAssignPrecedence.kt:97:19: error: Unresolved reference 'plusAssign' on receiver of type 'StringProperty'.
+
+/plusAssignPrecedence.kt:101:40: error: Ambiguity between assign operator candidates:
+fun plus(v: String): StringPropertyWithPlusAndPlusAssign
+fun plusAssign(v: String): Unit

@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
 // FIR_DUMP
 open class Base
 class Derived : Base()
@@ -15,8 +14,8 @@ open class A(protected open val foo: Base) {
         when (other) {
             is B -> {
                 // OK in K2, INVISIBLE_MEMBER (B::foo) in K1
-                <!DEBUG_INFO_SMARTCAST!>other<!>.<!INVISIBLE_MEMBER!>foo<!>
-                <!DEBUG_INFO_SMARTCAST!>other<!>.<!INVISIBLE_MEMBER!>bar<!>()
+                other.foo
+                other.bar()
             }
         }
     }

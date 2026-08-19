@@ -1,6 +1,4 @@
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-61907
-// REASON: unexpected red code in K1 (see corresponding diagnostic test)
 
 fun box(): String {
     testYield()

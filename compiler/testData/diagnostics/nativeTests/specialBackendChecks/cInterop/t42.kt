@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 import kotlinx.cinterop.*
 
 fun foo(x: Any) = x

@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.descriptors.ValueClassRepresentation
 import org.jetbrains.kotlin.generators.tree.ImplementationKind
+import org.jetbrains.kotlin.generators.tree.StandardTypes
 import org.jetbrains.kotlin.generators.tree.imports.ArbitraryImportable
 import org.jetbrains.kotlin.generators.tree.printer.FunctionParameter
 import org.jetbrains.kotlin.generators.tree.printer.VariableKind
@@ -227,13 +228,13 @@ object IrTree : AbstractTreeBuilder() {
         +field("type", irTypeType)
     }
     val valueParameter: Element by element(Declaration) {
-        doPrint = false
         needTransformMethod()
 
         parent(declarationBase)
         parent(valueDeclaration)
 
         +descriptor("ParameterDescriptor")
+        +field("kind", type(Packages.declarations, "IrParameterKind"))
         +field("isAssignable", boolean)
         +declaredSymbol(valueParameterSymbol)
         +field("varargElementType", irTypeType, nullable = true)
@@ -273,7 +274,7 @@ object IrTree : AbstractTreeBuilder() {
         addImport(ArbitraryImportable(Packages.declarations, "DelicateIrParameterIndexSetter"))
         generationCallback = {
             println()
-            printPropertyDeclaration("index", int, VariableKind.VAR, initializer = "-1")
+            printPropertyDeclaration("indexInParameters", int, VariableKind.VAR, initializer = "-1")
             println()
             withIndent {
                 println("@DelicateIrParameterIndexSetter")
@@ -328,7 +329,7 @@ object IrTree : AbstractTreeBuilder() {
     val mutableAnnotationContainer: Element by element(Declaration) {
         parent(type(Packages.declarations, "IrAnnotationContainer"))
 
-        +listField("annotations", constructorCall, mutability = Var, isChild = false) {
+        +listField("annotations", annotation, mutability = Var, isChild = false) {
             isOverride = true
         }
     }
@@ -421,6 +422,9 @@ object IrTree : AbstractTreeBuilder() {
     }
     val functionWithLateBinding: Element by declarationWithLateBinding(simpleFunctionSymbol) {
         parent(simpleFunction)
+    }
+    val constructorWithLateBinding: Element by declarationWithLateBinding(constructorSymbol) {
+        parent(constructor)
     }
     val propertyWithLateBinding: Element by declarationWithLateBinding(propertySymbol) {
         parent(property)
@@ -569,18 +573,16 @@ object IrTree : AbstractTreeBuilder() {
                 Stores implicit receiver parameters configured for the snippet.
             """.trimIndent()
         }
-        +listField("variablesFromOtherSnippets", variable, mutability = MutableList)
-        +listField("declarationsFromOtherSnippets", declaration, mutability = MutableList)
+        +listField("variablesFromOtherSnippets", variable, mutability = MutableList, isChild = false)
+        +listField("declarationsFromOtherSnippets", declaration, mutability = MutableList, isChild = false)
         +referencedSymbol("stateObject", classSymbol, nullable = true) {
             kDoc = """
                 Contains link to the static state object for this compilation session.
             """.trimIndent()
         }
-        +field("body", body)
-        +field("returnType", irTypeType, nullable = true)
-        +referencedSymbol("targetClass", classSymbol, nullable = true){
+        +referencedSymbol("targetClass", classSymbol, nullable = true) {
             kDoc = """
-                Contains link to the IrClass symbol to which this snippet should be lowered on the appropriate stage.
+                Contains link to the IrClass symbol to which this snippet was lowered.
             """.trimIndent()
         }
     }
@@ -596,6 +598,7 @@ object IrTree : AbstractTreeBuilder() {
         +field("isOperator", boolean)
         +field("isInfix", boolean)
         +referencedSymbol("correspondingPropertySymbol", propertySymbol, nullable = true)
+        +referencedSymbol("companionExtensionClass", classSymbol, nullable = true)
     }
     val typeAlias: Element by element(Declaration) {
         parent(declarationBase)
@@ -715,14 +718,14 @@ object IrTree : AbstractTreeBuilder() {
 
         +referencedSymbol(s, mutable = false)
         +field("origin", statementOriginType, nullable = true)
+        +listField("arguments", expression.copy(nullable = true), mutability = MutableList, isChild = true) {
+            doPrint = false
+        }
         +listField(
             name = "typeArguments",
             baseType = irTypeType.copy(nullable = true),
             mutability = MutableList,
-        ) {
-            deepCopyExcludeFromConstructor = true
-            deepCopyExcludeFromApply = true
-        }
+        )
     }
     val functionAccessExpression: Element by sealedElement(Expression) {
         nameInVisitorMethod = "FunctionAccess"
@@ -739,6 +742,16 @@ object IrTree : AbstractTreeBuilder() {
         +referencedSymbol(constructorSymbol)
         +field("source", type<SourceElement>())
         +field("constructorTypeArgumentsCount", int)
+    }
+    val annotation: Element by element(Expression) {
+        parent(constructorCall)
+        parent(type<AnnotationMarker>())
+
+        +referencedSymbol("classSymbol", classSymbol, mutable = false)
+        +field("argumentMapping", StandardTypes.map.withArgs(type<Name>(), expression), nullable = true)
+        +referencedSymbol("symbol", type = constructorSymbol) {
+            optInAnnotation = deprecatedCompilerApi.withArgument("deprecatedSince", "org.jetbrains.kotlin.CompilerVersionOfApiDeprecation._2_4_20")
+        }
     }
     val getSingletonValue: Element by element(Expression) {
         nameInVisitorMethod = "SingletonReference"

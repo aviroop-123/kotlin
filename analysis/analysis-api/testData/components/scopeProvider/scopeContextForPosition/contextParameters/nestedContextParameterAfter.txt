@@ -19,8 +19,11 @@ scopes:
         compilerVisibility: Local
         contextReceivers: []
         isActual: false
+        isCompanion: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isLateInit: false
         isVal: true
         location: LOCAL
@@ -51,8 +54,11 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         isActual: false
+        isCompanion: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isVal: true
         location: LOCAL
         modality: FINAL
@@ -69,11 +75,15 @@ scopes:
         compilerVisibility: Public
         contextReceivers: []
         generatedPrimaryConstructorProperty: null
+        hasDeclaredDefaultValue: false
         hasDefaultValue: false
         isActual: false
+        isCompanion: false
         isCrossinline: false
+        isDelegated: false
         isExpect: false
         isExtension: false
+        isExternal: false
         isImplicitLambdaParameter: false
         isNoinline: false
         isVal: true
@@ -106,13 +116,13 @@ scopes:
                   typeArguments: []
                   type: kotlin/Unit
               ]
-              type: @ContextFunctionTypeParams(1) @ExtensionFunctionType kotlin/Function2<B, C, kotlin/Unit>
+              type: context(B) C.() -> kotlin/Unit
             KaUsualClassType:
               annotations: []
               typeArguments: []
               type: kotlin/Unit
           ]
-          type: @ContextFunctionTypeParams(1) kotlin/Function2<D, @ContextFunctionTypeParams(1) @ExtensionFunctionType kotlin/Function2<B, C, kotlin/Unit>, kotlin/Unit>
+          type: context(D) (context(B) C.() -> kotlin/Unit) -> kotlin/Unit
         visibility: PUBLIC
     constructors: 0
 
@@ -124,6 +134,7 @@ scopes:
         compilerVisibility: Local
         isActual: false
         isExpect: false
+        isExternal: false
         isReified: false
         location: LOCAL
         modality: FINAL
@@ -345,8 +356,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -364,8 +378,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -383,8 +400,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -402,8 +422,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -446,6 +469,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -479,8 +503,11 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             isActual: false
+            isCompanion: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isVal: true
             location: LOCAL
             modality: FINAL
@@ -503,6 +530,7 @@ scopes:
         hasStableParameterNames: true
         isActual: false
         isBuiltinFunctionInvoke: false
+        isCompanion: false
         isExpect: false
         isExtension: false
         isExternal: false
@@ -528,6 +556,7 @@ scopes:
             compilerVisibility: Local
             isActual: false
             isExpect: false
+            isExternal: false
             isReified: false
             location: LOCAL
             modality: FINAL
@@ -549,11 +578,15 @@ scopes:
             compilerVisibility: Public
             contextReceivers: []
             generatedPrimaryConstructorProperty: null
+            hasDeclaredDefaultValue: false
             hasDefaultValue: false
             isActual: false
+            isCompanion: false
             isCrossinline: false
+            isDelegated: false
             isExpect: false
             isExtension: false
+            isExternal: false
             isImplicitLambdaParameter: false
             isNoinline: false
             isVal: true
@@ -586,13 +619,13 @@ scopes:
                       typeArguments: []
                       type: kotlin/Unit
                   ]
-                  type: @ContextFunctionTypeParams(1) @ExtensionFunctionType kotlin/Function2<B, C, kotlin/Unit>
+                  type: context(B) C.() -> kotlin/Unit
                 KaUsualClassType:
                   annotations: []
                   typeArguments: []
                   type: kotlin/Unit
               ]
-              type: @ContextFunctionTypeParams(1) kotlin/Function2<D, @ContextFunctionTypeParams(1) @ExtensionFunctionType kotlin/Function2<B, C, kotlin/Unit>, kotlin/Unit>
+              type: context(D) (context(B) C.() -> kotlin/Unit) -> kotlin/Unit
             visibility: PUBLIC
         ]
         visibility: PUBLIC
@@ -609,4 +642,3 @@ scopes:
     constructors: 0
 
   DefaultStarImportingScope, index = 10
-

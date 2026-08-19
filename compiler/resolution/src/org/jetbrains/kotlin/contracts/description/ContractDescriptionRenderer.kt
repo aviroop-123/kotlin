@@ -16,8 +16,10 @@
 
 package org.jetbrains.kotlin.contracts.description
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.contracts.description.expressions.*
 
+@K1Deprecation
 class ContractDescriptionRenderer(private val builder: StringBuilder) : ContractDescriptionVisitor<Unit, Unit> {
     override fun visitConditionalEffectDeclaration(conditionalEffect: ConditionalEffectDeclaration, data: Unit) {
         conditionalEffect.effect.accept(this, data)
@@ -36,6 +38,12 @@ class ContractDescriptionRenderer(private val builder: StringBuilder) : Contract
         callsEffect.variableReference.accept(this, data)
         builder.append(", ${callsEffect.kind})")
 
+    }
+
+    override fun visitReturnsResultOfEffectDeclaration(returnsResultOfEffect: ReturnsResultOfEffectDeclaration, data: Unit) {
+        builder.append("ReturnsResultOf(")
+        returnsResultOfEffect.variableReference.accept(this, data)
+        builder.append(")")
     }
 
     override fun visitLogicalOr(logicalOr: LogicalOr, data: Unit) {

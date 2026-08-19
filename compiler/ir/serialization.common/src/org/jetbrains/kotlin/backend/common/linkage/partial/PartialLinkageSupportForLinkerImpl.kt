@@ -6,36 +6,54 @@
 package org.jetbrains.kotlin.backend.common.linkage.partial
 
 import org.jetbrains.kotlin.backend.common.linkage.issues.PartialLinkageErrorsLogged
+import org.jetbrains.kotlin.backend.common.linkage.partial.ClassifierPartialLinkageStatus.Unusable.*
 import org.jetbrains.kotlin.backend.common.overrides.IrLinkerFakeOverrideProvider
-import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.config.PartialLinkageConfig
+import org.jetbrains.kotlin.config.PartialLinkageLogLevel
 import org.jetbrains.kotlin.ir.IrBuiltIns
+import org.jetbrains.kotlin.ir.IrDiagnosticReporter
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
+import org.jetbrains.kotlin.ir.declarations.IrFactory
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.symbols.IrTypeAliasSymbol
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.defaultTypeWithoutArguments
 import org.jetbrains.kotlin.ir.util.SymbolTable
+import org.jetbrains.kotlin.ir.util.defaultType
 
 fun createPartialLinkageSupportForLinker(
     partialLinkageConfig: PartialLinkageConfig,
-    builtIns: IrBuiltIns,
-    messageCollector: MessageCollector,
-): PartialLinkageSupportForLinker = if (partialLinkageConfig.isEnabled)
-    PartialLinkageSupportForLinkerImpl(
-        builtIns = builtIns,
-        logger = PartialLinkageLogger(messageCollector, partialLinkageConfig.logLevel),
-    )
-else
-    PartialLinkageSupportForLinker.DISABLED
+    irFactory: IrFactory,
+    anyClass: IrClassSymbol,
+    nothingClass: IrClassSymbol,
+    diagnosticReporter: IrDiagnosticReporter,
+): PartialLinkageSupportForLinker = PartialLinkageSupportForLinkerImpl(
+    irFactory,
+    anyClass,
+    nothingClass,
+    PartialLinkageLogger(diagnosticReporter, partialLinkageConfig.logLevel)
+)
 
 internal class PartialLinkageSupportForLinkerImpl(
-    builtIns: IrBuiltIns,
+    irFactory: IrFactory,
+    private val anyClass: IrClassSymbol,
+    nothingClass: IrClassSymbol,
     private val logger: PartialLinkageLogger,
 ) : PartialLinkageSupportForLinker {
-    private val stubGenerator = MissingDeclarationStubGenerator(builtIns)
-    private val classifierExplorer = ClassifierExplorer(builtIns, stubGenerator)
-    private val patcher = PartiallyLinkedIrTreePatcher(builtIns, classifierExplorer, stubGenerator, logger)
+    private val stubGenerator = MissingDeclarationStubGenerator(irFactory, nothingClass.defaultTypeWithoutArguments)
+    private val classifierExplorer = ClassifierExplorer(anyClass, stubGenerator)
+    private val patcher = PartiallyLinkedIrTreePatcher(
+        irFactory,
+        anyClass,
+        nothingClass.defaultTypeWithoutArguments,
+        classifierExplorer,
+        stubGenerator,
+        logger
+    )
 
     /**
      * The queue of IR files to remove unusable annotations.
@@ -62,43 +80,55 @@ internal class PartialLinkageSupportForLinkerImpl(
     }
 
     override fun exploreClassifiers(fakeOverrideBuilder: IrLinkerFakeOverrideProvider) {
-        val entries = fakeOverrideBuilder.fakeOverrideCandidates
-        if (entries.isEmpty()) return
-
-        val toExclude = buildSet {
-            for (clazz in entries.keys) {
-                if (classifierExplorer.exploreSymbol(clazz.symbol) != null) {
-                    this += clazz
-                }
-            }
+        for (clazz in fakeOverrideBuilder.fakeOverrideCandidates.keys) {
+            classifierExplorer.exploreSymbol(clazz.symbol)
         }
-
-        entries -= toExclude
     }
 
     override fun exploreClassifiersInInlineLazyIrFunction(function: IrFunction) {
         classifierExplorer.exploreIrElement(function)
     }
 
-    override fun generateStubsAndPatchUsages(symbolTable: SymbolTable) {
+    override fun generateStubsAndPatchUsages(irBuiltIns: IrBuiltIns, symbolTable: SymbolTable) {
         // Generate stubs.
         for (symbol in symbolTable.descriptorExtension.allUnboundSymbols) {
             stubGenerator.getDeclaration(symbol)
         }
 
-        // Patch IR files (without visiting contained declarations).
-        patcher.removeUnusableAnnotationsFromFiles(filesEnqueuedForProcessing.getCopyAndClear())
+        with(irBuiltIns) {
+            // Patch IR files (without visiting contained declarations).
+            patcher.removeUnusableAnnotationsFromFiles(filesEnqueuedForProcessing.getCopyAndClear())
 
-        // Patch all IR declarations scheduled so far.
-        patcher.patchDeclarations(declarationsEnqueuedForProcessing.getCopyAndClear())
+            // Patch all IR declarations scheduled so far.
+            patcher.patchDeclarations(declarationsEnqueuedForProcessing.getCopyAndClear())
+        }
 
         // Make sure that there are no linkage issues that have been reported with the 'error' severity.
         // If there are, abort the current compilation.
         if (logger.logLevel == PartialLinkageLogLevel.ERROR && patcher.linkageIssuesLogged > 0)
-            PartialLinkageErrorsLogged.raiseIssue(logger.messageCollector)
+            PartialLinkageErrorsLogged.raiseIssue(logger.diagnosticReporter)
     }
 
-    override fun generateStubsForClassifiers(symbolTable: SymbolTable) {
+    override fun preprocessBeforeFakeOverridesBuilding(symbolTable: SymbolTable, fakeOverrideBuilder: IrLinkerFakeOverrideProvider) {
+        // Strip off supertypes from some `Unusable` classes to fix unclear/broken inheritance structure.
+        for (candidateClass in fakeOverrideBuilder.fakeOverrideCandidates.keys) {
+            candidateClass.partialLinkageStatus?.let {
+                when (it) {
+                    is ClassifierPartialLinkageStatus.Usable -> {}
+                    is AnnotationWithUnacceptableParameter -> {} // no problems with inheritance structure, so should not be treated here.
+                    is MissingClassifier -> {
+                        // Should not reach here, since if a class was not deserialized, it will not be enqueued into fakeOverrideCandidates.
+                        // Should it ever reach here, most probably, it should have either no supertypes, or only kotlin/Any.
+                    }
+                    is DueToOtherClassifier, is InvalidInheritance -> {
+                        // these usecases are tested by `js/js.translator/testData/incremental/invalidationWithPL/interfaceBecomeClass/`
+                        candidateClass.superTypes = listOf(anyClass.owner.defaultType)
+                    }
+                }
+            }
+        }
+
+        // Generate stubs for classifiers
         symbolTable.descriptorExtension.allUnboundSymbols
             .filter { it is IrClassifierSymbol || it is IrTypeAliasSymbol }
             .forEach { stubGenerator.getDeclaration(it) }

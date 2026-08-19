@@ -4,9 +4,10 @@ import plugins.configureKotlinPomAttributes
 description = "Runtime library for the JS Plain Objects compiler plugin"
 
 plugins {
-    kotlin("js")
+    kotlin("multiplatform")
     `maven-publish`
     id("nodejs-cache-redirector-configuration")
+    id("nodejs-configuration")
 }
 
 group = "org.jetbrains.kotlin"
@@ -15,9 +16,12 @@ kotlin {
     js {
         browser()
         nodejs()
-        compilations["main"].defaultSourceSet {
+    }
+
+    sourceSets {
+        jsMain {
             dependencies {
-                compileOnly(kotlin("stdlib-js"))
+                compileOnly(project(":kotlin-stdlib"))
             }
         }
     }
@@ -33,7 +37,8 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             artifactId = "kotlin-js-plain-objects"
-            from(components["kotlin"])
+            // FIXME: Remove customized publication in KT-83065
+            from(kotlin.js().components.single())
             configureKotlinPomAttributes(project, "Annotations library for the JS Plain Objects compiler plugin", packaging = "klib")
         }
         withType<MavenPublication> {

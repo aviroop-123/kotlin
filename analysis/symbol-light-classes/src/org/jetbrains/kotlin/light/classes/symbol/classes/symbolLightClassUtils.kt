@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,7 +8,10 @@ package org.jetbrains.kotlin.light.classes.symbol.classes
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.ModificationTracker
 import com.intellij.psi.*
+import org.jetbrains.kotlin.analysis.api.KaContextParameterApi
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.components.getExpectsForActual
 import org.jetbrains.kotlin.analysis.api.getModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
@@ -19,7 +22,6 @@ import org.jetbrains.kotlin.analysis.api.types.KaClassErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.KaTypeMappingMode
-import org.jetbrains.kotlin.analysis.utils.errors.requireIsInstance
 import org.jetbrains.kotlin.asJava.KotlinAsJavaSupportBase
 import org.jetbrains.kotlin.asJava.classes.KotlinSuperTypeListBuilder
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
@@ -27,10 +29,13 @@ import org.jetbrains.kotlin.asJava.classes.METHOD_INDEX_BASE
 import org.jetbrains.kotlin.asJava.classes.findEntry
 import org.jetbrains.kotlin.asJava.hasInterfaceDefaultImpls
 import org.jetbrains.kotlin.asJava.toLightClass
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.config.JvmDefaultMode
 import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
+import org.jetbrains.kotlin.config.MavenComparableVersion
 import org.jetbrains.kotlin.config.jvmDefaultMode
 import org.jetbrains.kotlin.light.classes.symbol.analyzeForLightClasses
+import org.jetbrains.kotlin.light.classes.symbol.annotations.getIntroducedAtVersionFromAnnotation
 import org.jetbrains.kotlin.light.classes.symbol.annotations.hasJvmOverloadsAnnotation
 import org.jetbrains.kotlin.light.classes.symbol.annotations.hasJvmSyntheticAnnotation
 import org.jetbrains.kotlin.light.classes.symbol.copy
@@ -41,6 +46,7 @@ import org.jetbrains.kotlin.light.classes.symbol.isJvmField
 import org.jetbrains.kotlin.light.classes.symbol.mapType
 import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightAccessorMethod.Companion.createPropertyAccessors
 import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightSimpleMethod.Companion.createSimpleMethods
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.JvmStandardClassIds
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.*
@@ -112,14 +118,19 @@ private fun lightClassForEnumEntry(ktEnumEntry: KtEnumEntry): KtLightClass? {
     return (targetField as? SymbolLightFieldForEnumEntry)?.initializingClass as? KtLightClass
 }
 
+/**
+ * @param staticsFromCompanion whether this function was called to materialize static members from a companion object
+ * inside the containing class
+ */
 internal fun KaSession.createMethods(
     lightClass: SymbolLightClassBase,
     declarations: Sequence<KaCallableSymbol>,
     result: MutableList<PsiMethod>,
     isTopLevel: Boolean = false,
     suppressStatic: Boolean = false,
+    staticsFromCompanion: Boolean = false,
 ) {
-    val (ctorProperties, regularMembers) = declarations.partition { it is KaPropertySymbol && it.isFromPrimaryConstructor }
+    val [ctorProperties, regularMembers] = declarations.partition { it is KaPropertySymbol && it.isFromPrimaryConstructor }
 
     fun KaSession.handleDeclaration(declaration: KaCallableSymbol) {
         when (declaration) {
@@ -131,6 +142,7 @@ internal fun KaSession.createMethods(
                 methodIndex = METHOD_INDEX_BASE,
                 isTopLevel = isTopLevel,
                 suppressStatic = suppressStatic,
+                staticsFromCompanion = staticsFromCompanion,
             )
 
             is KaPropertySymbol -> createPropertyAccessors(
@@ -138,7 +150,8 @@ internal fun KaSession.createMethods(
                 result,
                 declaration,
                 isTopLevel = isTopLevel,
-                suppressStatic = suppressStatic
+                suppressStatic = suppressStatic,
+                staticsFromCompanion = staticsFromCompanion,
             )
 
             is KaConstructorSymbol -> error("Constructors should be handled separately and not passed to this function")
@@ -215,17 +228,228 @@ internal fun <T : KaFunctionSymbol> KaSession.createMethodsJvmOverloadsAware(
     val pickMask = BitSet(parameterCount)
     pickMask.set(0, parameterCount)
 
+    val parameterMaskFilter = valueParameterMaskFilter(valueParameters, parameterCount)
+
+    val defaultValueMask = defaultParameterValueMask(declaration)
     for (index in parameterCount - 1 downTo 0) {
-        val valueParameter = valueParameters[index]
-        if (!valueParameter.hasDefaultValue) continue
+        if (!defaultValueMask[index] || !pickMask[index]) continue
         pickMask.clear(index)
 
-        lightMethodCreator.create(
-            methodIndex = methodIndex++,
-            valueParameterPickMask = pickMask.copy(),
-            hasValueClassInParameterType = hasValueClassInParameterType || valueClassMask?.intersects(pickMask) == true,
-        )
+        if (parameterMaskFilter.accepts(pickMask)) {
+            lightMethodCreator.create(
+                methodIndex = methodIndex++,
+                valueParameterPickMask = pickMask.copy(),
+                hasValueClassInParameterType = hasValueClassInParameterType || valueClassMask?.intersects(pickMask) == true,
+            )
+        }
     }
+}
+
+/**
+ * For each value parameter of the [declaration] (a function or a constructor), tells whether it has a default value
+ * that the compiler takes into account when generating `@JvmOverloads` variants (or the synthetic no-arg constructor)
+ * *on this very declaration*.
+ *
+ * - A default value declared on the parameter itself always counts;
+ * - For an `actual` declaration, a default value declared on the corresponding `expect` parameter counts, because the
+ *   overloads are emitted on the `actual` declaration (the `expect` one has no body);
+ * - A default value inherited from an *overridden* function is intentionally ignored: `@JvmOverloads` has no effect on
+ *   an override, the overloads belong to the base declaration.
+ */
+@OptIn(KaContextParameterApi::class)
+context(_: KaSession)
+internal fun defaultParameterValueMask(declaration: KaFunctionSymbol): BitSet {
+    val valueParameters = declaration.valueParameters
+    val mask = BitSet(valueParameters.size)
+
+    valueParameters.forEachIndexed { index, valueParameter ->
+        if (valueParameter.hasDeclaredDefaultValue) {
+            mask.set(index)
+        }
+    }
+
+    if (declaration.isActual) {
+        for (expectSymbol in declaration.getExpectsForActual()) {
+            val expectParameters = (expectSymbol as? KaFunctionSymbol)?.valueParameters ?: continue
+            for (index in valueParameters.indices) {
+                if (!mask[index] && expectParameters.getOrNull(index)?.hasDeclaredDefaultValue == true) {
+                    mask.set(index)
+                }
+            }
+        }
+    }
+
+    return mask
+}
+
+private sealed class ValueParameterMaskFilter {
+    abstract fun accepts(pickMask: BitSet): Boolean
+
+    object AcceptAll : ValueParameterMaskFilter() {
+        override fun accepts(pickMask: BitSet): Boolean = true
+    }
+}
+
+
+private val ERROR_CLASS_ID: ClassId = ClassId.topLevel(StandardNames.NON_EXISTENT_CLASS)
+
+/**
+ * Represents a filter for value parameter masks based on [IntroducedAt] annotations.
+ *
+ * @param deprecatedMasks a set of masks that represent deprecated versions of the method
+ * @param valueParameters value parameters of the method
+ * @param isAscending whether the version ordering is ascending (from oldest to newest)
+ * @param session the session in which [valueParameters] were obtained
+ */
+private class ValueParameterMaskFilterByIntroducedAt(
+    private val deprecatedMasks: Set<BitSet>,
+    private val valueParameters: List<KaValueParameterSymbol>,
+    isAscending: Boolean,
+    private val session: KaSession,
+) : ValueParameterMaskFilter() {
+    /**
+     * In the case of non-ascending version order, it is not enough to just check the signature mask because
+     * the real deprecated mask might be different if the parameter types are the same.
+     *
+     * ### Example
+     * ```kotlin
+     * @JvmOverloads
+     * fun randomSameType(
+     *     a: Int = 1,
+     *     @IntroducedAt("3") b: Int = 3,
+     *     @IntroducedAt("2") c: Int = 2,
+     *     @IntroducedAt("4") d: Int = 4,
+     * ) {
+     * }
+     * ```
+     *
+     * in this case the basic ([deprecatedMasks]) will cover only [(1000), (1010), (1110)] cases, but the real
+     * deprecated mask will be [(1000), (1100), (1110)] since we have parameter types clash.
+     */
+    private val nonAscendingDeprecatedSignatures = if (isAscending) {
+        null
+    } else {
+        lazy(LazyThreadSafetyMode.NONE) {
+            deprecatedMasks.mapTo(HashSet()) { pickMask ->
+                createSignature(pickMask)
+            }
+        }
+    }
+
+    /**
+     * Represents a value-parameter-only signature of a method.
+     *
+     * The dedicated class is mostly needed to improve performance
+     */
+    private class MethodSignature(private val parameterClassIds: List<ClassId>) {
+        override fun equals(other: Any?): Boolean = when {
+            this === other -> true
+            other !is MethodSignature -> false
+            else -> {
+                val otherParameterClassIds = other.parameterClassIds
+                parameterClassIds.size == otherParameterClassIds.size && parameterClassIds == other.parameterClassIds
+            }
+        }
+
+        private var hashCode: Int? = null
+        override fun hashCode(): Int = hashCode ?: parameterClassIds.hashCode().also { hashCode = it }
+    }
+
+    private fun createSignature(pickMask: BitSet): MethodSignature {
+        val classIds = if (pickMask.isEmpty) {
+            emptyList()
+        } else {
+            valueParameters.mapIndexedNotNullTo(ArrayList(pickMask.length())) { index, symbol ->
+                if (pickMask[index]) with(session) {
+                    symbol.returnType.expandedSymbol?.classId ?: ERROR_CLASS_ID
+                } else {
+                    null
+                }
+            }
+        }
+
+        return classIds.let(::MethodSignature)
+    }
+
+    override fun accepts(pickMask: BitSet): Boolean {
+        if (pickMask in deprecatedMasks) {
+            return false
+        }
+
+        val deprecatedSignatures = nonAscendingDeprecatedSignatures?.value ?: return true
+        val signatureToCheck = createSignature(pickMask)
+        return signatureToCheck !in deprecatedSignatures
+    }
+}
+
+/**
+ * Returns a set of parameter masks for already generated by [IntroducedAt] feature hidden functions
+ */
+context(session: KaSession)
+private fun valueParameterMaskFilter(
+    valueParameters: List<KaValueParameterSymbol>,
+    parameterCount: Int,
+): ValueParameterMaskFilter {
+    val versionSortedMap = TreeMap<MavenComparableVersion?, MutableList<Int>>(
+        nullsFirst(compareBy { it }),
+    ).apply {
+        // We always have the base method without versions
+        put(null, mutableListOf())
+
+        valueParameters.forEachIndexed { index, valueParameter ->
+            val version = if (valueParameter.hasDeclaredDefaultValue) {
+                valueParameter.getIntroducedAtVersionFromAnnotation()?.let(::MavenComparableVersion)
+            } else {
+                null
+            }
+
+            getOrPut(version) { mutableListOf() }.add(index)
+        }
+    }
+
+    val lastIndex = versionSortedMap.size - 1
+
+    // We always have the base method without versions
+    val hasVersioning = lastIndex > 0
+    return if (hasVersioning) {
+        var isAscending = true
+        val deprecatedMaks = HashSet<BitSet>().apply {
+            var currentMask = BitSet(parameterCount)
+            versionSortedMap.values.forEachIndexed { index, indices ->
+                // The last iteration represents the actual non-deprecated method
+                if (index == lastIndex) {
+                    return@forEachIndexed
+                }
+
+                // To accurately exclude the exact method signature
+                val newMask = currentMask.copyAndModify {
+                    indices.forEach(this::set)
+                }
+
+                currentMask = newMask.also(this::add)
+
+                // The last parameter wasn't changed -> the change is not ascending
+                if (currentMask.length() == newMask.length()) {
+                    isAscending = false
+                }
+            }
+        }
+
+        ValueParameterMaskFilterByIntroducedAt(
+            deprecatedMasks = deprecatedMaks,
+            valueParameters = valueParameters,
+            isAscending = isAscending,
+            session = session,
+        )
+    } else {
+        ValueParameterMaskFilter.AcceptAll
+    }
+}
+
+private inline fun BitSet.copyAndModify(block: BitSet.() -> Unit): BitSet {
+    val copy = clone() as BitSet
+    block(copy)
+    return copy
 }
 
 internal fun createAndAddField(
@@ -263,10 +487,18 @@ internal fun createField(
 
 private fun hasBackingField(property: KaPropertySymbol): Boolean {
     if (property is KaSyntheticJavaPropertySymbol) return true
-    requireIsInstance<KaKotlinPropertySymbol>(property)
+
+    requireWithAttachment(
+        property is KaKotlinPropertySymbol,
+        message = { "Expected ${KaKotlinPropertySymbol::class}" },
+        buildAttachment = {
+            withEntry("actualSymbolClassName", property::class.qualifiedName ?: "<null>")
+            withEntry("symbol", property) { it.toString() }
+        }
+    )
 
     if (property.origin.cannotHasBackingField() || property.isStatic) return false
-    if (property.isLateInit || property.isDelegatedProperty || property.isFromPrimaryConstructor) return true
+    if (property.isLateInit || property.isDelegated || property.isFromPrimaryConstructor) return true
     val hasBackingFieldByPsi: Boolean? = property.psi?.hasBackingField()
     if (hasBackingFieldByPsi == false) {
         return hasBackingFieldByPsi
@@ -346,7 +578,7 @@ internal fun KaSession.createInheritanceList(
                 lightClass,
                 KaTypeMappingMode.SUPER_TYPE_KOTLIN_COLLECTIONS_AS_IS
             ) ?: return@forEach
-            listBuilder.addReference(mappedType)
+
             if (mappedType.canonicalText.startsWith("kotlin.collections.")) {
                 val mappedToNoCollectionAsIs = mapType(superType, lightClass, KaTypeMappingMode.SUPER_TYPE)
                 if (mappedToNoCollectionAsIs != null &&
@@ -359,6 +591,8 @@ internal fun KaSession.createInheritanceList(
                         listBuilder.addMarkerInterfaceIfNeeded(superType.classId)
                     }
                 }
+            } else {
+                listBuilder.addReference(mappedType)
             }
         }
 
@@ -460,9 +694,11 @@ internal fun KaSession.addPropertyBackingFields(
             filter { lightClass.containingClass?.isInterface == true && !it.isJvmField }
         }
 
-    val (ctorProperties, memberProperties) = propertySymbols.partition { it.isFromPrimaryConstructor }
-    val isStatic = forceIsStaticTo ?: (containerSymbol is KaClassSymbol && containerSymbol.classKind.isObject)
+    val [ctorProperties, memberProperties] = propertySymbols.partition { it.isFromPrimaryConstructor }
+    val containerIsObject = containerSymbol is KaClassSymbol && containerSymbol.classKind.isObject
     fun addPropertyBackingField(propertySymbol: KaPropertySymbol) {
+        @OptIn(KaExperimentalApi::class)
+        val isStatic = forceIsStaticTo ?: (containerIsObject || propertySymbol.isCompanion)
         createAndAddField(
             lightClass = lightClass,
             declaration = propertySymbol,
@@ -499,7 +735,7 @@ internal fun KaSession.hasValueClassInSignature(
     if (callableSymbol.receiverType?.let { typeForValueClass(it) } == true) return true
     if (callableSymbol.contextParameters.any { typeForValueClass(it.returnType) }) return true
     if (!skipValueParametersCheck && callableSymbol is KaFunctionSymbol) {
-        return callableSymbol.valueParameters.withIndex().any { (index, valueParameter) ->
+        return callableSymbol.valueParameters.withIndex().any { [index, valueParameter] ->
             valueParameterPickMask?.get(index) != false && typeForValueClass(valueParameter.returnType)
         }
     }

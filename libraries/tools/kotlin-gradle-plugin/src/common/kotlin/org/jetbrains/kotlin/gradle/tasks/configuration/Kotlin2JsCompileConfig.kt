@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetType
 import org.jetbrains.kotlin.gradle.targets.js.internal.LibraryFilterCachingService
 import org.jetbrains.kotlin.gradle.targets.js.ir.*
 import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
-import org.jetbrains.kotlin.gradle.utils.klibModuleName
+import org.jetbrains.kotlin.gradle.utils.moduleName
 import org.jetbrains.kotlin.gradle.utils.providerWithLazyConvention
 
 internal typealias Kotlin2JsCompileConfig = BaseKotlin2JsCompileConfig<Kotlin2JsCompile>
@@ -55,6 +55,11 @@ internal open class BaseKotlin2JsCompileConfig<TASK : Kotlin2JsCompile>(
                         .flatMap { (it.compilerOptions as KotlinJsCompilerOptions).moduleName }
                 )
             }
+            when (compilation.platformType) {
+                KotlinPlatformType.js -> task.runViaBuildToolsApi.convention(propertiesProvider.runKotlinJsCompilerViaBuildToolsApi)
+                KotlinPlatformType.wasm -> task.runViaBuildToolsApi.convention(propertiesProvider.runKotlinWasmCompilerViaBuildToolsApi)
+                else -> task.runViaBuildToolsApi.value(false).disallowChanges()
+            }
         }
     }
 
@@ -81,7 +86,7 @@ internal open class BaseKotlin2JsCompileConfig<TASK : Kotlin2JsCompile>(
             "${project.name}_${compilation.compilationName}"
         }
         if (none { it.startsWith(KLIB_MODULE_NAME) }) {
-            add("$KLIB_MODULE_NAME=${project.klibModuleName(baseName)}")
+            add("$KLIB_MODULE_NAME=${project.moduleName(baseName)}")
         }
 
         if (compilation.platformType == KotlinPlatformType.wasm) {

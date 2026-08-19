@@ -20,18 +20,42 @@ FILE: structuralCast.kt
     public final fun checkAny(df: R|org/jetbrains/kotlinx/dataframe/DataFrame<*>|): R|kotlin/Unit| {
         R|<local>/df|.R|org/jetbrains/kotlinx/dataframe/api/cast|<R|org/jetbrains/kotlinx/dataframe/B|>()
     }
+    public final fun checkEmptySchema(): R|kotlin/Unit| {
+        R|kotlin/run|<R|org/jetbrains/kotlinx/dataframe/DataFrame<<local>/DataFrameOf_89>|>(<L> = fun <anonymous>(): R|org/jetbrains/kotlinx/dataframe/DataFrame<<local>/DataFrameOf_89>| <inline=Inline, kind=EXACTLY_ONCE>  {
+            local abstract class DataFrameOf_89I : R|kotlin/Any| {
+                public constructor(): R|<local>/DataFrameOf_89I|
+
+            }
+
+            local final class DataFramePropertiesScope0 : R|kotlin/Any| {
+                public constructor(): R|<local>/DataFramePropertiesScope0|
+
+            }
+
+            local abstract class DataFrameOf_89 : R|<local>/DataFrameOf_89I| {
+                @R|org/jetbrains/kotlinx/dataframe/annotations/ScopeProperty|() public abstract val dataFramePropertiesScope0: R|<local>/DataFramePropertiesScope0|
+                    public get(): R|<local>/DataFramePropertiesScope0|
+
+                public constructor(): R|<local>/DataFrameOf_89|
+
+            }
+
+            ^ R|org/jetbrains/kotlinx/dataframe/api/dataFrameOf|(vararg(<strcat>(String(a), String(b)).R|kotlin/to|<R|kotlin/String|, R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|>(R|org/jetbrains/kotlinx/dataframe/api/columnOf|<R|kotlin/Int|>(vararg(Int(123))))))
+        }
+        ).R|org/jetbrains/kotlinx/dataframe/api/cast|<R|org/jetbrains/kotlinx/dataframe/A|>()
+    }
 FILE: org/jetbrains/kotlinx/dataframe/__GENERATED__CALLABLES__.kt
     package org.jetbrains.kotlinx.dataframe
 
     public final val R|org/jetbrains/kotlinx/dataframe/DataRow<org/jetbrains/kotlinx/dataframe/A>|.a: R|kotlin/Int|
-        public get(): R|kotlin/Int|
+        @R|kotlin/jvm/JvmName|(name = String(A_a)) public get(): R|kotlin/Int|
     public final val R|org/jetbrains/kotlinx/dataframe/ColumnsContainer<org/jetbrains/kotlinx/dataframe/A>|.a: R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
-        public get(): R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
+        @R|kotlin/jvm/JvmName|(name = String(A_a)) public get(): R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
     public final val R|org/jetbrains/kotlinx/dataframe/DataRow<org/jetbrains/kotlinx/dataframe/B>|.b: R|kotlin/Int|
-        public get(): R|kotlin/Int|
+        @R|kotlin/jvm/JvmName|(name = String(B_b)) public get(): R|kotlin/Int|
     public final val R|org/jetbrains/kotlinx/dataframe/ColumnsContainer<org/jetbrains/kotlinx/dataframe/B>|.b: R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
-        public get(): R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
+        @R|kotlin/jvm/JvmName|(name = String(B_b)) public get(): R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
     public final val R|org/jetbrains/kotlinx/dataframe/DataRow<org/jetbrains/kotlinx/dataframe/B>|.b1: R|kotlin/Int|
-        public get(): R|kotlin/Int|
+        @R|kotlin/jvm/JvmName|(name = String(B_b1)) public get(): R|kotlin/Int|
     public final val R|org/jetbrains/kotlinx/dataframe/ColumnsContainer<org/jetbrains/kotlinx/dataframe/B>|.b1: R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
-        public get(): R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|
+        @R|kotlin/jvm/JvmName|(name = String(B_b1)) public get(): R|org/jetbrains/kotlinx/dataframe/DataColumn<kotlin/Int>|

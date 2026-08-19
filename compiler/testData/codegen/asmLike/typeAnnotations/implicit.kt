@@ -1,9 +1,7 @@
 // EMIT_JVM_TYPE_ANNOTATIONS
 // RENDER_ANNOTATIONS
 // WITH_STDLIB
-
-// FIR_DIFFERENCE
-// With FIR, the backend generates lambdas via invokedynamic by default.
+// LANGUAGE: +JvmEnhancedBridges
 
 package foo
 

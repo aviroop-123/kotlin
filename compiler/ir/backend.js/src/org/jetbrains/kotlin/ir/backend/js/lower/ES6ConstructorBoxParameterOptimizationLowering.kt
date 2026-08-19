@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.ir.backend.js.lower
 
 import org.jetbrains.kotlin.backend.common.DeclarationTransformer
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.constructorFactory
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.ir.backend.js.utils.getVoid
 import org.jetbrains.kotlin.ir.backend.js.utils.irEmpty
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.isFullValueClass
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
@@ -27,7 +29,6 @@ import org.jetbrains.kotlin.ir.util.superClass
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
-import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 import org.jetbrains.kotlin.utils.filterIsInstanceAnd
 import org.jetbrains.kotlin.utils.memoryOptimizedFilterNot
 
@@ -70,6 +71,7 @@ private var IrSimpleFunction.replacementWithoutBoxParameter: IrSimpleFunction? b
  * }
  * ```
  */
+@PhasePrerequisites(ES6CollectConstructorsWhichNeedBoxParameters::class)
 class ES6ConstructorBoxParameterOptimizationLowering(private val context: JsIrBackendContext) : FileLoweringPass {
 
     override fun lower(irFile: IrFile) {
@@ -148,8 +150,8 @@ class ES6ConstructorBoxParameterOptimizationLowering(private val context: JsIrBa
     }
 
     private val IrCall.isSuperCallWithBoxParameter: Boolean
-        get() = symbol == context.intrinsics.jsCreateThisSymbol ||
-                symbol == context.intrinsics.jsCreateExternalThisSymbol ||
+        get() = symbol == context.symbols.jsCreateThisSymbol ||
+                symbol == context.symbols.jsCreateExternalThisSymbol ||
                 symbol.owner.isEs6ConstructorReplacement && symbol.owner.boxParameter != null
 
     private fun IrCall.replaceCalleeIfNeeded(): IrCall {
@@ -168,7 +170,7 @@ class ES6ConstructorBoxParameterOptimizationLowering(private val context: JsIrBa
         ).apply {
             copyAttributes(original)
             copyTypeArgumentsFrom(original)
-            for ((i, argument) in original.arguments.withIndex()) {
+            for ([i, argument] in original.arguments.withIndex()) {
                 // Don't copy the `box` argument
                 if (replacementWithBoxParameter.parameters[i].isBoxParameter) continue
                 arguments[i] = argument
@@ -189,7 +191,9 @@ class ES6CollectConstructorsWhichNeedBoxParameters(private val context: JsIrBack
 
         if (hasSuperClass && declaration.isInner) {
             declaration.markAsNeedsBoxParameter()
-        } else if (hasSuperClass && declaration.isOriginallyLocal && declaration.containsCapturedValues()) {
+        } else if (
+            hasSuperClass && (declaration.isOriginallyLocal || declaration.isFullValueClass) && declaration.containsCapturedValues()
+        ) {
             declaration.markAsNeedsBoxParameter()
         }
 

@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -38,7 +39,7 @@ KaNamedFunctionSymbol:
         typeArguments: []
         type: kotlin/Unit
     ]
-    type: {@R|Anno3|()  SecondTypeAlias=} @R|Anno1|()  @R|Anno2|()  @R|Anno3|()  kotlin/Function0<kotlin/Unit>
+    type: () -> kotlin/Unit
   typeParameters: []
   valueParameters: []
   visibility: PUBLIC
@@ -47,3 +48,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: foo

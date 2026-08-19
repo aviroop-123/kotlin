@@ -21,15 +21,12 @@ import org.jetbrains.kotlin.gradle.targets.js.nodejs.TasksRequirements
 import org.jetbrains.kotlin.gradle.targets.js.npm.*
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolver.KotlinRootNpmResolver
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolver.PACKAGE_JSON_UMBRELLA_TASK_NAME
-import org.jetbrains.kotlin.gradle.targets.js.npm.resolver.implementing
 import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmCachesSetup
 import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmInstallTask
 import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.RootPackageJsonTask
 import org.jetbrains.kotlin.gradle.targets.web.HasPlatformDisambiguator
-import org.jetbrains.kotlin.gradle.tasks.CleanDataTask
-import org.jetbrains.kotlin.gradle.tasks.CleanDataTask.Companion.deprecationMessage
-import org.jetbrains.kotlin.gradle.tasks.internal.CleanableStore
 import org.jetbrains.kotlin.gradle.tasks.registerTask
+import org.jetbrains.kotlin.gradle.tasks.withType
 import org.jetbrains.kotlin.gradle.utils.getFile
 import org.jetbrains.kotlin.gradle.utils.providerWithLazyConvention
 import kotlin.reflect.KClass
@@ -44,6 +41,7 @@ internal class NodeJsRootPluginApplier(
     private val lockFileDirectory: (projectDirectory: Directory) -> Directory,
     private val singleNodeJsPluginApply: (project: Project) -> BaseNodeJsEnvSpec,
     private val yarnPlugin: KClass<out Plugin<Project>>,
+    private val beforePackageManager: (project: Project) -> Unit = {},
     private val platformType: KotlinPlatformType,
 ) {
 
@@ -297,23 +295,16 @@ internal class NodeJsRootPluginApplier(
             listOf(npm.storePackageLockTaskProvider)
         ).disallowChanges()
 
+        @Suppress("DEPRECATION_ERROR")
         project.tasks.register(
             platformDisambiguate.extensionName(
-                "node" + CleanDataTask.NAME_SUFFIX,
+                "node" + org.jetbrains.kotlin.gradle.tasks.CleanDataTask.NAME_SUFFIX,
                 prefix = null,
             ),
-            CleanDataTask::class.java
-        ) {
-            it.doFirst {
-                it.logger.warn(deprecationMessage(it.path))
-            }
+            org.jetbrains.kotlin.gradle.tasks.CleanDataTask::class.java
+        ) {}
 
-            it.cleanableStoreProvider = nodeJs
-                .installationDirectory
-                .map { CleanableStore.Companion[it.asFile.path] }
-            it.group = NodeJsRootPlugin.TASKS_GROUP_NAME
-            it.description = "Clean unused local node version"
-        }
+        beforePackageManager(project)
 
         val propertiesProvider = PropertiesProvider.Companion(project)
 
@@ -364,8 +355,8 @@ internal class NodeJsRootPluginApplier(
         rootPackageJson: TaskProvider<RootPackageJsonTask>,
     ) {
         val fn: (Project) -> Unit = {
-            it.tasks.implementing(RequiresNpmDependencies::class)
-                .forEach {}
+            it.tasks.withType<RequiresNpmDependenciesTask>()
+                .forEach { _ -> }
         }
         rootPackageJson.configure {
             project.allprojects

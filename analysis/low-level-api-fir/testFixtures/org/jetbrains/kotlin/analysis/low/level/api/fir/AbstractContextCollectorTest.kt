@@ -1,15 +1,15 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.low.level.api.fir
 
 import org.jetbrains.kotlin.analysis.api.projectStructure.copyOrigin
-import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
+import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.AnalysisApiFirCustomScriptDefinitionTestConfigurator
-import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.AnalysisApiFirSourceTestConfigurator
+import org.jetbrains.kotlin.analysis.low.level.api.fir.test.configurators.LLSourceLikeTestConfigurator
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.ContextCollector
 import org.jetbrains.kotlin.analysis.test.framework.base.AbstractAnalysisApiBasedTest
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.KtTestModule
@@ -20,7 +20,6 @@ import org.jetbrains.kotlin.fir.declarations.FirTowerDataContext
 import org.jetbrains.kotlin.fir.renderer.FirDeclarationRendererWithAttributes
 import org.jetbrains.kotlin.fir.renderer.FirRenderer
 import org.jetbrains.kotlin.fir.renderer.FirResolvePhaseRenderer
-import org.jetbrains.kotlin.fir.resolve.dfa.RealVariable
 import org.jetbrains.kotlin.fir.scopes.*
 import org.jetbrains.kotlin.fir.scopes.impl.*
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
@@ -32,6 +31,7 @@ import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.assertions
+import org.jetbrains.kotlin.types.SmartcastStability
 
 abstract class AbstractContextCollectorTest : AbstractAnalysisApiBasedTest() {
     override fun doTestByMainFile(mainFile: KtFile, mainModule: KtTestModule, testServices: TestServices) {
@@ -41,7 +41,7 @@ abstract class AbstractContextCollectorTest : AbstractAnalysisApiBasedTest() {
         val fakeFile = createFileCopy(mainFile)
 
         performTestByMainFile(fakeFile, mainModule, testServices, testPrefixes = listOf("copy"), useBodyElement = false)
-        performTestByMainFile(fakeFile, mainModule, testServices, testPrefixes = listOf("body.copy", "copy"), useBodyElement = true)
+        performTestByMainFile(fakeFile, mainModule, testServices, testPrefixes = listOf("copy", "body.copy"), useBodyElement = true)
     }
 
     private fun createFileCopy(file: KtFile): KtFile {
@@ -93,12 +93,13 @@ private class FirDeclarationRendererWithPartialBodyResolveState : FirDeclaration
 internal object ElementContextRenderer {
     fun render(context: ContextCollector.Context, builder: StringBuilder) = with(builder) {
         renderTowerDataContext(context.towerDataContext)
+        renderExpressionStability(context.expressionStability)
         renderSmartCasts(context.smartCasts)
     }
 
     private fun StringBuilder.renderTowerDataContext(towerDataContext: FirTowerDataContext) {
         appendBlock("Tower Data Context:") {
-            for ((index, towerDataElement) in towerDataContext.towerDataElements.withIndex()) {
+            for ([index, towerDataElement] in towerDataContext.towerDataElements.withIndex()) {
                 appendBlock("Element $index") {
                     for (scope in towerDataElement.scope?.flatten().orEmpty()) {
                         appendBlock("Scope: " + scope.javaClass.simpleName) {
@@ -112,21 +113,6 @@ internal object ElementContextRenderer {
 
                             appendBlock {
                                 append("Type: ").appendType(implicitReceiver.type).appendLine()
-                            }
-                        }
-                    }
-
-                    towerDataElement.contextReceiverGroup?.takeIf { it.isNotEmpty() }?.let { contextReceiverValues ->
-                        appendBlock("Context receivers:") {
-                            for (contextReceiverValue in contextReceiverValues) {
-                                appendSymbol(contextReceiverValue.boundSymbol).appendLine()
-
-                                appendBlock {
-                                    append("Type: ").appendType(contextReceiverValue.type).appendLine()
-                                    contextReceiverValue.labelName?.let { labelName ->
-                                        append("Label: ").appendLine(labelName)
-                                    }
-                                }
                             }
                         }
                     }
@@ -153,7 +139,6 @@ internal object ElementContextRenderer {
     private fun StringBuilder.renderScope(scope: FirScope) {
         when (scope) {
             is FirDefaultSimpleImportingScope, is FirDefaultStarImportingScope -> {
-                Unit
                 // Skip to avoid fixing default imports in an unrelated test
             }
             is FirPackageMemberScope -> {
@@ -215,23 +200,31 @@ internal object ElementContextRenderer {
         }
     }
 
-    private fun StringBuilder.renderSmartCasts(smartCasts: Map<RealVariable, Set<ConeKotlinType>>) {
+    private fun StringBuilder.renderSmartCasts(smartCasts: List<ContextCollector.SmartCast>) {
         if (smartCasts.isEmpty()) {
             return
         }
 
         appendBlock("Smart Casts:") {
-            for ((realVariable, types) in smartCasts) {
-                appendSymbol(realVariable.symbol).appendLine()
+            for (smartCast in smartCasts) {
+                appendSymbol(smartCast.realVariable.symbol).appendLine()
+                append("Stability: ").append(smartCast.stability).appendLine()
 
                 appendBlock("Types:") {
-                    for (type in types) {
+                    for (type in smartCast.upperTypes) {
                         appendType(type).appendLine()
                     }
                 }
-
             }
         }
+    }
+
+    private fun StringBuilder.renderExpressionStability(stability: SmartcastStability?) {
+        if (stability == null) {
+            return
+        }
+
+        append("Expression Stability: ").append(stability).appendLine()
     }
 
     private fun StringBuilder.appendBlock(title: String? = null, block: StringBuilder.() -> Unit): StringBuilder {
@@ -282,11 +275,10 @@ private fun FirScope.flatten(): List<FirScope> {
 }
 
 abstract class AbstractContextCollectorSourceTest : AbstractContextCollectorTest() {
-    override val configurator: AnalysisApiTestConfigurator = AnalysisApiFirSourceTestConfigurator(analyseInDependentSession = false)
+    override val configurator: AnalysisApiTestConfigurator = LLSourceLikeTestConfigurator()
 }
 
 abstract class AbstractContextCollectorScriptTest : AbstractContextCollectorTest() {
     override val configurator: AnalysisApiTestConfigurator =
         AnalysisApiFirCustomScriptDefinitionTestConfigurator(analyseInDependentSession = false)
 }
-

@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.inline.InlineFunctionOrAccessor
 import org.jetbrains.kotlin.inline.InlinePropertyAccessor
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmMemberSignature
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import java.io.*
@@ -90,10 +91,10 @@ object FqNameExternalizer : DataExternalizer<FqName> {
 }
 
 object ClassIdExternalizer : DataExternalizer<ClassId> {
-
     override fun save(output: DataOutput, classId: ClassId) {
         FqNameExternalizer.save(output, classId.packageFqName)
         FqNameExternalizer.save(output, classId.relativeClassName)
+        @OptIn(ClassIdBasedLocality::class)
         output.writeBoolean(classId.isLocal)
     }
 
@@ -144,7 +145,7 @@ abstract class StringMapExternalizer<T> : DataExternalizer<Map<String, T>> {
     override fun save(output: DataOutput, map: Map<String, T>?) {
         output.writeInt(map!!.size)
 
-        for ((key, value) in map.entries) {
+        for ([key, value] in map.entries) {
             output.writeString(key)
             writeValue(output, value)
         }
@@ -373,7 +374,7 @@ open class MapExternalizer<K, V, M : Map<K, V>>(
 
     override fun save(output: DataOutput, map: M) {
         output.writeInt(map.size)
-        for ((key, value) in map) {
+        for ([key, value] in map) {
             keyExternalizer.save(output, key)
             valueExternalizer.save(output, value)
         }

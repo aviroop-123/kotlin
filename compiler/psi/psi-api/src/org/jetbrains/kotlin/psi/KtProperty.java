@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.KtNodeTypes;
 import org.jetbrains.kotlin.KtStubBasedElementTypes;
 import org.jetbrains.kotlin.lexer.KtTokens;
+import org.jetbrains.kotlin.psi.psiUtil.KtPsiUtilKt;
 import org.jetbrains.kotlin.psi.stubs.KotlinPropertyStub;
 import org.jetbrains.kotlin.psi.typeRefHelpers.TypeRefHelpersKt;
 
@@ -27,6 +28,16 @@ import static org.jetbrains.kotlin.KtNodeTypes.PROPERTY_DELEGATE;
 import static org.jetbrains.kotlin.lexer.KtTokens.EQ;
 import static org.jetbrains.kotlin.psi.psiUtil.KtPsiUtilKt.isKtFile;
 
+/**
+ * Represents a property declaration with an optional getter and setter.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ *    val name: String = "Kotlin"
+ * // ^_________________________^
+ * // The entire property
+ * }</pre>
+ */
 public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         implements KtVariableDeclaration {
 
@@ -55,14 +66,17 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         return getNode().findChildByType(KtTokens.VAR_KEYWORD) != null;
     }
 
+    /**
+     * Whether the property is local.
+     * <p>
+     * <b>Note</b>: a member property of a local class is not local
+     */
     public boolean isLocal() {
         return !isTopLevel() && !isMember();
     }
 
     public boolean isMember() {
-        PsiElement parent = getParent();
-        return parent instanceof KtClassOrObject || parent instanceof KtClassBody ||
-               parent instanceof KtBlockExpression && parent.getParent() instanceof KtScript;
+        return KtPsiUtilKt.getContainingClassOrScript(this) != null;
     }
 
     public boolean isTopLevel() {
@@ -88,6 +102,7 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
 
     @Override
     @Nullable
+    @SuppressWarnings("deprecation") // KT-78356
     public KtTypeReference getReceiverTypeReference() {
         KotlinPropertyStub stub = getGreenStub();
         if (stub != null) {
@@ -99,18 +114,6 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
             }
         }
         return getReceiverTypeRefByTree();
-    }
-
-    @NotNull
-    @Override
-    public List<KtContextReceiver> getContextReceivers() {
-        KtContextReceiverList contextReceiverList = getContextReceiverList();
-        if (contextReceiverList != null) {
-            return contextReceiverList.contextReceivers();
-        }
-        else {
-            return Collections.emptyList();
-        }
     }
 
     @Nullable
@@ -150,10 +153,15 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         return TypeRefHelpersKt.getTypeReference(this);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.setPropertyTypeReference(this, typeRef)}
+     * instead.
+     */
     @Override
     @Nullable
+    @Deprecated
     public KtTypeReference setTypeReference(@Nullable KtTypeReference typeRef) {
-        return TypeRefHelpersKt.setTypeReference(this, getNameIdentifier(), typeRef);
+        return KtPsiMutationService.getInstance().setPropertyTypeReference(this, typeRef);
     }
 
     @Nullable
@@ -269,39 +277,14 @@ public class KtProperty extends KtTypeParameterListOwnerStub<KotlinPropertyStub>
         return hasDelegateExpression() || hasInitializer();
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.setPropertyInitializer(this, initializer)}
+     * instead.
+     */
     @Nullable
+    @Deprecated
     public KtExpression setInitializer(@Nullable KtExpression initializer) {
-        KtExpression oldInitializer = getInitializer();
-
-        if (oldInitializer != null) {
-            if (initializer != null) {
-                return (KtExpression) oldInitializer.replace(initializer);
-            }
-            else {
-                PsiElement nextSibling = oldInitializer.getNextSibling();
-                PsiElement last =
-                        nextSibling != null
-                        && nextSibling.getNode() != null
-                        && nextSibling.getNode().getElementType() == KtTokens.SEMICOLON
-                        ? nextSibling : oldInitializer;
-
-                deleteChildRange(findChildByType(EQ), last);
-                return null;
-            }
-        }
-        else {
-            if (initializer != null) {
-                PsiElement addAfter = getTypeReference();
-                if (addAfter == null) {
-                    addAfter = getNameIdentifier();
-                }
-                PsiElement eq = addAfter(new KtPsiFactory(getProject()).createEQ(), addAfter);
-                return (KtExpression) addAfter(initializer, eq);
-            }
-            else {
-                return null;
-            }
-        }
+        return KtPsiMutationService.getInstance().setPropertyInitializer(this, initializer);
     }
 
     @Nullable

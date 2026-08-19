@@ -69,7 +69,7 @@ internal class KotlinStandaloneIndexBuilder private constructor(
 
         decompiledFilesFromBuiltins.forEach { rawIndex.indexStubRecursively(it) }
 
-        val (decompiledBuiltinsFilesFromBinaryRoots, decompiledFilesFromOtherFiles) = decompiledFilesFromBinaryRoots.partition { entry ->
+        val [decompiledBuiltinsFilesFromBinaryRoots, decompiledFilesFromOtherFiles] = decompiledFilesFromBinaryRoots.partition { entry ->
             entry.virtualFile.fileType == KotlinBuiltInFileType
         }
 
@@ -146,7 +146,7 @@ internal class KotlinStandaloneIndexBuilder private constructor(
         VfsUtilCore.visitChildrenRecursively(root, object : VirtualFileVisitor<Void>() {
             override fun visitFile(file: VirtualFile): Boolean {
                 if (!file.isDirectory) {
-                    val (sharedFile, ktFile) = findSharedDecompiledFile(file) ?: return true
+                    val [sharedFile, ktFile] = findSharedDecompiledFile(file) ?: return true
                     processor(sharedFile, ktFile)
                 }
 
@@ -209,8 +209,10 @@ internal class KotlinStandaloneIndexBuilder private constructor(
         }
 
         // This call is required to bind the view provider, its file and the psi manager together
-        viewProvider.forceCachedPsi(ktFile)
-        return IndexableFile(virtualFile = virtualFile, ktFile = ktFile, isShared = true)
+        return ApplicationManager.getApplication().runWriteAction<_> {
+            viewProvider.forceCachedPsi(ktFile)
+            IndexableFile(virtualFile = virtualFile, ktFile = ktFile, isShared = true)
+        }
     }
 
     private val decompiledFilesFromBuiltins = mutableSetOf<IndexableFile>()
@@ -224,7 +226,7 @@ internal class KotlinStandaloneIndexBuilder private constructor(
 
                 sharedFiles.mapTo(decompiledFilesFromBuiltins, this::materializeSharedDecompiledFile)
             } else {
-                val (_, ktFile) = findSharedDecompiledFile(virtualFile) ?: continue
+                val [_, ktFile] = findSharedDecompiledFile(virtualFile) ?: continue
                 decompiledFilesFromBuiltins += IndexableFile(virtualFile, ktFile, isShared = true)
             }
         }
@@ -275,6 +277,7 @@ private class IndexableFile(
  */
 private val KtFile.forcedStub: KotlinFileStubImpl
     get() {
+        @Suppress("DEPRECATION") // KT-78356
         val stubTree = greenStubTree ?: calcStubTree()
         return stubTree.root as KotlinFileStubImpl
     }

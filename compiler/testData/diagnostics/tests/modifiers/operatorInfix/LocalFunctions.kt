@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_PARAMETER
 
 class Example
@@ -11,14 +10,14 @@ operator infix fun Example.times(other: Example) = 0
 fun Example.div(other: Example) = 0
 
 fun a() {
-    with (Example()) {
+    <!CANNOT_INFER_PARAMETER_TYPE!>with<!> (Example()) {
         operator infix fun Example.plus(other: Example) = ""
         fun Example.minus(other: Example) = ""
 
         operator infix fun Example.times(other: Example) = ""
         fun Example.div(other: Example) = ""
 
-        with (Example()) {
+        <!CANNOT_INFER_PARAMETER_TYPE!>with<!> (Example()) {
             val a = Example()
             val b = Example()
 
@@ -29,10 +28,10 @@ fun a() {
             consumeInt(a minus b)
 
             a * b
-            a <!OPERATOR_MODIFIER_REQUIRED!>/<!> b
+            a <!NONE_APPLICABLE!>/<!> b
 
             a times b
-            a <!INFIX_MODIFIER_REQUIRED!>div<!> b
+            a <!NONE_APPLICABLE!>div<!> b
         }
     }
 }

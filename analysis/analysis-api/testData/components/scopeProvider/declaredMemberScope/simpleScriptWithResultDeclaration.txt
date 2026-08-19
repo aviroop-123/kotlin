@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -35,11 +36,15 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
+      isCompanion: false
       isCrossinline: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isImplicitLambdaParameter: false
       isNoinline: false
       isVal: true
@@ -57,12 +62,13 @@ KaNamedFunctionSymbol:
             typeArguments: []
             type: kotlin/Int
         ]
-        type: kotlin/Function0<kotlin/Int>
+        type: () -> kotlin/Int
       visibility: PUBLIC
       getContainingFileSymbol: KaFileSymbol(simpleScriptWithResultDeclaration.kts)
       getContainingJvmClassName: null
       getContainingModule: KaScriptModule "Script simpleScriptWithResultDeclaration.kts"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getContainingFileSymbol: KaFileSymbol(simpleScriptWithResultDeclaration.kts)
@@ -70,6 +76,8 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaScriptModule "Script simpleScriptWithResultDeclaration.kts"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: foo
 
 KaKotlinPropertySymbol:
   annotations: []
@@ -85,8 +93,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -104,13 +114,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: null
     getContainingModule: KaScriptModule "Script simpleScriptWithResultDeclaration.kts"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: true
   hasGetter: true
   hasSetter: false
   initializer: KaNonConstantInitializerValue(foo { ...)
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -135,8 +147,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: null
   getContainingModule: KaScriptModule "Script simpleScriptWithResultDeclaration.kts"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: get$$result
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: $$result

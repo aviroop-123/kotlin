@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.backend.common.lower
 
 import org.jetbrains.kotlin.backend.common.CommonBackendContext
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
-import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
@@ -33,7 +32,7 @@ import org.jetbrains.kotlin.utils.memoryOptimizedPlus
  * This is needed to avoid creating fake overrides of declarations at later state.
  * @see org.jetbrains.kotlin.ir.overrides.IrFakeOverrideBuilder.buildFakeOverridesForClassUsingOverriddenSymbols for more details.
  */
-internal var IrClass.declarationsAtFunctionReferenceLowering: List<IrDeclaration>? by irAttribute(copyByDefault = true)
+var IrClass.declarationsAtFunctionReferenceLowering: List<IrDeclaration>? by irAttribute(copyByDefault = true)
 
 /**
  * This lowering transforms [IrRichFunctionReference] nodes to an anonymous class.
@@ -135,35 +134,6 @@ abstract class AbstractFunctionReferenceLowering<C : CommonBackendContext>(val c
         }, null)
     }
 
-    // SAM class used as a superclass can sometimes have type projections.
-    // But that's not suitable for super-types, so we erase them
-    protected fun IrType.removeProjections(): IrType {
-        if (this !is IrSimpleType) return this
-        val arguments = arguments.mapIndexed { index, argument ->
-            val typeParameter = (classifier as IrClassSymbol).owner.typeParameters[index]
-            fun erasedUpperBound() = typeParameter.erasedUpperBound.defaultType
-
-            // Star projections are not allowed in supertype clause
-            if (argument !is IrTypeProjection) return@mapIndexed erasedUpperBound()
-
-            // `in` and `out` projections are not allowed either
-            if (argument.variance != Variance.INVARIANT) return@mapIndexed erasedUpperBound()
-
-            // In case a lambda parameter's type is inferred by the frontend to an intersection type, in IR
-            // it will be approximated to `Nothing` (because intersection types are not representable in IR at all).
-            // Since function parameters are contravariant, `Nothing` is the only type we can approximate an intersection type to.
-            // We cannot use `Nothing` as a parameter type, though —
-            // semantically it would mean that such a function reference can never be invoked, which is not true.
-            // Some targets like Wasm can break because of this.
-            // That's why we treat such type arguments similarly to type projections.
-            // For a concrete example, see this test: compiler/testData/codegen/box/callableReference/kt49526_sam.kt
-            if (typeParameter.variance == Variance.IN_VARIANCE && argument.type.isNothing()) return@mapIndexed erasedUpperBound()
-
-            argument.type
-        }
-        return classifier.typeWith(arguments)
-    }
-
     private fun buildClass(functionReference: IrRichFunctionReference, parent: IrDeclarationParent): IrClass {
         val functionReferenceClass = context.irFactory.buildClass {
             startOffset = functionReference.startOffset
@@ -175,10 +145,10 @@ abstract class AbstractFunctionReferenceLowering<C : CommonBackendContext>(val c
             this.parent = parent
             createThisReceiverParameter()
         }
-        val superClass = getSuperClassType(functionReference)
+        val superClassType = getSuperClassType(functionReference)
         val superInterfaceType = functionReference.type.removeProjections()
         functionReferenceClass.superTypes =
-            listOf(superClass, superInterfaceType) memoryOptimizedPlus getAdditionalInterfaces(functionReference)
+            listOf(superClassType, superInterfaceType) memoryOptimizedPlus getAdditionalInterfaces(functionReference)
         val constructor = functionReferenceClass.addConstructor {
             origin = getConstructorOrigin(functionReference)
             isPrimary = true
@@ -193,7 +163,7 @@ abstract class AbstractFunctionReferenceLowering<C : CommonBackendContext>(val c
                 }
             } + getExtraConstructorParameters(this, functionReference)
             body = context.createIrBuilder(symbol, this.startOffset, this.endOffset).irBlockBody {
-                +generateSuperClassConstructorCall(this@apply, superClass, functionReference)
+                +generateSuperClassConstructorCall(this@apply, superClassType, functionReference)
                 +IrInstanceInitializerCallImpl(this.startOffset, this.endOffset, functionReferenceClass.symbol, context.irBuiltIns.unitType)
             }
         }
@@ -234,6 +204,10 @@ abstract class AbstractFunctionReferenceLowering<C : CommonBackendContext>(val c
         return functionReferenceClass
     }
 
+    /**
+     * This function is very similar to [org.jetbrains.kotlin.backend.jvm.lower.FunctionReferenceLowering.FunctionReferenceBuilder.createInvokeMethod].
+     * If you make any changes, don't forget to also change the other one.
+     */
     private fun buildInvokeMethod(
         functionReference: IrRichFunctionReference,
         functionReferenceClass: IrClass,
@@ -264,25 +238,31 @@ abstract class AbstractFunctionReferenceLowering<C : CommonBackendContext>(val c
             )
 
             val nonDispatchParameters = superFunction.nonDispatchParameters.mapIndexed { i, superParameter ->
+                val oldParameter = invokeFunction.parameters[i + boundFields.size]
                 superParameter.copyTo(
                     this,
-                    startOffset = if (isLambda) invokeFunction.parameters[i].startOffset else UNDEFINED_OFFSET,
-                    endOffset = if (isLambda) invokeFunction.parameters[i].endOffset else UNDEFINED_OFFSET,
-                    name = invokeFunction.parameters[i].name,
+                    startOffset = if (isLambda) oldParameter.startOffset else UNDEFINED_OFFSET,
+                    endOffset = if (isLambda) oldParameter.endOffset else UNDEFINED_OFFSET,
+                    name = oldParameter.name,
                     type = typeSubstitutor.substitute(superParameter.type),
                     defaultValue = null,
-                )
+                ).apply { copyAnnotationsFrom(oldParameter) }
             }
             this.parameters += nonDispatchParameters
-            overriddenSymbols += superFunction.symbol
+            val overriddenMethodOfAny = superFunction.findOverriddenMethodOfAny()
+            overriddenSymbols = if (overriddenMethodOfAny == null)
+                listOf(superFunction.symbol)
+            else functionReferenceClass.superTypes.mapNotNull { superType ->
+                superType.classOrFail.owner.functions.firstOrNull { it.overrides(overriddenMethodOfAny) }?.symbol
+            }
 
             val builder = context.createIrBuilder(symbol).applyIf(isLambda) { at(invokeFunction.body!!) }
             body = builder.irBlockBody {
                 val variablesMapping = buildMap {
-                    for ((index, field) in boundFields.withIndex()) {
+                    for ([index, field] in boundFields.withIndex()) {
                         put(invokeFunction.parameters[index], irTemporary(irGetField(irGet(dispatchReceiverParameter!!), field)))
                     }
-                    for ((index, parameter) in nonDispatchParameters.withIndex()) {
+                    for ([index, parameter] in nonDispatchParameters.withIndex()) {
                         val invokeParameter = invokeFunction.parameters[index + boundFields.size]
                         if (parameter.type != invokeParameter.type) {
                             put(invokeParameter, irTemporary(irGet(parameter).implicitCastTo(invokeParameter.type)))

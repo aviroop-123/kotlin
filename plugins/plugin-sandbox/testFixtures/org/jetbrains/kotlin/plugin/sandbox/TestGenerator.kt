@@ -5,12 +5,21 @@
 
 package org.jetbrains.kotlin.plugin.sandbox
 
-import org.jetbrains.kotlin.generators.generateTestGroupSuiteWithJUnit5
+import org.jetbrains.kotlin.generators.dsl.junit5.generateTestGroupSuiteWithJUnit5
+import org.jetbrains.kotlin.generators.model.annotation
+import org.jetbrains.kotlin.generators.tests.provider
+import org.jetbrains.kotlin.generators.tests.standalone
+import org.jetbrains.kotlin.generators.tests.standaloneNoTR
+import org.jetbrains.kotlin.konan.test.blackbox.AbstractNativeCodegenBoxTest
+import org.jetbrains.kotlin.konan.test.blackbox.support.EnforcedHostTarget
+import org.jetbrains.kotlin.konan.test.blackbox.support.group.UseExtTestCaseGroupProvider
 import org.jetbrains.kotlin.test.utils.CUSTOM_TEST_DATA_EXTENSION_PATTERN
+import org.junit.jupiter.api.Tag
 
-fun main() {
-    generateTestGroupSuiteWithJUnit5 {
-        testGroup("plugins/plugin-sandbox/tests-gen", "plugins/plugin-sandbox/testData") {
+fun main(args: Array<String>) {
+    val testsRoot = args[0]
+    generateTestGroupSuiteWithJUnit5(args) {
+        testGroup(testsRoot, "plugins/plugin-sandbox/testData") {
             testClass<AbstractFirPsiPluginDiagnosticTest> {
                 model("diagnostics", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
             }
@@ -23,11 +32,11 @@ fun main() {
                 model("box", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
             }
 
-            testClass<AbstractFirJsLightTreePluginBlackBoxCodegenTest> {
+            testClass<AbstractJsLightTreePluginBlackBoxCodegenTest> {
                 model("box", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
             }
 
-            testClass<AbstractFirJsLightTreePluginBlackBoxCodegenWithSeparateKmpCompilationTest> {
+            testClass<AbstractJsLightTreePluginBlackBoxCodegenWithSeparateKmpCompilationTest> {
                 model("box", excludedPattern = CUSTOM_TEST_DATA_EXTENSION_PATTERN)
             }
 
@@ -35,12 +44,24 @@ fun main() {
                 model("firLoadK2Compiled")
             }
 
-            testClass<AbstractFirLoadK2CompiledWithPluginJsKotlinTest> {
+            testClass<AbstractLoadCompiledWithPluginJsKotlinTest> {
                 model("firLoadK2Compiled")
             }
 
             testClass<AbstractFirMetadataPluginSandboxTest> {
                 model("metadata")
+            }
+
+            testClass<AbstractNativeCodegenBoxTest>(
+                suiteTestClassName = "PluginSandboxNativeTestGenerated",
+                annotations = listOf(
+                    standalone(),
+                    annotation(Tag::class.java, "sandbox-native"),
+                    provider<UseExtTestCaseGroupProvider>(),
+                    provider<EnforcedHostTarget>(),
+                )
+            ) {
+                model("box")
             }
         }
     }

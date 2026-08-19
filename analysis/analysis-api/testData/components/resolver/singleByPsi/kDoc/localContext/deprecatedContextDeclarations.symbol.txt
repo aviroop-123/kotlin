@@ -1,0 +1,49 @@
+<caret_1>:
+  KDocName(8,22): 'conPropWarning'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val conPropWarning: kotlin.Int
+      ]
+
+<caret_2>:
+  KDocName(28,40): 'conPropError'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val conPropError: kotlin.Int
+      ]
+
+<caret_3>:
+  KDocName(46,59): 'conPropHidden'
+    null
+
+<caret_4>:
+  KDocName(65,76): 'propWarning'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val propWarning: kotlin.Int
+      ]
+
+<caret_5>:
+  KDocName(82,91): 'propError'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        val propError: kotlin.Int
+      ]
+
+<caret_6>:
+  KDocName(97,107): 'propHidden'
+    null
+
+<caret_7>:
+  KDocName(632,634): 'AA'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        /AA
+      ]
+
+<caret_8>:
+  KDocName(644,656): 'hiddenConPar'
+    KaSymbolResolutionSuccess:
+      symbols = [
+        hiddenConPar: kotlin.Int
+      ]

@@ -8,8 +8,10 @@ package org.jetbrains.kotlin.fir.scopes
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSessionComponent
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
+import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirVariable
+import org.jetbrains.kotlin.fir.declarations.utils.hasExplicitBackingField
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.resolve.transformers.ReturnTypeCalculator
 import org.jetbrains.kotlin.fir.scopes.impl.FirTypeIntersectionScopeContext.ResultOfIntersection
@@ -147,8 +149,8 @@ class FirOverrideService(val session: FirSession) : FirSessionComponent {
         }
 
         return when (aFir) {
-            is FirSimpleFunction -> {
-                require(bFir is FirSimpleFunction) { "b is " + bFir.javaClass }
+            is FirNamedFunction -> {
+                require(bFir is FirNamedFunction) { "b is " + bFir.javaClass }
                 byVisibilityAndType
             }
 
@@ -160,7 +162,14 @@ class FirOverrideService(val session: FirSession) : FirSessionComponent {
                 // the other var, or both are vars of different types.
                 if (aFir.isVar && !aSubtypesB) return null
                 if (bFir.isVar && !bSubtypesA) return null
-                merge(aFir.isVar, bFir.isVar, byVisibilityAndType)
+
+                val byExplicitBackingField = merge(
+                    preferA = aFir is FirProperty && aFir.hasExplicitBackingField,
+                    preferB = bFir is FirProperty && bFir.hasExplicitBackingField,
+                    previous = byVisibilityAndType,
+                ) ?: return null
+
+                merge(aFir.isVar, bFir.isVar, byExplicitBackingField)
             }
 
             else -> throw IllegalArgumentException("Unexpected callable: " + aFir.javaClass)

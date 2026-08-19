@@ -1,3 +1,0 @@
-KtNameReferenceExpression(74,77): 'Foo'
-  KtSimpleNameReference:
-    (in Foo) constructor <T : MyClass>(x: T)

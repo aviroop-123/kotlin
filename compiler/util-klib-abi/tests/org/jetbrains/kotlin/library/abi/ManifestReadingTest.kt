@@ -8,8 +8,8 @@ package org.jetbrains.kotlin.library.abi
 import com.intellij.openapi.util.io.FileUtil.createTempDirectory
 import org.jetbrains.kotlin.library.*
 import org.jetbrains.kotlin.library.impl.BuiltInsPlatform
-import org.jetbrains.kotlin.library.impl.KotlinLibraryLayoutForWriter
-import org.jetbrains.kotlin.library.impl.KotlinLibraryWriterImpl
+import org.jetbrains.kotlin.library.writer.KlibWriter
+import org.jetbrains.kotlin.library.writer.includeIr
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -17,8 +17,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInfo
 import java.io.File
-import java.util.*
-import org.jetbrains.kotlin.konan.file.File as KFile
 
 @OptIn(ExperimentalLibraryAbiReader::class)
 class ManifestReadingTest {
@@ -51,6 +49,14 @@ class ManifestReadingTest {
                     LibraryTarget.Native("ios_simulator_arm64"),
                     LibraryTarget.Native("macos_arm64"),
                     LibraryTarget.Native("macos_x64"),
+                ),
+                compilerVersion = null,
+                abiVersion = null,
+                irProviderName = null
+            ),
+            "sample-library-3" to LibraryManifest(
+                platform = BuiltInsPlatform.WASM.name,
+                platformTargets = listOf(
                     LibraryTarget.WASM("wasm-js"),
                     LibraryTarget.WASM("wasm-wasi"),
                 ),
@@ -60,7 +66,7 @@ class ManifestReadingTest {
             ),
         )
 
-        testData.forEach { (libraryName, originalManifest) ->
+        testData.forEach { [libraryName, originalManifest] ->
             val libraryFile = createEmptyLibraryWithSpecificManifest(libraryName, originalManifest)
             val readManifest = LibraryAbiReader.readAbiInfo(libraryFile).manifest
 
@@ -70,43 +76,36 @@ class ManifestReadingTest {
     }
 
     private fun createEmptyLibraryWithSpecificManifest(libraryName: String, libraryManifest: LibraryManifest): File {
-        val libraryVersioning = KotlinLibraryVersioning(
-            compilerVersion = libraryManifest.compilerVersion,
-            abiVersion = libraryManifest.abiVersion?.parseKotlinAbiVersion(),
-            metadataVersion = null
-        )
-        val builtInsPlatform = libraryManifest.platform?.let(BuiltInsPlatform::parseFromString)
+        val libraryFile = buildDir.resolve("$libraryName.klib")
+
+        val platform = libraryManifest.platform?.let(BuiltInsPlatform::parseFromString)
             ?: error("Unknown platform: ${libraryManifest.platform}")
 
-        val libraryFile = buildDir.resolve("$libraryName.klib")
-        val libraryKFile = KFile(libraryFile.absolutePath)
+        val targetNames = when (platform) {
+            BuiltInsPlatform.NATIVE -> libraryManifest.platformTargets.filterIsInstance<LibraryTarget.Native>().map { it.name }
+            BuiltInsPlatform.WASM -> libraryManifest.platformTargets.filterIsInstance<LibraryTarget.WASM>().map { it.name }
+            else -> emptyList()
+        }
 
-        val libraryLayout = KotlinLibraryLayoutForWriter(libraryKFile, libraryKFile)
-        val library = KotlinLibraryWriterImpl(
-            moduleName = libraryName,
-            versions = libraryVersioning,
-            builtInsPlatform = builtInsPlatform,
-            nativeTargets = libraryManifest.platformTargets.filterIsInstance<LibraryTarget.Native>().map { it.name },
-            nopack = true,
-            shortName = libraryName,
-            layout = libraryLayout
-        )
-
-        library.addManifestAddend(
-            Properties().apply {
-                val wasmTargets = libraryManifest.platformTargets.filterIsInstance<LibraryTarget.WASM>()
-                if (wasmTargets.isNotEmpty()) {
-                    this[KLIB_PROPERTY_WASM_TARGETS] = wasmTargets.joinToString(" ") { it.name }
-                }
-
-                libraryManifest.irProviderName?.let { irProviderName ->
-                    this[KLIB_PROPERTY_IR_PROVIDER] = irProviderName
+        KlibWriter {
+            manifest {
+                moduleName(libraryName)
+                versions(
+                    KotlinLibraryVersioning(
+                        compilerVersion = libraryManifest.compilerVersion,
+                        abiVersion = libraryManifest.abiVersion?.parseKotlinAbiVersion(),
+                        metadataVersion = null
+                    )
+                )
+                platformAndTargets(platform, targetNames)
+                customProperties {
+                    libraryManifest.irProviderName?.let { irProviderName ->
+                        this[KLIB_PROPERTY_IR_PROVIDER] = irProviderName
+                    }
                 }
             }
-        )
-
-        library.addIr(SerializedIrModule(files = emptyList(), fileWithPreparedInlinableFunctions = null)) // Empty library.
-        library.commit()
+            includeIr(SerializedIrModule(files = emptyList(), fileWithPreparedInlinableFunctions = null)) // empty IR
+        }.writeTo(libraryFile.absolutePath)
 
         return libraryFile
     }

@@ -1,5 +1,3 @@
-// IGNORE_BACKEND_K1: ANY
-
 lateinit var result: String
 
 fun foo(x: Int, y: Any): Int {

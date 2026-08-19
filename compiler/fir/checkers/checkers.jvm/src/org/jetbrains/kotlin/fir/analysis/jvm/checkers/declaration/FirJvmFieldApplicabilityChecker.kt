@@ -19,11 +19,13 @@ import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.classKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirPropertyChecker
-import org.jetbrains.kotlin.fir.analysis.checkers.declaration.needsMultiFieldValueClassFlattening
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.needsJvmInlineMultiFieldValueClassFlattening
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors
+import org.jetbrains.kotlin.fir.analysis.isInlineClassThatRequiresMangling
 import org.jetbrains.kotlin.fir.containingClassLookupTag
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.*
+import org.jetbrains.kotlin.fir.isDisabled
 import org.jetbrains.kotlin.fir.isEnabled
 import org.jetbrains.kotlin.fir.resolve.getContainingDeclaration
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
@@ -36,6 +38,9 @@ import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_MULTIFILE_CLASS_ID
 import org.jetbrains.kotlin.name.StandardClassIds
 
 object FirJvmFieldApplicabilityChecker : FirPropertyChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirProperty) {
         val session = context.session
@@ -61,7 +66,7 @@ object FirJvmFieldApplicabilityChecker : FirPropertyChecker(MppCheckerKind.Commo
             containingClassSymbol == null && isInsideJvmMultifileClassFile() ->
                 TOP_LEVEL_PROPERTY_OF_MULTIFILE_FACADE
             declaration.returnTypeRef.isInlineClassThatRequiresMangling(session) -> RETURN_TYPE_IS_VALUE_CLASS
-            declaration.returnTypeRef.needsMultiFieldValueClassFlattening(session) -> RETURN_TYPE_IS_VALUE_CLASS
+            declaration.returnTypeRef.needsJvmInlineMultiFieldValueClassFlattening(session) -> RETURN_TYPE_IS_VALUE_CLASS
             containingClassSymbol?.classKind == ClassKind.ANNOTATION_CLASS -> ANNOTATION
             declaration.hasExplicitBackingField -> PROPERTY_WITH_EXPLICIT_FIELD
             else -> return
@@ -70,7 +75,7 @@ object FirJvmFieldApplicabilityChecker : FirPropertyChecker(MppCheckerKind.Commo
         val factory = when {
             problem == ANNOTATION -> {
                 when {
-                    !ForbidJvmAnnotationsOnAnnotationParameters.isEnabled() ->
+                    ForbidJvmAnnotationsOnAnnotationParameters.isDisabled() ->
                         FirJvmErrors.INAPPLICABLE_JVM_FIELD_WARNING
                     ForbidFieldAnnotationsOnAnnotationParameters.isEnabled() ->
                         return
@@ -130,13 +135,4 @@ object FirJvmFieldApplicabilityChecker : FirPropertyChecker(MppCheckerKind.Commo
     private fun isInsideJvmMultifileClassFile(): Boolean {
         return context.containingFileSymbol?.hasAnnotation(JVM_MULTIFILE_CLASS_ID, context.session) == true
     }
-}
-
-fun FirTypeRef.isInlineClassThatRequiresMangling(session: FirSession): Boolean {
-    val symbol = this.coneType.toRegularClassSymbol(session) ?: return false
-    return symbol.isInlineOrValue && !symbol.isDontMangleClass()
-}
-
-private fun FirRegularClassSymbol.isDontMangleClass(): Boolean {
-    return this.classId == StandardClassIds.Result
 }

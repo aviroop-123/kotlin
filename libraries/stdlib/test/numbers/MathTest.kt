@@ -153,7 +153,7 @@ class DoubleMathTest {
             392890.22 to 73.24147345684439
         )
 
-        for ((x, result) in testingPairs) {
+        for ([x, result] in testingPairs) {
             assertEquals(result, cbrt(x), if (result.isFinite()) 2.0 * result.ulp else 0.0)
             assertEquals(cbrt(-x), -cbrt(x))
         }
@@ -249,7 +249,7 @@ class DoubleMathTest {
                 doubleArrayOf( 2.8,  2.0,  2.0,  3.0,  3.0),
                 doubleArrayOf(-2.8, -3.0, -2.0, -3.0, -2.0)
         )
-        for ((v, f, t, r, c) in data) {
+        for ([v, f, t, r, c] in data) {
             assertEquals(f, floor(v), "floor($v)")
             assertEquals(t, truncate(v), "truncate($v)")
             assertEquals(r, round(v), "round($v)")
@@ -524,7 +524,7 @@ class FloatMathTest {
             392890.22f to 73.24147f
         )
 
-        for ((x, result) in testingPairs) {
+        for ([x, result] in testingPairs) {
             assertEquals(result, cbrt(x), if (result.isFinite()) 2.0f * result.ulpCommon else 0.0f)
             assertEquals(cbrt(-x), -cbrt(x))
         }
@@ -616,7 +616,7 @@ class FloatMathTest {
                 floatArrayOf( 2.8F,  2.0F,  2.0F,  3.0F,  3.0F),
                 floatArrayOf(-2.8F, -3.0F, -2.0F, -3.0F, -2.0F)
         )
-        for ((v, f, t, r, c) in data) {
+        for ([v, f, t, r, c] in data) {
             assertEquals(f, floor(v), "floor($v)")
             assertEquals(t, truncate(v), "truncate($v)")
             assertEquals(r, round(v), "round($v)")
@@ -728,6 +728,15 @@ class IntegerMathTest {
         positives.forEach { assertEquals(it, it.absoluteValue) }
     }
 
+    @Test fun absoluteValue() {
+        assertEquals(Int.MIN_VALUE, Int.MIN_VALUE.absoluteValue)
+        assertEquals(Int.MIN_VALUE, abs(Int.MIN_VALUE))
+
+        for (value in intArrayOf(0, 1, 42, Int.MAX_VALUE)) {
+            assertEquals(value, (-value).absoluteValue)
+            assertEquals(value, abs(-value))
+        }
+    }
 
     @Test fun longSigns() {
         val negatives = listOf(Long.MIN_VALUE, -65536L, -1L)
@@ -740,5 +749,15 @@ class IntegerMathTest {
         assertEquals(Long.MIN_VALUE, Long.MIN_VALUE.absoluteValue)
 
         positives.forEach { assertEquals(it, it.absoluteValue) }
+    }
+
+    @Test fun longAbsoluteValue() {
+        assertEquals(Long.MIN_VALUE, Long.MIN_VALUE.absoluteValue)
+        assertEquals(Long.MIN_VALUE, abs(Long.MIN_VALUE))
+
+        for (value in longArrayOf(0L, 1L, 42L, Long.MAX_VALUE)) {
+            assertEquals(value, (-value).absoluteValue)
+            assertEquals(value, abs(-value))
+        }
     }
 }

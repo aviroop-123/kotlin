@@ -9,7 +9,6 @@ package org.jetbrains.kotlin.gradle.dependencyResolutionTests.tcs
 
 import org.jetbrains.kotlin.gradle.dependencyResolutionTests.mavenCentralCacheRedirector
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtension
-import org.jetbrains.kotlin.gradle.plugin.KotlinJsCompilerType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.ide.IdeMultiplatformImport
 import org.jetbrains.kotlin.gradle.util.applyMultiplatformPlugin
@@ -17,7 +16,7 @@ import org.jetbrains.kotlin.gradle.util.buildProject
 import org.jetbrains.kotlin.gradle.util.configureDefaults
 import org.jetbrains.kotlin.gradle.util.enableDependencyVerification
 import org.jetbrains.kotlin.gradle.utils.androidExtension
-import org.junit.Test
+import kotlin.test.Test
 import java.util.*
 
 class IdeSourceSetConstraintTest {
@@ -57,7 +56,7 @@ class IdeSourceSetConstraintTest {
     fun `test single target JS project`() {
         val project = buildMppProject()
         val kotlin = project.multiplatformExtension
-        kotlin.js(KotlinJsCompilerType.IR)
+        kotlin.js()
 
         val commonMain = kotlin.sourceSets.getByName("commonMain")
         val commonTest = kotlin.sourceSets.getByName("commonTest")
@@ -122,6 +121,7 @@ class IdeSourceSetConstraintTest {
         val project = buildMppProjectWithAndroidPlugin()
         val kotlin = project.multiplatformExtension
         kotlin.jvm()
+        @Suppress("DEPRECATION")
         kotlin.androidTarget()
 
         val commonMain = kotlin.sourceSets.getByName("commonMain")
@@ -289,7 +289,7 @@ class IdeSourceSetConstraintTest {
         val project = buildMppProject()
         val kotlin = project.multiplatformExtension
         kotlin.linuxX64("linux")
-        kotlin.js(KotlinJsCompilerType.IR)
+        kotlin.js()
 
         val commonMain = kotlin.sourceSets.getByName("commonMain")
         val commonTest = kotlin.sourceSets.getByName("commonTest")
@@ -353,7 +353,7 @@ class IdeSourceSetConstraintTest {
         kotlin.applyDefaultHierarchyTemplate()
 
         kotlin.jvm()
-        kotlin.js(KotlinJsCompilerType.IR)
+        kotlin.js()
         kotlin.linuxX64()
         kotlin.linuxArm64()
 

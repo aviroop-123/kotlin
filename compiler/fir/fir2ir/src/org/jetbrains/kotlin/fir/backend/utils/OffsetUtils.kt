@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.fir.psi
 import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularPropertySymbol
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -41,7 +42,7 @@ fun AbstractKtSourceElement?.startOffsetSkippingComments(keywordTokens: TokenSet
 
 internal inline fun <T : IrElement> FirElement.convertWithOffsets(f: (startOffset: Int, endOffset: Int) -> T): T {
     val tokenSet = when (this) {
-        is FirSimpleFunction -> FUNCTION_KEYWORD_TOKENS
+        is FirNamedFunction -> FUNCTION_KEYWORD_TOKENS
         is FirConstructor -> CONSTRUCTOR_KEYWORD_TOKENS
         is FirVariable -> VAL_VAR
         else -> null
@@ -65,10 +66,10 @@ internal fun <T : IrElement> FirPropertyAccessor?.convertWithOffsets(
      * Property offsets: <1>..<3>
      * Accessors offsets: <1>..<2>
      */
-    if (source?.kind == KtFakeSourceElementKind.DefaultAccessor) {
+    if (source?.kind is KtFakeSourceElementKind.DefaultAccessor) {
         val property = this.propertySymbol.fir
-        if (!property.isLocal) {
-            property.computeOffsetsWithoutInitializer()?.let { (startOffset, endOffset) ->
+        if (property.symbol is FirRegularPropertySymbol) {
+            property.computeOffsetsWithoutInitializer()?.let { [startOffset, endOffset] ->
                 return f(startOffset, endOffset)
             }
         }
@@ -86,7 +87,7 @@ internal inline fun <T : IrElement> KtSourceElement?.convertWithOffsets(
 
     if (
         isCompiledElement(psi) ||
-        this?.kind == KtFakeSourceElementKind.DataClassGeneratedMembers ||
+        this?.kind is KtFakeSourceElementKind.DataClassGeneratedMembers ||
         this?.kind == KtFakeSourceElementKind.ImplicitThisReceiverExpression ||
         this?.kind == KtFakeSourceElementKind.ImplicitContextParameterArgument
     ) {

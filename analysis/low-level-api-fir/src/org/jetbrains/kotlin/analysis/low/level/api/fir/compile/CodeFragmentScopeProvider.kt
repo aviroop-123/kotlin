@@ -76,7 +76,7 @@ class CodeFragmentScopeProvider(private val session: FirSession) : FirSessionCom
     private fun getForeignValuesScope(ktCodeFragment: KtCodeFragment, foreignValues: Map<String, String>): FirLocalScope {
         var result = FirLocalScope(session)
 
-        for ((variableNameString, typeDescriptor) in foreignValues) {
+        for ([variableNameString, typeDescriptor] in foreignValues) {
             val variableName = Name.identifier(variableNameString)
 
             val variable = buildProperty {
@@ -84,6 +84,7 @@ class CodeFragmentScopeProvider(private val session: FirSession) : FirSessionCom
                 moduleData = session.moduleData
                 origin = FirDeclarationOrigin.ForeignValue
                 status = FirResolvedDeclarationStatusImpl(Visibilities.Local, Modality.FINAL, EffectiveVisibility.Local)
+                isLocal = true
                 returnTypeRef = typeCache.getValue(typeDescriptor, ktCodeFragment)
                 deprecationsProvider = EmptyDeprecationsProvider
                 name = variableName

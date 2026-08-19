@@ -4,14 +4,14 @@
  */
 package org.jetbrains.kotlin.generators.model
 
-open class DelegatingTestClassModel(private val delegate: TestClassModel) : TestClassModel() {
+abstract class DelegatingTestClassModel(private val delegate: TestClassModel) : TestClassModel() {
     override val name: String
         get() = delegate.name
 
     override val innerTestClasses: Collection<TestClassModel>
         get() = delegate.innerTestClasses
 
-    override val methods: Collection<MethodModel>
+    override val methods: Collection<MethodModel<*>>
         get() = delegate.methods
 
     override val isEmpty: Boolean
@@ -28,4 +28,13 @@ open class DelegatingTestClassModel(private val delegate: TestClassModel) : Test
 
     override val tags: List<String>
         get() = delegate.tags
+
+    override val testKClass: Class<*>
+        get() = delegate.testKClass
+
+    override val isSmokeTest: Boolean
+        get() = delegate.isSmokeTest
+
+    override val smokeTestLimit: Int
+        get() = delegate.smokeTestLimit
 }

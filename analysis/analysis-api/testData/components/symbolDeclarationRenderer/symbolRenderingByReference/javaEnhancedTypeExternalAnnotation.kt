@@ -17,4 +17,4 @@ public class ClassWithExternalAnnotatedMembers {
 // FILE: main.kt
 import ClassWithExternalAnnotatedMembers
 
-fun test(a: ClassWithExternalAnnotatedMembers) = a.e<caret><caret_onAirContext>xternalNotNullMethod()
+fun test(a: ClassWithExternalAnnotatedMembers) = a.e<caret>xternalNotNullMethod()

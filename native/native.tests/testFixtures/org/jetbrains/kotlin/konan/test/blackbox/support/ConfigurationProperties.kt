@@ -29,9 +29,6 @@ internal enum class ProcessLevelProperty(shortName: String) {
 annotation class EnforcedProperty(val property: ClassLevelProperty, val propertyValue: String)
 
 @Target(AnnotationTarget.CLASS)
-annotation class EnforcedHostTarget
-
-@Target(AnnotationTarget.CLASS)
 internal annotation class AcceptablePropertyValues(val property: ClassLevelProperty, val acceptableValues: Array<String>)
 
 class EnforcedProperties(testClass: Class<*>) {
@@ -40,6 +37,9 @@ class EnforcedProperties(testClass: Class<*>) {
             this[it.property] = it.propertyValue
         }
         if (testClass.isAnnotationPresent(EnforcedHostTarget::class.java)) {
+            // Custom binary options might not be compatible with the host target.
+            // For example, this is the case for `macabi` property.
+            this[ClassLevelProperty.BINARY_OPTIONS] = ""
             this[ClassLevelProperty.TEST_TARGET] = HostManager.host.name
         }
     }
@@ -68,11 +68,11 @@ enum class ClassLevelProperty(val shortName: String) {
     GC_TYPE("gcType"),
     GC_SCHEDULER("gcScheduler"),
     ALLOCATOR("alloc"),
+    PAGED_ALLOCATOR("pagedAllocator"),
     CACHE_MODE("cacheMode"),
     EXECUTION_TIMEOUT("executionTimeout"),
     SANITIZER("sanitizer"),
     COMPILER_OUTPUT_INTERCEPTOR("compilerOutputInterceptor"),
-    PIPELINE_TYPE("pipelineType"),
     SHARED_TEST_EXECUTION("sharedTestExecution"),
     BINARY_LIBRARY_KIND("binaryLibraryKind"),
     C_INTERFACE_MODE("cInterfaceMode"),

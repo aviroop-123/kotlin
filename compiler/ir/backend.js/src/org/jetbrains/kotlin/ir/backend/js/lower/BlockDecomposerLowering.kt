@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.ir.backend.js.lower
 import org.jetbrains.kotlin.backend.common.BodyLoweringPass
 import org.jetbrains.kotlin.backend.common.compilationException
 import org.jetbrains.kotlin.backend.common.ir.isPure
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
@@ -15,6 +16,8 @@ import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.backend.js.JsCommonBackendContext
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrBuilder
+import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.JsSuspendFunctionWithGeneratorsLowering
+import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.JsSuspendFunctionsLowering
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
@@ -36,9 +39,10 @@ import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 /**
  * Transforms statement-like-expression nodes into pure-statement to make it easily transform into JS.
  */
+@PhasePrerequisites(TypeOperatorLowering::class, JsSuspendFunctionsLowering::class, JsSuspendFunctionWithGeneratorsLowering::class)
 class JsBlockDecomposerLowering(val context: JsIrBackendContext) : AbstractBlockDecomposerLowering(context) {
     override fun unreachableExpression(): IrExpression =
-        JsIrBuilder.buildCall(context.intrinsics.unreachable, context.irBuiltIns.nothingType)
+        JsIrBuilder.buildCall(context.symbols.unreachable, context.irBuiltIns.nothingType)
 }
 
 abstract class AbstractBlockDecomposerLowering(private val context: JsCommonBackendContext) : BodyLoweringPass {
@@ -407,7 +411,7 @@ class BlockDecomposerTransformer(
             }
 
             if (compositeCount == 0) {
-                val branches = results.memoryOptimizedMap { (cond, res, orig) ->
+                val branches = results.memoryOptimizedMap { [cond, res, orig] ->
                     when {
                         isElseBranch(orig) -> IrElseBranchImpl(orig.startOffset, orig.endOffset, cond, res)
                         else /* IrBranch */ -> IrBranchImpl(orig.startOffset, orig.endOffset, cond, res)
@@ -419,7 +423,7 @@ class BlockDecomposerTransformer(
             val block = IrBlockImpl(expression.startOffset, expression.endOffset, unitType, expression.origin)
 
             // TODO: consider decomposing only when it is really required
-            results.foldIndexed(block) { i, appendBlock, (cond, res, orig) ->
+            results.foldIndexed(block) { i, appendBlock, [cond, res, orig] ->
                 val condStatements = destructureComposite(cond)
                 val condValue = condStatements.last() as IrExpression
 
@@ -530,7 +534,7 @@ class BlockDecomposerTransformer(
             var compositesLeft = compositeCount
             val arguments = mutableListOf<IrExpression?>()
 
-            for ((index, arg) in oldArguments.withIndex()) {
+            for ([index, arg] in oldArguments.withIndex()) {
                 val value = if (arg is IrComposite) {
                     compositesLeft--
                     newStatements += arg.statements.run { subList(0, lastIndex) }
@@ -544,7 +548,7 @@ class BlockDecomposerTransformer(
                     value.isPure(anyVariable = false, symbols = context.symbols) -> value
                     else -> {
                         // TODO: do not wrap if value is pure (const, variable, etc)
-                        val (newArg, tempVar) = mapArgument(value)
+                        val [newArg, tempVar] = mapArgument(value)
                         newStatements += tempVar
                         newArg
                     }
@@ -610,7 +614,7 @@ class BlockDecomposerTransformer(
                 newStatements
             )
 
-            val arguments = expression.elements.withIndex().map { (i, v) ->
+            val arguments = expression.elements.withIndex().map { [i, v] ->
                 val expr = argumentsExpressions[i]!!
                 (v as? IrSpreadElement)?.run { IrSpreadElementImpl(startOffset, endOffset, expr) } ?: expr
             }
@@ -799,7 +803,7 @@ class BlockDecomposerTransformer(
             if (hasComposites) {
                 val irVar = makeTempVar(expression.type)
 
-                val newBranches = decomposedResults.memoryOptimizedMap { (branch, condition, result) ->
+                val newBranches = decomposedResults.memoryOptimizedMap { [branch, condition, result] ->
                     val newResult = wrap(result, irVar)
                     when {
                         isElseBranch(branch) -> IrElseBranchImpl(branch.startOffset, branch.endOffset, condition, newResult)
@@ -813,7 +817,7 @@ class BlockDecomposerTransformer(
 
                 return JsIrBuilder.buildComposite(expression.type, listOf(irVar, newWhen, JsIrBuilder.buildGetValue(irVar.symbol)))
             } else {
-                val newBranches = decomposedResults.memoryOptimizedMap { (branch, condition, result) ->
+                val newBranches = decomposedResults.memoryOptimizedMap { [branch, condition, result] ->
                     when {
                         isElseBranch(branch) -> IrElseBranchImpl(branch.startOffset, branch.endOffset, condition, result)
                         else /* IrBranch  */ -> IrBranchImpl(branch.startOffset, branch.endOffset, condition, result)

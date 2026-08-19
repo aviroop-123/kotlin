@@ -6,26 +6,43 @@
 package org.jetbrains.kotlin.fir.analysis.checkers.expression
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
+import org.jetbrains.kotlin.KtNodeTypes.TYPE_ARGUMENT_LIST
+import org.jetbrains.kotlin.KtSourceElement
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
+import org.jetbrains.kotlin.diagnostics.SourceElementPositioningStrategies
 import org.jetbrains.kotlin.diagnostics.reportOn
-import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.FirSessionComponent
+import org.jetbrains.kotlin.fir.*
+import org.jetbrains.kotlin.fir.analysis.checkers.FE10LikeConeSubstitutor
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
+import org.jetbrains.kotlin.fir.analysis.checkers.checkUpperBoundViolatedInLhsOfGetClass
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
+import org.jetbrains.kotlin.fir.analysis.checkers.typeParameterSymbols
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.analysis.getChild
-import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
+import org.jetbrains.kotlin.fir.declarations.utils.isInner
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.toResolvedTypeParameterSymbol
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
-import org.jetbrains.kotlin.fir.scopes.impl.toConeType
+import org.jetbrains.kotlin.fir.resolve.toSymbol
+import org.jetbrains.kotlin.fir.resolve.toTypeParameterSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
-import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.lexer.KtTokens.QUEST
 import org.jetbrains.kotlin.resolve.checkers.OptInNames
 
 object FirClassLiteralChecker : FirGetClassCallChecker(MppCheckerKind.Common) {
+
+    context(context: CheckerContext)
+    private val isGenericArrayAllowed: Boolean
+        get() = context.session.firGenericArrayClassLiteralSupport.isEnabled
+
+    context(context: CheckerContext)
+    private val areUselessTypeArgumentsForbidden: Boolean
+        get() = LanguageFeature.ForbidUselessTypeArgumentsIn25.isEnabled()
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(expression: FirGetClassCall) {
         val source = expression.source ?: return
@@ -50,11 +67,11 @@ object FirClassLiteralChecker : FirGetClassCallChecker(MppCheckerKind.Common) {
         val markedNullable = source.getChild(QUEST, depth = 1) != null
         val resolvedFullyExpandedType = argument.resolvedType.fullyExpandedType()
         val isNullable = markedNullable ||
-                (argument as? FirResolvedQualifier)?.isNullableLHSForCallableReference == true ||
+                (argument as? FirResolvedQualifier)?.isNullableLhsForCallableReference == true ||
                 resolvedFullyExpandedType.isMarkedNullable ||
-                resolvedFullyExpandedType.isNullableTypeParameter(context.session.typeContext)
+                resolvedFullyExpandedType.isNullableTypeParameter(isExpression = !argument.canBeDoubleColonLhsAsType)
         if (isNullable) {
-            if (argument.canBeDoubleColonLHSAsType) {
+            if (argument.canBeDoubleColonLhsAsType) {
                 reporter.reportOn(source, FirErrors.NULLABLE_TYPE_IN_CLASS_LITERAL_LHS)
             } else {
                 reporter.reportOn(
@@ -66,6 +83,19 @@ object FirClassLiteralChecker : FirGetClassCallChecker(MppCheckerKind.Common) {
             return
         }
 
+        if (!argument.canBeDoubleColonLhsAsType &&
+            LanguageFeature.ForbidClassLiteralWithPotentiallyNullableReifiedLhs.isDisabled() &&
+            resolvedFullyExpandedType.toTypeParameterSymbol()?.isReified == true &&
+            !resolvedFullyExpandedType.isMarkedNullable &&
+            resolvedFullyExpandedType.canBeNull(context.session)
+        ) {
+            reporter.reportOn(
+                argument.source,
+                FirErrors.EXPRESSION_OF_NULLABLE_TYPE_IN_CLASS_LITERAL_LHS_WARNING,
+                argument.resolvedType
+            )
+        }
+
         argument.safeAsTypeParameterSymbol?.let {
             if (!it.isReified) {
                 // E.g., fun <T: Any> foo(): Any = T::class
@@ -73,33 +103,19 @@ object FirClassLiteralChecker : FirGetClassCallChecker(MppCheckerKind.Common) {
             }
         }
 
-        if (argument !is FirResolvedQualifier) return
-        if (argument.typeArguments.isNotEmpty() && !resolvedFullyExpandedType.isAllowedInClassLiteral()) {
-            val symbol = argument.symbol
-            symbol?.lazyResolveToPhase(FirResolvePhase.TYPES)
-            // Among type parameter references, only count actual type parameter while discarding [FirOuterClassTypeParameterRef]
-            val expectedTypeArgumentSize = symbol?.ownTypeParameterSymbols?.size ?: 0
-            if (expectedTypeArgumentSize != argument.typeArguments.size) {
-                if (symbol != null) {
-                    reporter.reportOn(argument.source, FirErrors.WRONG_NUMBER_OF_TYPE_ARGUMENTS, expectedTypeArgumentSize, symbol)
-                }
-                return
-            }
-            reporter.reportOn(source, FirErrors.CLASS_LITERAL_LHS_NOT_A_CLASS)
-        }
+        reportTypeArguments(argument, resolvedFullyExpandedType, source)
     }
 
-    private fun ConeKotlinType.isNullableTypeParameter(context: ConeInferenceContext): Boolean {
+    context(context: CheckerContext)
+    private fun ConeKotlinType.isNullableTypeParameter(isExpression: Boolean): Boolean {
         if (this !is ConeTypeParameterType) return false
         val typeParameter = lookupTag.typeParameterSymbol
-        with(context) {
-            return !typeParameter.isReified &&
-                    // E.g., fun <T> f2(t: T): Any = t::class
-                    typeParameter.toConeType().isNullableType()
-        }
+        // E.g., fun <T> f2(t: T): Any = t::class
+        return canBeNull(context.session) &&
+                (!typeParameter.isReified || isExpression && LanguageFeature.ForbidClassLiteralWithPotentiallyNullableReifiedLhs.isEnabled())
     }
 
-    private val FirExpression.canBeDoubleColonLHSAsType: Boolean
+    private val FirExpression.canBeDoubleColonLhsAsType: Boolean
         get() {
             return this is FirResolvedQualifier ||
                     this is FirResolvedReifiedParameterReference ||
@@ -111,24 +127,127 @@ object FirClassLiteralChecker : FirGetClassCallChecker(MppCheckerKind.Common) {
             return (this as? FirQualifiedAccessExpression)?.calleeReference?.toResolvedTypeParameterSymbol()
         }
 
-    context(context: CheckerContext)
-    private fun ConeKotlinType.isAllowedInClassLiteral(): Boolean =
-        when (this) {
-            is ConeClassLikeType -> {
-                val isPlatformThatAllowsNonPrimitiveArrays = context.session.firGenericArrayClassLiteralSupport.isEnabled
-                if (isNonPrimitiveArray && isPlatformThatAllowsNonPrimitiveArrays) {
-                    typeArguments.none { typeArgument ->
-                        when (typeArgument) {
-                            is ConeStarProjection -> true
-                            is ConeKotlinTypeProjection -> !typeArgument.type.isAllowedInClassLiteral()
-                        }
-                    }
-                } else
-                    typeArguments.isEmpty()
+    /**
+     * Type arguments are only allowed in `Array` (not typealiases to `Array`!) on JVM.
+     *
+     * Without [LanguageFeature.ForbidUselessTypeArgumentsIn25], the following cases must produce deprecation warnings:
+     *  1. typealiases to non-generic classes with arbitrary non-zero number of type arguments;
+     *  2. typealiases to `Array` on JVM (with arbitrary non-zero number of type arguments);
+     *  3. reified type parameters with non-zero number of type arguments.
+     *
+     * Cases like `Array<Int, Int>::class` do not require deprecation since they produced internal error in backend.
+     *
+     * TODO: KT-84254. Here, just remove deprecation logic.
+     */
+    context(context: CheckerContext, reporter: DiagnosticReporter)
+    private fun reportTypeArguments(
+        argument: FirExpression,
+        fullyExpandedType: ConeKotlinType,
+        getClassSource: KtSourceElement,
+    ) {
+        if (argument is FirResolvedReifiedParameterReference) {
+            val argumentList = getClassSource.getChild(TYPE_ARGUMENT_LIST) ?: return
+            val diagnostic = if (!areUselessTypeArgumentsForbidden) {
+                FirErrors.TYPE_ARGUMENTS_NOT_ALLOWED_WARNING
+            } else {
+                FirErrors.TYPE_ARGUMENTS_NOT_ALLOWED
             }
-            is ConeTypeParameterType -> this.lookupTag.typeParameterSymbol.isReified
-            else -> false
+            reporter.reportOn(argumentList, diagnostic, "for type parameters")
+        } else if (argument is FirResolvedQualifier) {
+            val symbol = argument.symbol ?: return
+            if (argument.typeArguments.isNotEmpty()) {
+                val isAllowedGenericArray = fullyExpandedType.isAllowedGenericArrayTypeInClassLiteral()
+                val isTypeAliasToAllowedArray = symbol is FirTypeAliasSymbol && isAllowedGenericArray
+                val isDeprecationCase = symbol.isTypeAliasToNonGeneric || isTypeAliasToAllowedArray
+
+                if (!reportWrongNumberOfTypeArguments(
+                        argument,
+                        isDeprecationCase
+                    ) && (!isAllowedGenericArray || isTypeAliasToAllowedArray)
+                ) {
+                    val diagnostic = if (isDeprecationCase && !areUselessTypeArgumentsForbidden) {
+                        FirErrors.CLASS_LITERAL_LHS_NOT_A_CLASS_WARNING
+                    } else {
+                        FirErrors.CLASS_LITERAL_LHS_NOT_A_CLASS
+                    }
+                    reporter.reportOn(getClassSource, diagnostic)
+                    return
+                }
+            }
+            checkUpperBoundViolationsInTypeAlias(argument, symbol, fullyExpandedType)
         }
+    }
+
+    context(context: CheckerContext, reporter: DiagnosticReporter)
+    private tailrec fun reportWrongNumberOfTypeArguments(
+        qualifier: FirResolvedQualifier?,
+        deprecationCase: Boolean,
+    ): Boolean {
+        val symbol = qualifier?.symbol ?: return false
+        if (symbol.ownTypeParameterSymbols.size != qualifier.ownTypeArguments.size) {
+            val diagnostic = if (deprecationCase && !areUselessTypeArgumentsForbidden) {
+                FirErrors.WRONG_NUMBER_OF_TYPE_ARGUMENTS_IN_GET_CLASS_WARNING
+            } else {
+                FirErrors.WRONG_NUMBER_OF_TYPE_ARGUMENTS
+            }
+            reporter.reportOn(
+                qualifier.source,
+                diagnostic,
+                symbol.ownTypeParameterSymbols.size,
+                symbol,
+                positioningStrategy = SourceElementPositioningStrategies.TYPE_ARGUMENT_LIST_OR_WITHOUT_RECEIVER
+            )
+            return true
+        }
+        if (!symbol.isInner) return false
+        return reportWrongNumberOfTypeArguments(qualifier.explicitParent, deprecationCase)
+    }
+
+    context(checkerContext: CheckerContext)
+    private val FirClassLikeSymbol<*>.isTypeAliasToNonGeneric: Boolean
+        get() = this is FirTypeAliasSymbol && resolvedExpandedTypeRef.coneType.fullyExpandedType().typeArguments.isEmpty()
+
+    context(context: CheckerContext)
+    private fun ConeKotlinType.isAllowedGenericArrayTypeInClassLiteral(): Boolean {
+        return this is ConeClassLikeType &&
+                (isNonPrimitiveArray && isGenericArrayAllowed) &&
+                typeArguments.all { typeArgument ->
+                    when (typeArgument) {
+                        is ConeStarProjection -> false
+                        is ConeKotlinTypeProjection ->
+                            typeArgument.type.isAllowedTypeArgumentInClassLiteral()
+                    }
+                }
+    }
+
+    context(context: CheckerContext)
+    private fun ConeKotlinType.isAllowedTypeArgumentInClassLiteral(): Boolean {
+        return (this is ConeClassLikeType && typeArguments.isEmpty())
+                || (this is ConeTypeParameterType && lookupTag.typeParameterSymbol.isReified)
+                || isAllowedGenericArrayTypeInClassLiteral()
+    }
+
+    /**
+     * Sometimes, substituting type parameters of type alias with all stars results in upper bound violations.
+     * In this case, we report a warning.
+     */
+    context(context: CheckerContext, reporter: DiagnosticReporter)
+    private fun checkUpperBoundViolationsInTypeAlias(
+        argument: FirResolvedQualifier,
+        symbol: FirClassLikeSymbol<*>,
+        fullyExpandedType: ConeKotlinType,
+    ) {
+        if (symbol is FirTypeAliasSymbol) {
+            val typeParameterSymbolsOfExpandedType = fullyExpandedType.toSymbol()?.typeParameterSymbols ?: return
+            val typeArgumentsOfExpandedType = fullyExpandedType.typeArguments.toList()
+            checkUpperBoundViolatedInLhsOfGetClass(
+                typeParameterSymbolsOfExpandedType,
+                typeArgumentsOfExpandedType,
+                FE10LikeConeSubstitutor(typeParameterSymbolsOfExpandedType, typeArgumentsOfExpandedType, context.session),
+                argument.source,
+            )
+        }
+    }
 }
 
 interface FirGenericArrayClassLiteralSupport : FirSessionComponent {

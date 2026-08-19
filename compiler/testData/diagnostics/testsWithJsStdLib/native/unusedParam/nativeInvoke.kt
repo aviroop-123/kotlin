@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // DIAGNOSTICS: -DEPRECATION
 @nativeInvoke
 fun Int.foo(a: String): Int = definedExternally

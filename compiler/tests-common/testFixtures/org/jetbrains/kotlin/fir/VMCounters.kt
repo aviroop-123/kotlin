@@ -64,7 +64,7 @@ data class VMCounters(
 
 private fun <K, V : Any> merge(first: Map<K, V>, second: Map<K, V>, valueOp: (V, V) -> V): Map<K, V> {
     val result = first.toMutableMap()
-    for ((k, v) in second) {
+    for ([k, v] in second) {
         result.merge(k, v, valueOp)
     }
     return result
@@ -77,7 +77,7 @@ object Init {
 }
 
 fun vmStateSnapshot(): VMCounters {
-    Init
+    @Suppress("UNUSED_EXPRESSION") Init
     val threadMXBean = ManagementFactoryHelper.getThreadMXBean()
     val hotspotRuntimeMBean = ManagementFactoryHelper.getHotspotRuntimeMBean()
 

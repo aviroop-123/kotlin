@@ -3,9 +3,12 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
+@file:OptIn(LegacyRenderingContextApi::class)
+
 package org.jetbrains.kotlin.diagnostics.rendering
 
 import com.intellij.openapi.util.text.StringUtil
+import org.jetbrains.kotlin.config.MavenComparableVersion
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.Variance
@@ -22,6 +25,11 @@ object CommonRenderers {
 
     @JvmField
     val NAME = Renderer<Name> { it.asString() }
+
+    @JvmField
+    val MAVEN_VERSION = Renderer<MavenComparableVersion?> {
+        it?.toString() ?: "initial version"
+    }
 
     @JvmField
     val THROWABLE = Renderer<Throwable> {

@@ -1,11 +1,12 @@
 /*
- * Copyright 2010-2023 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.ir.backend.js.transformers.irToJs
 
 import org.jetbrains.kotlin.ir.backend.js.utils.emptyScope
+import org.jetbrains.kotlin.js.artifacts.CachedTestFunctionsWithTheirPackage
 import org.jetbrains.kotlin.js.backend.ast.*
 
 object JsTestFunctionTransformer {
@@ -20,7 +21,7 @@ object JsTestFunctionTransformer {
             JsInvocation(it.testFunctionName.makeRef()).makeStmt()
         } // String -> [IrSimpleFunction]
 
-        for ((pkg, testCalls) in tests) {
+        for ([pkg, testCalls] in tests) {
             val pkgTestFun = JsFunction(emptyScope, JsBlock(), "test fun for $pkg")
             pkgTestFun.body.statements += testCalls
             testFun.body.statements += JsInvocation(suiteFunRef, JsStringLiteral(pkg), JsBooleanLiteral(false), pkgTestFun).makeStmt()
@@ -60,7 +61,7 @@ fun CachedTestFunctionsWithTheirPackage.asTestFunctionContainers(
     suiteFunction: String?,
     nameBindings: Map<String, JsName>
 ): List<JsTestFunctionTransformer.TestFunctionContainer> {
-    return entries.flatMap { (packageFqn, testFunctions) ->
+    return entries.flatMap { [packageFqn, testFunctions] ->
         testFunctions.map {
             JsTestFunctionTransformer.TestFunctionContainer(
                 packageFqn,

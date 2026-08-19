@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.ir.backend.js.lower
 
 import org.jetbrains.kotlin.backend.common.BodyLoweringPass
 import org.jetbrains.kotlin.backend.common.compilationException
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.declarations.IrClass
@@ -26,6 +27,7 @@ import org.jetbrains.kotlin.ir.util.getInlineClassBackingField
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 
+@PhasePrerequisites(InteropCallableReferenceLowering::class)
 class VarargLowering(val context: JsIrBackendContext) : BodyLoweringPass {
 
     override fun lower(irBody: IrBody, container: IrDeclaration) {
@@ -51,7 +53,7 @@ private class VarargTransformer(
             when (e) {
                 is IrSpreadElement -> {
                     if (currentList.isNotEmpty()) {
-                        segments.add(arrayInfo.toPrimitiveArrayLiteral(currentList))
+                        segments.add(arrayInfo.toPrimitiveArrayLiteral(currentList, expression.startOffset, expression.endOffset))
                         currentList.clear()
                     }
                     segments.add(arrayInfo.unboxElementIfNeeded(e.expression))
@@ -63,14 +65,14 @@ private class VarargTransformer(
             }
         }
         if (currentList.isNotEmpty()) {
-            segments.add(arrayInfo.toPrimitiveArrayLiteral(currentList))
+            segments.add(arrayInfo.toPrimitiveArrayLiteral(currentList, expression.startOffset, expression.endOffset))
             currentList.clear()
         }
 
         // empty vararg => empty array literal
         if (segments.isEmpty()) {
             with(arrayInfo) {
-                return boxArrayIfNeeded(toPrimitiveArrayLiteral(emptyList<IrExpression>()))
+                return boxArrayIfNeeded(toPrimitiveArrayLiteral(emptyList<IrExpression>(), expression.startOffset, expression.endOffset))
             }
         }
 
@@ -89,14 +91,16 @@ private class VarargTransformer(
         val arrayLiteral =
             segments.toArrayLiteral(
                 context,
-                IrSimpleTypeImpl(context.intrinsics.array, false, emptyList(), emptyList()), // TODO: Substitution
-                context.irBuiltIns.anyType
+                IrSimpleTypeImpl(context.irBuiltIns.arrayClass, false, emptyList(), emptyList()), // TODO: Substitution
+                context.irBuiltIns.anyType,
+                expression.startOffset,
+                expression.endOffset,
             )
 
-        val concatFun = if (arrayInfo.primitiveArrayType.classifierOrNull in context.intrinsics.primitiveArrays.keys) {
-            context.intrinsics.primitiveArrayConcat
+        val concatFun = if (arrayInfo.primitiveArrayType.classifierOrNull in context.irBuiltIns.primitiveArraysToPrimitiveTypes.keys) {
+            context.symbols.primitiveArrayConcat
         } else {
-            context.intrinsics.arrayConcat
+            context.symbols.arrayConcat
         }
 
         val res = IrCallImpl(
@@ -126,9 +130,9 @@ private class VarargTransformer(
             val elementType = arrayInfo.primitiveElementType
             val copyFunction =
                 if (elementType.isChar() || elementType.isBoolean() || elementType.isLong())
-                    context.intrinsics.taggedArrayCopy
+                    context.symbols.taggedArrayCopy
                 else
-                    context.intrinsics.jsArraySlice
+                    context.symbols.jsArraySlice
 
             IrCallImpl(
                 expression.startOffset,
@@ -156,12 +160,12 @@ private class VarargTransformer(
             }
         }
 
-        for ((parameter, argument) in expression.getAllArgumentsWithIr()) {
+        for ([parameter, argument] in expression.getAllArgumentsWithIr()) {
             val varargElementType = parameter.varargElementType
             if (argument == null && varargElementType != null) {
                 val arrayInfo = InlineClassArrayInfo(context, varargElementType, parameter.type)
                 val emptyArray = with(arrayInfo) {
-                    boxArrayIfNeeded(toPrimitiveArrayLiteral(emptyList()))
+                    boxArrayIfNeeded(toPrimitiveArrayLiteral(emptyList(), UNDEFINED_OFFSET, UNDEFINED_OFFSET))
                 }
 
                 expression.arguments[parameter] = emptyArray
@@ -172,19 +176,21 @@ private class VarargTransformer(
     }
 }
 
-private fun List<IrExpression>.toArrayLiteral(context: JsIrBackendContext, type: IrType, varargElementType: IrType): IrExpression {
+private fun List<IrExpression>.toArrayLiteral(
+    context: JsIrBackendContext,
+    type: IrType,
+    varargElementType: IrType,
+    startOffset: Int,
+    endOffset: Int,
+): IrExpression {
 
-    // TODO: Use symbols when builtins symbol table is fixes
-    val primitiveType = context.intrinsics.primitiveArrays.mapKeys { it.key }[type.classifierOrNull]
+    val primitiveType = context.irBuiltIns.primitiveArraysToPrimitiveTypes.mapKeys { it.key }[type.classifierOrNull]
 
     val intrinsic =
         if (primitiveType != null)
-            context.intrinsics.primitiveToLiteralConstructor.getValue(primitiveType)
+            context.symbols.primitiveToLiteralConstructor.getValue(primitiveType)
         else
-            context.intrinsics.arrayLiteral
-
-    val startOffset = firstOrNull()?.startOffset ?: UNDEFINED_OFFSET
-    val endOffset = lastOrNull()?.endOffset ?: UNDEFINED_OFFSET
+            context.symbols.arrayLiteral
 
     val irVararg = IrVarargImpl(startOffset, endOffset, type, varargElementType, this)
 
@@ -248,6 +254,6 @@ internal class InlineClassArrayInfo(val context: JsIrBackendContext, val element
         }
     }
 
-    fun toPrimitiveArrayLiteral(elements: List<IrExpression>) =
-        elements.toArrayLiteral(context, primitiveArrayType, primitiveElementType)
+    fun toPrimitiveArrayLiteral(elements: List<IrExpression>, startOffset: Int, endOffset: Int) =
+        elements.toArrayLiteral(context, primitiveArrayType, primitiveElementType, startOffset, endOffset)
 }

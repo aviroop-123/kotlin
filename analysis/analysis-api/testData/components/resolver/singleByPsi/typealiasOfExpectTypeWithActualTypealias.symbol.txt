@@ -1,0 +1,30 @@
+common - Common.kt:
+
+
+jvm - Jvm.kt:
+  <caret_return>:
+    KtNameReferenceExpression(182,204): 'ExpectClassCommonAlias'
+      isImplicitReferenceToCompanion: false
+      usesContextSensitiveResolution: false
+      KaSymbolResolutionSuccess:
+        symbols = [
+          /ExpectClassCommonAlias
+        ]
+
+  <caret_instanceCheck>:
+    KtNameReferenceExpression(225,247): 'ExpectClassCommonAlias'
+      isImplicitReferenceToCompanion: false
+      usesContextSensitiveResolution: false
+      KaSymbolResolutionSuccess:
+        symbols = [
+          /ExpectClassCommonAlias
+        ]
+
+  <caret_typeArg>:
+    KtNameReferenceExpression(272,294): 'ExpectClassCommonAlias'
+      isImplicitReferenceToCompanion: false
+      usesContextSensitiveResolution: false
+      KaSymbolResolutionSuccess:
+        symbols = [
+          /ExpectClassCommonAlias
+        ]

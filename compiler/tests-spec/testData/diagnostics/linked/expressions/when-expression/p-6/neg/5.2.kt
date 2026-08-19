@@ -1,6 +1,3 @@
-// FIR_IDENTICAL
-// LANGUAGE: +WarnAboutNonExhaustiveWhenOnAlgebraicTypes
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)

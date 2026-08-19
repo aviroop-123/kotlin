@@ -14,10 +14,7 @@ import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.annotations.BuiltInAnnotationDescriptor
 import org.jetbrains.kotlin.descriptors.impl.AbstractTypeParameterDescriptor
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.FqNameUnsafe
-import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.name.SpecialNames
+import org.jetbrains.kotlin.name.*
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.inference.CapturedType
 import org.jetbrains.kotlin.resolve.constants.IntegerLiteralTypeConstructor
@@ -57,6 +54,7 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
 
     override fun TypeConstructorMarker.isLocalType(): Boolean {
         require(this is TypeConstructor, this::errorMessage)
+        @OptIn(ClassIdBasedLocality::class)
         return declarationDescriptor?.classId?.isLocal == true
     }
 
@@ -436,11 +434,12 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
 
 
     override fun newTypeCheckerState(
+        typeSystemContext: TypeSystemContext,
         errorTypesEqualToAnything: Boolean,
         stubTypesEqualToAnything: Boolean,
         dnnTypesEqualToFlexible: Boolean,
     ): TypeCheckerState {
-        return createClassicTypeCheckerState(errorTypesEqualToAnything, stubTypesEqualToAnything, typeSystemContext = this)
+        return createClassicTypeCheckerState(errorTypesEqualToAnything, stubTypesEqualToAnything, typeSystemContext)
     }
 
     override fun nullableNothingType(): SimpleTypeMarker {
@@ -654,6 +653,11 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
         return this is TypeUtils.SpecialType
     }
 
+    @K2Only
+    override fun KotlinTypeMarker.hasEnhancedNullability(): Boolean {
+        error("hasEnhancedNullability is only supported in K2")
+    }
+
     override fun TypeConstructorMarker.isTypeVariable(): Boolean {
         errorSupportedOnlyInTypeInference()
     }
@@ -771,9 +775,9 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
         return (declarationDescriptor as? ClassDescriptor)?.valueClassRepresentation is InlineClassRepresentation
     }
 
-    override fun TypeConstructorMarker.isMultiFieldValueClass(): Boolean {
+    override fun TypeConstructorMarker.isJvmInlineMultiFieldValueClass(): Boolean {
         require(this is TypeConstructor, this::errorMessage)
-        return (declarationDescriptor as? ClassDescriptor)?.valueClassRepresentation is MultiFieldValueClassRepresentation
+        return (declarationDescriptor as? ClassDescriptor)?.valueClassRepresentation is JvmInlineMultiFieldValueClassRepresentation
     }
 
     override fun TypeConstructorMarker.getValueClassProperties(): List<Pair<Name, SimpleTypeMarker>>? {
@@ -791,13 +795,13 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
         return representativeUpperBound
     }
 
-    override fun KotlinTypeMarker.getUnsubstitutedUnderlyingType(): KotlinTypeMarker? {
+    override fun KotlinTypeMarker.getUnsubstitutedUnderlyingTypeInJvm(): KotlinTypeMarker? {
         require(this is KotlinType, this::errorMessage)
         return unsubstitutedUnderlyingType()
     }
 
     override fun typeSubstitutorForUnderlyingType(map: Map<TypeConstructorMarker, KotlinTypeMarker>): TypeSubstitutorMarker =
-        map.map { (parameter, argument) ->
+        map.map { [parameter, argument] ->
             (parameter as TypeConstructor) to (argument as KotlinType).asTypeProjection()
         }.toMap().let { TypeSubstitutor.create(it) }
 
@@ -905,6 +909,8 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
 
     override fun usePreciseSimplificationToFlexibleLowerConstraint(): Boolean = false
 
+    override fun simplifyFlexibleUpperConstraintWithDnnBoundToNullable(): Boolean = true
+
     override fun substitutionSupertypePolicy(type: RigidTypeMarker): TypeCheckerState.SupertypesPolicy {
         require(type is SimpleType, type::errorMessage)
         val substitutor = TypeConstructorSubstitution.create(type).buildSubstitutor()
@@ -928,14 +934,6 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
 
     override fun supportsImprovedVarianceInCst(): Boolean {
         return false
-    }
-}
-
-fun TypeVariance.convertVariance(): Variance {
-    return when (this) {
-        TypeVariance.INV -> Variance.INVARIANT
-        TypeVariance.IN -> Variance.IN_VARIANCE
-        TypeVariance.OUT -> Variance.OUT_VARIANCE
     }
 }
 

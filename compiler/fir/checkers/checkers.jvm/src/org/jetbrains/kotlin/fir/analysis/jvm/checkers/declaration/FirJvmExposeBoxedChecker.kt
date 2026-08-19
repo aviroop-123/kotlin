@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirBasicDeclarationChecker
-import org.jetbrains.kotlin.fir.analysis.checkers.declaration.isLocalMember
+import org.jetbrains.kotlin.fir.analysis.checkers.declaration.isLocalDeclaredInBlock
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors
 import org.jetbrains.kotlin.fir.containingClassLookupTag
 import org.jetbrains.kotlin.fir.declarations.*
@@ -29,6 +29,8 @@ import org.jetbrains.kotlin.name.JvmStandardClassIds
 import org.jetbrains.kotlin.name.Name
 
 object FirJvmExposeBoxedChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
 
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirDeclaration) {
@@ -52,9 +54,13 @@ object FirJvmExposeBoxedChecker : FirBasicDeclarationChecker(MppCheckerKind.Comm
                 reporter.reportOn(name.source, FirJvmErrors.INAPPLICABLE_JVM_EXPOSE_BOXED_WITH_NAME)
             }
 
-            val value = name.evaluateAs<FirLiteralExpression>(context.session)?.value as? String
+            val value = (name as? FirLiteralExpression)?.value as? String
             if (value != null && !Name.isValidIdentifier(value)) {
                 reporter.reportOn(name.source, FirJvmErrors.ILLEGAL_JVM_NAME)
+            }
+
+            if (declaration is FirFunction && declaration.nameOrSpecialName.asString() == value) {
+                reporter.reportOn(name.source, FirJvmErrors.JVM_EXPOSE_BOXED_CANNOT_BE_THE_SAME)
             }
         }
 
@@ -91,7 +97,7 @@ object FirJvmExposeBoxedChecker : FirBasicDeclarationChecker(MppCheckerKind.Comm
                 reporter.reportOn(jvmExposeBoxedAnnotation.source, FirJvmErrors.JVM_EXPOSE_BOXED_CANNOT_EXPOSE_SUSPEND)
             }
 
-            if (declaration.isLocalMember) {
+            if (declaration.isLocalDeclaredInBlock) {
                 reporter.reportOn(jvmExposeBoxedAnnotation.source, FirJvmErrors.JVM_EXPOSE_BOXED_CANNOT_EXPOSE_LOCALS)
             }
         }
@@ -103,17 +109,13 @@ object FirJvmExposeBoxedChecker : FirBasicDeclarationChecker(MppCheckerKind.Comm
         declaration: FirDeclaration,
     ) {
         if (name == null) return
-        val value = name.evaluateAs<FirLiteralExpression>(context.session)?.value as? String ?: return
+        val value = (name as? FirLiteralExpression)?.value as? String ?: return
 
         if (value == declaration.findJvmNameValue()) {
             reporter.reportOn(
                 name.source,
                 FirJvmErrors.JVM_EXPOSE_BOXED_CANNOT_BE_THE_SAME_AS_JVM_NAME
             )
-        }
-
-        if (declaration is FirFunction && declaration.nameOrSpecialName.asString() == value) {
-            reporter.reportOn(name.source, FirJvmErrors.JVM_EXPOSE_BOXED_CANNOT_BE_THE_SAME)
         }
     }
 
@@ -138,9 +140,16 @@ object FirJvmExposeBoxedChecker : FirBasicDeclarationChecker(MppCheckerKind.Comm
         if (receiverParameter?.typeRef?.isInline(session) == true) return true
         if (contextParameters.any { it.returnTypeRef.isInline(session) }) return true
         if (this is FirFunction && valueParameters.any { it.returnTypeRef.isInline(session) }) return true
+        // Check dispatch receiver as well - we use `-impl` suffix for them
+        if (this !is FirConstructor) {
+            val containingClass = containingClassLookupTag()?.toRegularClassSymbol(session)
+            return containingClass?.isBasicValueClass == true
+        }
         return false
     }
 
-    private fun FirTypeRef.isInline(session: FirSession): Boolean =
-        toRegularClassSymbol(session)?.isInlineOrValue ?: false
+    private fun FirTypeRef.isInline(session: FirSession): Boolean {
+        val classSymbol = toRegularClassSymbol(session) ?: return false
+        return classSymbol.isBasicValueClass
+    }
 }

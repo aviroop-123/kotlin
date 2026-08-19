@@ -68,19 +68,7 @@ class JsMainFunctionDetector(val context: JsCommonBackendContext) {
 
         return resultPair?.second
     }
-
-    class MainFunctionCandidate(val packageFqn: String, val mainFunctionTag: String?)
-    companion object {
-        inline fun <T> pickMainFunctionFromCandidates(candidates: List<T>, convertToCandidate: (T) -> MainFunctionCandidate): T? {
-            return candidates
-                .map { it to convertToCandidate(it) }
-                .sortedBy { it.second.packageFqn }
-                .firstOrNull { it.second.mainFunctionTag != null }
-                ?.first
-        }
-    }
 }
-
 
 fun IrValueParameter.isStringArrayParameter(): Boolean {
     val type = this.type as? IrSimpleType ?: return false
@@ -99,5 +87,5 @@ fun IrValueParameter.isStringArrayParameter(): Boolean {
 fun IrFunction.isLoweredSuspendFunction(context: JsCommonBackendContext): Boolean {
     val parameter = parameters.lastOrNull() ?: return false
     val type = parameter.type as? IrSimpleType ?: return false
-    return type.classifier == context.symbols.coroutineSymbols.continuationClass
+    return type.classifier == context.symbols.continuationClass
 }

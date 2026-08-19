@@ -1,4 +1,3 @@
-// IGNORE_BACKEND_K1: ANY
 // LANGUAGE: +ContextParameters
 class A(val a: String)
 class B(val b: String)

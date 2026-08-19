@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -9,13 +9,19 @@ import com.intellij.lang.ASTNode
 import com.intellij.psi.stubs.StubElement
 import com.intellij.psi.stubs.StubInputStream
 import com.intellij.psi.stubs.StubOutputStream
+import org.jetbrains.kotlin.contracts.description.KtContractDescriptionElement
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtClassLikeDeclaration
 import org.jetbrains.kotlin.psi.KtEnumEntry
+import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 import org.jetbrains.kotlin.psi.stubs.elements.KtTokenSets
+import org.jetbrains.kotlin.psi.stubs.impl.KotlinContractEffectType
+import org.jetbrains.kotlin.psi.stubs.impl.KotlinContractSerializationVisitor
+import org.jetbrains.kotlin.psi.stubs.impl.KotlinTypeBean
 
 object StubUtils {
     @JvmStatic
@@ -30,14 +36,28 @@ object StubUtils {
     }
 
     @JvmStatic
-    fun createNestedClassId(parentStub: StubElement<*>, currentDeclaration: KtClassLikeDeclaration): ClassId? {
+    fun StubOutputStream.serializeKdocText(kdocText: String?) {
+        writeBoolean(kdocText != null)
+        if (kdocText != null) {
+            writeUTFFast(kdocText)
+        }
+    }
+
+    @JvmStatic
+    fun StubInputStream.deserializeKdocText(): String? {
+        return if (readBoolean()) readUTFFast() else null
+    }
+
+    @JvmStatic
+    @Suppress("DEPRECATION") // KT-78356
+    fun createClassId(parentStub: StubElement<*>, currentDeclaration: KtClassLikeDeclaration): ClassId? {
         if (currentDeclaration is KtObjectDeclaration && currentDeclaration.isObjectLiteral()) {
             return null
         }
 
         return when (parentStub) {
-            is KotlinFileStub -> ClassId(parentStub.getPackageFqName(), currentDeclaration.nameAsSafeName)
-            is KotlinScriptStub -> createNestedClassId(parentStub.parentStub, currentDeclaration)
+            is KotlinFileStub -> parentStub.createTopLevelClassId(currentDeclaration)
+            is KotlinScriptStub -> parentStub.createClassId(currentDeclaration)
             is KotlinPlaceHolderStub<*> if parentStub.stubType == KtStubElementTypes.CLASS_BODY -> {
                 val containingClassStub = parentStub.parentStub as? KotlinClassifierStub
                 if (containingClassStub != null && currentDeclaration !is KtEnumEntry) {
@@ -47,6 +67,23 @@ object StubUtils {
                 }
             }
             else -> null
+        }
+    }
+
+    private fun KotlinFileStub.createTopLevelClassId(name: Name): ClassId = ClassId(getPackageFqName(), name)
+    private fun KotlinFileStub.createTopLevelClassId(currentDeclaration: KtClassLikeDeclaration): ClassId {
+        return createTopLevelClassId(currentDeclaration.nameAsSafeName)
+    }
+
+    private fun KotlinScriptStub.createClassId(currentDeclaration: KtClassLikeDeclaration): ClassId? {
+        val fileStub = parentStub as? KotlinFileStub ?: return null
+
+        @OptIn(KtImplementationDetail::class)
+        return if (isReplSnippet) {
+            val snippetClassName = fqName.shortName()
+            fileStub.createTopLevelClassId(snippetClassName).createNestedClassId(currentDeclaration.nameAsSafeName)
+        } else {
+            fileStub.createTopLevelClassId(currentDeclaration)
         }
     }
 
@@ -81,4 +118,78 @@ object StubUtils {
 
     @JvmStatic
     internal fun StubInputStream.readFqName(): FqName = FqName(readNameString()!!)
+
+    @JvmStatic
+    internal inline fun <K : Any, V : Any> StubOutputStream.writeNullableMap(
+        map: Map<K, V>?,
+        keyWriter: StubOutputStream.(K) -> Unit,
+        valueWriter: StubOutputStream.(V) -> Unit,
+    ) {
+        val nullableSize = map?.size?.plus(1) ?: 0 // +1 since 0 is reserved for null value
+        writeVarInt(nullableSize)
+
+        map?.forEach { entry ->
+            keyWriter(entry.key)
+            valueWriter(entry.value)
+        }
+    }
+
+    @JvmStatic
+    internal fun <K : Any, V : Any> StubInputStream.readNullableMap(
+        keyReader: StubInputStream.() -> K,
+        valueReader: StubInputStream.() -> V,
+    ): Map<K, V>? = when (val nullableSize = readVarInt()) {
+        0 -> null
+        else -> when (val size = nullableSize - 1) { // -1 since 0 is reserved for null value
+            0 -> emptyMap()
+            1 -> mapOf(keyReader() to valueReader())
+            else -> buildMap(size) {
+                repeat(size) {
+                    val key = keyReader()
+                    val value = valueReader()
+                    put(key, value)
+                }
+            }
+        }
+    }
+
+    @JvmStatic
+    internal inline fun <E : Any> StubOutputStream.writeNullableCollection(
+        collection: Collection<E>?,
+        elementWriter: StubOutputStream.(E) -> Unit,
+    ) {
+        val nullableSize = collection?.size?.plus(1) ?: 0 // +1 since 0 is reserved for null value
+        writeVarInt(nullableSize)
+
+        collection?.forEach { elementWriter(it) }
+    }
+
+    @JvmStatic
+    internal fun <E : Any> StubInputStream.readNullableCollection(
+        elementReader: StubInputStream.() -> E,
+    ): List<E>? = when (val nullableSize = readVarInt()) {
+        0 -> null
+        else -> when (val size = nullableSize - 1) { // -1 since 0 is reserved for null value
+            0 -> emptyList()
+            1 -> listOf(elementReader())
+            else -> buildList(size) {
+                repeat(size) {
+                    add(elementReader())
+                }
+            }
+        }
+    }
+
+    @JvmStatic
+    internal fun StubOutputStream.writeContract(contract: List<KtContractDescriptionElement<KotlinTypeBean, Nothing?>>?) {
+        writeNullableCollection(contract) { effect ->
+            effect.accept(KotlinContractSerializationVisitor(this), null)
+        }
+    }
+
+    @JvmStatic
+    internal fun StubInputStream.readContract(): List<KtContractDescriptionElement<KotlinTypeBean, Nothing?>>? = readNullableCollection {
+        val effectType: KotlinContractEffectType = KotlinContractEffectType.entries[readVarInt()]
+        effectType.deserialize(this@readContract)
+    }
 }

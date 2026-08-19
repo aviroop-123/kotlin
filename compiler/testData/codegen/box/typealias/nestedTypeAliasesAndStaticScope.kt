@@ -1,8 +1,9 @@
-// IGNORE_BACKEND_K1: ANY
 // ISSUE: KT-74107
 // LANGUAGE: +NestedTypeAliases
 
 // FILE: staticScope.kt
+
+package test
 
 class Bar {
     inner class Inner {
@@ -30,9 +31,10 @@ class Bar {
 }
 
 // FILE: main.kt
+package test
 
-import Bar.TAtoInner
-import Bar.TA2toInner2
+import test.Bar.TAtoInner
+import test.Bar.TA2toInner2
 
 fun test(): String {
     val bar = Bar()

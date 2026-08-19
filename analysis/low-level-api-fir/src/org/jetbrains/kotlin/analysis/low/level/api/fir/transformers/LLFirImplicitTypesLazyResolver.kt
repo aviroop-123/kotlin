@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.util.checkReturnTypeRefIs
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
 import org.jetbrains.kotlin.fir.canHaveDeferredReturnTypeCalculation
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.utils.getExplicitBackingField
 import org.jetbrains.kotlin.fir.declarations.utils.isConst
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.FirImplicitAwareBodyResolveTransformer
@@ -175,7 +176,13 @@ internal class LLFirImplicitBodyTargetResolver(
     override fun doLazyResolveUnderLock(target: FirElementWithResolveState) {
         when (target) {
             is FirCallableDeclaration if target.canHaveDeferredReturnTypeCalculation -> {
-                transformer.returnTypeCalculator.callableCopyTypeCalculator.computeReturnType(target)
+                val typeCalculator = transformer.returnTypeCalculator.callableCopyTypeCalculator
+                typeCalculator.computeReturnType(target)
+
+                val explicitBackingField = (target as? FirProperty)?.getExplicitBackingField()
+                if (explicitBackingField != null) {
+                    typeCalculator.computeReturnType(explicitBackingField)
+                }
             }
 
             is FirFunction -> {
@@ -185,7 +192,7 @@ internal class LLFirImplicitBodyTargetResolver(
             }
 
             is FirProperty -> {
-                if (target.isConst || target.returnTypeRef is FirImplicitTypeRef || target.backingField?.returnTypeRef is FirImplicitTypeRef) {
+                if (target.shouldBeResolvedOnImplicitTypePhase) {
                     resolve(target, BodyStateKeepers.PROPERTY)
                 }
             }
@@ -196,7 +203,16 @@ internal class LLFirImplicitBodyTargetResolver(
                 }
             }
 
-            is FirRegularClass, is FirTypeAlias, is FirFile, is FirCodeFragment, is FirAnonymousInitializer, is FirDanglingModifierList, is FirEnumEntry, is FirScript -> {
+            is FirRegularClass,
+            is FirTypeAlias,
+            is FirFile,
+            is FirCodeFragment,
+            is FirAnonymousInitializer,
+            is FirDanglingModifierList,
+            is FirEnumEntry,
+            is FirScript,
+            is FirReplSnippet,
+                -> {
                 // No implicit bodies here
             }
 
@@ -218,3 +234,9 @@ internal class LLFirImplicitBodyTargetResolver(
         LLFirDeclarationModificationService.bodyResolved(target, resolverPhase)
     }
 }
+
+/**
+ * Whether the property has something to resolve on the [FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE] phase.
+ */
+internal val FirProperty.shouldBeResolvedOnImplicitTypePhase: Boolean
+    get() = isConst || returnTypeRef is FirImplicitTypeRef || backingField?.returnTypeRef is FirImplicitTypeRef

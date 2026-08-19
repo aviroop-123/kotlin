@@ -1,8 +1,5 @@
 // ISSUE: KT-52757
 
-// IGNORE_BACKEND_K1: ANY
-// Reason: red code
-
 fun box(): String {
     build {
         typeVariableConsumer = ::consumeTargetType

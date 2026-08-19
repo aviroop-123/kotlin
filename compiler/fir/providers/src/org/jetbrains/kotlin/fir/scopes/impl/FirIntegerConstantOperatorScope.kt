@@ -6,8 +6,9 @@
 package org.jetbrains.kotlin.fir.scopes.impl
 
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.SessionAndScopeSessionHolder
 import org.jetbrains.kotlin.fir.declarations.*
-import org.jetbrains.kotlin.fir.declarations.builder.buildSimpleFunctionCopy
+import org.jetbrains.kotlin.fir.declarations.builder.buildNamedFunctionCopy
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.scope
 import org.jetbrains.kotlin.fir.resolve.scopeSessionKey
@@ -27,10 +28,10 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
 class FirIntegerConstantOperatorScope(
-    val session: FirSession,
-    val scopeSession: ScopeSession,
+    override val session: FirSession,
+    override val scopeSession: ScopeSession,
     val isUnsigned: Boolean
-) : FirTypeScope() {
+) : FirTypeScope(), SessionAndScopeSessionHolder {
     private val baseScope: FirTypeScope = run {
         val baseType = when (isUnsigned) {
             true -> session.builtinTypes.uIntType
@@ -38,8 +39,6 @@ class FirIntegerConstantOperatorScope(
         }.coneType
 
         baseType.scope(
-            session,
-            scopeSession,
             CallableCopyTypeCalculator.DoNothing,
             requiredMembersPhase = FirResolvePhase.STATUS,
         ) ?: Empty
@@ -76,7 +75,7 @@ class FirIntegerConstantOperatorScope(
 
     private fun wrapIntOperator(originalSymbol: FirNamedFunctionSymbol): FirNamedFunctionSymbol {
         val originalFunction = originalSymbol.fir
-        val wrappedFunction = buildSimpleFunctionCopy(originalFunction) {
+        val wrappedFunction = buildNamedFunctionCopy(originalFunction) {
             symbol = FirNamedFunctionSymbol(originalSymbol.callableId)
             origin = FirDeclarationOrigin.WrappedIntegerOperator
             returnTypeRef = buildResolvedTypeRef {
@@ -147,20 +146,20 @@ private val INTEGER_CONSTANT_OPERATOR_SCOPE = scopeSessionKey<Boolean, FirIntege
 private object OriginalForWrappedIntegerOperator : FirDeclarationDataKey()
 private object IsUnsignedForWrappedIntegerOperator : FirDeclarationDataKey()
 
-var FirSimpleFunction.originalForWrappedIntegerOperator: FirNamedFunctionSymbol? by FirDeclarationDataRegistry.data(
+var FirNamedFunction.originalForWrappedIntegerOperator: FirNamedFunctionSymbol? by FirDeclarationDataRegistry.data(
     OriginalForWrappedIntegerOperator
 )
 
-private var FirSimpleFunction.isUnsignedWrappedIntegerOperator: Boolean? by FirDeclarationDataRegistry.data(
+private var FirNamedFunction.isUnsignedWrappedIntegerOperator: Boolean? by FirDeclarationDataRegistry.data(
     IsUnsignedForWrappedIntegerOperator
 )
 
 @OptIn(ExperimentalContracts::class)
 fun FirDeclaration.isWrappedIntegerOperator(): Boolean {
     contract {
-        returns(true) implies (this@isWrappedIntegerOperator is FirSimpleFunction)
+        returns(true) implies (this@isWrappedIntegerOperator is FirNamedFunction)
     }
-    return (this as? FirSimpleFunction)?.originalForWrappedIntegerOperator != null
+    return (this as? FirNamedFunction)?.originalForWrappedIntegerOperator != null
 }
 
 @OptIn(ExperimentalContracts::class)

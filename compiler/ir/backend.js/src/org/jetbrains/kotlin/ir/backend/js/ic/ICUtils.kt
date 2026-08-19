@@ -71,7 +71,7 @@ internal fun findStdlib(
     allFragments: Map<KotlinLibraryFile, IrModuleFragment>
 ): Pair<KotlinLibraryFile, IrModuleFragment> {
     val stdlibDescriptor = mainFragment.descriptor.builtIns.builtInsModule
-    val (stdlibFile, stdlibIr) = allFragments.entries.find {
+    val [stdlibFile, stdlibIr] = allFragments.entries.find {
         it.value.descriptor === stdlibDescriptor
     } ?: notFoundIcError("stdlib fragment")
     return stdlibFile to stdlibIr
@@ -81,15 +81,13 @@ internal class StopwatchIC {
     private var lapStart: Long = 0
     private var lapDescription: String? = null
 
-    private val lapsImpl = mutableListOf<Pair<String, Long>>()
-
     val laps: List<Pair<String, Long>>
-        get() = lapsImpl
+        field = mutableListOf<Pair<String, Long>>()
 
     fun clear() {
         lapStart = 0
         lapDescription = null
-        lapsImpl.clear()
+        laps.clear()
     }
 
     fun startNext(description: String) {
@@ -101,7 +99,7 @@ internal class StopwatchIC {
 
     fun stop(stopTime: Long? = null) {
         lapDescription?.let { description ->
-            lapsImpl += description to ((stopTime ?: System.nanoTime()) - lapStart)
+            laps += description to ((stopTime ?: System.nanoTime()) - lapStart)
         }
         lapDescription = null
     }

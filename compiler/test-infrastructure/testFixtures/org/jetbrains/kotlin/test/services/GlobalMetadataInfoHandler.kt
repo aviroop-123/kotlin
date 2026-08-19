@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.codeMetaInfo.model.CodeMetaInfo
 import org.jetbrains.kotlin.codeMetaInfo.model.ParsedCodeMetaInfo
 import org.jetbrains.kotlin.test.model.TestFile
 import org.jetbrains.kotlin.test.model.TestModule
+import org.jetbrains.kotlin.test.preprocessors.MetaInfosCleanupPreprocessor
 
 class GlobalMetadataInfoHandler(
     val testServices: TestServices,
@@ -27,7 +28,8 @@ class GlobalMetadataInfoHandler(
     fun parseExistingMetadataInfosFromAllSources() {
         existingInfosPerFile = buildMap {
             for (file in testServices.moduleStructure.modules.flatMap { it.files }) {
-                put(file, CodeMetaInfoParser.getCodeMetaInfoFromText(file.originalContent))
+                val halfProcessedContent = testServices.sourceFileProvider.getContentOfSourceFile(file) { it !is MetaInfosCleanupPreprocessor }
+                put(file, CodeMetaInfoParser.getCodeMetaInfoFromText(halfProcessedContent))
             }
         }
     }
@@ -59,8 +61,8 @@ class GlobalMetadataInfoHandler(
         // So, to reconstruct the original source file it needs not per-module traversal, but in original file order.
         val filesInOriginalOrder = moduleStructure.modules
             .flatMap { module -> module.files.map { file -> module to file } }
-            .sortedBy { (_, file) -> file.startLineNumberInOriginalFile }
-        for ((module, file) in filesInOriginalOrder) {
+            .sortedBy { [_, file] -> file.startLineNumberInOriginalFile }
+        for ([module, file] in filesInOriginalOrder) {
             if (!file.isAdditional) {
                 processors.forEach { it.processMetaInfos(module, file) }
                 val codeMetaInfos = infosPerFile.getValue(file)

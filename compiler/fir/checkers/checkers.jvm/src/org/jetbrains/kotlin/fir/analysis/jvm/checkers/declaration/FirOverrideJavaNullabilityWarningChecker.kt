@@ -67,7 +67,7 @@ sealed class FirOverrideJavaNullabilityWarningChecker(mppKind: MppCheckerKind) :
                             anyReported = true
                             reporter.reportOn(
                                 memberSymbol.source,
-                                FirJvmErrors.WRONG_NULLABILITY_FOR_JAVA_OVERRIDE,
+                                FirJvmErrors.WRONG_TYPE_FOR_JAVA_OVERRIDE,
                                 memberSymbol,
                                 substitutedBase
                             )
@@ -79,7 +79,7 @@ sealed class FirOverrideJavaNullabilityWarningChecker(mppKind: MppCheckerKind) :
                 if (anyBaseEnhanced && !anyReported) {
                     memberSymbol.checkReturnType(enhancedOverrides, typeCheckerState)?.let {
                         reporter.reportOn(
-                            memberSymbol.source, FirJvmErrors.WRONG_NULLABILITY_FOR_JAVA_OVERRIDE, memberSymbol, it
+                            memberSymbol.source, FirJvmErrors.WRONG_TYPE_FOR_JAVA_OVERRIDE, memberSymbol, it
                         )
                     }
                 }
@@ -94,7 +94,7 @@ sealed class FirOverrideJavaNullabilityWarningChecker(mppKind: MppCheckerKind) :
                             anyReported = true
                             reporter.reportOn(
                                 memberSymbol.source,
-                                FirJvmErrors.WRONG_NULLABILITY_FOR_JAVA_OVERRIDE,
+                                FirJvmErrors.WRONG_TYPE_FOR_JAVA_OVERRIDE,
                                 memberSymbol,
                                 substitutedBase
                             )
@@ -106,7 +106,7 @@ sealed class FirOverrideJavaNullabilityWarningChecker(mppKind: MppCheckerKind) :
                 if (anyBaseEnhanced && !anyReported) {
                     memberSymbol.checkReturnType(enhancedOverrides, typeCheckerState)?.let {
                         reporter.reportOn(
-                            memberSymbol.source, FirJvmErrors.WRONG_NULLABILITY_FOR_JAVA_OVERRIDE, memberSymbol, it
+                            memberSymbol.source, FirJvmErrors.WRONG_TYPE_FOR_JAVA_OVERRIDE, memberSymbol, it
                         )
                     }
                 }
@@ -120,9 +120,9 @@ context(context: CheckerContext)
  * @see org.jetbrains.kotlin.fir.scopes.impl.FirClassSubstitutionScope.createSubstitutionOverrideFunction
  * @see org.jetbrains.kotlin.fir.scopes.impl.FirClassSubstitutionScope.createSubstitutedData
  */
-private fun FirSimpleFunction.substituteOrNull(
+private fun FirNamedFunction.substituteOrNull(
     substitutor: EnhancedForWarningConeSubstitutor,
-): FirSimpleFunction? {
+): FirNamedFunction? {
     symbol.lazyResolveToPhase(FirResolvePhase.TYPES)
     var isEnhanced = false
 

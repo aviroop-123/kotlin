@@ -14,36 +14,12 @@ import org.jetbrains.kotlin.gradle.internal.execWithProgress
 import org.jetbrains.kotlin.gradle.internal.newBuildOpLogger
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolved.PreparedKotlinCompilationNpmResolution
 import org.jetbrains.kotlin.gradle.utils.getFile
-import org.jetbrains.kotlin.gradle.utils.property
 import java.io.File
 
 class Npm internal constructor(
     private val execOps: ExecOperations,
     private val objects: ObjectFactory,
 ) : NpmApiExecution<NpmEnvironment> {
-
-    /**
-     * Manually creating new instances of this class is deprecated.
-     *
-     * Instead, an instance of [Npm] can be found from the extensions
-     * [NpmExtension][org.jetbrains.kotlin.gradle.targets.js.npm.NpmExtension]
-     * and
-     * [WasmNpmExtension][org.jetbrains.kotlin.gradle.targets.wasm.npm.WasmNpmExtension].
-     *
-     * @see org.jetbrains.kotlin.gradle.targets.js.npm.NpmExtension.packageManager
-     * @see org.jetbrains.kotlin.gradle.targets.wasm.npm.WasmNpmExtension.packageManager
-     */
-    @Deprecated(
-        message = "Manually creating instances of this class is deprecated. " +
-                "An instance can be obtained via NpmExtension or WasmNpmExtension. " +
-                "Scheduled for removal in Kotlin 2.4.",
-        level = DeprecationLevel.ERROR,
-    )
-    @Suppress("UNREACHABLE_CODE", "unused")
-    constructor() : this(
-        execOps = error("Cannot create instance of Npm. Constructor is deprecated."),
-        objects = error("Cannot create instance of Npm. Constructor is deprecated."),
-    )
 
     override fun preparedFiles(nodeJs: NodeJsEnvironment): Collection<File> {
         return listOf(
@@ -90,7 +66,6 @@ class Npm internal constructor(
     }
 
     override fun resolveRootProject(
-        services: ServiceRegistry,
         logger: Logger,
         nodeJs: NodeJsEnvironment,
         packageManagerEnvironment: NpmEnvironment,
@@ -117,31 +92,6 @@ class Npm internal constructor(
             }
     }
 
-    @Deprecated(
-        "Updated to remove ServiceRegistry. Scheduled for removal in Kotlin 2.4.",
-        ReplaceWith("packageManagerExec(logger, nodeJs, environment, dir, description, args)"),
-    )
-    @Suppress("unused")
-    fun npmExec(
-        @Suppress("UNUSED_PARAMETER")
-        services: ServiceRegistry,
-        logger: Logger,
-        nodeJs: NodeJsEnvironment,
-        environment: NpmEnvironment,
-        dir: File,
-        description: String,
-        args: List<String>,
-    ) {
-        packageManagerExec(
-            logger = logger,
-            nodeJs = nodeJs,
-            environment = environment,
-            dir = objects.property<File>().value(dir),
-            description = description,
-            args = args,
-        )
-    }
-
     override fun packageManagerExec(
         logger: Logger,
         nodeJs: NodeJsEnvironment,
@@ -152,12 +102,12 @@ class Npm internal constructor(
     ) {
         val progressLogger = objects.newBuildOpLogger()
         execWithProgress(progressLogger, description, execOps = execOps) { execSpec ->
-            val arguments: List<String> = mutableListOf<String>().apply {
+            val arguments = buildList {
                 add("install")
-                addAll(args)
+                addAll(args.filter(String::isNotEmpty))
                 if (logger.isDebugEnabled) add("--verbose")
                 if (environment.ignoreScripts) add("--ignore-scripts")
-            }.filter { it.isNotEmpty() }
+            }
 
             if (!environment.standalone) {
                 val nodeExecutable = nodeJs.nodeExecutable

@@ -6,9 +6,11 @@
 package org.jetbrains.kotlin.gradle.dsl.abi
 
 import org.gradle.api.Action
-import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectContainer
+import org.gradle.api.Task
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.TaskProvider
 import org.jetbrains.kotlin.gradle.dsl.KotlinGradlePluginDsl
 
 /**
@@ -29,127 +31,21 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinGradlePluginDsl
  *
  * Note that this DSL is experimental, and it will likely change in future versions until it is stable.
  *
- * @since 2.1.20
- */
-/*
-We can't mark top level extensions with @ExperimentalAbiValidation because
-in buildSrc Gradle always creates accessors for these extensions which cause the opt-in error,
-which cannot be suppressed.
-
-See Gradle issue https://github.com/gradle/gradle/issues/32019
+ * @since 2.2.0
  */
 @KotlinGradlePluginDsl
-interface AbiValidationExtension : AbiValidationVariantSpec {
+@ExperimentalAbiValidation
+interface AbiValidationExtension {
     /**
-     * Enable ABI validation tasks.
-     *
-     * If value is `false`, then the tasks of generating, verifying, and updating the dump will do nothing.
-     *
-     * By default, all ABI validation tasks are disabled in order to perform ABI generation and verification
-     * in multi-project builds only on explicitly marked projects.
-     *
-     * `false` by default.
+     * @deprecated Property was removed, to enable ABI validation call function `abiValidation()`, `abiValidation { ... }` or read `abiValidation` property.
      */
-    @ExperimentalAbiValidation
+    @Deprecated(
+        "Property was removed, to enable ABI validation call function abiValidation(), abiValidation { ... } or read abiValidation property.",
+        level = DeprecationLevel.ERROR
+    )
     val enabled: Property<Boolean>
+        get() = error("Property 'enabled' was removed, to enable ABI validation call function abiValidation(), abiValidation { ... } or read abiValidation property.")
 
-    /**
-     * All ABI validation report variants that are available in this project.
-     *
-     * See [AbiValidationVariantSpec] for more details about report variants.
-     *
-     * By default, each project always has one variant, called the main variant. It is named [AbiValidationVariantSpec.MAIN_VARIANT_NAME] and is configured in the `kotlin {}` block:
-     *
-     * ```kotlin
-     * kotlin {
-     *     abiValidation {
-     *         // main variant configuration
-     *     }
-     * }
-     * ```
-     *
-     * This is a live mutable collection. New custom variants can be created using special functions such as [NamedDomainObjectContainer.create] or [NamedDomainObjectContainer.register].
-     * Variants can also be configured at the time of their creation:
-     *
-     * ```kotlin
-     * kotlin {
-     *     abiValidation {
-     *         variants.register("my") {
-     *             // 'my' variant configuration, not main
-     *         }
-     *     }
-     * }
-     * ```
-     * Or later:
-     *
-     * ```kotlin
-     * kotlin {
-     *     abiValidation {
-     *         variants.register("my")
-     *     }
-     * }
-     * //
-     * kotlin {
-     *     abiValidation {
-     *         variants.getByName("my").filters {
-     *             // configure filters for 'my' variant
-     *         }
-     *     }
-     * }
-     * ```
-     */
-    @ExperimentalAbiValidation
-    val variants: NamedDomainObjectContainer<AbiValidationVariantSpec>
-}
-
-/**
- *  A specification for the ABI validation report variant.
- *
- * An ABI validation report variant is a group of configurations (like filters, klib validation, etc.), for which a separate set of Gradle tasks is created.
- * Different variants allow generating ABI dumps for different sets of classes and targets without modifying the build script.
- *
- * Each report variant has a unique name.
- *
- * A distinct set of Gradle tasks is created for each variant, with unique names.
- *
- * You can access tasks using properties:
- *
- * For the main variant:
- *
- * ```kotlin
- * kotlin {
- *     abiValidation {
- *         legacyDump.legacyDumpTaskProvider
- *         legacyDump.legacyCheckTaskProvider
- *         legacyDump.legacyUpdateTaskProvider
- *     }
- * }
- * ```
- * And for custom variants:
- *
- *```kotlin
- * kotlin {
- *     abiValidation {
- *         variants.getByName("my").legacyDump.legacyDumpTaskProvider
- *         variants.getByName("my").legacyDump.legacyCheckTaskProvider
- *         variants.getByName("my").legacyDump.legacyUpdateTaskProvider
- *     }
- * }
- * ```
- *
- * Note that this DSL is experimental, and it will likely change in future versions until it is stable.
- *
- * @since 2.1.20
- */
-/*
-We can't mark top level extensions with @ExperimentalAbiValidation because
-in buildSrc Gradle always creates accessors for these extensions which cause the opt-in error,
-which cannot be suppressed.
-
-See Gradle issue https://github.com/gradle/gradle/issues/32019
- */
-@KotlinGradlePluginDsl
-interface AbiValidationVariantSpec : Named {
     /**
      * A set of filtering rules that restrict Application Binary Interface (ABI) declarations from being included in a dump.
      *
@@ -159,12 +55,12 @@ interface AbiValidationVariantSpec : Named {
      * ```kotlin
      * abiValidation {
      *     filters {
-     *         excluded {
+     *         exclude {
      *             byNames.add("foo.Bar")
      *             annotatedWith.add("foo.ExcludeAbi")
      *         }
      *
-     *         included {
+     *         include {
      *             byNames.add("foo.api.**")
      *             annotatedWith.add("foo.PublicApi")
      *         }
@@ -178,29 +74,218 @@ interface AbiValidationVariantSpec : Named {
      *
      * A declaration successfully passes the inclusion filter if no inclusion rules exist, if it matches any inclusion rule, or if at least one of its members (relevant for class declaration) matches any inclusion rule.
      */
-    @ExperimentalAbiValidation
     val filters: AbiFiltersSpec
 
     /**
      * Configures the [filters] with the provided configuration.
      */
-    @ExperimentalAbiValidation
     fun filters(action: Action<AbiFiltersSpec>) {
         action.execute(filters)
     }
 
     /**
+     * The directory containing reference dumps that the dump generated from the current code is compared with by the [checkTaskProvider] task.
+     *
+     * @since 2.4.0
+     */
+    val referenceDumpDir: DirectoryProperty
+
+    /**
+     * A provider for the task that compares actual dumps from the current with dumps from [referenceDumpDir].
+     *
+     * This task fails if any differences are found between the files.
+     *
+     * @since 2.4.0
+     */
+    val checkTaskProvider: TaskProvider<Task>
+
+    /**
+     * Overwrite dumps in the [referenceDumpDir] directory with the actual dumps for the current code.
+     *
+     * @since 2.4.0
+     */
+    val updateTaskProvider: TaskProvider<Task>
+
+    /**
+     * Whether to include the declarations for targets which are not supported by the host in the generated dump.
+     * Targets which are not supported by the host in two cases:
+     * - cross-compilation is disabled and some targets can't be compiled on the host machine
+     * - c-interop being used and some targets can't be compiled on the host machine
+     *
+     * These declarations are taken from the reference dump, if available.
+     *
+     * If possible, unsupported targets are supplemented with common declarations that are already present in the supported targets.
+     *
+     * However, this does not provide a complete guarantee, so it should be used with caution.
+     * This mode is intended to improve the "local" development experience only, and it is crucial to double-check ABI dumps on a host supporting corresponding compilation targets.
+     *
+     * If the option is set to `false` and the compiler does not support some of the Kotlin targets used in the current project, the dump generation fails with an error.
+     *
+     * #### Example
+     *
+     *  There are two targets in the project `iosX64`, `androidNativeX64` and `linuxX64`.
+     *  Current dump contains class `my.Utils` which present in all targets, `my.IosUtils` only in iosX64.
+     *
+     *  Suppose we make such changes:
+     *  - added `my.Utils2` in all targets
+     *  - added `my.LinuxUtils` in linuxX64
+     *  - added `my.NonAppleUtils` in linuxX64 and androidNativeX64
+     *  - added `my.IosUtils2` in iosX64
+     *
+     *  On a host that lacks iosX64 support, and this mode is enabled, there will be such changes in the dump:
+     *  - `my.Utils` will stay present in all targets of the new dump (correct inference)
+     *  - `my.IosUtils` will stay present in iosX64 target of the new dump (correct inference)
+     *  - `my.Utils2` will be present in all targets of the new dump (correct inference)
+     *  - `my.LinuxUtils` will be present in linuxX64 target of the new dump (correct inference)
+     *  - `my.NonAppleUtils` will be present in all targets of the new dump (incorrect inference - because usually if it is added to everything, then there is a high chance that the symbol is added to an unsupported target)
+     *  - `my.IosUtils2` won't be present in iosX64 targets of the new dump (incorrect inference - because we can't compile the target and see what appeared individually in it)
+     *
+     *
+     * Default value: `true`
+     *
+     * @since 2.4.0
+     */
+    val keepLocallyUnsupportedTargets: Property<Boolean>
+
+    /**
+     * Specifies the source of the binaries to extract ABI declarations from.
+     *
+     * Refer to the [BinariesSource] for more information.
+     *
+     * The default value is [BinariesSource.MAIN_COMPILATION].
+     *
+     * @since 2.4.0
+     */
+    val binariesSource: Property<BinariesSource>
+
+    /**
      * Provides configuration for dumps stored in the old format that are used separately in the [Binary Compatibility validator plugin](https://github.com/Kotlin/binary-compatibility-validator).
      *
      * Use this property for a smooth migration from the old to the new dump format.
+     *
+     * @deprecated A separate property 'legacyDump' was removed. Please place all its properties on a higher level.
      */
-    @ExperimentalAbiValidation
+    @Deprecated(
+        "A separate property 'legacyDump' was removed. Please place all its properties on a higher level.",
+        level = DeprecationLevel.ERROR
+    )
+    @Suppress("DEPRECATION_ERROR")
     val legacyDump: AbiValidationLegacyDumpExtension
+        get() = error("A separate property 'legacyDump' was removed. Please place all its properties on a higher level.")
 
     /**
      * Configures the [legacyDump] with the provided configuration.
+     * @deprecated A separate block 'legacyDump' was removed. Please place all its properties on a higher level.
      */
-    @ExperimentalAbiValidation
+    @Deprecated(
+        "A separate block 'legacyDump' was removed. Please place all its properties on a higher level.",
+        level = DeprecationLevel.ERROR
+    )
+    @Suppress("DEPRECATION_ERROR")
+    fun legacyDump(action: Action<AbiValidationLegacyDumpExtension>) {
+        error("A separate block 'legacyDump' was removed. Please place all its properties on a higher level.")
+    }
+
+    /**
+     * @deprecated Property was renamed to 'internalDumpTaskProvider'.
+     */
+    @Deprecated(
+        "Property was renamed to 'internalDumpTaskProvider'.",
+        replaceWith = ReplaceWith("internalDumpTaskProvider"),
+        level = DeprecationLevel.ERROR
+    )
+    @Suppress("DEPRECATION_ERROR")
+    val legacyDumpTaskProvider: TaskProvider<org.jetbrains.kotlin.gradle.tasks.abi.KotlinLegacyAbiDumpTask>
+        get() = error("Property was renamed to 'internalDumpTaskProvider'.")
+
+    /**
+     * @deprecated Property was renamed to 'checkTaskProvider'.
+     */
+    @Deprecated(
+        "Property was renamed to 'checkTaskProvider'.",
+        replaceWith = ReplaceWith("checkTaskProvider"),
+        level = DeprecationLevel.ERROR
+    )
+    @Suppress("DEPRECATION_ERROR")
+    val legacyCheckTaskProvider: TaskProvider<org.jetbrains.kotlin.gradle.tasks.abi.KotlinLegacyAbiCheckTask>
+        get() = error("Property was renamed to 'checkTaskProvider'.")
+
+    /**
+     * @deprecated Property was renamed to 'updateTaskProvider'.
+     */
+    @Deprecated(
+        "Property was renamed to 'updateTaskProvider'.",
+        replaceWith = ReplaceWith("updateTaskProvider"),
+        level = DeprecationLevel.ERROR
+    )
+    val legacyUpdateTaskProvider: TaskProvider<Task>
+        get() = error("Property was renamed to 'updateTaskProvider'.")
+
+    /**
+     * @deprecated Variants DSL was removed and is no longer supported.
+     */
+    @Deprecated("Variants DSL was removed and is no longer supported.", level = DeprecationLevel.ERROR)
+    @Suppress("DEPRECATION_ERROR")
+    val variants: NamedDomainObjectContainer<AbiValidationVariantSpec>
+        get() = error("Variants DSL was removed and is no longer supported.")
+
+    /**
+     * @deprecated Property 'klib' was removed. Nested property 'enabled' was removed - ABI dumps always generated for klib-based targets. 'keepUnsupportedTargets' was moved to the higher level.
+     */
+    @Deprecated(
+        "Property 'klib' was removed.\n\tNested property 'enabled' was removed - ABI dumps always generated for klib-based targets.\n\t'keepUnsupportedTargets' was moved to the higher level.",
+        level = DeprecationLevel.ERROR
+    )
+    @Suppress("DEPRECATION_ERROR")
+    val klib: AbiValidationKlibKindExtension
+        get() = error("Property 'klib' was removed.\n\tNested property 'enabled' was removed - ABI dumps always generated for klib-based targets.\n\t'keepUnsupportedTargets' was moved to the higher level.")
+
+    /**
+     * @deprecated Block 'klib' was removed. Nested property 'enabled' was removed - ABI dumps always generated for klib-based targets. 'keepUnsupportedTargets' was moved to the higher level.
+     */
+    @Deprecated(
+        "Block 'klib' was removed.\n\tNested property 'enabled' was removed - ABI dumps always generated for klib-based targets.\n\t'keepUnsupportedTargets' was moved to the higher level.",
+        level = DeprecationLevel.ERROR
+    )
+    @Suppress("DEPRECATION_ERROR")
+    fun klib(action: Action<AbiValidationKlibKindExtension>) {
+        error("Block 'klib' was removed.\n\tNested property 'enabled' was removed - ABI dumps always generated for klib-based targets.\n\t'keepUnsupportedTargets' was moved to the higher level.")
+    }
+}
+
+/**
+ * @deprecated The class 'AbiValidationVariantSpec' was removed.
+ */
+@KotlinGradlePluginDsl
+@Deprecated("The class 'AbiValidationVariantSpec' was removed.", level = DeprecationLevel.ERROR)
+@ExperimentalAbiValidation
+interface AbiValidationVariantSpec {
+    /**
+     * Left for source compatibility.
+     * The @Deprecated annotation is not needed because there is no way to use it from the script.
+     */
+    val filters: AbiFiltersSpec
+
+    /**
+     * Left for source compatibility.
+     * The @Deprecated annotation is not needed because there is no way to use it from the script.
+     */
+    fun filters(action: Action<AbiFiltersSpec>) {
+        action.execute(filters)
+    }
+
+    /**
+     * Left for source compatibility.
+     * The @Deprecated annotation is not needed because there is no way to use it from the script.
+     */
+    @Suppress("DEPRECATION_ERROR")
+    val legacyDump: AbiValidationLegacyDumpExtension
+
+    /**
+     * Left for source compatibility.
+     * The @Deprecated annotation is not needed because there is no way to use it from the script.
+     */
+    @Suppress("DEPRECATION_ERROR")
     fun legacyDump(action: Action<AbiValidationLegacyDumpExtension>) {
         action.execute(legacyDump)
     }
@@ -208,25 +293,34 @@ interface AbiValidationVariantSpec : Named {
     /**
      * The constants for ABI validation variants.
      */
-    @ExperimentalAbiValidation
     companion object {
         /**
-         * The report variant name for the variant configured in the `kotlin {}` block:
-         *
-         * ```kotlin
-         * kotlin {
-         *     abiValidation {
-         *         // main variant
-         *     }
-         * }
-         * ```
-
-         *
-         * This variant is also called the "main variant".
-         *
-         * See [AbiValidationVariantSpec] for more details about report variants.
+         * @deprecated Variants DSL was removed and is no longer supported.
          */
-        @ExperimentalAbiValidation
+        @Deprecated("Variants DSL was removed and is no longer supported.", level = DeprecationLevel.ERROR)
         const val MAIN_VARIANT_NAME = "main"
     }
+}
+
+/**
+ * Type of the source of the binaries to extract ABI declarations from.
+ */
+enum class BinariesSource {
+    /**
+     * The binaries are taken from the Maven publications of the project.
+     * To do this, the `maven-publish` plugin must be applied, the Maven publications must be created and configured correctly.
+     *
+     * Only publishable artifacts for which no classifier is specified (is null) are taken into account.
+     */
+    MAVEN_PUBLICATIONS,
+
+    /**
+     * The binaries are taken from the output of the Kotlin compilation task for main and commonMain source sets.
+     */
+    MAIN_COMPILATION,
+
+    /**
+     * The binaries are taken from the output of the Kotlin compilation tasks which do not contain the word `test` in the name in any case.
+     */
+    NON_TEST_COMPILATIONS
 }

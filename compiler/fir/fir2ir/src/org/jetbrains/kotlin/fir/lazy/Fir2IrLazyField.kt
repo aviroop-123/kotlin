@@ -20,8 +20,8 @@ import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
 import org.jetbrains.kotlin.fir.propertyIfBackingField
+import org.jetbrains.kotlin.fir.resultOrNull
 import org.jetbrains.kotlin.fir.unwrapFakeOverrides
-import org.jetbrains.kotlin.fir.unwrapOr
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
@@ -29,7 +29,7 @@ import org.jetbrains.kotlin.ir.declarations.IrField
 import org.jetbrains.kotlin.ir.declarations.MetadataSource
 import org.jetbrains.kotlin.ir.declarations.createExpressionBody
 import org.jetbrains.kotlin.ir.declarations.lazy.lazyVar
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
 import org.jetbrains.kotlin.ir.symbols.IrFieldSymbol
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
@@ -50,7 +50,7 @@ class Fir2IrLazyField(
         symbol.bind(this)
     }
 
-    override var annotations: List<IrConstructorCall> by createLazyAnnotations()
+    override var annotations: List<IrAnnotation> by createLazyAnnotations()
 
     @ObsoleteDescriptorBasedAPI
     override val descriptor: PropertyDescriptor
@@ -81,7 +81,7 @@ class Fir2IrLazyField(
 
     override var initializer: IrExpressionBody? by lazyVar(lock) {
         val field = fir.unwrapFakeOverrides()
-        val evaluatedInitializer = (field.propertyIfBackingField as? FirProperty)?.evaluatedInitializer?.unwrapOr<FirExpression> {}
+        val evaluatedInitializer = (field.propertyIfBackingField as? FirProperty)?.evaluatedInitializer?.resultOrNull<FirExpression>()
         when (val initializer = evaluatedInitializer ?: field.initializer) {
             is FirLiteralExpression -> factory.createExpressionBody(initializer.toIrConst(type))
             else -> null

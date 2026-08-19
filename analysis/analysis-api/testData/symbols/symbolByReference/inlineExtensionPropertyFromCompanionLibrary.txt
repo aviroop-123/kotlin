@@ -6,8 +6,12 @@ KaKotlinPropertySymbol:
     compilerVisibility: Private
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
+    isNotDefault: false
     isVal: true
     location: PROPERTY
     modality: FINAL
@@ -28,6 +32,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: MyClass.Companion
     getContainingModule: KaLibraryModule "Library library"
     deprecationStatus: null
+    importableFqName: null
   callableId: /MyClass.Companion.extension
   compilerVisibility: Public
   contextParameters: []
@@ -39,8 +44,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: true
     isNotDefault: true
     isOverride: false
@@ -53,8 +60,11 @@ KaKotlinPropertySymbol:
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL
@@ -71,6 +81,7 @@ KaKotlinPropertySymbol:
       getContainingJvmClassName: MyClass.Companion
       getContainingModule: KaLibraryModule "Library library"
       deprecationStatus: null
+      importableFqName: null
     returnType: KaUsualClassType:
       annotations: []
       typeArguments: []
@@ -85,13 +96,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: MyClass.Companion
     getContainingModule: KaLibraryModule "Library library"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: false
   hasGetter: true
   hasSetter: false
   initializer: null
   isActual: false
+  isCompanion: false
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: true
   isExternal: false
@@ -110,8 +123,11 @@ KaKotlinPropertySymbol:
     compilerVisibility: Public
     contextReceivers: []
     isActual: false
+    isCompanion: false
+    isDelegated: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isVal: true
     location: LOCAL
     modality: FINAL
@@ -128,6 +144,7 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: MyClass.Companion
     getContainingModule: KaLibraryModule "Library library"
     deprecationStatus: null
+    importableFqName: null
   returnType: KaUsualClassType:
     annotations: []
     typeArguments: []
@@ -143,8 +160,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: MyClass.Companion
   getContainingModule: KaLibraryModule "Library library"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getExtension
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: true
+  importableFqName: MyClass.Companion.extension

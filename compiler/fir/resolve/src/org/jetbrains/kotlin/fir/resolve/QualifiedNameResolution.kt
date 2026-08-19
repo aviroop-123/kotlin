@@ -6,18 +6,19 @@
 package org.jetbrains.kotlin.fir.resolve
 
 import org.jetbrains.kotlin.KtSourceElement
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.SessionHolder
 import org.jetbrains.kotlin.fir.declarations.FirClass
-import org.jetbrains.kotlin.fir.declarations.getDeprecationForCallSite
 import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.unwrapSmartcastExpression
+import org.jetbrains.kotlin.fir.isEnabled
 import org.jetbrains.kotlin.fir.lookupTracker
 import org.jetbrains.kotlin.fir.recordNameLookup
 import org.jetbrains.kotlin.fir.references.impl.FirSimpleNamedReference
-import org.jetbrains.kotlin.fir.resolve.diagnostics.ConeDeprecated
 import org.jetbrains.kotlin.fir.resolve.diagnostics.ConeNestedClassAccessedViaInstanceReference
 import org.jetbrains.kotlin.fir.resolve.providers.impl.FirTypeCandidateCollector
 import org.jetbrains.kotlin.fir.scopes.FirScope
@@ -43,12 +44,16 @@ fun BodyResolveComponents.resolveRootPartOfQualifier(
     isUsedAsReceiver: Boolean,
 ): QualifierResolutionResult? {
     val name = namedReference.name
-    if (name.asString() == ROOT_PREFIX_FOR_IDE_RESOLUTION_MODE) {
+    if (FirQualifierResolver.isRootIdePackageAllowed() && name.asString() == ROOT_PREFIX_FOR_IDE_RESOLUTION_MODE) {
         return buildResolvedQualifierResult(
             qualifiedAccess = qualifiedAccess,
             packageFqName = FqName.ROOT,
             nonFatalDiagnostics = nonFatalDiagnosticsFromExpression,
-            resolvedSymbolOrigin = FirResolvedSymbolOrigin.Qualified
+            resolvedSymbolOrigin =
+                if (FirQualifierResolver.isRootIdePackageDeprecated())
+                    FirResolvedSymbolOrigin.QualifiedWithDeprecatedRootIdePackage
+                else
+                    FirResolvedSymbolOrigin.Qualified
         )
     }
 
@@ -83,11 +88,12 @@ fun BodyResolveComponents.resolveRootPartOfQualifier(
 
     // KT-72173 To mimic K1 behavior,
     // we allow resolving to classifiers in the root package without import if they are receivers but not top-level.
-    return FqName.ROOT.continueQualifierInPackage(
+    return continueQualifierInPackage(
+        FqName.ROOT,
         name,
         qualifiedAccess,
         nonFatalDiagnosticsFromExpression,
-        this
+        explicitParent = null,
     ).takeIf { isUsedAsReceiver || it?.qualifier?.symbol == null }
 }
 
@@ -100,12 +106,19 @@ fun FirResolvedQualifier.continueQualifier(
 ): QualifierResolutionResult? {
     val name = namedReference.name
 
+    val resolvedSymbolOriginForNextQualifierPart =
+        (qualifiedAccess.explicitReceiver as? FirResolvedQualifier)?.resolvedSymbolOrigin
+            ?.takeIf { it == FirResolvedSymbolOrigin.QualifiedWithDeprecatedRootIdePackage }
+            ?: FirResolvedSymbolOrigin.Qualified
+
     // No symbol means it's a package. Continue resolution in that package.
-    val outerClassSymbol = symbol ?: return packageFqName.continueQualifierInPackage(
+    val outerClassSymbol = symbol ?: return components.continueQualifierInPackage(
+        packageFqName,
         name,
         qualifiedAccess,
         nonFatalDiagnosticsFromExpression,
-        components
+        explicitParent = this,
+        resolvedSymbolOriginForNextQualifierPart,
     )
 
     val firClass = outerClassSymbol.fir
@@ -121,15 +134,12 @@ fun FirResolvedQualifier.continueQualifier(
         components.file.source
     )
 
-    val candidate = nestedClassifierScope.getUnambiguousCandidate(name, components) ?: return null
+    val candidate = nestedClassifierScope.getUnambiguousCandidate(name, components, resolvedSymbolOriginForNextQualifierPart) ?: return null
     val nestedClassSymbol = candidate.symbol as? FirClassLikeSymbol ?: return null
 
     val nonFatalDiagnostics = extractNonFatalDiagnostics(
-        qualifiedAccess.source,
         explicitReceiver = null,
-        nestedClassSymbol,
         extraNotFatalDiagnostics = nonFatalDiagnosticsFromExpression,
-        session
     )
 
     return components.buildResolvedQualifierResult(
@@ -140,54 +150,61 @@ fun FirResolvedQualifier.continueQualifier(
         nonFatalDiagnostics = nonFatalDiagnostics,
         extraTypeArguments = this@continueQualifier.typeArguments,
         candidate = candidate,
-        explicitParent = this,
+        explicitParent = this@continueQualifier,
     )
 }
 
-private fun FirScope.getUnambiguousCandidate(name: Name, components: BodyResolveComponents): FirTypeCandidateCollector.TypeCandidate? {
+private fun FirScope.getUnambiguousCandidate(
+    name: Name,
+    components: BodyResolveComponents,
+    resolvedSymbolOrigin: FirResolvedSymbolOrigin? = null,
+): FirTypeCandidateCollector.TypeCandidate? {
     val collector = FirTypeCandidateCollector(components.session, components.file, components.containingDeclarations)
     processClassifiersByName(name) {
-        collector.processCandidate(it, null, this@getUnambiguousCandidate.toResolvedSymbolOrigin())
+        collector.processCandidate(it, null, resolvedSymbolOrigin ?: this@getUnambiguousCandidate.toResolvedSymbolOrigin())
     }
     return collector.getResult().resolvedCandidateOrNull()
 }
 
-private fun FqName.continueQualifierInPackage(
+private fun BodyResolveComponents.continueQualifierInPackage(
+    parentFqName: FqName,
     name: Name,
     qualifiedAccess: FirQualifiedAccessExpression,
     nonFatalDiagnosticsFromExpression: List<ConeDiagnostic>?,
-    components: BodyResolveComponents,
+    explicitParent: FirResolvedQualifier?,
+    resolvedSymbolOrigin: FirResolvedSymbolOrigin = FirResolvedSymbolOrigin.Qualified,
 ): QualifierResolutionResult? {
-    val childFqName = this.child(name)
-    if (components.symbolProvider.hasPackage(childFqName)) {
-        return components.buildResolvedQualifierResult(
+    val childFqName = parentFqName.child(name)
+    if (qualifiedAccess.canBePackagePartOfQualifier() && symbolProvider.hasPackage(childFqName)) {
+        return buildResolvedQualifierResult(
             qualifiedAccess = qualifiedAccess,
             packageFqName = childFqName,
             nonFatalDiagnostics = nonFatalDiagnosticsFromExpression,
-            resolvedSymbolOrigin = FirResolvedSymbolOrigin.Qualified,
+            resolvedSymbolOrigin = resolvedSymbolOrigin,
         )
     }
 
     val classId = ClassId.topLevel(childFqName)
-    val symbol = components.symbolProvider.getClassLikeSymbolByClassId(classId) ?: return null
-    val collector = FirTypeCandidateCollector(components.session, components.file, components.containingDeclarations)
-    collector.processCandidate(symbol, resolvedSymbolOrigin = FirResolvedSymbolOrigin.Qualified)
+    val symbol = symbolProvider.getClassLikeSymbolByClassId(classId) ?: return null
+    val collector = FirTypeCandidateCollector(session, file, containingDeclarations)
+    collector.processCandidate(
+        symbol,
+        resolvedSymbolOrigin = if (annotatedPackageQualifiersForbidden) FirResolvedSymbolOrigin.Qualified else resolvedSymbolOrigin,
+    )
     val candidate = collector.getResult().resolvedCandidateOrNull()
 
     val nonFatalDiagnostics = extractNonFatalDiagnostics(
-        qualifiedAccess.source,
         explicitReceiver = null,
-        symbol,
         extraNotFatalDiagnostics = nonFatalDiagnosticsFromExpression,
-        components.session
     )
-    return components.buildResolvedQualifierResult(
+    return buildResolvedQualifierResult(
         qualifiedAccess = qualifiedAccess,
-        packageFqName = this@continueQualifierInPackage,
+        packageFqName = parentFqName,
         relativeClassFqName = classId.relativeClassName,
         symbol = symbol,
         candidate = candidate,
         nonFatalDiagnostics = nonFatalDiagnostics,
+        explicitParent = explicitParent.takeIf { annotatedPackageQualifiersForbidden },
     )
 }
 
@@ -199,11 +216,8 @@ private fun BodyResolveComponents.buildResolvedQualifierResultForTopLevelClass(
 ): QualifierResolutionResult {
     val classId = symbol.classId
     val nonFatalDiagnostics = extractNonFatalDiagnostics(
-        qualifiedAccess.source,
         explicitReceiver = null,
-        symbol,
         extraNotFatalDiagnostics = nonFatalDiagnosticsFromExpression,
-        session
     )
     return buildResolvedQualifierResult(
         qualifiedAccess = qualifiedAccess,
@@ -254,28 +268,37 @@ internal fun extractNestedClassAccessDiagnostic(
 }
 
 internal fun extractNonFatalDiagnostics(
-    source: KtSourceElement?,
     explicitReceiver: FirExpression?,
-    symbol: FirClassLikeSymbol<*>,
-    extraNotFatalDiagnostics: List<ConeDiagnostic>?,
-    session: FirSession,
+    extraNotFatalDiagnostics: List<ConeDiagnostic>?
 ): List<ConeDiagnostic> {
     val prevDiagnostics = (explicitReceiver?.unwrapSmartcastExpression() as? FirResolvedQualifier)?.nonFatalDiagnostics ?: emptyList()
-    var result: MutableList<ConeDiagnostic>? = null
-
-    val deprecation = symbol.getDeprecationForCallSite(session)
-    if (deprecation != null) {
-        result = mutableListOf()
-        result.addAll(prevDiagnostics)
-        result.add(ConeDeprecated(source, symbol, deprecation))
+    return when {
+        !extraNotFatalDiagnostics.isNullOrEmpty() -> prevDiagnostics + extraNotFatalDiagnostics
+        else -> prevDiagnostics
     }
-    if (extraNotFatalDiagnostics != null && extraNotFatalDiagnostics.isNotEmpty()) {
-        if (result == null) {
-            result = mutableListOf()
-            result.addAll(prevDiagnostics)
-        }
-        result.addAll(extraNotFatalDiagnostics)
-    }
-
-    return result?.toList() ?: prevDiagnostics
 }
+
+/**
+ * ```kotlin
+ * package part1.part2.part3
+ *
+ * fun foo() { }
+ * ```
+ * If the user wrote something like `part1.part2<Int>.part3.foo()` it is generally unclear what they wanted.
+ *
+ * This function forces (when the feature is on) for `part2` to become an unresolved `FirPropertyAccessExpression`.
+ * The reason for this is that we have better control over unresolved property accesses: we do not have a `FirResolvedQualifier` for each
+ * package part which means we may drop annotations and type arguments on these part from FIR (which is bad for AA).
+ */
+context(sessionHolder: SessionHolder)
+private fun FirQualifiedAccessExpression.canBePackagePartOfQualifier(): Boolean {
+    if (!annotatedPackageQualifiersForbidden) {
+        return true
+    }
+
+    return annotations.isEmpty() && typeArguments.isEmpty()
+}
+
+context(sessionHolder: SessionHolder)
+private val annotatedPackageQualifiersForbidden: Boolean
+    get() = LanguageFeature.ForbidAnnotationsTypeArgumentsAndParenthesesForPackageQualifier.isEnabled()

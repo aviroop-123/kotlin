@@ -8,8 +8,7 @@ package org.jetbrains.kotlin.ir.inline
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.LoweringContext
 import org.jetbrains.kotlin.backend.common.lower.inline.KlibSyntheticAccessorGenerator
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
-import org.jetbrains.kotlin.descriptors.DescriptorVisibilities.*
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrExpression
@@ -21,13 +20,13 @@ import org.jetbrains.kotlin.ir.irAttribute
 import org.jetbrains.kotlin.ir.util.file
 import org.jetbrains.kotlin.ir.util.parents
 import org.jetbrains.kotlin.ir.util.render
-import org.jetbrains.kotlin.ir.visitors.*
+import org.jetbrains.kotlin.ir.visitors.IrTransformer
 import org.jetbrains.kotlin.utils.addToStdlib.getOrSetIfNull
 
 /**
  * Generates a special private member accessor for outer@this implicit value parameter in inline functions.
  */
-@PhaseDescription("OuterThisInInlineFunctionsSpecialAccessorLowering")
+@PhasePrerequisites(FunctionInlining::class) // private inline only
 class OuterThisInInlineFunctionsSpecialAccessorLowering(context: LoweringContext) : FileLoweringPass {
     private val accessorGenerator = KlibSyntheticAccessorGenerator(context)
 
@@ -60,7 +59,7 @@ class OuterThisInInlineFunctionsSpecialAccessorLowering(context: LoweringContext
     }
 
     private fun addAccessorsToParents(accessors: Collection<IrSimpleFunction>) {
-        for ((innerClass, accessorsInInnerClass) in accessors.groupBy { it.parent as IrClass }) {
+        for ([innerClass, accessorsInInnerClass] in accessors.groupBy { it.parent as IrClass }) {
             if (accessorsInInnerClass.size == 1) {
                 innerClass.declarations += accessorsInInnerClass[0]
             } else {

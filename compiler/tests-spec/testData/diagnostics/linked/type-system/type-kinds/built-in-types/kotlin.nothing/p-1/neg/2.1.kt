@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION -UNREACHABLE_CODE
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -16,7 +15,7 @@
 class Case1(val nothing: Nothing)
 
 fun case1() {
-    val res = Case1(<!INVISIBLE_MEMBER!>Nothing<!>())
+    val res = Case1(<!INVISIBLE_REFERENCE!>Nothing<!>())
 }
 
 
@@ -27,5 +26,5 @@ class Case2 {
 
 fun case2(c: Case2) {
     val testValue = c.data ?: throw IllegalArgumentException("data required")
-    testValue checkType { <!NONE_APPLICABLE!>check<!><Nothing>() }
+    testValue checkType { <!NONE_APPLICABLE, NO_VALUE_FOR_PARAMETER!>check<!><Nothing>() }
 }

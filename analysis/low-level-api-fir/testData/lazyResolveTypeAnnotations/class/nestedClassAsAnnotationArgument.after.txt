@@ -1,4 +1,4 @@
-@R|Special|(why = <getClass>(Q|Outer.Nested|))  Interface
+@R|Special|(why = <getClass>(Q|Outer.Nested|) [evaluated = <getClass>(Q|Outer.Nested|)])  Interface
   context -> FirRegularClassSymbol Outer.Nested
   anchor -> [FirRegularClassSymbol Outer.Nested]
 
@@ -15,12 +15,12 @@ FILE: [ResolvedTo(IMPORTS)] nestedClassAsAnnotationArgument.kt
     public final? [ResolvedTo(SUPER_TYPES)] interface Interface : R|kotlin/Any| {
     }
     public final [ResolvedTo(STATUS)] class Outer : R|kotlin/Any| {
-        public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Outer] constructor(): R|Outer| {
+        public [ResolvedTo(STATUS)] [ContainingClassKey=Outer] constructor(): R|Outer| {
             LAZY_super<R|kotlin/Any|>
         }
 
-        @R|Special|[Types](why = <getClass>(Q|Outer.Nested|)) public final [ResolvedTo(ANNOTATION_ARGUMENTS)] class Nested<@R|Special|[Types](why = <getClass>(Q|Outer.Nested|)) [ResolvedTo(ANNOTATION_ARGUMENTS)] T> : R|@R|Special|(why = <getClass>(Q|Outer.Nested|))  Interface| {
-            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Nested] constructor<@R|Special|[Types](why = <getClass>(Q|Outer.Nested|)) [ResolvedTo(ANNOTATION_ARGUMENTS)] T>(): R|Outer.Nested<T>| {
+        @R|Special|[Types](why = <getClass>(Q|Outer.Nested|) [evaluated = <getClass>(Q|Outer.Nested|)]) public final [ResolvedTo(ANNOTATION_ARGUMENTS)] class Nested<@R|Special|[Types](why = <getClass>(Q|Outer.Nested|) [evaluated = <getClass>(Q|Outer.Nested|)]) [ResolvedTo(ANNOTATION_ARGUMENTS)] T> : R|@R|Special|(why = <getClass>(Q|Outer.Nested|) [evaluated = <getClass>(Q|Outer.Nested|)])  Interface| {
+            public? [ResolvedTo(RAW_FIR)] [ContainingClassKey=Nested] constructor<@R|Special|[Types](why = <getClass>(Q|Outer.Nested|) [evaluated = <getClass>(Q|Outer.Nested|)]) [ResolvedTo(ANNOTATION_ARGUMENTS)] T>(): R|Outer.Nested<T>| {
                 LAZY_super<<implicit>>
             }
 

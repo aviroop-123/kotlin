@@ -12,12 +12,14 @@ val Project.intellijVersion
 
 fun Project.intellijCore() = dependencies.project(":dependencies:intellij-core")
 fun Project.intellijUtilRt() = "com.jetbrains.intellij.platform:util-rt:$intellijVersion"
+fun Project.intellijUtilRtJava8() = "com.jetbrains.intellij.platform:util-rt-java8:$intellijVersion"
 
 fun Project.jpsModel() = "com.jetbrains.intellij.platform:jps-model:$intellijVersion"
 fun Project.jpsModelSerialization() = "com.jetbrains.intellij.platform:jps-model-serialization:$intellijVersion"
 fun Project.jpsModelImpl() = "com.jetbrains.intellij.platform:jps-model-impl:$intellijVersion"
 fun Project.jpsBuildTest() = "com.jetbrains.intellij.idea:jps-build-test:$intellijVersion"
 fun Project.jpsBuild() = "com.jetbrains.intellij.platform:jps-build:$intellijVersion"
+fun Project.jpsBuildJavacRt() = "com.jetbrains.intellij.platform:jps-build-javac-rt:$intellijVersion"
 fun Project.testFramework() = "com.jetbrains.intellij.platform:test-framework:$intellijVersion"
 fun Project.devKitJps() = "com.jetbrains.intellij.devkit:devkit-jps:$intellijVersion"
 fun Project.intellijPlatformUtil() = "com.jetbrains.intellij.platform:util:$intellijVersion"

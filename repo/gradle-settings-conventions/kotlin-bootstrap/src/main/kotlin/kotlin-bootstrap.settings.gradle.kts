@@ -149,11 +149,10 @@ private fun RepositoryHandler.addBootstrapRepo(
                 .toTypedArray()
         )
         filter {
-            // kotlin-build-gradle-plugin and non-bootstrap versions
-            // should be excluded from strict content filtering
+            // non-bootstrap versions should be excluded from strict content filtering
             includeVersionByRegex(
                 "org\\.jetbrains\\.kotlin",
-                "^(?!kotlin-build-gradle-plugin).*$",
+                ".*",
                 bootstrapVersion.toRegex().pattern
             )
 
@@ -197,26 +196,30 @@ private fun Settings.applyBootstrapConfiguration(
 
         repositories.addBootstrapRepo(bootstrapRepo, bootstrapVersion, additionalRepos)
 
-        fun Configuration.substituteProjectsWithBootstrap() {
+        fun Configuration.substituteProjectsWithBootstrap(substituteReason: String) {
             if (path == ":kotlin-stdlib") {
                 resolutionStrategy.dependencySubstitution {
                     substitute(module("org.jetbrains.kotlin:kotlin-stdlib"))
                         .using(project(":dependencies:bootstrap:kotlin-stdlib-bootstrap"))
+                        .because(substituteReason)
                 }
             } else if (path == ":kotlin-script-runtime") {
                 resolutionStrategy.dependencySubstitution {
                     substitute(module("org.jetbrains.kotlin:kotlin-script-runtime"))
                         .using(project(":dependencies:bootstrap:kotlin-script-runtime-bootstrap"))
+                        .because(substituteReason)
                 }
             } else if (path == ":kotlin-reflect") {
                 resolutionStrategy.dependencySubstitution {
                     substitute(module("org.jetbrains.kotlin:kotlin-reflect"))
                         .using(project(":dependencies:bootstrap:kotlin-reflect-bootstrap"))
+                        .because(substituteReason)
                 }
             } else if (path == ":kotlin-compiler-embeddable") {
                 resolutionStrategy.dependencySubstitution {
                     substitute(module("org.jetbrains.kotlin:kotlin-compiler-embeddable"))
                         .using(project(":dependencies:bootstrap:kotlin-compiler-embeddable-bootstrap"))
+                        .because(substituteReason)
                 }
             }
         }
@@ -224,20 +227,25 @@ private fun Settings.applyBootstrapConfiguration(
         configurations.configureEach {
             // Overriding the Kotlin compiler classpath
             if (name == "kotlinCompilerClasspath") {
-                dependencies.add(
-                    project.dependencies.enforcedPlatform("org.jetbrains.kotlin:kotlin-bom:$bootstrapVersion")
-                )
+                val compilerClasspathSubstituteReason = "Override Kotlin compiler classpath with bootstrap"
                 dependencies.add(
                     project.dependencies.create("org.jetbrains.kotlin:kotlin-compiler-embeddable:$bootstrapVersion")
+                )
+                dependencies.add(
+                    project.dependencies.create("org.jetbrains.kotlin:kotlin-build-tools-compat:$bootstrapVersion")
+                )
+                dependencies.add(
+                    project.dependencies.create("org.jetbrains.kotlin:kotlin-build-tools-impl:$bootstrapVersion")
                 )
                 dependencyConstraints.add(
                     project.dependencies.constraints.create("org.jetbrains.kotlin:kotlin-compiler-embeddable") {
                         version {
                             strictly(bootstrapVersion)
+                            because(compilerClasspathSubstituteReason)
                         }
                     }
                 )
-                substituteProjectsWithBootstrap()
+                substituteProjectsWithBootstrap(compilerClasspathSubstituteReason)
             }
 
             // Removing scripting support
@@ -252,32 +260,74 @@ private fun Settings.applyBootstrapConfiguration(
                 exclude("org.jetbrains.kotlin", "kotlin-scripting-compiler-embeddable")
             }
 
-            // Overriding built tools API classpath
+            // Overriding build tools API classpath
             if (name == "kotlinBuildToolsApiClasspath") {
+                val buildToolsAPIClasspathSubstituteReason = "Override build tools API classpath with bootstrap"
+
                 if (path == ":compiler:build-tools:kotlin-build-tools-api") {
                     resolutionStrategy.dependencySubstitution {
                         substitute(module("org.jetbrains.kotlin:kotlin-build-tools-api"))
                             .using(project(":dependencies:bootstrap:kotlin-build-tools-api-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
                     }
                 } else if (path == ":kotlin-daemon-client") {
                     resolutionStrategy.dependencySubstitution {
                         substitute(module("org.jetbrains.kotlin:kotlin-daemon-client"))
                             .using(project(":dependencies:bootstrap:kotlin-daemon-client-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
+                    }
+                } else if (path == ":kotlin-scripting-common") {
+                    resolutionStrategy.dependencySubstitution {
+                        substitute(module("org.jetbrains.kotlin:kotlin-scripting-common"))
+                            .using(project(":dependencies:bootstrap:kotlin-scripting-common-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
+                    }
+                } else if (path == ":kotlin-scripting-jvm") {
+                    resolutionStrategy.dependencySubstitution {
+                        substitute(module("org.jetbrains.kotlin:kotlin-scripting-jvm"))
+                            .using(project(":dependencies:bootstrap:kotlin-scripting-jvm-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
+                    }
+                } else if (path == ":kotlin-tooling-core") {
+                    resolutionStrategy.dependencySubstitution {
+                        substitute(module("org.jetbrains.kotlin:kotlin-tooling-core"))
+                            .using(project(":dependencies:bootstrap:kotlin-tooling-core-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
                     }
                 } else if (path == ":compiler:build-tools:kotlin-build-tools-impl") {
                     resolutionStrategy.dependencySubstitution {
                         substitute(module("org.jetbrains.kotlin:kotlin-build-tools-impl"))
                             .using(project(":dependencies:bootstrap:kotlin-build-tools-impl-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
+                    }
+                } else if (path == ":compiler:build-tools:kotlin-build-tools-compat") {
+                    resolutionStrategy.dependencySubstitution {
+                        substitute(module("org.jetbrains.kotlin:kotlin-build-tools-compat"))
+                            .using(project(":dependencies:bootstrap:kotlin-build-tools-compat-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
+                    }
+                } else if (path == ":compiler:build-tools:kotlin-build-tools-cri-impl") {
+                    resolutionStrategy.dependencySubstitution {
+                        substitute(module("org.jetbrains.kotlin:kotlin-build-tools-cri-impl"))
+                            .using(project(":dependencies:bootstrap:kotlin-build-tools-cri-impl-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
+                    }
+                } else if (path == ":kotlin-compiler-runner") {
+                    resolutionStrategy.dependencySubstitution {
+                        substitute(module("org.jetbrains.kotlin:kotlin-compiler-runner"))
+                            .using(project(":dependencies:bootstrap:kotlin-compiler-runner-bootstrap"))
+                            .because(buildToolsAPIClasspathSubstituteReason)
                     }
                 }
 
-                substituteProjectsWithBootstrap()
+                substituteProjectsWithBootstrap(buildToolsAPIClasspathSubstituteReason)
             }
 
             if (name == "kotlinKlibCommonizerClasspath" && path == ":kotlin-stdlib") {
                 resolutionStrategy.dependencySubstitution {
                     substitute(module("org.jetbrains.kotlin:kotlin-stdlib"))
                         .using(project(":dependencies:bootstrap:kotlin-stdlib-bootstrap"))
+                        .because("Override commonizer classpath with bootstrap")
                 }
             }
         }

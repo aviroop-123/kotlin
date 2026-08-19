@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.asJava.classes.*
 import org.jetbrains.kotlin.asJava.isGetEntriesMethod
 import org.jetbrains.kotlin.asJava.isSyntheticValuesOrValueOfMethod
 import org.jetbrains.kotlin.load.java.structure.LightClassOriginKind
+import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
 
 internal inline fun <R : PsiElement, T> R.cachedValueWithLibraryTracker(
@@ -35,7 +36,7 @@ internal inline fun <R : PsiElement, T> R.cachedValueWithLibraryTracker(
     )
 }
 
-private inline fun <reified T> Collection<T>.toArrayIfNotEmptyOrDefault(default: Array<T>): Array<T> {
+internal inline fun <reified T> Collection<T>.toArrayIfNotEmptyOrDefault(default: Array<T>): Array<T> {
     return if (isNotEmpty()) toTypedArray() else default
 }
 
@@ -121,6 +122,23 @@ open class KtLightClassForDecompiledDeclaration(
 
     override fun isEnum(): Boolean = clsDelegate.isEnum
     override fun isRecord(): Boolean = clsDelegate.isRecord
+
+    override fun getRecordHeader(): PsiRecordHeader? = cachedValueWithLibraryTracker {
+        val clsRecordHeader = clsDelegate.recordHeader
+        if (clsRecordHeader != null) {
+            KtLightRecordHeaderForDecompiledDeclaration(
+                clsDelegate = clsRecordHeader,
+                containingClass = this,
+                kotlinOrigin = kotlinOrigin?.primaryConstructor,
+            )
+        } else {
+            null
+        }
+    }
+
+    override fun getRecordComponents(): Array<PsiRecordComponent> =
+        recordHeader?.recordComponents ?: PsiRecordComponent.EMPTY_ARRAY
+
     override fun getExtendsListTypes(): Array<PsiClassType> = PsiClassImplUtil.getExtendsListTypes(this)
     override fun getTypeParameterList(): PsiTypeParameterList? = clsDelegate.typeParameterList
     override fun isAnnotationType(): Boolean = clsDelegate.isAnnotationType
@@ -222,7 +240,6 @@ open class KtLightClassForDecompiledDeclaration(
     override fun hashCode(): Int = qualifiedName?.hashCode() ?: kotlinOrigin?.fqName?.hashCode() ?: 0
     override fun copy(): PsiElement = this
     override fun clone(): Any = this
-    override fun toString(): String = "${this.javaClass.simpleName} of $parent"
     override fun getName(): String? = clsDelegate.name
     override fun isValid(): Boolean = file.isValid && clsDelegate.isValid && (kotlinOrigin?.isValid != false)
 }

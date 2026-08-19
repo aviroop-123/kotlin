@@ -15,22 +15,17 @@ import org.jetbrains.kotlin.diagnostics.hasVar
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
+import org.jetbrains.kotlin.fir.analysis.checkers.canBeEvaluated
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.getAllowedAnnotationTargets
 import org.jetbrains.kotlin.fir.analysis.checkers.getTargetAnnotation
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
-import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.CYCLE_IN_ANNOTATION_PARAMETER
+import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.CYCLE_IN_ANNOTATION_PARAMETER_ERROR
 import org.jetbrains.kotlin.fir.declarations.*
-import org.jetbrains.kotlin.fir.declarations.primaryConstructorIfAny
-import org.jetbrains.kotlin.fir.expressions.canBeEvaluatedAtCompileTime
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.name.StandardClassIds.primitiveArrayTypeByElementType
@@ -64,8 +59,8 @@ object FirAnnotationClassDeclarationChecker : FirRegularClassChecker(MppCheckerK
 
     context(context: CheckerContext, reporter: DiagnosticReporter)
     private fun checkAnnotationClassMember(member: FirBasedSymbol<*>) {
-        when {
-            member is FirConstructorSymbol && member.isPrimary -> {
+        when (member) {
+            is FirConstructorSymbol if member.isPrimary -> {
                 for (parameter in member.valueParameterSymbols) {
                     val source = parameter.source ?: continue
                     if (!source.hasValOrVar()) {
@@ -73,12 +68,10 @@ object FirAnnotationClassDeclarationChecker : FirRegularClassChecker(MppCheckerK
                     } else if (source.hasVar()) {
                         reporter.reportOn(source, FirErrors.VAR_ANNOTATION_PARAMETER)
                     }
-                    if (parameter.hasDefaultValue && !canBeEvaluatedAtCompileTime(
-                            parameter.resolvedDefaultValue, context.session, allowErrors = true, calledOnCheckerStage = true
-                        )
-                    ) {
+                    if (parameter.hasDefaultValue && parameter.resolvedDefaultValue != null && !canBeEvaluated(parameter.resolvedDefaultValue!!)) {
                         reporter.reportOn(
-                            parameter.defaultValueSource, FirErrors.ANNOTATION_PARAMETER_DEFAULT_VALUE_MUST_BE_CONSTANT
+                            parameter.defaultValueSource,
+                            FirErrors.ANNOTATION_PARAMETER_DEFAULT_VALUE_MUST_BE_CONSTANT
                         )
                     }
 
@@ -127,13 +120,13 @@ object FirAnnotationClassDeclarationChecker : FirRegularClassChecker(MppCheckerK
                     }
                 }
             }
-            member is FirRegularClassSymbol -> {
+            is FirRegularClassSymbol -> {
                 // DO NOTHING: nested annotation classes are allowed in 1.3+
             }
-            member is FirPropertySymbol && member.source?.elementType == VALUE_PARAMETER -> {
+            is FirPropertySymbol if member.source?.elementType == VALUE_PARAMETER -> {
                 // DO NOTHING to avoid reporting constructor properties
             }
-            member is FirNamedFunctionSymbol && member.isSynthetic -> {
+            is FirNamedFunctionSymbol if member.isSynthetic -> {
                 // DO NOTHING to avoid reporting synthetic functions
             }
             else -> {
@@ -188,7 +181,7 @@ object FirAnnotationClassDeclarationChecker : FirRegularClassChecker(MppCheckerK
         val checker = CycleChecker(annotation, context.session)
         for (valueParameter in primaryConstructor.valueParameterSymbols) {
             if (checker.parameterHasCycle(annotation, valueParameter)) {
-                reporter.reportOn(valueParameter.source, CYCLE_IN_ANNOTATION_PARAMETER)
+                reporter.reportOn(valueParameter.source, CYCLE_IN_ANNOTATION_PARAMETER_ERROR)
             }
         }
     }

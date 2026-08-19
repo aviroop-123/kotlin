@@ -5,15 +5,20 @@
 
 package org.jetbrains.kotlin.test.services
 
+import org.jetbrains.kotlin.test.isTeamCityBuild
 import org.jetbrains.kotlin.test.util.convertLineSeparators
 import org.jetbrains.kotlin.test.util.trimTrailingWhitespacesAndAddNewlineAtEOF
 import org.jetbrains.kotlin.utils.rethrow
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.function.Executable
 import org.opentest4j.AssertionFailedError
 import org.opentest4j.FileInfo
+import org.opentest4j.MultipleFailuresError
 import java.io.File
 import java.io.IOException
 import java.nio.charset.StandardCharsets
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 import org.junit.jupiter.api.Assertions as JUnit5PlatformAssertions
 
 object JUnit5Assertions : AssertionsService() {
@@ -24,16 +29,6 @@ object JUnit5Assertions : AssertionsService() {
             sanitizer,
             fileNotFoundMessageTeamCity = { "Expected data file did not exist `$expectedFile`" },
             fileNotFoundMessageLocal = { "Expected data file did not exist. Generating: $expectedFile" }).first
-    }
-
-    override fun assertEqualsToFile(expectedFile: File, actual: String, sanitizer: (String) -> String, message: () -> String) {
-        assertEqualsToFile(
-            expectedFile,
-            actual,
-            sanitizer,
-            differenceObtainedMessage = message,
-            fileNotFoundMessageTeamCity = { "Expected data file did not exist `$expectedFile`" },
-            fileNotFoundMessageLocal = { "Expected data file did not exist. Generating: $expectedFile" })
     }
 
     private fun doesEqualToFile(
@@ -62,19 +57,15 @@ object JUnit5Assertions : AssertionsService() {
         }
     }
 
-    fun assertEqualsToFile(
-        expectedFile: File,
-        actual: String,
-        sanitizer: (String) -> String,
-        differenceObtainedMessage: () -> String,
-        fileNotFoundMessageTeamCity: (File) -> String,
-        fileNotFoundMessageLocal: (File) -> String,
-    ) {
-        val (equalsToFile, expected) =
-            doesEqualToFile(expectedFile, actual, sanitizer, fileNotFoundMessageTeamCity, fileNotFoundMessageLocal)
+    override fun assertEqualsToFile(expectedFile: File, actual: String, sanitizer: (String) -> String, message: () -> String) {
+        val [equalsToFile, expected] = doesEqualToFile(
+            expectedFile, actual, sanitizer,
+            fileNotFoundMessageTeamCity = { "Expected data file did not exist `$expectedFile`" },
+            fileNotFoundMessageLocal = { "Expected data file did not exist. Generating: $expectedFile" },
+        )
         if (!equalsToFile) {
             throw AssertionFailedError(
-                "${differenceObtainedMessage()}: ${expectedFile.name}",
+                "${message()}: ${expectedFile.name}",
                 FileInfo(expectedFile.absolutePath, expected.toByteArray(StandardCharsets.UTF_8)),
                 actual,
             )
@@ -106,6 +97,13 @@ object JUnit5Assertions : AssertionsService() {
         JUnit5PlatformAssertions.assertAll(conditions.map { Executable { it() } })
     }
 
+    override fun unfoldException(e: Throwable): List<Throwable> {
+        return when (e) {
+            is MultipleFailuresError if e.failures.isNotEmpty() -> e.failures
+            else -> listOf(e)
+        }
+    }
+
     override fun assertNotNull(value: Any?, message: (() -> String)?) {
         JUnit5PlatformAssertions.assertNotNull(value, message)
     }
@@ -116,6 +114,14 @@ object JUnit5Assertions : AssertionsService() {
 
     override fun fail(message: () -> String): Nothing {
         org.junit.jupiter.api.fail(message)
+    }
+
+    override fun assumeFalse(value: Boolean, message: () -> String) {
+        Assumptions.assumeFalse(value, message)
+    }
+
+    override fun assertTimeoutPreemptively(timeout: Duration, message: () -> String, action: () -> Unit) {
+        org.junit.jupiter.api.assertTimeoutPreemptively(timeout.toJavaDuration(), message, action)
     }
 
     private object AssertionFailedErrorFirst : Comparator<Throwable> {

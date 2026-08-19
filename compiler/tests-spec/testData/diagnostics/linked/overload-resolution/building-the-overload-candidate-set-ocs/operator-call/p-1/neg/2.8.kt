@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -25,8 +24,8 @@ import LibPackCase1.b.plusAssign
 
 fun case1 (){
     var b: B = B()
-    b <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>+=<!>{ C() }
-    b <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>+=<!>{ 1 }
+    b <!OVERLOAD_RESOLUTION_AMBIGUITY!>+=<!>{ C() }
+    b <!OVERLOAD_RESOLUTION_AMBIGUITY!>+=<!>{ 1 }
 }
 
 class B
@@ -58,8 +57,8 @@ import LibPackCase2.b.plusAssign
 
 fun case2 (){
     var b: B = B()
-    b <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>+=<!>{ C() }
-    b <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>+=<!>{ 1 }
+    b <!OVERLOAD_RESOLUTION_AMBIGUITY!>+=<!>{ C() }
+    b <!OVERLOAD_RESOLUTION_AMBIGUITY!>+=<!>{ 1 }
 
     b.<!OVERLOAD_RESOLUTION_AMBIGUITY!>plusAssign<!>{ C() }
 }

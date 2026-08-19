@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("test-inputs-check")
     id("project-tests-convention")
 }
@@ -10,9 +9,9 @@ dependencies {
     api(commonDependency("javax.inject"))
     compileOnly(kotlinStdlib())
     compileOnly(intellijCore())
-    testApi(kotlinStdlib())
+    testImplementation(kotlinStdlib())
     testCompileOnly("org.jetbrains:annotations:13.0")
-    testApi(kotlinTest("junit5"))
+    testImplementation(kotlinTest("junit5"))
     testCompileOnly(intellijCore())
 
     testImplementation("org.junit.jupiter:junit-jupiter:${libs.versions.junit5.get()}")
@@ -25,6 +24,8 @@ sourceSets {
     "main" { projectDefault() }
     "test" { projectDefault() }
 }
+
+optInToK1Deprecation()
 
 testsJar {}
 

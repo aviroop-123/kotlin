@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 // JSPECIFY_STATE: warn
 // ALLOW_KOTLIN_PACKAGE
 
@@ -36,9 +35,9 @@ public class Test {
 import test.Test
 
 fun main(x: Test) {
-    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>x.Test3().foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
-    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>x.Test3().Test5().foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
+    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>x.Test3().foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
+    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>x.Test3().Test5().foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
 
-    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>Test.Test2().foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
-    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>Test.Test2().Test5().foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
+    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>Test.Test2().foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
+    <!DEBUG_INFO_EXPRESSION_TYPE("(kotlin.Int..kotlin.Int?)")!>Test.Test2().Test5().foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>)<!>
 }

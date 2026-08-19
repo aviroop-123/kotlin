@@ -8,6 +8,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -39,11 +40,11 @@ KaNamedFunctionSymbol:
                 psi: KtAnnotationEntry
             ]
             typeArguments: []
-            type: {@R|Anno3|()  SecondTypeAlias=} @R|Anno1|(s = String(s))  @R|Anno2|()  @R|Anno3|()  BaseAnnotation
+            type: {@R|Anno3|()  SecondTypeAlias=} @R|Anno1|(s = String(s) [evaluated = String(s)])  @R|Anno2|()  @R|Anno3|()  BaseAnnotation
         ]
-        type: kotlin/collections/List<{@R|Anno3|()  SecondTypeAlias=} @R|Anno1|(s = String(s))  @R|Anno2|()  @R|Anno3|()  BaseAnnotation>
+        type: kotlin/collections/List<{@R|Anno3|()  SecondTypeAlias=} @R|Anno1|(s = String(s) [evaluated = String(s)])  @R|Anno2|()  @R|Anno3|()  BaseAnnotation>
     ]
-    type: kotlin/collections/List<kotlin/collections/List<{@R|Anno3|()  SecondTypeAlias=} @R|Anno1|(s = String(s))  @R|Anno2|()  @R|Anno3|()  BaseAnnotation>>?
+    type: kotlin/collections/List<kotlin/collections/List<{@R|Anno3|()  SecondTypeAlias=} @R|Anno1|(s = String(s) [evaluated = String(s)])  @R|Anno2|()  @R|Anno3|()  BaseAnnotation>>?
   typeParameters: []
   valueParameters: []
   visibility: PUBLIC
@@ -52,3 +53,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: foo2

@@ -16,9 +16,11 @@
 
 package org.jetbrains.kotlin.psi2ir
 
+import org.jetbrains.kotlin.K1Deprecation
+
+@K1Deprecation
 class Psi2IrConfiguration(
     val ignoreErrors: Boolean = false,
-    val partialLinkageEnabled: Boolean = false,
     val skipBodies: Boolean = false,
 ) {
     val generateBodies: Boolean

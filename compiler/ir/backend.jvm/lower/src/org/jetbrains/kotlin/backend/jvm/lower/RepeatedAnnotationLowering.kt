@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.ClassKind
@@ -15,9 +14,9 @@ import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationBase
 import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrClassReference
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
-import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrAnnotationImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrVarargImpl
 import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
@@ -49,7 +48,6 @@ import org.jetbrains.kotlin.load.java.JvmAnnotationNames
  *     @A.Container(value = [A(), A(), A()])
  *     fun f() {}
  */
-@PhaseDescription(name = "RepeatedAnnotation")
 internal class RepeatedAnnotationLowering(private val context: JvmBackendContext) : IrVisitorVoid(), FileLoweringPass {
     override fun lower(irFile: IrFile) {
         irFile.acceptVoid(this)
@@ -79,16 +77,16 @@ internal class RepeatedAnnotationLowering(private val context: JvmBackendContext
         super.visitClass(declaration)
     }
 
-    private fun transformAnnotations(annotations: List<IrConstructorCall>): List<IrConstructorCall> {
+    private fun transformAnnotations(annotations: List<IrAnnotation>): List<IrAnnotation> {
         if (!context.state.classBuilderMode.generateBodies) return annotations
         if (annotations.size < 2) return annotations
 
-        val annotationsByClass = annotations.groupByTo(mutableMapOf()) { it.symbol.owner.constructedClass }
+        val annotationsByClass = annotations.groupByTo(mutableMapOf()) { it.classSymbol.owner }
         if (annotationsByClass.values.none { it.size > 1 }) return annotations
 
-        val result = mutableListOf<IrConstructorCall>()
+        val result = mutableListOf<IrAnnotation>()
         for (annotation in annotations) {
-            val annotationClass = annotation.symbol.owner.constructedClass
+            val annotationClass = annotation.classSymbol.owner
             val grouped = annotationsByClass.remove(annotationClass) ?: continue
             if (grouped.size < 2) {
                 result.add(grouped.single())
@@ -119,10 +117,10 @@ internal class RepeatedAnnotationLowering(private val context: JvmBackendContext
     private fun wrapAnnotationEntriesInContainer(
         annotationClass: IrClass,
         containerClass: IrClass,
-        entries: List<IrConstructorCall>,
-    ): IrConstructorCall {
+        entries: List<IrAnnotation>,
+    ): IrAnnotation {
         val annotationType = annotationClass.typeWith()
-        return IrConstructorCallImpl.fromSymbolOwner(containerClass.defaultType, containerClass.primaryConstructor!!.symbol).apply {
+        return IrAnnotationImpl.fromSymbolOwner(containerClass.defaultType, containerClass.primaryConstructor!!.symbol).apply {
             arguments[0] = IrVarargImpl(
                 UNDEFINED_OFFSET, UNDEFINED_OFFSET,
                 context.irBuiltIns.arrayClass.typeWith(annotationType),

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -176,11 +176,6 @@ object SourceElementPositioningStrategies {
         PositioningStrategies.NAME_OF_NAMED_ARGUMENT
     )
 
-    val VALUE_ARGUMENTS = SourceElementPositioningStrategy(
-        LightTreePositioningStrategies.VALUE_ARGUMENTS,
-        PositioningStrategies.VALUE_ARGUMENTS
-    )
-
     val VALUE_ARGUMENTS_LIST = SourceElementPositioningStrategy(
         LightTreePositioningStrategies.VALUE_ARGUMENTS_LIST,
         PositioningStrategies.VALUE_ARGUMENTS_LIST
@@ -209,6 +204,15 @@ object SourceElementPositioningStrategies {
     val REFERENCED_NAME_BY_QUALIFIED = SourceElementPositioningStrategy(
         LightTreePositioningStrategies.REFERENCED_NAME_BY_QUALIFIED,
         PositioningStrategies.REFERENCED_NAME_BY_QUALIFIED
+    )
+
+    /**
+     * NB! The whole receiver including parentheses is marked, which is not true if we use the FIR source of the receiver
+     * element with [DEFAULT] positioning.
+     */
+    val RECEIVER_OF_DOT_QUALIFIED = SourceElementPositioningStrategy(
+        LightTreePositioningStrategies.RECEIVER_OF_DOT_QUALIFIED,
+        PositioningStrategies.RECEIVER_OF_DOT_QUALIFIED
     )
 
     val DEPRECATION = SourceElementPositioningStrategy(
@@ -266,9 +270,9 @@ object SourceElementPositioningStrategies {
         PositioningStrategies.RETURN_WITH_LABEL
     )
 
-    val PROPERTY_INITIALIZER = SourceElementPositioningStrategy(
-        LightTreePositioningStrategies.LAST_CHILD,
-        PositioningStrategies.PROPERTY_INITIALIZER
+    val VARIABLE_INITIALIZER = SourceElementPositioningStrategy(
+        LightTreePositioningStrategies.VARIABLE_INITIALIZER,
+        PositioningStrategies.VARIABLE_INITIALIZER
     )
 
     val WHOLE_ELEMENT = SourceElementPositioningStrategy(
@@ -448,6 +452,11 @@ object SourceElementPositioningStrategies {
     val TYPE_ARGUMENT_LIST_OR_SELF = SourceElementPositioningStrategy(
         LightTreePositioningStrategies.TYPE_ARGUMENT_LIST_OR_SELF,
         PositioningStrategies.TYPE_ARGUMENT_LIST_OR_SELF,
+    )
+
+    val TYPE_ARGUMENT_LIST_OR_WITHOUT_RECEIVER = SourceElementPositioningStrategy(
+        LightTreePositioningStrategies.TYPE_ARGUMENT_LIST_OR_WITHOUT_RECEIVER,
+        PositioningStrategies.TYPE_ARGUMENT_LIST_OR_WITHOUT_RECEIVER,
     )
 
     val PACKAGE_DIRECTIVE_NAME_EXPRESSION = SourceElementPositioningStrategy(

@@ -11,7 +11,6 @@ import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.file.FileCollection
 import org.gradle.api.internal.artifacts.dependencies.SelfResolvingDependencyInternal
 import org.gradle.api.model.ObjectFactory
-import org.gradle.api.tasks.TaskDependency
 import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProject.Companion.PACKAGE_JSON
 import java.io.File
 
@@ -38,17 +37,9 @@ data class NpmDependency(
 
     override fun getVersion() = version
 
-    override fun resolve(transitive: Boolean): Set<File> =
-        resolve()
-
     override fun getTargetComponentId(): ComponentIdentifier? = null
-    override fun resolve(): MutableSet<File> = mutableSetOf()
 
     override fun getFiles(): FileCollection = objectFactory.fileCollection()
-
-    override fun getBuildDependencies(): TaskDependency = TaskDependency { mutableSetOf() }
-
-    override fun contentEquals(dependency: Dependency) = this == dependency
 
     override fun copy(): Dependency = this.copy(name = name)
 
@@ -77,11 +68,12 @@ internal fun directoryNpmDependency(
     )
 }
 
+@Deprecated("Internal KGP utility. Scheduled for removal in Kotlin 2.7")
 fun String.isFileVersion() =
-    startsWith(FILE_VERSION_PREFIX)
+    startsWith(NPM_DEP_FILE_VERSION_PREFIX)
 
 internal fun fileVersion(directory: File): String =
-    "$FILE_VERSION_PREFIX${directory.absolutePath}"
+    "$NPM_DEP_FILE_VERSION_PREFIX${directory.absolutePath}"
 
 internal fun moduleName(directory: File): String {
     val packageJson = directory.resolve(PACKAGE_JSON)
@@ -93,4 +85,11 @@ internal fun moduleName(directory: File): String {
     return directory.name
 }
 
-const val FILE_VERSION_PREFIX = "file:"
+/**
+ * A version that starts with `file:` indicates that the dependency is a local file.
+ * https://docs.npmjs.com/cli/v11/configuring-npm/package-json#local-paths
+ */
+internal const val NPM_DEP_FILE_VERSION_PREFIX = "file:"
+
+@Deprecated("Internal KGP utility. Scheduled for removal in Kotlin 2.7")
+const val FILE_VERSION_PREFIX = NPM_DEP_FILE_VERSION_PREFIX

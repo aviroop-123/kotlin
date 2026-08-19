@@ -98,13 +98,12 @@ class MultipleSourceSetRootsInCompilationTest {
 
             kotlin {
                 linuxX64()
-                androidTarget {
-
-                }
+                @Suppress("DEPRECATION")
+                androidTarget()
             }
         }
 
         project.evaluate()
-        project.assertNoDiagnostics()
+        project.checkDiagnostics("multipleSourceRoots-androidWithMultipleVariants")
     }
 }

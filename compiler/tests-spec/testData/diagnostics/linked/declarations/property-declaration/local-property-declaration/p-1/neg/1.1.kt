@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNREACHABLE_CODE -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -21,8 +20,8 @@ fun case1() {
     val x: Boolean
     try {
         val x0: Boolean = (throw Exception()) || true
-        !x // UNINITIALIZED_VARIABLE should be
-        val a: Int = x1.toInt() // UNINITIALIZED_VARIABLE should be
+        !<!UNINITIALIZED_VARIABLE!>x<!> // UNINITIALIZED_VARIABLE should be
+        val a: Int = <!UNINITIALIZED_VARIABLE!>x1<!>.toInt() // UNINITIALIZED_VARIABLE should be
     } catch (e: Exception) {
     }
 }
@@ -34,7 +33,7 @@ fun case1() {
 fun case2() {
     val x: Boolean = false
     try {
-        x = (throw Exception()) || true //VAL_REASSIGNMENT should be
+        <!VAL_REASSIGNMENT!>x<!> = (throw Exception()) || true //VAL_REASSIGNMENT should be
     } catch (e: Exception) {
     }
 }

@@ -1,0 +1,5 @@
+// RUN_PIPELINE_TILL: BACKEND
+<!CONFLICTING_JVM_DECLARATIONS!>val aa<!> = 1
+<!CONFLICTING_JVM_DECLARATIONS!>val Aa<!> = 1
+
+/* GENERATED_FIR_TAGS: integerLiteral, propertyDeclaration */

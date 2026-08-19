@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 // COMPARE_WITH_LIGHT_TREE
 
 /*
@@ -58,7 +57,7 @@ fun case5() {
     try {
         throwException()
     } catch (e: ExcA, <!SYNTAX!>e2<!><!SYNTAX!><!> <!SYNTAX!>: ExcB)<!>
-    <!UNUSED_LAMBDA_EXPRESSION!>{}<!>
+    {}
 }
 
 
@@ -72,4 +71,4 @@ fun case6() {
     } catch (e: ExcA)<!SYNTAX!><!>
     catch (e: ExcB) {
     }
-}
+}<!SYNTAX{LT}!><!>

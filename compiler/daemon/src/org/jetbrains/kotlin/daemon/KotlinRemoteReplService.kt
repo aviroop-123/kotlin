@@ -20,14 +20,15 @@ package org.jetbrains.kotlin.daemon
 
 import com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.cli.common.extensions.ReplFactoryExtension
-import org.jetbrains.kotlin.cli.common.messages.*
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.repl.*
+import org.jetbrains.kotlin.cli.create
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
 import org.jetbrains.kotlin.cli.jvm.config.configureJdkClasspathRoots
 import org.jetbrains.kotlin.cli.jvm.configureJdkHomeFromSystemProperty
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
-import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.daemon.common.CompileService
 import org.jetbrains.kotlin.daemon.common.CompilerId
@@ -39,7 +40,6 @@ import java.net.URLClassLoader
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import java.util.logging.Logger
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
@@ -51,9 +51,8 @@ abstract class KotlinJvmReplServiceBase(
     protected val messageCollector: MessageCollector
 ) : ReplCompileAction, ReplCheckAction, CreateReplStageStateAction {
 
-    private val log by lazy { Logger.getLogger("replService") }
-
-    protected val configuration = CompilerConfiguration().apply {
+    protected val configuration = CompilerConfiguration.create().apply {
+        @OptIn(MessageCollectorAccess::class) // write access
         this.messageCollector = messageCollector
         addJvmClasspathRoots(PathUtil.kotlinPathsForCompiler.let { listOf(it.stdlibPath, it.reflectPath, it.scriptRuntimePath) })
         addJvmClasspathRoots(templateClasspath)
@@ -189,9 +188,6 @@ inline fun getValidId(counter: AtomicInteger, check: (Int) -> Boolean): Int {
 
 fun CompilerConfiguration.configureScripting(compilerId: CompilerId) {
     val error = try {
-        val componentRegistrars = loadRegistrars<ComponentRegistrar>(compilerId)
-        addAll(ComponentRegistrar.PLUGIN_COMPONENT_REGISTRARS, componentRegistrars)
-
         val compilerPluginRegistrars = loadRegistrars<CompilerPluginRegistrar>(compilerId)
         addAll(CompilerPluginRegistrar.COMPILER_PLUGIN_REGISTRARS, compilerPluginRegistrars)
 

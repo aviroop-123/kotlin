@@ -41,13 +41,13 @@ object FirNativeObjCOverrideInitChecker : FirClassChecker(MppCheckerKind.Platfor
             val bParams = other.valueParameterSymbols
             if (aParams.size != bParams.size)
                 return false
-            return aParams.zip(bParams).all { (thisParameter, otherParameter) ->
+            return aParams.zip(bParams).all { [thisParameter, otherParameter] ->
                 thisParameter.name == otherParameter.name && thisParameter.resolvedReturnType == otherParameter.resolvedReturnType
             }
         }
 
         fun checkCanGenerateOverrideInit(firClass: FirClass, constructor: FirConstructorSymbol) {
-            val superClass = (firClass as FirRegularClass).symbol.getSuperClassSymbolOrAny(session)
+            val superClass = (firClass as FirRegularClass).symbol.getSuperClassSymbolOrAny(session) ?: return
             val superConstructors = superClass.constructors(session).filter {
                 constructor.overridesConstructor(it)
             }.toList()

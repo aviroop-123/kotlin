@@ -1,3 +1,0 @@
-KtNameReferenceExpression(52,53): 'A'
-  KtSimpleNameReference:
-    (in test) class A

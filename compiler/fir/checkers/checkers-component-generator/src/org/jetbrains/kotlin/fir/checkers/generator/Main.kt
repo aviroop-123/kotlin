@@ -113,7 +113,7 @@ fun main(args: Array<String>) {
             alias<FirStatement>("BasicExpressionChecker", false).let {
                 visitAlso<FirExpression>(it)
                 visitAlso<FirVarargArgumentsExpression>(it)
-                visitAlso<FirSamConversionExpression>(it)
+                visitAlso<FirFunctionTypeConversionExpression>(it)
                 visitAlso<FirWrappedExpression>(it)
                 visitAlso<FirWrappedArgumentExpression>(it)
                 visitAlso<FirSpreadArgumentExpression>(it)
@@ -151,6 +151,10 @@ fun main(args: Array<String>) {
             alias<FirBooleanOperatorExpression>("BooleanOperatorExpressionChecker")
             alias<FirReturnExpression>("ReturnExpressionChecker")
             alias<FirBlock>("BlockChecker")
+            alias<FirReplDeclarationReference>("ReplDeclarationReferenceChecker")
+            alias<FirReplPropertyInitializer>("ReplPropertyInitializerChecker")
+            alias<FirReplPropertyDelegate>("ReplPropertyDelegateChecker")
+            alias<FirReplExpressionReference>("ReplExpressionReferenceChecker")
             alias<FirAnnotation>("AnnotationChecker")
             alias<FirAnnotationCall>("AnnotationCallChecker").let {
                 visitAlso<FirErrorAnnotationCall>(it)
@@ -172,7 +176,7 @@ fun main(args: Array<String>) {
             alias<FirWhileLoop>("WhileLoopChecker")
             alias<FirThrowExpression>("ThrowExpressionChecker")
             alias<FirDoWhileLoop>("DoWhileLoopChecker")
-            alias<FirArrayLiteral>("ArrayLiteralChecker")
+            alias<FirCollectionLiteral>("CollectionLiteralChecker")
             alias<FirClassReferenceExpression>("ClassReferenceExpressionChecker")
             alias<FirInaccessibleReceiverExpression>("InaccessibleReceiverChecker")
         }
@@ -194,7 +198,7 @@ fun main(args: Array<String>) {
                 visitAlso<FirErrorProperty>(it)
             }
             alias<FirFunction>("FunctionChecker", false)
-            alias<FirSimpleFunction>("SimpleFunctionChecker")
+            alias<FirNamedFunction>("NamedFunctionChecker")
             alias<FirProperty>("PropertyChecker")
             alias<FirClassLikeDeclaration>("ClassLikeChecker", false)
             alias<FirClass>("ClassChecker")

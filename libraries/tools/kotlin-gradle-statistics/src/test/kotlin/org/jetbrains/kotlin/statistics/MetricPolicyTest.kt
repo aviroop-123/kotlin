@@ -52,21 +52,21 @@ class MetricPolicyTest {
         assertEquals("1.2.3", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("1.2.3-unknown suffix"))
 
         assertEquals("123.234.345-dev", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("123.234.345-dev-12345"))
-        assertEquals("2.3.255-snapshot", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("2.3.255-SNAPSHOT"))
+        assertEquals("2.4.255-snapshot", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("2.4.255-SNAPSHOT"))
 
-        assertEquals("2.3.255-beta", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("2.3.255-beta"))
-        assertEquals("2.3.255-beta1", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("2.3.255-beta1"))
+        assertEquals("2.4.255-beta", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("2.4.255-beta"))
+        assertEquals("2.4.255-beta1", StringAnonymizationPolicy.ComponentVersionAnonymizer().anonymize("2.4.255-beta1"))
     }
 
     @Test
     fun versionStringValidation() {
-        val separator = ConcatMetricContainer.SEPARATOR
-        val container = MetricsContainer()
+        val separator = "0123"
+        val container = MetricsContainer(metricValuesSeparator = separator)
         fun whenAdded(newValue: String, expected: String) {
             container.report(StringMetrics.MPP_PLATFORMS, newValue)
-            val currentValue = container.getMetric(StringMetrics.MPP_PLATFORMS)!!.toStringRepresentation()
+            val currentValue = container.getStringMetricPresentation(StringMetrics.MPP_PLATFORMS)!!
             assertEquals(expected, currentValue)
-            val regex = StringMetrics.MPP_PLATFORMS.anonymization.validationRegexp()
+            val regex = StringMetrics.MPP_PLATFORMS.anonymization.validationRegexp(separator)
             assertTrue(currentValue.matches(Regex(regex)), "'${currentValue}' should match '${regex}'")
         }
         whenAdded("js", "js")

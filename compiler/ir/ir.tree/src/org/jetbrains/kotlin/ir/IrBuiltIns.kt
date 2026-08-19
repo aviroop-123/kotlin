@@ -18,30 +18,28 @@ import org.jetbrains.kotlin.ir.declarations.IrExternalPackageFragment
 import org.jetbrains.kotlin.ir.declarations.IrFactory
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
-import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
-import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
 import org.jetbrains.kotlin.ir.util.addFakeOverrides
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
-import org.jetbrains.kotlin.ir.util.irError
-import org.jetbrains.kotlin.name.CallableId
-import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
+
+@RequiresOptIn(level = RequiresOptIn.Level.ERROR, message = "This is temporary API to be removed soon")
+@Target(AnnotationTarget.PROPERTY)
+annotation class UnstableBuiltInsApi
 
 /**
  * Symbols for builtins that are available without any context and are not specific to any backend
  * (but specific to the frontend)
  */
 @OptIn(InternalSymbolFinderAPI::class)
-abstract class IrBuiltIns {
-    abstract val symbolFinder: SymbolFinder
-    abstract val languageVersionSettings: LanguageVersionSettings
-
+abstract class IrBuiltIns : SymbolFinderHolder {
     abstract val irFactory: IrFactory
+
+    @UnstableBuiltInsApi
+    open var functionFactory: IrAbstractFunctionFactory? = null
 
     abstract val anyType: IrType
     abstract val anyClass: IrClassSymbol
@@ -152,6 +150,9 @@ abstract class IrBuiltIns {
     abstract val primitiveArrayElementTypes: Map<IrClassSymbol, IrType?>
     abstract val primitiveArrayForType: Map<IrType?, IrClassSymbol>
 
+    val arrays: List<IrClassSymbol>
+        get() = primitiveTypesToPrimitiveArrays.values + unsignedTypesToUnsignedArrays.values + arrayClass
+
     abstract val unsignedTypesToUnsignedArrays: Map<UnsignedType, IrClassSymbol>
     abstract val unsignedArraysElementTypes: Map<IrClassSymbol, IrType?>
 
@@ -179,16 +180,13 @@ abstract class IrBuiltIns {
     abstract val intXorSymbol: IrSimpleFunctionSymbol
     abstract val intAndSymbol: IrSimpleFunctionSymbol
 
-    abstract val extensionToString: IrSimpleFunctionSymbol
-    abstract val memberToString: IrSimpleFunctionSymbol
-
-    abstract val extensionStringPlus: IrSimpleFunctionSymbol
-    abstract val memberStringPlus: IrSimpleFunctionSymbol
-
     abstract val arrayOf: IrSimpleFunctionSymbol
     abstract val arrayOfNulls: IrSimpleFunctionSymbol
 
     abstract val linkageErrorSymbol: IrSimpleFunctionSymbol
+
+    abstract val deprecatedSymbol: IrClassSymbol
+    abstract val deprecationLevelSymbol: IrClassSymbol
 
     abstract fun functionN(arity: Int): IrClass
     abstract fun kFunctionN(arity: Int): IrClass
@@ -235,81 +233,4 @@ object BuiltInOperatorNames {
     const val ANDAND = "ANDAND"
     const val OROR = "OROR"
     const val CHECK_NOT_NULL = "CHECK_NOT_NULL"
-}
-
-@RequiresOptIn(level = RequiresOptIn.Level.ERROR)
-@Target(AnnotationTarget.CLASS)
-annotation class InternalSymbolFinderAPI
-
-@InternalSymbolFinderAPI
-abstract class SymbolFinder {
-    // TODO: drop variants from segments, add helper from whole fqn
-    abstract fun findFunctions(callableId: CallableId): Iterable<IrSimpleFunctionSymbol>
-    abstract fun findProperties(callableId: CallableId): Iterable<IrPropertySymbol>
-    abstract fun findClass(classId: ClassId): IrClassSymbol?
-
-    // TODO: replace this with lazy get
-    abstract fun findGetter(property: IrPropertySymbol): IrSimpleFunctionSymbol?
-
-    fun findFunctions(name: Name, vararg packageNameSegments: String = arrayOf("kotlin")): Iterable<IrSimpleFunctionSymbol> {
-        return findFunctions(CallableId(FqName.fromSegments(listOf(*packageNameSegments)), name))
-    }
-
-    fun findFunctions(name: Name, packageFqName: FqName): Iterable<IrSimpleFunctionSymbol> {
-        return findFunctions(CallableId(packageFqName, name))
-    }
-
-    fun findProperties(name: Name, packageFqName: FqName): Iterable<IrPropertySymbol> {
-        return findProperties(CallableId(packageFqName, name))
-    }
-
-    fun findClass(name: Name, vararg packageNameSegments: String = arrayOf("kotlin")): IrClassSymbol? {
-        return findClass(ClassId(FqName.fromSegments(listOf(*packageNameSegments)), name))
-    }
-
-    fun findClass(name: Name, packageFqName: FqName): IrClassSymbol? {
-        return findClass(ClassId(packageFqName, name))
-    }
-
-    fun topLevelClass(classId: ClassId): IrClassSymbol =
-        findClass(classId.shortClassName, classId.packageFqName) ?: error("No class $classId found")
-
-    fun topLevelClass(packageName: FqName, name: String): IrClassSymbol =
-        findClass(Name.identifier(name), packageName) ?: error("No class ${packageName}.${name} found")
-
-    fun topLevelProperty(packageName: FqName, name: String): IrPropertySymbol {
-        val elements = findProperties(Name.identifier(name), packageName).toList()
-        require(elements.isNotEmpty()) { "No property ${packageName}.$name found" }
-        require(elements.size == 1) {
-            "Several properties ${packageName}.$name found:\n${elements.joinToString("\n")}"
-        }
-        return elements.single()
-    }
-
-    fun topLevelFunctions(packageName: FqName, name: String): Iterable<IrSimpleFunctionSymbol> =
-        findFunctions(Name.identifier(name), packageName)
-
-    inline fun topLevelFunction(
-        callableId: CallableId,
-        condition: (IrFunctionSymbol) -> Boolean = { true },
-    ): IrSimpleFunctionSymbol {
-        val elements = findFunctions(callableId).filter(condition)
-        require(elements.isNotEmpty()) { "No function ${callableId} found corresponding given condition" }
-        require(elements.size == 1) {
-            "Several functions ${callableId} found corresponding given condition:\n${elements.joinToString("\n")}"
-        }
-        return elements.single()
-    }
-
-    inline fun topLevelFunction(
-        packageName: FqName,
-        name: String,
-        condition: (IrFunctionSymbol) -> Boolean = { true },
-    ): IrSimpleFunctionSymbol {
-        return topLevelFunction(CallableId(packageName, Name.identifier(name)), condition)
-    }
-
-    fun findTopLevelPropertyGetter(packageName: FqName, name: String) =
-        findGetter(topLevelProperty(packageName, name))
-            ?: irError("Cannot find getter for $packageName.$name")
 }

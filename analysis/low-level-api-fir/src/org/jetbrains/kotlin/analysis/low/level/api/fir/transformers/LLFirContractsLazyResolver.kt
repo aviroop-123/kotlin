@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -60,7 +60,7 @@ private class LLFirContractsTargetResolver(target: LLFirResolveTarget) : LLFirAb
                 // No contracts here
             }
 
-            is FirSimpleFunction -> {
+            is FirNamedFunction -> {
                 if (target.contractDescription != null) {
                     resolveContracts(target, ContractStateKeepers.SIMPLE_FUNCTION)
                 }
@@ -87,6 +87,7 @@ private class LLFirContractsTargetResolver(target: LLFirResolveTarget) : LLFirAb
             is FirScript,
             is FirCodeFragment,
             is FirDanglingModifierList,
+            is FirReplSnippet,
                 -> {
                 // No contracts here
                 check(target !is FirContractDescriptionOwner) {
@@ -110,7 +111,7 @@ private class LLFirContractsTargetResolver(target: LLFirResolveTarget) : LLFirAb
 
     private fun dropRedundantContractDescription(target: FirElementWithResolveState) {
         when (target) {
-            is FirSimpleFunction, is FirConstructor -> dropRedundantContractDescriptionForFunction(target)
+            is FirNamedFunction, is FirConstructor -> dropRedundantContractDescriptionForFunction(target)
             is FirProperty -> {
                 target.getter?.let(::dropRedundantContractDescriptionForFunction)
                 target.setter?.let(::dropRedundantContractDescriptionForFunction)
@@ -160,7 +161,7 @@ private object ContractStateKeepers {
         }
     }
 
-    val SIMPLE_FUNCTION: StateKeeper<FirSimpleFunction, FirDesignation> = stateKeeper { builder, _, designation ->
+    val SIMPLE_FUNCTION: StateKeeper<FirNamedFunction, FirDesignation> = stateKeeper { builder, _, designation ->
         builder.add(CONTRACT_DESCRIPTION_OWNER, designation)
         builder.add(BODY_OWNER, designation)
     }

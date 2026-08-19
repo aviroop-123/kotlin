@@ -1,0 +1,7 @@
+KtNameReferenceExpression(48,50): 'CA'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      test/CA
+    ]

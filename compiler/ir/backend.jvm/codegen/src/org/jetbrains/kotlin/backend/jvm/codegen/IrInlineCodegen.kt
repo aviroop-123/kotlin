@@ -16,14 +16,17 @@ import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.codegen.*
 import org.jetbrains.kotlin.codegen.AsmUtil.genThrow
 import org.jetbrains.kotlin.codegen.AsmUtil.isPrimitive
+import org.jetbrains.kotlin.codegen.coroutines.withInstructionAdapter
 import org.jetbrains.kotlin.codegen.inline.*
 import org.jetbrains.kotlin.codegen.state.GenerationState
 import org.jetbrains.kotlin.codegen.state.KotlinTypeMapperBase
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.isUnit
 import org.jetbrains.kotlin.ir.util.dump
 import org.jetbrains.kotlin.ir.util.getPackageFragment
+import org.jetbrains.kotlin.ir.util.isSuspend
 import org.jetbrains.kotlin.ir.util.isSuspendFunction
 import org.jetbrains.kotlin.resolve.jvm.AsmTypes
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
@@ -44,6 +47,7 @@ class IrInlineCodegen(
     private val typeParameterMappings: TypeParameterMappings<IrType>,
     private val sourceCompiler: SourceCompilerForInline,
     private val reifiedTypeInliner: ReifiedTypeInliner<IrType>,
+    private val markInlinedSuspensionPointAsUnitReturning: Boolean,
 ) : IrInlineCallGenerator {
 
     private val inlineArgumentsInPlace = canInlineArgumentsInPlace()
@@ -64,7 +68,7 @@ class IrInlineCodegen(
             nodeAndSmap = sourceCompiler.compileInlineFunction(jvmSignature).apply {
                 node.preprocessSuspendMarkers(forInline = true, keepFakeContinuation = false)
             }
-            val result = inlineCall(nodeAndSmap, function.isInlineOnly())
+            val result = inlineCall(nodeAndSmap, function.isInlineOnly(), expression)
             leaveTemps()
             codegen.propagateChildReifiedTypeParametersUsages(result.reifiedTypeParametersUsages)
             codegen.markLineNumberAfterInlineIfNeeded(isInsideIfCondition)
@@ -255,7 +259,7 @@ class IrInlineCodegen(
         return canInlineArgumentsInPlace(sourceCompiler.compileInlineFunction(jvmSignature).node)
     }
 
-    private fun inlineCall(nodeAndSmap: SMAPAndMethodNode, isInlineOnly: Boolean): InlineResult {
+    private fun inlineCall(nodeAndSmap: SMAPAndMethodNode, isInlineOnly: Boolean, expression: IrFunctionAccessExpression): InlineResult {
         val node = nodeAndSmap.node
         if (maskStartIndex != -1) {
             val parameters = invocationParamBuilder.buildParameters()
@@ -280,6 +284,34 @@ class IrInlineCodegen(
             }
         }
 
+        if (codegen.irFunction.isSuspend) {
+            val suspendGenericCallMarkers = node.instructions.filter { isBeforeSuspendGenericCallMarker(it) }
+            suspendGenericCallMarkers.forEach {
+                require(expression.typeArguments.size == 1) { "Expected single type argument for inlined suspend function's with INLINE_MARKER_BEFORE_SUSPEND_GENERIC_CALL" }
+                if (expression.typeArguments.single()!!.isUnit()) {
+                    // replace inlined INLINE_MARKER_BEFORE_SUSPEND_GENERIC_CALL with INLINE_MARKER_BEFORE_SUSPEND_UNIT_CALL
+                    node.instructions.insert(it, withInstructionAdapter {
+                        addBeforeSuspendUnitCallMarker(this)
+                    })
+                    node.instructions.remove(it.previous)
+                    node.instructions.remove(it)
+                } else if (!expression.isGenericCallWithCallersSingleTypeParameter(codegen.irFunction)) {
+                    // delete the marker
+                    node.instructions.remove(it.previous)
+                    node.instructions.remove(it)
+                } // else keep the marker
+            }
+
+            if (suspendGenericCallMarkers.isEmpty() && markInlinedSuspensionPointAsUnitReturning) {
+                // the old version of "suspendCoroutine" TCO support, to be removed soon
+                node.instructions.firstOrNull { isBeforeSuspendMarker(it) }?.let {
+                    node.instructions.insert(it, withInstructionAdapter {
+                        addBeforeSuspendUnitCallMarker(this)
+                    })
+                }
+            }
+        }
+
         val reificationResult = reifiedTypeInliner.reifyInstructions(node)
 
         val parameters = invocationParamBuilder.buildParameters()
@@ -296,7 +328,11 @@ class IrInlineCodegen(
         val callSite = SourcePosition(lastLineNumber, sourceInfo.sourceFileName!!, sourceInfo.pathOrCleanFQN)
         info.inlineScopesGenerator?.apply { currentCallSiteLineNumber = lastLineNumber }
         val inliner = MethodInliner(
-            node, parameters, info, FieldRemapper(null, null, parameters), sourceCompiler.isCallInsideSameModuleAsCallee,
+            node,
+            parameters,
+            info,
+            FieldRemapper(null, null, parameters),
+            sourceCompiler.isCallInsideSameModuleAsCallee,
             { "Method inlining " + sourceCompiler.callElementText },
             SourceMapCopier(sourceMapper, nodeAndSmap.classSMAP, callSite),
             info.callSiteInfo,
@@ -304,6 +340,7 @@ class IrInlineCodegen(
             !isInlinedToInlineFunInKotlinRuntime(),
             maskStartIndex,
             maskStartIndex + maskValues.size,
+            skipLineNumbers = codegen.isNoLineNumberScope,
         ) //with captured
 
         val remapper = LocalVarRemapper(parameters, initialFrameSize)
@@ -340,6 +377,9 @@ class IrInlineCodegen(
         if (shouldSpillStack) {
             addInlineMarker(codegen.visitor, false)
         }
+
+        PrivateTypeFromNonPrivateInlineUsageChecker.check(codegen.irFunction, expression, function, adapter, codegen.context)
+
         return result
     }
 
@@ -493,4 +533,14 @@ class IrExpressionLambdaImpl(
         invokeMethodParameters = freeParameters.map { it.type }
         invokeMethodReturnType = unboxedReturnType ?: function.returnType
     }
+}
+
+private enum class ValueKind {
+    GENERAL,
+    DEFAULT_PARAMETER,
+    DEFAULT_INLINE_PARAMETER,
+    DEFAULT_MASK,
+    METHOD_HANDLE_IN_DEFAULT,
+    READ_OF_INLINE_LAMBDA_FOR_INLINE_SUSPEND_PARAMETER,
+    READ_OF_OBJECT_FOR_INLINE_SUSPEND_PARAMETER
 }

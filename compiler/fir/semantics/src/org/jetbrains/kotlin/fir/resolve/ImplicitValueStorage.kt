@@ -13,7 +13,6 @@ import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
 import org.jetbrains.kotlin.fir.resolve.calls.*
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirAnonymousFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirThisOwnerSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.util.PersistentSetMultimap
 import org.jetbrains.kotlin.name.Name
@@ -26,7 +25,7 @@ import org.jetbrains.kotlin.name.Name
 class ImplicitValueStorage private constructor(
     private val implicitReceiverStack: PersistentList<ImplicitReceiverValue<*>>,
     private val implicitReceiversByLabel: PersistentSetMultimap<Name, ImplicitReceiverValue<*>>,
-    private val implicitValuesBySymbol: PersistentMap<FirThisOwnerSymbol<*>, ImplicitValue<*>>
+    private val implicitValuesBySymbol: PersistentMap<FirBasedSymbol<*>, ImplicitValue<*>>
 ) {
     constructor() : this(
         persistentListOf(),
@@ -48,9 +47,9 @@ class ImplicitValueStorage private constructor(
         return receivers.fold(this) { acc, value -> acc.addImplicitReceiver(name = null, value) }
     }
 
-    fun addImplicitReceiver(name: Name?, value: ImplicitReceiverValue<*>, aliasLabel: Name? = null): ImplicitValueStorage {
+    fun addImplicitReceiver(name: Name?, value: ImplicitReceiverValue<*>): ImplicitValueStorage {
         val stack = implicitReceiverStack.add(value)
-        val receiversPerLabel = implicitReceiversByLabel.putIfNameIsNotNull(name, value).putIfNameIsNotNull(aliasLabel, value)
+        val receiversPerLabel = implicitReceiversByLabel.putIfNameIsNotNull(name, value)
         val implicitValuesBySymbol = implicitValuesBySymbol.put(value.boundSymbol, value)
 
         return ImplicitValueStorage(
@@ -62,23 +61,22 @@ class ImplicitValueStorage private constructor(
 
 
     fun addAllContexts(
-        contextReceivers: List<ContextReceiverValue>,
         contextParameters: List<ImplicitContextParameterValue>,
     ): ImplicitValueStorage {
-        if (contextReceivers.isEmpty() && contextParameters.isEmpty()) {
+        if (contextParameters.isEmpty()) {
             return this
         }
 
         return ImplicitValueStorage(
             implicitReceiverStack,
-            contextReceivers.fold(implicitReceiversByLabel) { acc, value -> acc.putIfNameIsNotNull(value.labelName, value) },
-            implicitValuesBySymbol.addAll(contextParameters).addAll(contextReceivers),
+            implicitReceiversByLabel,
+            implicitValuesBySymbol.addAll(contextParameters),
         )
     }
 
-    private fun PersistentMap<FirThisOwnerSymbol<*>, ImplicitValue<*>>.addAll(
+    private fun PersistentMap<FirBasedSymbol<*>, ImplicitValue<*>>.addAll(
         contextParameters: List<ImplicitValue<*>>,
-    ): PersistentMap<FirThisOwnerSymbol<*>, ImplicitValue<*>> {
+    ): PersistentMap<FirBasedSymbol<*>, ImplicitValue<*>> {
         return contextParameters.fold(this) { acc, value ->
             acc.put(value.boundSymbol, value)
         }
@@ -90,9 +88,33 @@ class ImplicitValueStorage private constructor(
         else
             this
 
+    /**
+     * Returns a set of [ImplicitReceiverValue]s associated with the given [name].
+     * If [name] is `null`, returns a set containing the last [ImplicitReceiverValue] or empty set if none is present.
+     *
+     * Similar to tower resolution, inapplicable candidates (according to [ImplicitReceiverValue.producesInapplicableCandidate]) are
+     * filtered out if some applicable ones are associated with the given [name].
+     *
+     * If no applicable ones are present, inapplicable ones are returned.
+     */
     operator fun get(name: String?): Set<ImplicitReceiverValue<*>> {
-        if (name == null) return implicitReceiverStack.lastOrNull()?.let(::setOf).orEmpty()
-        return implicitReceiversByLabel[Name.identifier(name)]
+        if (name == null) {
+            return (implicitReceiverStack.lastOrNull { !it.producesInapplicableCandidate() } ?: implicitReceiverStack.lastOrNull())
+                ?.let(::setOf)
+                .orEmpty()
+        }
+
+        val receivers = implicitReceiversByLabel[Name.identifier(name)]
+
+        return if (receivers.count { it.producesInapplicableCandidate() } != receivers.size) {
+            receivers.filterNotTo(mutableSetOf()) { it.producesInapplicableCandidate() }
+        } else {
+            receivers
+        }
+    }
+
+    fun getBySymbol(symbol: FirBasedSymbol<*>): ImplicitValue<*>? {
+        return implicitValuesBySymbol[symbol]
     }
 
     fun lastDispatchReceiver(): ImplicitDispatchReceiverValue? {
@@ -105,6 +127,20 @@ class ImplicitValueStorage private constructor(
 
     fun receiversAsReversed(): List<ImplicitReceiverValue<*>> = implicitReceiverStack.asReversed()
 
+    private val labelByImplicitValueMap: Map<ImplicitReceiverValue<*>, Name> by lazy {
+        buildMap {
+            implicitReceiversByLabel.entries.forEach { entry ->
+                entry.value.forEach {
+                    this[it] = entry.key
+                }
+            }
+        }
+    }
+
+    fun ImplicitReceiverValue<*>.label(): Name? {
+        return labelByImplicitValueMap[this@label]
+    }
+
     /**
      * Applies smart-casted type to an [ImplicitValue] identified by its [symbol].
      *
@@ -113,28 +149,23 @@ class ImplicitValueStorage private constructor(
      */
     @ImplicitValue.ImplicitValueInternals
     fun replaceImplicitValueType(symbol: FirBasedSymbol<*>, type: ConeKotlinType) {
-        val implicitValue = implicitValuesBySymbol[symbol as FirThisOwnerSymbol<*>] ?: return
+        val implicitValue = implicitValuesBySymbol[symbol] ?: return
         implicitValue.updateTypeFromSmartcast(type)
     }
 
     internal fun createSnapshot(mapper: ImplicitValueMapper): ImplicitValueStorage = ImplicitValueStorage(
         implicitReceiverStack = implicitReceiverStack.map { mapper(it) }.toPersistentList(),
-        implicitReceiversByLabel = implicitReceiversByLabel.entries.fold(PersistentSetMultimap()) { accOuterMap, (name, receiverValues) ->
+        implicitReceiversByLabel = implicitReceiversByLabel.entries.fold(PersistentSetMultimap()) { accOuterMap, [name, receiverValues] ->
             receiverValues.fold(accOuterMap) { accMap, receiverValue ->
                 accMap.put(name, mapper(receiverValue))
             }
         },
-        implicitValuesBySymbol = implicitValuesBySymbol.mapValues { (_, v) -> mapper(v) }.toPersistentMap(),
+        implicitValuesBySymbol = implicitValuesBySymbol.mapValues { [_, v] -> mapper(v) }.toPersistentMap(),
     )
 }
 
 internal interface ImplicitValueMapper {
-    operator fun <S, T : ImplicitValue<S>> invoke(value: T): T where S : FirThisOwnerSymbol<*>, S : FirBasedSymbol<*>
-}
-
-fun Set<ImplicitReceiverValue<*>>.singleWithoutDuplicatingContextReceiversOrNull(): ImplicitReceiverValue<*>? {
-    // KT-69102: we may encounter a bug with duplicated context receivers, and it wasn't obvious how to fix it
-    return distinctBy { if (it.isContextReceiver) it.boundSymbol else it }.singleOrNull()
+    operator fun <S : FirBasedSymbol<*>, T : ImplicitValue<S>> invoke(value: T): T
 }
 
 fun Set<ImplicitReceiverValue<*>>.ambiguityDiagnosticFor(labelName: String?): ConeSimpleDiagnostic {

@@ -1,3 +1,0 @@
-KDocName(177,207): 'BoundedContainer.someExtension'
-  KDocReference:
-    (in ROOT) fun <T : C> Container<T>.someExtension()

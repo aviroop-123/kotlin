@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -19,7 +18,6 @@ class Case1 {
     fun boo(vararg x: Int): String = TODO()
     fun case() {
         this.<!DEBUG_INFO_CALL("fqName: Case1.boo; typeCall: function")!>boo(1, 1)<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>this.boo(1, 1)<!>
+        this.boo(1, 1)
     }
 }
-

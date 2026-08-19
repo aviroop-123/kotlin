@@ -292,10 +292,10 @@ FILE: [ResolvedTo(IMPORTS)] lambdaAsSAMInterfaceScript.kts
 
         }
 
-        public final [ResolvedTo(CONTRACTS)] [ScriptTopLevelDeclaration=true] fun testMe([ResolvedTo(CONTRACTS)] f: R|foo/Foo|): R|kotlin/Unit| { LAZY_BLOCK }
+        public final [ResolvedTo(STATUS)] [ScriptTopLevelDeclaration=true] fun testMe([ResolvedTo(STATUS)] f: R|foo/Foo|): R|kotlin/Unit| { LAZY_BLOCK }
 
         public final [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] fun resolveMe(): R|kotlin/Unit| {
-            R|foo/testMe|(<L> = SAM([ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=kotlin/Function1<foo/Arg, foo/Arg>] testMe@fun <anonymous>([ResolvedTo(BODY_RESOLVE)] b: R|foo/Arg|): R|foo/Arg| <inline=NoInline>  {
+            R|foo/testMe|(<L> = SAM([ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=(foo/Arg) -> foo/Arg] testMe@fun <anonymous>([ResolvedTo(BODY_RESOLVE)] b: R|foo/Arg|): R|foo/Arg| <inline=NoInline>  {
                 ^ R|<local>/b|
             }
             ))
@@ -324,9 +324,8 @@ FILE: [ResolvedTo(BODY_RESOLVE)] lambdaAsSAMInterfaceScript.kts
         }
 
         public final [ResolvedTo(BODY_RESOLVE)] [ScriptTopLevelDeclaration=true] fun resolveMe(): R|kotlin/Unit| {
-            R|foo/testMe|(<L> = SAM([ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=kotlin/Function1<foo/Arg, foo/Arg>] testMe@fun <anonymous>([ResolvedTo(BODY_RESOLVE)] b: R|foo/Arg|): R|foo/Arg| <inline=NoInline>  {
+            R|foo/testMe|(<L> = SAM([ResolvedTo(BODY_RESOLVE)] [MatchingParameterFunctionTypeKey=(foo/Arg) -> foo/Arg] testMe@fun <anonymous>([ResolvedTo(BODY_RESOLVE)] b: R|foo/Arg|): R|foo/Arg| <inline=NoInline>  {
                 ^ R|<local>/b|
             }
             ))
         }
-

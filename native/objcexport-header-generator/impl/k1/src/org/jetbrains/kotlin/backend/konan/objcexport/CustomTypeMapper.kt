@@ -10,6 +10,9 @@ import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.builtins.functions.FunctionTypeKind
 import org.jetbrains.kotlin.builtins.getFunctionTypeKind
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.isFunction
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.descriptorUtil.classId
@@ -21,6 +24,12 @@ fun ClassDescriptor.isMappedFunctionClass() =
     this.getFunctionTypeKind() == FunctionTypeKind.Function &&
         // Type parameters include return type.
         declaredTypeParameters.size - 1 < CustomTypeMappers.functionTypeMappersArityLimit
+
+@InternalKotlinNativeApi
+fun IrClass.isMappedFunctionClass() =
+    defaultType.isFunction() &&
+        // Type parameters include return type.
+        typeParameters.size - 1 < CustomTypeMappers.functionTypeMappersArityLimit
 
 @InternalKotlinNativeApi
 interface CustomTypeMapper {

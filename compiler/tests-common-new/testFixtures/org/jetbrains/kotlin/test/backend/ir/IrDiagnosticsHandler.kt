@@ -29,13 +29,13 @@ class IrDiagnosticsHandler(testServices: TestServices) : AbstractIrHandler(testS
     private val fullDiagnosticsRenderer = FullDiagnosticsRenderer(DiagnosticsDirectives.RENDER_IR_DIAGNOSTICS_FULL_TEXT)
 
     override fun processModule(module: TestModule, info: IrBackendInput) {
-        val diagnosticsByFilePath = info.diagnosticReporter.diagnosticsByFilePath
+        val diagnosticsByFile = info.diagnosticReporter.diagnosticsByFile
         for (currentModule in testServices.moduleStructure.modules) {
             val lightTreeComparingModeEnabled = FirDiagnosticsDirectives.COMPARE_WITH_LIGHT_TREE in currentModule.directives
             val lightTreeEnabled = currentModule.directives.singleOrZeroValue(FirDiagnosticsDirectives.FIR_PARSER) == FirParser.LightTree
             for (file in currentModule.files) {
-                val diagnostics = file.findByPath(testServices) {
-                    diagnosticsByFilePath[it]
+                val diagnostics = file.findByPath(testServices) { file ->
+                    diagnosticsByFile.entries.firstOrNull { it.key?.path == file }?.value
                 }
                 if (diagnostics != null && diagnostics.isNotEmpty()) {
                     val diagnosticsMetadataInfos =
@@ -44,13 +44,13 @@ class IrDiagnosticsHandler(testServices: TestServices) : AbstractIrHandler(testS
                             lightTreeEnabled, lightTreeComparingModeEnabled
                         )
                     globalMetadataInfoHandler.addMetadataInfosForFile(file, diagnosticsMetadataInfos)
-                    fullDiagnosticsRenderer.storeFullDiagnosticRender(module, diagnostics, file)
+                    fullDiagnosticsRenderer.storeFullDiagnosticRender(module, diagnostics, file, testServices)
                 }
             }
         }
     }
 
     override fun processAfterAllModules(someAssertionWasFailed: Boolean) {
-        fullDiagnosticsRenderer.assertCollectedDiagnostics(testServices, ".fir.ir.diag.txt")
+        fullDiagnosticsRenderer.assertCollectedDiagnostics(testServices, ".ir.diag.txt")
     }
 }

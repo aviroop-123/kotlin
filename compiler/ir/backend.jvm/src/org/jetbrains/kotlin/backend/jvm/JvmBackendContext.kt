@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.backend.jvm
 
 import org.jetbrains.kotlin.backend.common.CommonBackendContext
+import org.jetbrains.kotlin.backend.common.InlineClassesUtils
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.lower.ClosureAnnotator.ClosureBuilder
 import org.jetbrains.kotlin.backend.common.lower.InnerClassesSupport
@@ -21,7 +22,6 @@ import org.jetbrains.kotlin.codegen.state.JvmBackendConfig
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.ir.IrBuiltIns
-import org.jetbrains.kotlin.ir.IrProvider
 import org.jetbrains.kotlin.ir.KtDiagnosticReporterWithImplicitIrBasedContext
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.*
@@ -46,9 +46,6 @@ class JvmBackendContext(
     val symbolTable: SymbolTable,
     val generatorExtensions: JvmGeneratorExtensions,
     val backendExtension: JvmBackendExtension,
-    val irSerializer: JvmIrSerializer?,
-    val irDeserializer: JvmIrDeserializer,
-    val irProviders: List<IrProvider>,
     val irPluginContext: IrPluginContext?,
     val evaluatorData: JvmEvaluatorData?
 ) : CommonBackendContext {
@@ -73,7 +70,7 @@ class JvmBackendContext(
         this, generatorExtensions.cachedFields
     )
 
-    val ktDiagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(state.diagnosticReporter, config.languageVersionSettings)
+    override val diagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(state.diagnosticReporter, config.languageVersionSettings)
 
     override val symbols = JvmSymbols(this)
 
@@ -105,6 +102,10 @@ class JvmBackendContext(
 
     val optionalAnnotations = mutableListOf<MetadataSource.Class>()
 
+    @Deprecated("It is non-JVM API", level = DeprecationLevel.ERROR)
+    override val inlineClassesUtils: InlineClassesUtils
+        get() = error("Not supported in JVM")
+
     init {
         state.mapInlineClass = { descriptor ->
             defaultTypeMapper.mapType(referenceClass(descriptor).defaultType)
@@ -118,11 +119,13 @@ class JvmBackendContext(
             GenerationState.MultiFieldValueClassUnboxInfo(leavesInfo)
         }
 
-        state.reportDuplicateClassNameError = { origin, internalName, duplicateClasses ->
-            val declaration = (origin as JvmIrDeclarationOrigin).declaration
-            if (declaration != null) {
-                ktDiagnosticReporter.at(declaration).report(JvmBackendErrors.DUPLICATE_CLASS_NAMES, internalName, duplicateClasses)
-            }
+        state.reportDuplicateClassNameError = { origin1, internalName, origin2 ->
+            val declaration1 = (origin1 as JvmIrDeclarationOrigin).declaration as IrClass
+            val declaration2 = (origin2 as JvmIrDeclarationOrigin).declaration as IrClass
+            diagnosticReporter.at(declaration1).report(
+                JvmBackendErrors.DUPLICATE_CLASS_NAMES, internalName,
+                listOf(declaration1, declaration2).joinToString { it.name.asString() },
+            )
         }
     }
 

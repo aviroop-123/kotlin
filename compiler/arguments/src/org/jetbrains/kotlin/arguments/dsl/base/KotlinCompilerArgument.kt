@@ -19,10 +19,13 @@ import kotlin.properties.ReadOnlyProperty
  * The description text may have a different value for different Kotlin releases,
  * see [ReleaseDependent] on how to define the description for older versions.
  * @param delimiter if an argument accepts a list of file paths - defines an accepted delimiter between these paths.
+ * @param affectsCompilationOutcome if the argument affects the compilation outcome (e.g. affects the generated code).
+ * @param restrictedToCompilerPhase if set to something else than null, that means the argument only applies to the given compiler phase
  * @param valueType the argument value type.
  * @param valueDescription describes which values are accepted by the argument.
  * The description text may have a different value for different Kotlin releases,
  * see [ReleaseDependent] on how to define the description for older versions.
+ * @param argumentType the type-safe representation of the argument value type. This is an experimental API that may change in future versions.
  * @param additionalAnnotations additional annotations that should be added for the Kotlin compiler argument representation (e.g. [Deprecated]).
  * @param compilerName alternative property name in the generated Kotlin compiler argument representation
  *
@@ -36,11 +39,16 @@ data class KotlinCompilerArgument(
     val deprecatedName: String? = null,
     val description: ReleaseDependent<String>,
     val delimiter: Delimiter?,
+    val affectsCompilationOutcome: Boolean = true,
+    val restrictedToCompilerPhase: KotlinCompilerPhase? = null,
 
     val valueType: KotlinArgumentValueType<*>,
     val valueDescription: ReleaseDependent<String?> = null.asReleaseDependent(),
 
     override val releaseVersionsMetadata: KotlinReleaseVersionLifecycle,
+
+    @ExperimentalArgumentApi
+    val argumentType: KotlinArgumentValueType<*> = valueType,
 
     @kotlinx.serialization.Transient
     val additionalAnnotations: List<Annotation> = emptyList(),
@@ -50,17 +58,20 @@ data class KotlinCompilerArgument(
 
     @kotlinx.serialization.Transient
     val isObsolete: Boolean = false,
-
 ) : WithKotlinReleaseVersionsMetadata {
 
     // corresponds to [org.jetbrains.kotlin.cli.common.arguments.Argument.Delimiters]
     enum class Delimiter(val constantName: String) {
         Default("default"),
         None("none"),
-        PathSeparator("path-separator"),
+        PathSeparator("pathSeparator"),
         Space("space"),
         Semicolon("semicolon"),
     }
+}
+
+enum class KotlinCompilerPhase {
+    KLIB_COMPILATION, BACKEND_COMPILATION
 }
 
 /**
@@ -100,6 +111,12 @@ internal class KotlinCompilerArgumentBuilder {
     var valueDescription: ReleaseDependent<String?> = null.asReleaseDependent()
 
     /**
+     * @see KotlinCompilerArgument.argumentType
+     */
+    @ExperimentalArgumentApi
+    var argumentType: KotlinArgumentValueType<*>? = null
+
+    /**
      * @see KotlinCompilerArgument.compilerName
      */
     var compilerName: String? = null
@@ -110,6 +127,11 @@ internal class KotlinCompilerArgumentBuilder {
     var delimiter: KotlinCompilerArgument.Delimiter? = null
 
     /**
+     * @see KotlinCompilerArgument.affectsCompilationOutcome
+     */
+    var affectsCompilationOutcome: Boolean = true
+
+    /**
      * @see KotlinCompilerArgument.releaseVersionsMetadata
      */
     private lateinit var releaseVersionsMetadata: KotlinReleaseVersionLifecycle
@@ -118,6 +140,11 @@ internal class KotlinCompilerArgumentBuilder {
      * @see KotlinCompilerArgument.additionalAnnotations
      */
     private val additionalAnnotations: MutableList<Annotation> = mutableListOf()
+
+    /**
+     * @see KotlinCompilerArgument.restrictedToCompilerPhase
+     */
+    var restrictedToCompilerPhase: KotlinCompilerPhase? = null
 
     /**
      * Convenient method to define this argument [KotlinReleaseVersionLifecycle] metadata.
@@ -146,6 +173,7 @@ internal class KotlinCompilerArgumentBuilder {
     /**
      * Build a new instance of [KotlinCompilerArgument].
      */
+    @OptIn(ExperimentalArgumentApi::class)
     fun build(): KotlinCompilerArgument = KotlinCompilerArgument(
         name = name,
         shortName = shortName,
@@ -153,10 +181,13 @@ internal class KotlinCompilerArgumentBuilder {
         description = description,
         valueType = valueType,
         valueDescription = valueDescription,
+        argumentType = argumentType ?: valueType,
         releaseVersionsMetadata = releaseVersionsMetadata,
         additionalAnnotations = additionalAnnotations,
         compilerName = compilerName,
         delimiter = delimiter,
+        affectsCompilationOutcome = affectsCompilationOutcome,
+        restrictedToCompilerPhase = restrictedToCompilerPhase
     )
 }
 
@@ -179,7 +210,7 @@ internal class KotlinCompilerArgumentBuilder {
  * @see KotlinCompilerArgumentBuilder
  */
 internal fun compilerArgument(
-    config: KotlinCompilerArgumentBuilder.() -> Unit
+    config: KotlinCompilerArgumentBuilder.() -> Unit,
 ) = ReadOnlyProperty<Any?, KotlinCompilerArgument> { _, _ ->
     val builder = KotlinCompilerArgumentBuilder()
     config(builder)

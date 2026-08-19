@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.api.targets.session
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.tryCollectDesignation
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.llFirSession
+import org.jetbrains.kotlin.analysis.low.level.api.fir.util.checkAnalysisReadiness
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.checkDeclarationStatusIsResolved
 import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
@@ -259,11 +260,11 @@ private class LLFirStatusTargetResolver(
             true
         }
 
-        is FirSimpleFunction -> {
+        is FirNamedFunction -> {
             performResolveWithOverriddenCallables(
                 target,
                 { transformer.statusResolver.getOverriddenFunctions(it, transformer.containingClass) },
-                { element, overridden -> transformer.transformSimpleFunction(element, overridden) },
+                { element, overridden -> transformer.transformNamedFunction(element, overridden) },
             )
 
             true
@@ -287,7 +288,8 @@ private class LLFirStatusTargetResolver(
         getOverridden: (T) -> List<T>,
         crossinline transform: (T, List<T>) -> Unit,
     ) {
-        if (target.resolvePhase >= resolverPhase) return
+        if (checkAnalysisReadiness(target, containingDeclarations, resolverPhase)) return
+
         val overriddenDeclarations = getOverridden(target)
         performCustomResolveUnderLock(target) {
             transform(target, overriddenDeclarations)
@@ -297,7 +299,7 @@ private class LLFirStatusTargetResolver(
     override fun doLazyResolveUnderLock(target: FirElementWithResolveState) {
         when (target) {
             is FirRegularClass -> error("should be resolved in doResolveWithoutLock")
-            is FirFile, is FirScript -> {}
+            is FirFile, is FirScript, is FirReplSnippet -> {}
             else -> target.transformSingle(transformer, data = null)
         }
     }

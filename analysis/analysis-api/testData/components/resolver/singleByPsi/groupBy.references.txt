@@ -1,3 +1,0 @@
-KtNameReferenceExpression(263,267): 'nums'
-  KtSimpleNameReference:
-    nums: kotlin.IntArray

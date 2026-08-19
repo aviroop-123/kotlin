@@ -11,6 +11,8 @@ import org.jetbrains.kotlin.gradle.plugin.cocoapods.KotlinCocoapodsPlugin
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.KotlinCocoapodsPlugin.Companion.POD_BUILD_TASK_NAME
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.KotlinCocoapodsPlugin.Companion.POD_INSTALL_TASK_NAME
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.KotlinCocoapodsPlugin.Companion.POD_SETUP_BUILD_TASK_NAME
+import org.jetbrains.kotlin.gradle.tasks.asValidFrameworkName
+
 import org.jetbrains.kotlin.gradle.util.assertProcessRunResult
 import org.jetbrains.kotlin.gradle.util.replaceText
 import org.jetbrains.kotlin.gradle.util.runProcess
@@ -20,9 +22,6 @@ import java.nio.file.Path
 import kotlin.io.path.*
 import kotlin.test.assertTrue
 import kotlin.test.fail
-
-val String.normalizeCocoapadsFrameworkName: String
-    get() = replace('-', '_')
 
 enum class ImportMode(val directive: String) {
     FRAMEWORKS("use_frameworks!"),
@@ -45,7 +44,7 @@ fun TestProject.useCustomCocoapodsFrameworkName(
             .resolve(iosAppLocation)
             .resolve("ios-app/ViewController.swift")
             .replaceText(
-                "import ${subprojectName.normalizeCocoapadsFrameworkName}",
+                "import ${subprojectName.asValidFrameworkName}",
                 "import $frameworkName"
             )
     }
@@ -263,7 +262,7 @@ private fun gem(vararg args: String): String {
     println("Run command: ${command.joinToString(separator = " ")}")
     val result = runProcess(command, File("."))
 
-    assertProcessRunResult(result) {
+    result.assertProcessRunResult {
         assertTrue(
             result.isSuccessful,
             "Process 'gem ${args.joinToString(separator = " ")}' exited with error code ${result.exitCode}. See log for details."

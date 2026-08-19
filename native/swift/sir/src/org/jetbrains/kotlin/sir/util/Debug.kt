@@ -20,6 +20,7 @@ val SirElement.debugString: String
             is SirClass -> "class ${swiftFqName}${listOfNotNull(superClass?.render, renderProtocols.takeIf { it.isNotEmpty() }).joinToString().prefixIfNotEmpty(": ")}"
             is SirProtocol -> "protocol ${swiftFqName}${renderProtocols.prefixIfNotEmpty(": ")}"
             is SirEnum -> "enum ${swiftFqName}" // TODO: Render protocols
+            is SirEnumCase -> "case ${parent.swiftFqNameOrNull}.$name"
             is SirStruct -> "struct ${swiftFqName}" // TODO: Render protocols
             is SirTypealias -> "typealias ${swiftFqName} = ${type.render}"
             is SirModule -> "module ${swiftFqNameOrNull ?: "?"}"
@@ -38,13 +39,21 @@ private fun String.prefixIfNotEmpty(prefix: String): String = takeIf { it.isNotE
 
 private val SirProtocolConformingDeclaration.renderProtocols: String get() = protocols.joinToString { it.swiftFqName }
 
-private val SirType.render: String get() = when (this) {
+private val SirType.render: String
+    get() = when (this) {
+        is SirImplicitlyUnwrappedOptionalType if wrappedType is SirWrappedType -> "${wrappedType.render}!"
         is SirOptionalType -> "${wrappedType.render}?"
         is SirArrayType -> "[${elementType.render}]"
         is SirDictionaryType -> "[${keyType.render} : ${valueType.render}]"
-        is SirExistentialType -> protocols.takeIf { it.isNotEmpty() }?.joinToString(prefix = "any ", separator = " & ") { it.swiftFqName } ?: "Any"
-        is SirNominalType -> "${typeDeclaration.swiftFqName}"
+        is SirExistentialType -> protocols.takeIf {
+            it.isNotEmpty()
+        }?.joinToString(prefix = "any ", separator = " & ") { [protocol, typeArguments] ->
+            val typeArguments = typeArguments.takeIf { it.isNotEmpty() }
+            "${protocol.swiftFqName}${typeArguments?.joinToString(prefix = "<", postfix = ">", separator = ",") { it.render } ?: ""}"
+        } ?: "Any"
+        is SirNominalType -> typeDeclaration.swiftFqName
         is SirErrorType -> "<ERROR>"
         is SirUnsupportedType -> "<UNSUPPORTED>"
         is SirFunctionalType -> "(${parameterTypes.joinToString { it.render }}) -> ${returnType.render}"
+        is SirTupleType -> "(${types.joinToString { [name, type] -> "${name?.let { "$it: " } ?: ""}${type.render}" }})"
     }

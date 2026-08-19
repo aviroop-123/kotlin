@@ -9,8 +9,11 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL
@@ -26,14 +29,18 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: one.LibraryKt
       getContainingModule: KaLibraryModule "Library library"
       deprecationStatus: null
+      importableFqName: null
     KaContextParameterSymbol:
       annotations: []
       callableId: null
       compilerVisibility: Public
       contextReceivers: []
       isActual: false
+      isCompanion: false
+      isDelegated: false
       isExpect: false
       isExtension: false
+      isExternal: false
       isVal: true
       location: LOCAL
       modality: FINAL
@@ -49,6 +56,7 @@ KaNamedFunctionSymbol:
       getContainingJvmClassName: one.LibraryKt
       getContainingModule: KaLibraryModule "Library library"
       deprecationStatus: null
+      importableFqName: null
   ]
   contextReceivers: [
     KaContextReceiver:
@@ -68,6 +76,7 @@ KaNamedFunctionSymbol:
   hasStableParameterNames: true
   isActual: false
   isBuiltinFunctionInvoke: false
+  isCompanion: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -95,3 +104,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaLibraryModule "Library library"
   deprecationStatus: null
+  returnValueStatus: Unspecified
+  importableFqName: one.foo

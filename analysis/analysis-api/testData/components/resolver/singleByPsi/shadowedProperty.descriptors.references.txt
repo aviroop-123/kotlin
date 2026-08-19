@@ -1,6 +1,0 @@
-KtNameReferenceExpression(107,115): 'property'
-  KtSimpleNameReference:
-    (in pack.Foo) val property: kotlin.String
-  
-  SyntheticPropertyAccessorReference:
-    Nothing (Unresolved reference)

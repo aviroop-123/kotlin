@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.javac.wrappers.trees
 
 import com.sun.tools.javac.tree.JCTree
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.javac.wrappers.symbols.SymbolBasedArrayAnnotationArgument
 import org.jetbrains.kotlin.javac.wrappers.symbols.SymbolBasedReferenceAnnotationArgument
@@ -39,6 +40,9 @@ internal val JCTree.JCModifiers.isStatic: Boolean
 internal val JCTree.JCModifiers.hasDefaultModifier: Boolean
     get() = Modifier.DEFAULT in getFlags()
 
+internal val JCTree.JCModifiers.isNative: Boolean
+    get() = Modifier.NATIVE in getFlags()
+
 internal val JCTree.JCModifiers.visibility: Visibility
     get() = getFlags().getVisibility()
 
@@ -50,6 +54,7 @@ internal fun JCTree.annotations(): Collection<JCTree.JCAnnotation> = when (this)
     else -> null
 } ?: emptyList<JCTree.JCAnnotation>()
 
+@K1Deprecation
 fun Collection<JavaAnnotation>.filterTypeAnnotations(): Collection<JavaAnnotation> {
     val filteredAnnotations = arrayListOf<JavaAnnotation>()
     val targetClassId = ClassId(FqName("java.lang.annotation"), Name.identifier("Target"))

@@ -1,7 +1,6 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // OPT_IN: kotlin.RequiresOptIn
 // DIAGNOSTICS: -UNUSED_PARAMETER
-// NI_EXPECTED_FILE
 
 @file:OptIn(ExperimentalTypeInference::class)
 
@@ -15,12 +14,12 @@ fun <S> generate(g: suspend Controller<S>.() -> Unit): S = TODO()
 
 class A
 
-val test1 = <!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>generate<!> {
+val test1 = generate {
     yield(<!NO_COMPANION_OBJECT!>A<!>)
 }
 
 val test2: Int = generate {
-    yield(<!TYPE_MISMATCH!>A()<!>)
+    yield(<!ARGUMENT_TYPE_MISMATCH!>A()<!>)
 }
 
 /* GENERATED_FIR_TAGS: annotationUseSiteTargetFile, classDeclaration, classReference, functionDeclaration,

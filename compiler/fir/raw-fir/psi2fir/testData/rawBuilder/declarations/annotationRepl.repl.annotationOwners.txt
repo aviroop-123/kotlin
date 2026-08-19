@@ -1,0 +1,182 @@
+@Target(AnnotationTarget#.CLASS#, AnnotationTarget#.PROPERTY#, AnnotationTarget#.LOCAL_VARIABLE#, AnnotationTarget#.VALUE_PARAMETER#, AnnotationTarget#.CONSTRUCTOR#, AnnotationTarget#.FUNCTION#, AnnotationTarget#.TYPE#)
+owner -> FirRegularClassSymbol AnnotationRepl_repl.base
+context -> FirRegularClassSymbol AnnotationRepl_repl.base
+
+@base()
+owner -> FirConstructorSymbol /AnnotationRepl_repl.correct.correct
+context -> FirValueParameterSymbol <local>/x from FirConstructorSymbol /AnnotationRepl_repl.correct.correct
+
+@base()
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.correct.x
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.correct.x
+
+@base()
+owner -> FirConstructorSymbol /AnnotationRepl_repl.correct.correct
+context -> FirConstructorSymbol /AnnotationRepl_repl.correct.correct
+
+@base()
+owner -> FirAnonymousInitializerSymbol <init>
+context -> FirAnonymousInitializerSymbol <init> from FirRegularClassSymbol AnnotationRepl_repl.correct
+
+@base()
+owner -> FirRegularClassSymbol AnnotationRepl_repl.correct
+context -> FirRegularClassSymbol AnnotationRepl_repl.correct
+
+@base()
+owner -> FirEnumEntrySymbol /AnnotationRepl_repl.My.FIRST
+context -> FirEnumEntrySymbol /AnnotationRepl_repl.My.FIRST
+
+@base()
+owner -> FirEnumEntrySymbol /AnnotationRepl_repl.My.SECOND
+context -> FirEnumEntrySymbol /AnnotationRepl_repl.My.SECOND
+
+@base()
+owner -> FirRegularClassSymbol AnnotationRepl_repl.My
+context -> FirRegularClassSymbol AnnotationRepl_repl.My
+
+@base()
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+context -> FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+context -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+context -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar
+context -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar
+context -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+context -> FirNamedFunctionSymbol <local>/bar from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+context -> FirLocalPropertySymbol <local>/local from FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+context -> FirNamedFunctionSymbol /AnnotationRepl_repl.foo
+
+@base()
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.z
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.z
+
+@base()
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.x
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.x
+context -> FirPropertyAccessorSymbol special/accessor from FirRegularPropertySymbol /AnnotationRepl_repl.x
+context -> FirBackingFieldSymbol <local>/field from FirRegularPropertySymbol /AnnotationRepl_repl.x
+
+@base()
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.x
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.x
+context -> FirPropertyAccessorSymbol special/accessor from FirRegularPropertySymbol /AnnotationRepl_repl.x
+context -> FirBackingFieldSymbol <local>/field from FirRegularPropertySymbol /AnnotationRepl_repl.x
+
+@base()
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.x
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.x
+
+@Target(AnnotationTarget#.CLASS#, AnnotationTarget#.PROPERTY#, AnnotationTarget#.LOCAL_VARIABLE#, AnnotationTarget#.VALUE_PARAMETER#, AnnotationTarget#.CONSTRUCTOR#, AnnotationTarget#.FUNCTION#, AnnotationTarget#.TYPE#)
+owner -> FirRegularClassSymbol AnnotationRepl_repl.derived
+context -> FirRegularClassSymbol AnnotationRepl_repl.derived
+
+@base()
+owner -> FirRegularClassSymbol AnnotationRepl_repl.derived
+context -> FirRegularClassSymbol AnnotationRepl_repl.derived
+
+@derived(IntegerLiteral(1))
+owner -> FirConstructorSymbol /AnnotationRepl_repl.correctDerived.correctDerived
+context -> FirValueParameterSymbol <local>/x from FirConstructorSymbol /AnnotationRepl_repl.correctDerived.correctDerived
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.correctDerived.x
+context -> FirPropertyAccessorSymbol special/accessor from FirRegularPropertySymbol /AnnotationRepl_repl.correctDerived.x
+context -> FirBackingFieldSymbol <local>/field from FirRegularPropertySymbol /AnnotationRepl_repl.correctDerived.x
+
+@derived(IntegerLiteral(1))
+owner -> FirConstructorSymbol /AnnotationRepl_repl.correctDerived.correctDerived
+context -> FirValueParameterSymbol <local>/x from FirConstructorSymbol /AnnotationRepl_repl.correctDerived.correctDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.correctDerived.x
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.correctDerived.x
+
+@base()
+owner -> FirConstructorSymbol /AnnotationRepl_repl.correctDerived.correctDerived
+context -> FirConstructorSymbol /AnnotationRepl_repl.correctDerived.correctDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirRegularClassSymbol AnnotationRepl_repl.correctDerived
+context -> FirRegularClassSymbol AnnotationRepl_repl.correctDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirEnumEntrySymbol /AnnotationRepl_repl.MyDerived.FIRST
+context -> FirEnumEntrySymbol /AnnotationRepl_repl.MyDerived.FIRST
+
+@derived(IntegerLiteral(1))
+owner -> FirEnumEntrySymbol /AnnotationRepl_repl.MyDerived.SECOND
+context -> FirEnumEntrySymbol /AnnotationRepl_repl.MyDerived.SECOND
+
+@derived(IntegerLiteral(1))
+owner -> FirRegularClassSymbol AnnotationRepl_repl.MyDerived
+context -> FirRegularClassSymbol AnnotationRepl_repl.MyDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+context -> FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+context -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+context -> FirValueParameterSymbol <local>/y from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar
+context -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar
+context -> FirValueParameterSymbol <local>/z from FirNamedFunctionSymbol <local>/bar from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+context -> FirNamedFunctionSymbol <local>/bar from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+context -> FirLocalPropertySymbol <local>/local from FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+context -> FirNamedFunctionSymbol /AnnotationRepl_repl.fooDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.zDerived
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.zDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+context -> FirPropertyAccessorSymbol special/accessor from FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+context -> FirBackingFieldSymbol <local>/field from FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+context -> FirPropertyAccessorSymbol special/accessor from FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+context -> FirBackingFieldSymbol <local>/field from FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+
+@derived(IntegerLiteral(1))
+owner -> FirRegularPropertySymbol /AnnotationRepl_repl.xDerived
+context -> FirRegularPropertySymbol /AnnotationRepl_repl.xDerived

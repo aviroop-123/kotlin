@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (POSITIVE)
@@ -69,7 +68,7 @@ class Case4() : I {
 
     fun case() {
         I.<!DEBUG_INFO_CALL("fqName: I.Companion.invoke; typeCall: operator function")!>invoke("")<!>
-        <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.String")!>I.invoke("")<!>
+        I.invoke("")
         <!DEBUG_INFO_CALL("fqName: Case4.Companion.invoke; typeCall: operator function")!>invoke("")<!>
         <!DEBUG_INFO_EXPRESSION_TYPE("kotlin.Any")!>invoke("")<!>
         <!DEBUG_INFO_CALL("fqName: I.Companion.invoke; typeCall: variable&invoke")!>I("")<!>

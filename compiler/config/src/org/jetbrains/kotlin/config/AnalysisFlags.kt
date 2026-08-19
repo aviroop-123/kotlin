@@ -95,12 +95,8 @@ object AnalysisFlags {
     val lenientMode by AnalysisFlag.Delegates.Boolean
 
     val hierarchicalMultiplatformCompilation by AnalysisFlag.Delegates.Boolean(defaultValue = false)
-}
 
-@Deprecated(
-    message = "Deprecated. Not needed",
-    replaceWith = ReplaceWith("supportsFeature(LanguageFeature.DataClassCopyRespectsConstructorVisibility)")
-)
-fun LanguageVersionSettings.doesDataClassCopyRespectConstructorVisibility(): Boolean { // Used in IDE
-    return supportsFeature(LanguageFeature.DataClassCopyRespectsConstructorVisibility)
+    val headerMode by AnalysisFlag.Delegates.Boolean
+
+    val headerModeType by AnalysisFlag.Delegates.HeaderModeTypeAnyByDefault
 }

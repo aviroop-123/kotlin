@@ -18,14 +18,14 @@ package org.jetbrains.kotlin.gradle
 
 import org.gradle.api.logging.LogLevel
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
-import org.jetbrains.kotlin.cli.common.arguments.cliArgument
+import org.jetbrains.kotlin.cli.common.arguments.*
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.gradle.tasks.USING_JVM_INCREMENTAL_COMPILATION_MESSAGE
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.gradle.util.checkBytecodeContains
 import org.jetbrains.kotlin.gradle.util.checkedReplace
 import org.jetbrains.kotlin.gradle.util.testResolveAllConfigurations
+import org.jetbrains.kotlin.testFederation.SmokeTest
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.condition.DisabledOnOs
@@ -41,6 +41,7 @@ import kotlin.test.assertTrue
 
 @DisplayName("Basic Kotlin/JVM plugin tests")
 @JvmGradlePluginTests
+@SmokeTest
 class KotlinGradleIT : KGPBaseTest() {
 
     @DisplayName("Kotlin/Java cross compilation")
@@ -81,17 +82,6 @@ class KotlinGradleIT : KGPBaseTest() {
                     ":compileKotlin",
                     ":compileTestKotlin"
                 )
-            }
-        }
-    }
-
-    @DisplayName("Project path contains spaces")
-    @GradleTest
-    fun testKotlinCompileInFolderWithSpaces(gradleVersion: GradleVersion) {
-        project(projectName = "Project Path With Spaces", gradleVersion) {
-            build("build") {
-                assertTasksExecuted(":compileKotlin", ":compileTestKotlin")
-                assertOutputDoesNotContain("Forcing System.gc")
             }
         }
     }
@@ -293,7 +283,9 @@ class KotlinGradleIT : KGPBaseTest() {
 
             // check the arguments are not passed by default (they are inferred by the compiler)
             build("clean", "compileKotlin") {
+                @Suppress("DEPRECATION")
                 assertOutputDoesNotContain(CommonCompilerArguments::languageVersion.cliArgument)
+                @Suppress("DEPRECATION")
                 assertOutputDoesNotContain(CommonCompilerArguments::apiVersion.cliArgument)
                 assertNoBuildWarnings()
             }
@@ -304,7 +296,9 @@ class KotlinGradleIT : KGPBaseTest() {
 
             updateBuildGradle(firstSupported, firstApiVersion)
             build("clean", "compileKotlin") {
+                @Suppress("DEPRECATION")
                 assertOutputContains("${CommonCompilerArguments::languageVersion.cliArgument} $firstSupported")
+                @Suppress("DEPRECATION")
                 assertOutputContains("${CommonCompilerArguments::apiVersion.cliArgument} $firstApiVersion")
             }
 
@@ -313,7 +307,9 @@ class KotlinGradleIT : KGPBaseTest() {
 
             updateBuildGradle(latestStable, latestApiStable)
             build("clean", "compileKotlin") {
+                @Suppress("DEPRECATION")
                 assertOutputContains("${CommonCompilerArguments::languageVersion.cliArgument} $latestStable")
+                @Suppress("DEPRECATION")
                 assertOutputContains("${CommonCompilerArguments::apiVersion.cliArgument} $latestApiStable")
             }
         }
@@ -497,7 +493,7 @@ class KotlinGradleIT : KGPBaseTest() {
     }
 
     @DisplayName("KGP dependencies in buildSrc module")
-    @GradleTestVersions
+    @GradleTestVersions(minVersion = TestVersions.Gradle.G_8_3)
     @GradleTest
     fun testKotlinPluginDependenciesInBuildSrc(gradleVersion: GradleVersion) {
         project("kotlinPluginDepsInBuildSrc", gradleVersion) {
@@ -622,13 +618,15 @@ class KotlinGradleIT : KGPBaseTest() {
                 }
 
                 val publishedPom = moduleDir.resolve("new-model-1.0.pom")
-                val kotlinVersion = buildOptions.kotlinVersion
                 val pomText = publishedPom.readText().replace(Regex("\\s+"), "")
                 assertTrue { "kotlin-gradle-plugin-api</artifactId><scope>compile</scope>" in pomText }
                 assertTrue { "kotlin-stdlib-jdk8</artifactId><scope>runtime</scope>" in pomText }
 
                 assertFileExists(moduleDir.resolve("new-model-1.0-sources.jar"))
             }
+
+            // Workaround for Junit 'Failed to delete temp directory' on Windows OS
+            build("clean")
         }
     }
 
@@ -778,7 +776,7 @@ class KotlinGradleIT : KGPBaseTest() {
 
             buildGradle.modify {
                 val reorderedClasspath = run {
-                    val (kotlinCompilerEmbeddable, others) = classpath.partition {
+                    val [kotlinCompilerEmbeddable, others] = classpath.partition {
                         "kotlin-compiler-embeddable" in it ||
                                 // build-common should be loaded prior compiler-embedable, otherwise we could depend on old version of
                                 // serializer classes and fail with NSME
@@ -851,4 +849,14 @@ class KotlinGradleIT : KGPBaseTest() {
         }
     }
 
+    @DisplayName("KT-73090: BTA does not break Gradle convention plugins compilation")
+    @GradleTest
+    @GradleTestVersions(minVersion = TestVersions.Gradle.G_8_3)
+    fun testConventionPlugins(gradleVersion: GradleVersion) {
+        project("convention-plugin", gradleVersion, buildOptions = defaultBuildOptions.copy(runViaBuildToolsApi = true)) {
+            build("help") {
+                assertOutputContains("my-plugin applied")
+            }
+        }
+    }
 }

@@ -6,31 +6,25 @@
 package org.jetbrains.kotlin.lombok.k2.config
 
 import org.jetbrains.kotlin.descriptors.Visibility
-import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
-import org.jetbrains.kotlin.fir.declarations.evaluateAs
 import org.jetbrains.kotlin.fir.declarations.findArgumentByName
 import org.jetbrains.kotlin.fir.declarations.getStringArgument
 import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.references.impl.FirSimpleNamedReference
 import org.jetbrains.kotlin.fir.symbols.impl.FirEnumEntrySymbol
 import org.jetbrains.kotlin.lombok.config.AccessLevel
 import org.jetbrains.kotlin.lombok.utils.trimToNull
 import org.jetbrains.kotlin.name.Name
 
 @DirectDeclarationsAccess
-fun FirAnnotation.getAccessLevel(field: Name, session: FirSession): AccessLevel {
-    val value = getArgumentAsString(field, session) ?: return AccessLevel.PUBLIC
-    return AccessLevel.valueOf(value)
+fun FirAnnotation?.getVisibility(field: Name, defaultAccessLevel: AccessLevel = AccessLevel.PUBLIC): Visibility? {
+    val value = getArgumentAsString(field)?.let { arg -> AccessLevel.entries.find { it.name == arg } } ?: defaultAccessLevel
+    return value.toVisibility()
 }
 
 @DirectDeclarationsAccess
-fun FirAnnotation.getAccessLevel(session: FirSession): AccessLevel {
-    return getAccessLevel(LombokConfigNames.VALUE, session)
-}
-
-@DirectDeclarationsAccess
-private fun FirAnnotation.getArgumentAsString(field: Name, session: FirSession): String? {
-    val argument = findArgumentByName(field)?.evaluateAs<FirExpression>(session) ?: return null
+private fun FirAnnotation?.getArgumentAsString(field: Name): String? {
+    val argument = this?.findArgumentByName(field) ?: return null
     return when (argument) {
         is FirLiteralExpression -> argument.value as? String
         is FirEnumEntryDeserializedAccessExpression -> argument.enumEntryName.identifier
@@ -40,19 +34,14 @@ private fun FirAnnotation.getArgumentAsString(field: Name, session: FirSession):
             if (symbol is FirEnumEntrySymbol) {
                 symbol.callableId.callableName.identifier
             } else {
-                null
+                (argument.calleeReference as? FirSimpleNamedReference)?.name?.identifier
             }
         }
         else -> null
     }
 }
 
-@DirectDeclarationsAccess
-fun FirAnnotation.getVisibility(field: Name, session: FirSession): Visibility {
-    return getAccessLevel(field, session).toVisibility()
-}
-
-fun FirAnnotation.getNonBlankStringArgument(name: Name, session: FirSession): String? = getStringArgument(name, session)?.trimToNull()
+fun FirAnnotation.getNonBlankStringArgument(name: Name): String? = getStringArgument(name)?.trimToNull()
 
 object LombokConfigNames {
     val VALUE = Name.identifier("value")
@@ -62,6 +51,7 @@ object LombokConfigNames {
     val ACCESS = Name.identifier("access")
     val STATIC_NAME = Name.identifier("staticName")
     val STATIC_CONSTRUCTOR = Name.identifier("staticConstructor")
+    val FORCE = Name.identifier("force")
 
     val BUILDER_CLASS_NAME = Name.identifier("builderClassName")
     val BUILD_METHOD_NAME = Name.identifier("buildMethodName")
@@ -69,11 +59,41 @@ object LombokConfigNames {
     val TO_BUILDER = Name.identifier("toBuilder")
     val SETTER_PREFIX = Name.identifier("setterPrefix")
     val IGNORE_NULL_COLLECTIONS = Name.identifier("ignoreNullCollections")
+    val TOPIC = Name.identifier("topic")
 
-
-    const val FLUENT_CONFIG = "lombok.accessors.fluent"
-    const val CHAIN_CONFIG = "lombok.accessors.chain"
-    const val PREFIX_CONFIG = "lombok.accessors.prefix"
-    const val NO_IS_PREFIX_CONFIG = "lombok.getter.noIsPrefix"
+    const val ACCESSORS_FLUENT_CONFIG = "lombok.accessors.fluent"
+    const val ACCESSORS_CHAIN_CONFIG = "lombok.accessors.chain"
+    const val ACCESSORS_PREFIX_CONFIG = "lombok.accessors.prefix"
+    const val GETTER_NO_IS_PREFIX_CONFIG = "lombok.getter.noIsPrefix"
     const val BUILDER_CLASS_NAME_CONFIG = "lombok.builder.className"
+    const val LOG_FIELD_NAME_CONFIG = "lombok.log.fieldName"
+    const val LOG_FIELD_IS_STATIC_CONFIG = "lombok.log.fieldIsStatic"
+    const val LOG_FLAG_USAGE_CONFIG = "lombok.log.flagUsage"
+    const val JAVA_UTIL_LOG_FLAG_USAGE_CONFIG = "lombok.log.javaUtilLogging.flagUsage"
+    const val SLF4J_LOG_FLAG_USAGE_CONFIG = "lombok.log.slf4j.flagUsage"
+    const val LOG4J_LOG_FLAG_USAGE_CONFIG = "lombok.log.log4j.flagUsage"
+    const val COMMONS_LOG_FLAG_USAGE_CONFIG = "lombok.log.apacheCommons.flagUsage"
+    const val FLOGGER_LOG_FLAG_USAGE_CONFIG = "lombok.log.flogger.flagUsage"
+    const val JBOSS_LOG_FLAG_USAGE_CONFIG = "lombok.log.jbossLog.flagUsage"
+    const val LOG4J2_LOG_FLAG_USAGE_CONFIG = "lombok.log.log4j2.flagUsage"
+    const val XSLF4J_LOG_FLAG_USAGE_CONFIG = "lombok.log.xslf4j.flagUsage"
+
+    val INCLUDE_FIELD_NAMES = Name.identifier("includeFieldNames")
+    val CALL_SUPER = Name.identifier("callSuper")
+    val DO_NOT_USE_GETTERS = Name.identifier("doNotUseGetters")
+    val ONLY_EXPLICITLY_INCLUDED = Name.identifier("onlyExplicitlyIncluded")
+    val EXCLUDE = Name.identifier("exclude")
+    val INCLUDE_NAME = Name.identifier("name")
+    val INCLUDE_RANK = Name.identifier("rank")
+
+    const val TO_STRING_INCLUDE_FIELD_NAMES_CONFIG = "lombok.toString.includeFieldNames"
+    const val TO_STRING_CALL_SUPER_CONFIG = "lombok.toString.callSuper"
+    const val TO_STRING_DO_NOT_USE_GETTERS_CONFIG = "lombok.toString.doNotUseGetters"
+    const val TO_STRING_ONLY_EXPLICITLY_INCLUDED_CONFIG = "lombok.toString.onlyExplicitlyIncluded"
+    const val TO_STRING_FLAG_USAGE_CONFIG = "lombok.toString.flagUsage"
+}
+
+enum class FlagUsageValue {
+    Warning,
+    Error,
 }

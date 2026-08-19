@@ -1,42 +1,49 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.test.configuration
 
+import org.jetbrains.kotlin.codegen.forTestCompile.JavaForeignAnnotationType
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
-import org.jetbrains.kotlin.test.Constructor
-import org.jetbrains.kotlin.test.HandlersStepBuilder
+import org.jetbrains.kotlin.test.FirParser
 import org.jetbrains.kotlin.test.TestJdkKind
+import org.jetbrains.kotlin.test.TestStepBuilder
 import org.jetbrains.kotlin.test.backend.handlers.*
+import org.jetbrains.kotlin.test.backend.ir.BackendCliJvmFacade
 import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.builders.*
-import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
+import org.jetbrains.kotlin.test.directives.*
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.DUMP_SMAP
 import org.jetbrains.kotlin.test.directives.CodegenTestDirectives.RUN_DEX_CHECKER
 import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.WITH_STDLIB
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives.DIAGNOSTICS
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives.REPORT_ONLY_EXPLICITLY_DEFINED_DEBUG_INFO
-import org.jetbrains.kotlin.test.directives.ForeignAnnotationsDirectives
 import org.jetbrains.kotlin.test.directives.ForeignAnnotationsDirectives.ENABLE_FOREIGN_ANNOTATIONS
-import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.ENABLE_DEBUG_MODE
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives.USE_PSI_CLASS_FILES_READING
-import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives
-import org.jetbrains.kotlin.test.frontend.classic.ClassicFrontendOutputArtifact
+import org.jetbrains.kotlin.test.frontend.fir.Fir2IrCliJvmFacade
+import org.jetbrains.kotlin.test.frontend.fir.FirCliJvmFacade
 import org.jetbrains.kotlin.test.frontend.fir.FirMetaInfoDiffSuppressor
 import org.jetbrains.kotlin.test.frontend.fir.FirOutputArtifact
-import org.jetbrains.kotlin.test.model.*
-import org.jetbrains.kotlin.test.services.AdditionalSourceProvider
-import org.jetbrains.kotlin.test.services.configuration.*
+import org.jetbrains.kotlin.test.model.ArtifactKinds
+import org.jetbrains.kotlin.test.model.BackendKinds
+import org.jetbrains.kotlin.test.model.BinaryArtifacts
+import org.jetbrains.kotlin.test.model.DependencyKind
+import org.jetbrains.kotlin.test.model.FrontendKinds
+import org.jetbrains.kotlin.test.services.configuration.CommonEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.JvmEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.configuration.JvmForeignAnnotationsConfigurator
+import org.jetbrains.kotlin.test.services.configuration.ScriptingEnvironmentConfigurator
+import org.jetbrains.kotlin.test.services.fir.FirSpecificParserSuppressor
 import org.jetbrains.kotlin.test.services.sourceProviders.AdditionalDiagnosticsSourceFilesProvider
 import org.jetbrains.kotlin.test.services.sourceProviders.CoroutineHelpersSourceFilesProvider
 import org.jetbrains.kotlin.utils.bind
 
 /**
- * Setups the pipeline for all JVM backend tests
+ * Sets up the pipeline for all JVM backend tests
  *
  * Steps:
  * - FIR frontend
@@ -45,33 +52,38 @@ import org.jetbrains.kotlin.utils.bind
  *
  * There are handler steps after each facade step.
  */
-fun <F : ResultingArtifact.FrontendOutput<F>, B : ResultingArtifact.BackendInput<B>> TestConfigurationBuilder.commonConfigurationForJvmTest(
-    targetFrontend: FrontendKind<F>,
-    frontendFacade: Constructor<FrontendFacade<F>>,
-    frontendToBackendConverter: Constructor<Frontend2BackendConverter<F, B>>,
-    backendFacade: Constructor<BackendFacade<IrBackendInput, BinaryArtifacts.Jvm>>,
-    additionalSourceProvider: Constructor<AdditionalSourceProvider>? = null,
-) {
-    commonServicesConfigurationForCodegenAndDebugTest(targetFrontend)
-    additionalSourceProvider?.let { useAdditionalSourceProviders(it) }
-    facadeStep(frontendFacade)
-    classicFrontendHandlersStep()
-    firHandlersStep()
-    facadeStep(frontendToBackendConverter)
+fun TestConfigurationBuilder.setupJvmPipelineStepsWithoutCompilationErrorHandlers(parser: FirParser) {
+    commonServicesConfigurationForCodegenAndDebugTest()
+    configureFirParser(parser)
+
+    facadeStep(::FirCliJvmFacade)
+    firHandlersStep(init = {})
+    facadeStep(::Fir2IrCliJvmFacade)
     irHandlersStep(init = {})
-    facadeStep(backendFacade)
+    facadeStep(::BackendCliJvmFacade)
     jvmArtifactsHandlersStep(init = {})
 }
 
 /**
- * Setups the base test configuration for JVM backend tests, including
+ * Sets up the pipeline for all JVM backend tests (the same as [setupJvmPipelineStepsWithoutCompilationErrorHandlers]).
+ * Also includes default compilation error handlers for all the steps.
+ */
+fun TestConfigurationBuilder.setupJvmPipelineSteps(parser: FirParser) {
+    setupJvmPipelineStepsWithoutCompilationErrorHandlers(parser)
+    configureFirHandlersStep { commonFirHandlersForCodegenTest() }
+    configureIrHandlersStep { commonIrHandlersForCodegenTest() }
+    configureJvmArtifactsHandlersStep { useHandlers(::NoJvmSpecificCompilationErrorsHandler) }
+}
+
+/**
+ * Sets up the base test configuration for JVM backend tests, including
  * - global defaults
  * - environment configurators
  * - additional source providers
  */
-fun TestConfigurationBuilder.commonServicesConfigurationForCodegenAndDebugTest(targetFrontend: FrontendKind<*>) {
+private fun TestConfigurationBuilder.commonServicesConfigurationForCodegenAndDebugTest() {
     globalDefaults {
-        frontend = targetFrontend
+        frontend = FrontendKinds.FIR
         targetPlatform = JvmPlatforms.defaultJvmPlatform
         dependencyKind = DependencyKind.Binary
     }
@@ -82,15 +94,17 @@ fun TestConfigurationBuilder.commonServicesConfigurationForCodegenAndDebugTest(t
 
     useConfigurators(
         ::CommonEnvironmentConfigurator,
+        ::JvmForeignAnnotationsConfigurator,
         ::JvmEnvironmentConfigurator,
         ::ScriptingEnvironmentConfigurator,
-        ::JvmForeignAnnotationsConfigurator,
     )
 
     useAdditionalSourceProviders(
         ::AdditionalDiagnosticsSourceFilesProvider,
         ::CoroutineHelpersSourceFilesProvider,
     )
+
+    useMetaTestConfigurators(::FirSpecificParserSuppressor)
 }
 
 /**
@@ -128,7 +142,6 @@ fun TestConfigurationBuilder.configureDumpHandlersForCodegenTest(includeAllDumpH
         useHandlers(
             ::IrTreeVerifierHandler,
             ::IrTextDumpHandler,
-            ::IrMangledNameAndSignatureDumpHandler,
         )
     }
     configureJvmArtifactsHandlersStep {
@@ -141,8 +154,8 @@ fun TestConfigurationBuilder.configureDumpHandlersForCodegenTest(includeAllDumpH
 /**
  * Add all handlers usually used in codegen tests and the [JvmBoxRunner] handler
  */
-fun TestConfigurationBuilder.configureCommonHandlersForBoxTest(includeK1Handlers: Boolean = true) {
-    commonHandlersForCodegenTest(includeK1Handlers)
+fun TestConfigurationBuilder.configureCommonHandlersForBoxTest() {
+    commonHandlersForCodegenTest()
     configureJvmArtifactsHandlersStep {
         useHandlers(::JvmBoxRunner)
     }
@@ -151,15 +164,12 @@ fun TestConfigurationBuilder.configureCommonHandlersForBoxTest(includeK1Handlers
 /**
  * Add all handlers usually used in codegen tests
  */
-fun TestConfigurationBuilder.commonHandlersForCodegenTest(includeK1Handlers: Boolean = true) {
-    if (includeK1Handlers) {
-        configureClassicFrontendHandlersStep {
-            commonClassicFrontendHandlersForCodegenTest()
-        }
-    }
-
+fun TestConfigurationBuilder.commonHandlersForCodegenTest() {
     configureFirHandlersStep {
         commonFirHandlersForCodegenTest()
+    }
+    configureIrHandlersStep {
+        commonIrHandlersForCodegenTest()
     }
     configureJvmArtifactsHandlersStep {
         commonBackendHandlersForCodegenTest()
@@ -167,27 +177,27 @@ fun TestConfigurationBuilder.commonHandlersForCodegenTest(includeK1Handlers: Boo
 }
 
 /**
- * Adds a handler which checks that there are no compilation errors reported at the K1 frontend step
- */
-fun HandlersStepBuilder<ClassicFrontendOutputArtifact, FrontendKinds.ClassicFrontend>.commonClassicFrontendHandlersForCodegenTest() {
-    useHandlers(
-        ::NoCompilationErrorsHandler,
-    )
-}
-
-/**
  * Adds a handler which checks that there are no compilation errors reported at the K2 frontend step
  */
-fun HandlersStepBuilder<FirOutputArtifact, FrontendKinds.FIR>.commonFirHandlersForCodegenTest() {
+fun TestStepBuilder.HandlersStepBuilder.NonGroupingStage<FirOutputArtifact, FrontendKinds.FIR>.commonFirHandlersForCodegenTest() {
     useHandlers(
         ::NoFirCompilationErrorsHandler,
     )
 }
 
 /**
+ * Adds a handler which checks that there are no compilation errors reported at the K2 frontend step
+ */
+fun TestStepBuilder.HandlersStepBuilder.NonGroupingStage<IrBackendInput, BackendKinds.IrBackend>.commonIrHandlersForCodegenTest() {
+    useHandlers(
+        ::NoIrCompilationErrorsHandler,
+    )
+}
+
+/**
  * Add JVM artifact handlers usually used in codegen tests
  */
-fun HandlersStepBuilder<BinaryArtifacts.Jvm, ArtifactKinds.Jvm>.commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler: Boolean = true) {
+fun TestStepBuilder.HandlersStepBuilder.NonGroupingStage<BinaryArtifacts.Jvm, ArtifactKinds.Jvm>.commonBackendHandlersForCodegenTest(includeNoCompilationErrorsHandler: Boolean = true) {
     useHandlers(
         ::JvmBackendDiagnosticsHandler,
         ::DxCheckerHandler,
@@ -206,7 +216,7 @@ fun TestConfigurationBuilder.configureBlackBoxTestSettings() {
         -USE_PSI_CLASS_FILES_READING
     }
 
-    useAfterAnalysisCheckers(
+    useFailureSuppressors(
         ::FirMetaInfoDiffSuppressor
     )
 
@@ -217,15 +227,11 @@ fun TestConfigurationBuilder.configureBlackBoxTestSettings() {
  * Setups additional services and directives used in JVM box tests
  */
 fun TestConfigurationBuilder.baseFirBlackBoxCodegenTestDirectivesConfiguration() {
+    commonCodegenConfiguration()
+
     forTestsMatching("*WithStdLib/*") {
         defaultDirectives {
             +WITH_STDLIB
-        }
-    }
-
-    forTestsMatching("compiler/testData/codegen/box/properties/backingField/*") {
-        defaultDirectives {
-            LanguageSettingsDirectives.LANGUAGE with "+ExplicitBackingFields"
         }
     }
 }
@@ -233,25 +239,24 @@ fun TestConfigurationBuilder.baseFirBlackBoxCodegenTestDirectivesConfiguration()
 /**
  * Setups the backend-specific handlers and directives exclusively used by JVM box tests
  */
-fun TestConfigurationBuilder.configureJvmBoxCodegenSettings(includeAllDumpHandlers: Boolean) {
+fun TestConfigurationBuilder.configureJvmBoxCodegenSettings(includeAllDumpHandlers: Boolean, includeBytecodeTextHandler: Boolean = true) {
     configureJvmArtifactsHandlersStep {
         if (includeAllDumpHandlers) {
-            useHandlers(
-                ::BytecodeListingHandler,
-            )
+            useHandlers(::BytecodeListingHandler,)
         }
-
-        useHandlers(
-            ::BytecodeTextHandler.bind(true)
-        )
+        if (includeBytecodeTextHandler) {
+            useHandlers(::BytecodeTextHandler.bind(true))
+        }
     }
 
     defaultDirectives {
         +REPORT_ONLY_EXPLICITLY_DEFINED_DEBUG_INFO
+        +WITH_STDLIB
     }
 
     forTestsNotMatching(
         "compiler/testData/codegen/box/diagnostics/functions/tailRecursion/*" or
+                "compiler/testData/codegen/boxJvm/diagnostics/functions/tailRecursion/*" or
                 "compiler/testData/diagnostics/*" or
                 "compiler/fir/analysis-tests/testData/*"
     ) {
@@ -262,25 +267,16 @@ fun TestConfigurationBuilder.configureJvmBoxCodegenSettings(includeAllDumpHandle
 
     configureModernJavaWhenNeeded()
 
-    forTestsMatching("compiler/testData/codegen/box/coroutines/varSpilling/debugMode/*") {
+    forTestsMatching("compiler/testData/codegen/box(?:Jvm)?/coroutines/varSpilling/debugMode/*") {
         defaultDirectives {
             +ENABLE_DEBUG_MODE
         }
     }
 
-    forTestsMatching("compiler/testData/codegen/box/javaInterop/foreignAnnotationsTests/tests/*") {
+    forTestsMatching("compiler/testData/codegen/box(?:Jvm)?/javaInterop/foreignAnnotationsTests/tests/*") {
         defaultDirectives {
             +ENABLE_FOREIGN_ANNOTATIONS
             ForeignAnnotationsDirectives.ANNOTATIONS_PATH with JavaForeignAnnotationType.Annotations
-        }
-    }
-
-    forTestsMatching("compiler/testData/codegen/box/involvesIrInterpreter/*") {
-        configureFirHandlersStep {
-            useHandlers(::FirInterpreterDumpHandler)
-        }
-        configureJvmArtifactsHandlersStep {
-            useHandlers(::JvmIrInterpreterDumpHandler)
         }
     }
 }

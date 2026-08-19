@@ -7,8 +7,15 @@ package org.jetbrains.kotlin.wasm.ir
 
 import org.jetbrains.kotlin.wasm.ir.source.location.SourceLocation
 
+abstract class DeclarationResolver {
+    abstract fun resolve(type: WasmHeapType.Type): WasmTypeDeclaration
+    abstract fun resolve(type: WasmImmediate.TypeIdx): WasmTypeDeclaration
+    abstract fun resolve(global: WasmImmediate.GlobalIdx): WasmGlobal
+    abstract fun resolve(function: WasmImmediate.FuncIdx): WasmFunction
+}
 
 class WasmModule(
+    val resolver: DeclarationResolver,
     val recGroups: List<List<WasmTypeDeclaration>> = emptyList(),
     val importsInOrder: List<WasmNamedModuleField> = emptyList(),
     val importedFunctions: List<WasmFunction.Imported> = emptyList(),
@@ -36,22 +43,39 @@ sealed class WasmNamedModuleField {
     open val name: String = ""
 }
 
+/**
+ * Function-level annotations that apply to the whole function (always at byte offset 0).
+ * These are distinct from instruction-level annotations (e.g., branch hints) which carry
+ * a meaningful byte offset into the function body.
+ * Subclasses may carry arbitrary payload data for the annotation.
+ */
+sealed class WasmFunctionAnnotation {
+    /** The custom section name this annotation corresponds to in the binary format. */
+    abstract val sectionName: String
+
+    /** Marks the function as callable from JavaScript. Emits a binaryen.js.called annotation. */
+    data object JsCalled : WasmFunctionAnnotation() {
+        override val sectionName = "binaryen.js.called"
+    }
+}
+
 sealed class WasmFunction(
     override val name: String,
-    val type: WasmSymbolReadOnly<WasmFunctionType>,
+    val type: WasmHeapType.Type.FunctionType,
 ) : WasmNamedModuleField() {
     class Defined(
         name: String,
-        type: WasmSymbolReadOnly<WasmFunctionType>,
+        type: WasmHeapType.Type.FunctionType,
         val locals: MutableList<WasmLocal> = mutableListOf(),
         val instructions: MutableList<WasmInstr> = mutableListOf(),
         val startLocation: SourceLocation = SourceLocation.IgnoredLocation,
         val endLocation: SourceLocation = SourceLocation.IgnoredLocation,
+        val functionAnnotations: MutableSet<WasmFunctionAnnotation> = mutableSetOf(),
     ) : WasmFunction(name, type)
 
     class Imported(
         name: String,
-        type: WasmSymbolReadOnly<WasmFunctionType>,
+        type: WasmHeapType.Type.FunctionType,
         val importPair: WasmImportDescriptor,
     ) : WasmFunction(name, type)
 }
@@ -108,13 +132,9 @@ class WasmElement(
 }
 
 class WasmTag(
-    val type: WasmFunctionType,
+    val type: WasmHeapType.Type.FunctionType,
     val importPair: WasmImportDescriptor? = null
-) : WasmNamedModuleField() {
-    init {
-        assert(type.resultTypes.isEmpty()) { "Must have empty return as per current spec" }
-    }
-}
+) : WasmNamedModuleField()
 
 class WasmLocal(
     val id: Int,
@@ -156,7 +176,7 @@ data class WasmFunctionType(
 class WasmStructDeclaration(
     name: String,
     val fields: List<WasmStructFieldDeclaration>,
-    val superType: WasmSymbolReadOnly<WasmTypeDeclaration>?,
+    val superType: WasmHeapType.Type?,
     val isFinal: Boolean
 ) : WasmTypeDeclaration(name)
 
@@ -170,31 +190,6 @@ class WasmStructFieldDeclaration(
     val type: WasmType,
     val isMutable: Boolean
 )
-
-sealed class WasmInstr(
-    val operator: WasmOp,
-    val immediates: List<WasmImmediate> = emptyList()
-) {
-    abstract val location: SourceLocation?
-}
-
-class WasmInstrWithLocation(
-    operator: WasmOp,
-    immediates: List<WasmImmediate>,
-    override val location: SourceLocation
-) : WasmInstr(operator, immediates) {
-    constructor(
-        operator: WasmOp,
-        location: SourceLocation
-    ) : this(operator, emptyList(), location)
-}
-
-class WasmInstrWithoutLocation(
-    operator: WasmOp,
-    immediates: List<WasmImmediate> = emptyList(),
-) : WasmInstr(operator, immediates) {
-    override val location: SourceLocation? get() = null
-}
 
 data class WasmLimits(
     val minSize: UInt,

@@ -55,16 +55,17 @@ public class KtAnnotation extends KtElementImplStub<KotlinPlaceHolderStub<KtAnno
     }
 
     @Nullable
+    @SuppressWarnings("deprecation") // KT-78356
     public KtAnnotationUseSiteTarget getUseSiteTarget() {
         return getStubOrPsiChild(KtStubBasedElementTypes.ANNOTATION_TARGET);
     }
 
+    /**
+     * @deprecated Use {@code org.jetbrains.kotlin.idea.base.psi.KotlinPsiModificationUtils.removeAnnotationEntry(this, entry)}
+     * instead.
+     */
+    @Deprecated
     public void removeEntry(@NotNull KtAnnotationEntry entry) {
-        if (getEntries().size() > 1) {
-            entry.delete();
-        }
-        else {
-            delete();
-        }
+        KtPsiMutationService.getInstance().removeAnnotationEntry(this, entry);
     }
 }

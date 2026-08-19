@@ -1,6 +1,4 @@
-// FIR_IDENTICAL
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
 // DIAGNOSTICS: -USELESS_IS_CHECK, -DEBUG_INFO_SMARTCAST
 // ISSUE: KT-57194
 
@@ -13,7 +11,7 @@ fun test(arg: Any) {
     ::foo
 
     if (arg is Double) {
-        if (arg is Float) {
+        if (<!IMPOSSIBLE_IS_CHECK_WARNING!>arg is Float<!>) {
             foo(arg)
             arg.bar()
         }

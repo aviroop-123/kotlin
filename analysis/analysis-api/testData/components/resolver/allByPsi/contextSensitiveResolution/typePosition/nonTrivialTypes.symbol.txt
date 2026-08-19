@@ -1,0 +1,937 @@
+KtFile: 'main.kt'
+  null
+
+KtPackageDirective(0,0): ''
+  null
+
+KtImportList(0,0): ''
+  null
+
+KtClass(8,135): '// FILE: main.kt'
+  null
+
+KtDeclarationModifierList(25,31): 'sealed'
+  null
+
+KtClassBody(51,135): '{'
+  null
+
+KtClass(57,92): 'class Left(val x: String): MySealed'
+  null
+
+KtPrimaryConstructor(67,82): '(val x: String)'
+  null
+
+KtParameterList(67,82): '(val x: String)'
+  null
+
+KtParameter(68,81): 'val x: String'
+  null
+
+KtTypeReference(75,81): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(75,81): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(75,81): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtSuperTypeList(84,92): 'MySealed'
+  null
+
+KtSuperTypeEntry(84,92): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtTypeReference(84,92): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtUserType(84,92): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtNameReferenceExpression(84,92): 'MySealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtClass(97,133): 'class Right(val y: String): MySealed'
+  null
+
+KtPrimaryConstructor(108,123): '(val y: String)'
+  null
+
+KtParameterList(108,123): '(val y: String)'
+  null
+
+KtParameter(109,122): 'val y: String'
+  null
+
+KtTypeReference(116,122): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(116,122): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(116,122): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtSuperTypeList(125,133): 'MySealed'
+  null
+
+KtSuperTypeEntry(125,133): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtTypeReference(125,133): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtUserType(125,133): 'MySealed'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtNameReferenceExpression(125,133): 'MySealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed
+    ]
+
+KtClass(137,163): 'interface MyGeneric<E1> {}'
+  null
+
+KtTypeParameterList(156,160): '<E1>'
+  null
+
+KtTypeParameter(157,159): 'E1'
+  null
+
+KtClassBody(161,163): '{}'
+  null
+
+KtClass(165,332): 'sealed interface MyGenericSealed<E2> : MyGeneric<E2> {'
+  null
+
+KtDeclarationModifierList(165,171): 'sealed'
+  null
+
+KtTypeParameterList(197,201): '<E2>'
+  null
+
+KtTypeParameter(198,200): 'E2'
+  null
+
+KtSuperTypeList(204,217): 'MyGeneric<E2>'
+  null
+
+KtSuperTypeEntry(204,217): 'MyGeneric<E2>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGeneric
+    ]
+
+KtTypeReference(204,217): 'MyGeneric<E2>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGeneric
+    ]
+
+KtUserType(204,217): 'MyGeneric<E2>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGeneric
+    ]
+
+KtNameReferenceExpression(204,213): 'MyGeneric'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGeneric
+    ]
+
+KtTypeArgumentList(213,217): '<E2>'
+  null
+
+KtTypeProjection(214,216): 'E2'
+  null
+
+KtTypeReference(214,216): 'E2'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      E2
+    ]
+
+KtUserType(214,216): 'E2'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      E2
+    ]
+
+KtNameReferenceExpression(214,216): 'E2'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      E2
+    ]
+
+KtClassBody(218,332): '{'
+  null
+
+KtClass(224,274): 'class Left(val x: String): MyGenericSealed<String>'
+  null
+
+KtPrimaryConstructor(234,249): '(val x: String)'
+  null
+
+KtParameterList(234,249): '(val x: String)'
+  null
+
+KtParameter(235,248): 'val x: String'
+  null
+
+KtTypeReference(242,248): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(242,248): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(242,248): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtSuperTypeList(251,274): 'MyGenericSealed<String>'
+  null
+
+KtSuperTypeEntry(251,274): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtTypeReference(251,274): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtUserType(251,274): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtNameReferenceExpression(251,266): 'MyGenericSealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtTypeArgumentList(266,274): '<String>'
+  null
+
+KtTypeProjection(267,273): 'String'
+  null
+
+KtTypeReference(267,273): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(267,273): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(267,273): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtClass(279,330): 'class Right(val y: String): MyGenericSealed<String>'
+  null
+
+KtPrimaryConstructor(290,305): '(val y: String)'
+  null
+
+KtParameterList(290,305): '(val y: String)'
+  null
+
+KtParameter(291,304): 'val y: String'
+  null
+
+KtTypeReference(298,304): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(298,304): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(298,304): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtSuperTypeList(307,330): 'MyGenericSealed<String>'
+  null
+
+KtSuperTypeEntry(307,330): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtTypeReference(307,330): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtUserType(307,330): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtNameReferenceExpression(307,322): 'MyGenericSealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtTypeArgumentList(322,330): '<String>'
+  null
+
+KtTypeProjection(323,329): 'String'
+  null
+
+KtTypeReference(323,329): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(323,329): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(323,329): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNamedFunction(334,906): 'fun main(mg: MyGeneric<Any>, cs: CharSequence) {'
+  null
+
+KtParameterList(342,380): '(mg: MyGeneric<Any>, cs: CharSequence)'
+  null
+
+KtParameter(343,361): 'mg: MyGeneric<Any>'
+  null
+
+KtTypeReference(347,361): 'MyGeneric<Any>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGeneric
+    ]
+
+KtUserType(347,361): 'MyGeneric<Any>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGeneric
+    ]
+
+KtNameReferenceExpression(347,356): 'MyGeneric'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGeneric
+    ]
+
+KtTypeArgumentList(356,361): '<Any>'
+  null
+
+KtTypeProjection(357,360): 'Any'
+  null
+
+KtTypeReference(357,360): 'Any'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtUserType(357,360): 'Any'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtNameReferenceExpression(357,360): 'Any'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/Any
+    ]
+
+KtParameter(363,379): 'cs: CharSequence'
+  null
+
+KtTypeReference(367,379): 'CharSequence'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/CharSequence
+    ]
+
+KtUserType(367,379): 'CharSequence'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/CharSequence
+    ]
+
+KtNameReferenceExpression(367,379): 'CharSequence'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/CharSequence
+    ]
+
+KtBlockExpression(381,906): '{'
+  null
+
+KtWhenExpression(387,478): 'when (val foo = JavaClass.foo()) {'
+  null
+
+KtProperty(393,418): 'val foo = JavaClass.foo()'
+  null
+
+KtDotQualifiedExpression(403,418): 'JavaClass.foo()'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /JavaClass.foo(): MySealed!
+    ]
+
+KtNameReferenceExpression(403,412): 'JavaClass'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /JavaClass
+    ]
+
+KtCallExpression(413,418): 'foo()'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /JavaClass.foo(): MySealed!
+    ]
+
+KtNameReferenceExpression(413,416): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /JavaClass.foo(): MySealed!
+    ]
+
+KtValueArgumentList(416,418): '()'
+  null
+
+KtWhenEntry(430,446): 'is Left -> foo.x'
+  null
+
+KtWhenConditionIsPattern(430,437): 'is Left'
+  null
+
+KtTypeReference(433,437): 'Left'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Left
+    ]
+
+KtUserType(433,437): 'Left'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Left
+    ]
+
+KtNameReferenceExpression(433,437): 'Left'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: true
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Left
+    ]
+
+KtDotQualifiedExpression(441,446): 'foo.x'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val x: kotlin.String
+    ]
+
+KtNameReferenceExpression(441,444): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val foo: MySealed!
+    ]
+
+KtNameReferenceExpression(445,446): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val x: kotlin.String
+    ]
+
+KtWhenEntry(455,472): 'is Right -> foo.y'
+  null
+
+KtWhenConditionIsPattern(455,463): 'is Right'
+  null
+
+KtTypeReference(458,463): 'Right'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Right
+    ]
+
+KtUserType(458,463): 'Right'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Right
+    ]
+
+KtNameReferenceExpression(458,463): 'Right'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: true
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MySealed.Right
+    ]
+
+KtDotQualifiedExpression(467,472): 'foo.y'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val y: kotlin.String
+    ]
+
+KtNameReferenceExpression(467,470): 'foo'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val foo: MySealed!
+    ]
+
+KtNameReferenceExpression(471,472): 'y'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val y: kotlin.String
+    ]
+
+KtBinaryExpressionWithTypeRHS(583,612): 'mg as MyGenericSealed<String>'
+  null
+
+KtNameReferenceExpression(583,585): 'mg'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      mg: MyGeneric<kotlin.Any>
+    ]
+
+KtOperationReferenceExpression(586,588): 'as'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  null
+
+KtTypeReference(589,612): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtUserType(589,612): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtNameReferenceExpression(589,604): 'MyGenericSealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtTypeArgumentList(604,612): '<String>'
+  null
+
+KtTypeProjection(605,611): 'String'
+  null
+
+KtTypeReference(605,611): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(605,611): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(605,611): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtWhenExpression(617,683): 'when (mg) {'
+  null
+
+KtNameReferenceExpression(623,625): 'mg'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      mg: MyGeneric<kotlin.Any>
+    ]
+
+KtWhenEntry(637,652): 'is Left -> mg.x'
+  null
+
+KtWhenConditionIsPattern(637,644): 'is Left'
+  null
+
+KtTypeReference(640,644): 'Left'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed.Left
+    ]
+
+KtUserType(640,644): 'Left'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed.Left
+    ]
+
+KtNameReferenceExpression(640,644): 'Left'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: true
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed.Left
+    ]
+
+KtDotQualifiedExpression(648,652): 'mg.x'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val x: kotlin.String
+    ]
+
+KtNameReferenceExpression(648,650): 'mg'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      mg: MyGeneric<kotlin.Any>
+    ]
+
+KtNameReferenceExpression(651,652): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val x: kotlin.String
+    ]
+
+KtWhenEntry(661,677): 'is Right -> mg.y'
+  null
+
+KtWhenConditionIsPattern(661,669): 'is Right'
+  null
+
+KtTypeReference(664,669): 'Right'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed.Right
+    ]
+
+KtUserType(664,669): 'Right'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed.Right
+    ]
+
+KtNameReferenceExpression(664,669): 'Right'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: true
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed.Right
+    ]
+
+KtDotQualifiedExpression(673,677): 'mg.y'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val y: kotlin.String
+    ]
+
+KtNameReferenceExpression(673,675): 'mg'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      mg: MyGeneric<kotlin.Any>
+    ]
+
+KtNameReferenceExpression(676,677): 'y'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      val y: kotlin.String
+    ]
+
+KtBinaryExpressionWithTypeRHS(804,833): 'cs as MyGenericSealed<String>'
+  null
+
+KtNameReferenceExpression(804,806): 'cs'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      cs: kotlin.CharSequence
+    ]
+
+KtOperationReferenceExpression(807,809): 'as'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  null
+
+KtTypeReference(810,833): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtUserType(810,833): 'MyGenericSealed<String>'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtNameReferenceExpression(810,825): 'MyGenericSealed'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /MyGenericSealed
+    ]
+
+KtTypeArgumentList(825,833): '<String>'
+  null
+
+KtTypeProjection(826,832): 'String'
+  null
+
+KtTypeReference(826,832): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtUserType(826,832): 'String'
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtNameReferenceExpression(826,832): 'String'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      kotlin/String
+    ]
+
+KtWhenExpression(838,904): 'when (cs) {'
+  null
+
+KtNameReferenceExpression(844,846): 'cs'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      cs: kotlin.CharSequence
+    ]
+
+KtWhenEntry(858,873): 'is Left -> cs.x'
+  null
+
+KtWhenConditionIsPattern(858,865): 'is Left'
+  null
+
+KtTypeReference(861,865): 'Left'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Left'.>
+
+KtUserType(861,865): 'Left'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Left'.>
+
+KtNameReferenceExpression(861,865): 'Left'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Left'.>
+
+KtDotQualifiedExpression(869,873): 'cs.x'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'x'.>
+
+KtNameReferenceExpression(869,871): 'cs'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      cs: kotlin.CharSequence
+    ]
+
+KtNameReferenceExpression(872,873): 'x'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'x'.>
+
+KtWhenEntry(882,898): 'is Right -> cs.y'
+  null
+
+KtWhenConditionIsPattern(882,890): 'is Right'
+  null
+
+KtTypeReference(885,890): 'Right'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Right'.>
+
+KtUserType(885,890): 'Right'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Right'.>
+
+KtNameReferenceExpression(885,890): 'Right'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'Right'.>
+
+KtDotQualifiedExpression(894,898): 'cs.y'
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'y'.>
+
+KtNameReferenceExpression(894,896): 'cs'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      cs: kotlin.CharSequence
+    ]
+
+KtNameReferenceExpression(897,898): 'y'
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionError:
+    candidateSymbols = []
+    diagnostic = ERROR<UNRESOLVED_REFERENCE: Unresolved reference 'y'.>

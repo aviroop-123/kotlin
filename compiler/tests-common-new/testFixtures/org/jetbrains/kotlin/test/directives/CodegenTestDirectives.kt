@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -23,11 +23,6 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
         applicability = Global
     )
 
-    val IGNORE_BACKEND_K1 by enumDirective<TargetBackend>(
-        description = "Ignore specific backend if test uses K1 frontend",
-        applicability = Global
-    )
-
     val IGNORE_BACKEND_K2 by enumDirective<TargetBackend>(
         description = "Ignore specific backend if test uses K2 frontend",
         applicability = Global
@@ -45,13 +40,9 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
 
     val IGNORE_HMPP by enumDirective<TargetBackend>("Ignore test in HMPP setup")
 
-    val USE_JAVAC_BASED_ON_JVM_TARGET by directive(
-        description = """
-            Determine version of javac for compilation of java files based
-              on JvmTarget of module. If not enabled then javac from
-              current runtime will be used
-        """.trimIndent()
-    )
+    val IGNORE_HEADER_MODE by enumDirective<TargetBackend>("Ignore test in header mode setup")
+
+    val IGNORE_ANALYSIS_API_BASED_TYPESCRIPT_EXPORT by enumDirective<TargetBackend>("Ignore failures of the new AA-based TypeScript Export")
 
     val JAVAC_OPTIONS by stringDirective(
         description = "Specify javac options to compile java files"
@@ -92,7 +83,6 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
 
     val IGNORE_ERRORS by directive(
         description = """
-            Ignore frontend errors in ${NoCompilationErrorsHandler::class}
             If this directive is enabled then ${JvmIrBackendFacade::class} won't produce any binaries for test
               if there are errors in it
         """.trimIndent()
@@ -118,6 +108,10 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
         description = "Dumps generated backend IR after inlining (enables ${IrTextDumpHandler::class} after inlining)"
     )
 
+    val DUMP_IR_OF_PREPROCESSED_INLINE_FUNCTIONS by directive(
+        description = "Dumps generated backend IR of preprocessed inline functions (enables ${IrPreprocessedInlineFunctionDumpHandler::class})"
+    )
+
     val DUMP_EXTERNAL_CLASS by stringDirective(
         description = "Specifies names of external classes which IR should be dumped"
     )
@@ -139,26 +133,16 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
         description = "Skips check pretty kt IR dump (disables ${IrPrettyKotlinDumpHandler::class})"
     )
 
-    val DUMP_SIGNATURES by directive(
-        description = """
-        Like $DUMP_KT_IR, but does not dump function bodies, and prints a rendered binary signature and a mangled name for each declaration
-        (enables ${IrMangledNameAndSignatureDumpHandler::class})
-        """.trimIndent()
+    val KOTLIN_REFLECT_DUMP_MISMATCH by directive(
+        description = "K1 and new kotlin-reflect implementation mismatch"
     )
 
-    val SEPARATE_SIGNATURE_DUMP_FOR_K2 by directive(
-        description = """
-            Usually the signature dump must not differ between K1 and K2.
-            There are rare cases, however, when there is legitimate difference (for example, if the set of fake overrides is different).
-            Please always document the usage of this directive and carefully verify that the difference between K1 and K2 does
-            not affect IR linkage.
-            """.trimIndent()
+    val SKIP_NEW_KOTLIN_REFLECT_COMPATIBILITY_CHECK by directive(
+        description = "Skips the check that New kotlin-reflect dumps are the same to those of K1"
     )
 
-    val MUTE_SIGNATURE_COMPARISON_K2 by enumDirective<TargetBackend>(
-        description = "Ignores failures of signature dump comparison for tests with the $DUMP_SIGNATURES directive if the test uses the K2 frontend and the specified backend."
-    )
-
+    // Besides a list of phases, also supports values `ALL_BEFORE`, `ALL_AFTER` and `ALL` for dumping
+    // before all lowerings, after all lowerings and both before and after all lowerings, correspondingly.
     val DUMP_IR_FOR_GIVEN_PHASES by stringDirective(
         description = "Dumps backend IR after given lowerings (enables ${PhasedIrDumpHandler::class})",
     )
@@ -219,25 +203,31 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
         """.trimIndent()
     )
 
-    val IGNORE_FIR_METADATA_LOADING_K1 by directive(
-        description = """
-            Ignore exceptions in AbstractFirLoadK1CompiledKotlin tests
-        """.trimIndent()
-    )
-
     val IGNORE_FIR_METADATA_LOADING_K2 by directive(
         description = """
             Ignore exceptions in AbstractFirLoadK2CompiledKotlin tests
         """.trimIndent()
     )
 
-    val JVM_ABI_K1_K2_DIFF by stringDirective(
-        description = "Expect difference in JVM ABI between K1 and K2",
-        applicability = Global
+    val IGNORE_IR_EXPECT_FLAG by directive(
+        description = "Ignore the [expect] flag in IR text dumps"
+    )
+
+    // TODO: Drop this directive and make the offset validation enabled by default when KT-81475 is fixed.
+    val ENABLE_IR_NESTED_OFFSETS_CHECKS by directive(
+        description = "Enables validation of the nested IR elements offsets"
+    )
+
+    val DISABLE_IR_NESTED_OFFSETS_CHECKS by enumDirective<TargetBackend>(
+        description = "Disabled validation of the nested IR elements offsets on the target backend"
     )
 
     val DISABLE_IR_VISIBILITY_CHECKS by enumDirective<TargetBackend>(
         description = "Don't check for visibility violations when validating IR on the target backend"
+    )
+
+    val DISABLE_IR_FIELD_VISIBILITY_CHECK by enumDirective<TargetBackend>(
+        description = "Don't check for fields having non-private visibility when validating IR on the target backend"
     )
 
     val DISABLE_IR_VARARG_TYPE_CHECKS by enumDirective<TargetBackend>(
@@ -257,7 +247,6 @@ fun extractIgnoredDirectiveForTargetBackend(
     customIgnoreDirective: ValueDirective<TargetBackend>? = null,
 ): ValueDirective<TargetBackend>? =
     when (testServices.defaultsProvider.frontendKind) {
-        FrontendKinds.ClassicFrontend -> CodegenTestDirectives.IGNORE_BACKEND_K1
         FrontendKinds.FIR -> CodegenTestDirectives.IGNORE_BACKEND_K2
         else -> null
     }?.let { specificIgnoreDirective ->

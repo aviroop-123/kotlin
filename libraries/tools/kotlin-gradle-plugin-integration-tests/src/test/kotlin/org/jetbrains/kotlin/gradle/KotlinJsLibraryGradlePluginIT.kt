@@ -18,9 +18,7 @@ abstract class KotlinJsIrLibraryGradlePluginITBase : KGPBaseTest() {
 
     override val defaultBuildOptions = super.defaultBuildOptions.copy(
         jsOptions = BuildOptions.JsOptions(),
-        // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-        isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED,
-    )
+    ).disableIsolatedProjectsBecauseOfJsAndWasmKT75899()
 
     @DisplayName("simple binary library")
     @GradleTest
@@ -33,7 +31,7 @@ abstract class KotlinJsIrLibraryGradlePluginITBase : KGPBaseTest() {
                 projectPath.resolve("build/$DIST/js/productionLibrary/package.json").reader()
                     .use { Gson().fromJson(it, JsonObject::class.java) }
                     .getAsJsonObject("dependencies")
-                    ?.entrySet()?.associate { (k, v) -> k to v.asString }
+                    ?.entrySet()?.associate { [k, v] -> k to v.asString }
                     .let { dependencies ->
                         assertNotNull(dependencies?.get("decamelize")) { "Direct npm dependency missing in package.json" }
                         assertNotNull(dependencies?.get("@js-joda/core")) { "Transitive npm dependency missing in package.json" }
@@ -67,12 +65,6 @@ abstract class KotlinJsIrLibraryGradlePluginITBase : KGPBaseTest() {
             }
         }
     }
-}
-
-@DisplayName("Kotlin/JS K1 IR library")
-@JsGradlePluginTests
-class KotlinK1JsIrLibraryGradlePluginIT : KotlinJsIrLibraryGradlePluginITBase() {
-    override val defaultBuildOptions = super.defaultBuildOptions.copyEnsuringK1()
 }
 
 @DisplayName("Kotlin/JS K2 IR library")

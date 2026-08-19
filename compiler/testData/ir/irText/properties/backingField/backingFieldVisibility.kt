@@ -1,25 +1,14 @@
-// IGNORE_BACKEND_K1: ANY
-// FIR_IDENTICAL
 
 // IGNORE_BACKEND_KLIB: JS_IR
 
 class A {
     val a: Number
-        private field = 1
-
-    val b: Number
-        @Suppress("WRONG_MODIFIER_TARGET")
-        internal field = a + 2
+        field = 1
 
     val c = 1
     val d = c + 2
 
     fun rest() {
         val aI = A().a + 10
-        val bI = A().b + 20
     }
-}
-
-fun test() {
-    val bA = A().b + 20
 }

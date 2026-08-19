@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.konan.test.blackbox
 
 import com.intellij.testFramework.TestDataPath
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.nativeBinaryOptions.GC
 import org.jetbrains.kotlin.konan.target.Architecture
 import org.jetbrains.kotlin.konan.target.Family
@@ -16,7 +17,6 @@ import org.jetbrains.kotlin.konan.test.blackbox.support.TestCase
 import org.jetbrains.kotlin.konan.test.blackbox.support.TestCompilerArgs
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
-import org.jetbrains.kotlin.konan.test.blackbox.support.group.ClassicPipeline
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestExecutable
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunCheck
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
@@ -33,15 +33,11 @@ import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-@ClassicPipeline()
 @TestDataPath("\$PROJECT_ROOT")
-class ClassicComplexCInteropTest : ComplexCInteropTestBase()
-
-@TestDataPath("\$PROJECT_ROOT")
-class FirComplexCInteropTest : ComplexCInteropTestBase()
+class ComplexCInteropTest : ComplexCInteropTestBase()
 
 abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
-    private val interopDir = File("native/native.tests/testData/interop")
+    private val interopDir = ForTestCompileRuntime.transformTestDataPath("native/native.tests/testData/interop")
     private val interopObjCDir = interopDir.resolve("objc")
     private val testCompilationFactory = TestCompilationFactory()
 
@@ -67,7 +63,7 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
                 )
             }
         }
-        val (testCase, compilationResult) = compileDefAndKtToExecutable(
+        val [testCase, compilationResult] = compileDefAndKtToExecutable(
             testName = "embedStaticLibraries",
             defFile = defFile,
             ktFiles = listOf(embedStaticLibrariesDir.resolve("embedStaticLibraries.kt")),
@@ -112,7 +108,7 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
         val stringsdict = interopObjCDir.resolve("Localizable.stringsdict")
         stringsdict.copyTo(buildDir.resolve("$ktFilePrefix/en.lproj/Localizable.stringsdict"), overwrite = true)
 
-        val (testCase, success) = compileDefAndKtToExecutable(
+        val [testCase, success] = compileDefAndKtToExecutable(
             testName = ktFilePrefix,
             defFile = interopObjCDir.resolve("objcSmoke.def"),
             ktFiles = listOf(interopObjCDir.resolve("$ktFilePrefix.kt")),
@@ -154,7 +150,7 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
             "ObjcWeakRefsKt.testObjCWeakRef",
             "WeakRefsKt.testWeakRefs",
         )
-        val (testCase, success) = compileDefAndKtToExecutable(
+        val [testCase, success] = compileDefAndKtToExecutable(
             testName = "embedStaticLibraries",
             defFile = interopObjCDir.resolve("objcTests.def"),
             ktFiles = ktFiles,
@@ -353,7 +349,7 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
         if (testRunSettings.configurables.targetTriple.isSimulator)
             codesign(dylib.resultingArtifact.path)
 
-        val (_, success) = compileDefAndKtToExecutable(
+        val [_, success] = compileDefAndKtToExecutable(
             testName = testName,
             defFile = srcDir.resolve(defFile),
             ktFiles = listOf(srcDir.resolve(ktFile)),
@@ -397,7 +393,7 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
             }
         }
 
-        val (testCase, success) = compileDefAndKtToExecutable(
+        val [testCase, success] = compileDefAndKtToExecutable(
             testName = "withSpaces",
             defFile = withSpacesDef,
             ktFiles = listOf(srcDir.resolve("withSpaces.kt")),
@@ -501,7 +497,7 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
         val srcDir = interopObjCDir.resolve("safepointSignposts")
         compileDylib("cinterop", listOf(srcDir.resolve("cinterop.m")))
 
-        val (testCase, compilationResult) = compileDefAndKtToExecutable(
+        val [testCase, compilationResult] = compileDefAndKtToExecutable(
             testName = "safepointSignposts",
             defFile = srcDir.resolve("cinterop.def"),
             ktFiles = listOf(srcDir.resolve("main.kt")),
@@ -529,7 +525,7 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
 
         val srcDir = interopDir.resolve("swift/initWithExternalRCRef_leak")
 
-        val (testCase, compilationResult) = compileDefAndKtToExecutable(
+        val [testCase, compilationResult] = compileDefAndKtToExecutable(
             testName = "initWithExtgernalRCRef_leak",
             defFile = srcDir.resolve("cinterop.def"),
             ktFiles = listOf(srcDir.resolve("main.kt")),
@@ -538,7 +534,10 @@ abstract class ComplexCInteropTestBase : AbstractNativeSimpleTest() {
                     "-opt-in=kotlin.native.internal.InternalForKotlinNative",
                     "-Xbinary=swiftExport=true",
                 ),
-                cinteropArgs = listOf("-Xcompile-source", srcDir.resolve("cinterop.m").path),
+                cinteropArgs = listOf(
+                    "-Xcompile-source", srcDir.resolve("cinterop.m").path,
+                    "-Xccall-mode", "indirect", // Required for -Xcompile-source
+                ),
                 objcArc = false
             ),
             extras = TestCase.NoTestRunnerExtras(),

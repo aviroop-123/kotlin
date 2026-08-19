@@ -9,18 +9,18 @@ import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.fir.*
-import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
-import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
+import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.builder.buildErrorFunction
 import org.jetbrains.kotlin.fir.declarations.builder.buildErrorProperty
-import org.jetbrains.kotlin.fir.declarations.builder.buildSimpleFunctionCopy
-import org.jetbrains.kotlin.fir.declarations.fullyExpandedClass
+import org.jetbrains.kotlin.fir.declarations.builder.buildNamedFunctionCopy
+import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.extensions.*
 import org.jetbrains.kotlin.fir.resolve.calls.*
 import org.jetbrains.kotlin.fir.resolve.inference.inferenceLogger
 import org.jetbrains.kotlin.fir.resolve.isIntegerLiteralOrOperatorCall
+import org.jetbrains.kotlin.fir.resolve.requiresCompanionBlockOrExtensionLf
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.scopes.FirScope
 import org.jetbrains.kotlin.fir.scopes.impl.originalForWrappedIntegerOperator
@@ -35,12 +35,17 @@ import org.jetbrains.kotlin.resolve.calls.tasks.ExplicitReceiverKind
 class CandidateFactory private constructor(
     val context: ResolutionContext,
     private val baseSystem: ConstraintStorage
-) {
+) : SessionHolder by context {
     @OptIn(FirExtensionApiInternals::class)
     private val callRefinementExtensions = context.session.extensionService.callRefinementExtensions.takeIf { it.isNotEmpty() }
 
+    private val companionBlocksAndExtensionsEnabled = LanguageFeature.CompanionBlocksAndExtensions.isEnabled()
+
     companion object {
         private fun buildBaseSystem(context: ResolutionContext, callInfo: CallInfo): ConstraintStorage {
+            callInfo.containingCandidateForCollectionLiteral?.let {
+                return buildBaseSystemForContainingCallAwareCases(context, it, callInfo)
+            }
             val system = context.inferenceComponents.createConstraintSystem()
             callInfo.argumentAtoms.forEach {
                 system.addSubsystemFromAtom(it)
@@ -50,13 +55,25 @@ class CandidateFactory private constructor(
         }
 
         // For callable reference candidates, we use containing call as a source for the base system.
+        // The same is true for collection literal calls.
         // Thus, their Constraint Systems are effectively clones of the containing call ones with additional constraints.
-        fun createForCallableReferenceCandidate(context: ResolutionContext, containingCall: Candidate): CandidateFactory =
-            CandidateFactory(context, buildBaseSystemForCallableReference(context, containingCall))
+        fun createForCallableReferences(
+            context: ResolutionContext,
+            containingCall: Candidate,
+        ): CandidateFactory =
+            CandidateFactory(context, buildBaseSystemForContainingCallAwareCases(context, containingCall, null))
 
-        private fun buildBaseSystemForCallableReference(context: ResolutionContext, containingCall: Candidate): ConstraintStorage {
+        private fun buildBaseSystemForContainingCallAwareCases(
+            context: ResolutionContext,
+            containingCall: Candidate,
+            // For callable references, there is no call
+            callInfo: CallInfo?,
+        ): ConstraintStorage {
             val system = context.inferenceComponents.createConstraintSystem()
             system.setBaseSystem(containingCall.system.currentStorage())
+            callInfo?.argumentAtoms?.forEach {
+                system.addSubsystemFromAtom(it)
+            }
             return system.asReadOnlyStorage()
         }
     }
@@ -73,7 +90,7 @@ class CandidateFactory private constructor(
         explicitReceiverKind: ExplicitReceiverKind,
         scope: FirScope?,
         dispatchReceiver: FirExpression? = null,
-        givenExtensionReceiverOptions: List<FirExpression> = emptyList(),
+        givenExtensionReceiver: FirExpression? = null,
         objectsByName: Boolean = false,
         isFromOriginalTypeInPresenceOfSmartCast: Boolean = false,
     ): Candidate {
@@ -96,7 +113,7 @@ class CandidateFactory private constructor(
         val result = Candidate(
             symbol,
             ConeResolutionAtom.createRawAtom(dispatchReceiver),
-            givenExtensionReceiverOptions.map { ConeResolutionAtom.createRawAtom(it) },
+            ConeResolutionAtom.createRawAtom(givenExtensionReceiver),
             explicitReceiverKind,
             context.inferenceComponents.constraintSystemFactory,
             baseSystem,
@@ -104,7 +121,7 @@ class CandidateFactory private constructor(
             scope,
             isFromCompanionObjectTypeScope = when (explicitReceiverKind) {
                 ExplicitReceiverKind.EXTENSION_RECEIVER ->
-                    givenExtensionReceiverOptions.singleOrNull().isCandidateFromCompanionObjectTypeScope(callInfo.session)
+                    givenExtensionReceiver.isCandidateFromCompanionObjectTypeScope(callInfo.session)
                 ExplicitReceiverKind.DISPATCH_RECEIVER -> dispatchReceiver.isCandidateFromCompanionObjectTypeScope(callInfo.session)
                 // The following cases are not applicable for companion objects.
                 ExplicitReceiverKind.NO_EXPLICIT_RECEIVER, ExplicitReceiverKind.BOTH_RECEIVERS -> false
@@ -121,20 +138,26 @@ class CandidateFactory private constructor(
         // Here, we explicitly check if the referred declaration/symbol is value parameter, local variable, enum entry, or backing field.
         val callSite = callInfo.callSite
         if (callSite is FirCallableReferenceAccess) {
-            when {
-                symbol is FirValueParameterSymbol || symbol is FirPropertySymbol && symbol.isLocal || symbol is FirBackingFieldSymbol -> {
+            when (symbol) {
+                is FirValueParameterSymbol, is FirLocalPropertySymbol, is FirBackingFieldSymbol -> {
                     result.addDiagnostic(
                         Unsupported("References to variables aren't supported yet", callSite.calleeReference.source)
                     )
                 }
-                symbol is FirEnumEntrySymbol -> {
+                is FirEnumEntrySymbol -> {
                     result.addDiagnostic(
                         Unsupported("References to enum entries aren't supported", callSite.calleeReference.source)
                     )
                 }
             }
-        } else if (objectsByName && symbol.isRegularClassWithoutCompanion(callInfo.session)) {
-            result.addDiagnostic(NoCompanionObject)
+        } else if (objectsByName && symbol.isRegularClassWithoutCompanion(context.session)) {
+            if (!callInfo.isImplicitInvokeReceiver) result.addDiagnostic(NoCompanionObject)
+            else result.addDiagnostic(InvokeReceiverNoCompanionObject)
+        }
+        if (callInfo.candidateForCommonInvokeReceiver?.diagnostics?.contains(InvokeReceiverNoCompanionObject) == true) {
+            if (symbol !is FirCallableSymbol<*> || !symbol.isStatic || !companionBlocksAndExtensionsEnabled) {
+                result.addDiagnostic(InvokeOnHiddenCompanionObject)
+            }
         }
         if (callInfo.origin == FirFunctionCallOrigin.Operator) {
             val normalizedSymbol = when (symbol) {
@@ -144,14 +167,25 @@ class CandidateFactory private constructor(
             // Flag all references that are resolved from an convention operator call.
             normalizedSymbol?.let { result.addDiagnostic(NotFunctionAsOperator(normalizedSymbol)) }
         }
-        if (symbol is FirPropertySymbol &&
-            !context.session.languageVersionSettings.supportsFeature(LanguageFeature.PrioritizedEnumEntries)
-        ) {
+        if (symbol is FirPropertySymbol && LanguageFeature.PrioritizedEnumEntries.isDisabled()) {
             val containingClass = symbol.containingClassLookupTag()?.toRegularClassSymbol(context.session)?.fir
             if (containingClass != null && symbol.fir.isEnumEntries(containingClass)) {
                 result.addDiagnostic(LowerPriorityToPreserveCompatibilityDiagnostic)
             }
         }
+
+        if (dispatchReceiver.isInaccessibleAndInapplicable()) {
+            result.addDiagnostic(dispatchReceiver.toInaccessibleReceiverDiagnostic())
+        }
+
+        if (givenExtensionReceiver.isInaccessibleAndInapplicable()) {
+            result.addDiagnostic(givenExtensionReceiver.toInaccessibleReceiverDiagnostic())
+        }
+
+        if (!companionBlocksAndExtensionsEnabled && result.symbol.requiresCompanionBlockOrExtensionLf()) {
+            result.addDiagnostic(UnsupportedCompanionBlockOrExtensionCall)
+        }
+
         return result
     }
 
@@ -166,7 +200,7 @@ class CandidateFactory private constructor(
             extension: FirFunctionCallRefinementExtension
         ): FirNamedFunctionSymbol {
             val newSymbol = FirNamedFunctionSymbol(callableId)
-            val function = buildSimpleFunctionCopy(fir) {
+            val function = buildNamedFunctionCopy(fir) {
                 body = null
                 this.symbol = newSymbol
                 returnTypeRef = result.typeRef
@@ -185,7 +219,7 @@ class CandidateFactory private constructor(
                 unwrapIntegerOperatorSymbolIfNeeded(callInfo)
             }
             1 -> {
-                val (result, extension) = variants[0]
+                val [result, extension] = variants[0]
                 process(result, extension)
             }
             else -> {
@@ -199,7 +233,10 @@ class CandidateFactory private constructor(
 
     private fun FirBasedSymbol<*>.isRegularClassWithoutCompanion(session: FirSession): Boolean {
         val referencedClass = (this as? FirClassLikeSymbol<*>)?.fullyExpandedClass(session) ?: return false
-        return referencedClass.classKind != ClassKind.OBJECT && referencedClass.resolvedCompanionObjectSymbol == null
+        if (referencedClass.classKind == ClassKind.OBJECT) return false
+
+        val companionObject = referencedClass.resolvedCompanionObjectSymbol ?: return true
+        return LanguageFeature.SkipHiddenObjectsInResolution.isEnabled() && companionObject.isDeprecationLevelHidden(session)
     }
 
     private fun FirBasedSymbol<*>.unwrapIntegerOperatorSymbolIfNeeded(callInfo: CallInfo): FirBasedSymbol<*> {
@@ -226,16 +263,18 @@ class CandidateFactory private constructor(
             is CallKind.VariableAccess -> createErrorPropertySymbol(diagnostic, callInfo.callSite.source)
             is CallKind.Function,
             is CallKind.DelegatingConstructorCall,
-            is CallKind.CallableReference
-            -> createErrorFunctionSymbol(diagnostic)
-            is CallKind.SyntheticSelect -> throw IllegalStateException()
-            is CallKind.SyntheticIdForCallableReferencesResolution -> throw IllegalStateException()
-            is CallKind.CustomForIde -> throw IllegalStateException()
+            is CallKind.CallableReference,
+            is CallKind.CollectionLiteral,
+                -> createErrorFunctionSymbol(diagnostic)
+            is CallKind.SyntheticSelect,
+            is CallKind.SyntheticIdForCallableReferencesResolution,
+            is CallKind.CustomForIde
+                -> throw IllegalStateException()
         }
         return Candidate(
             symbol,
             dispatchReceiver = null,
-            givenExtensionReceiverOptions = emptyList(),
+            givenExtensionReceiver = null,
             explicitReceiverKind = ExplicitReceiverKind.NO_EXPLICIT_RECEIVER,
             context.inferenceComponents.constraintSystemFactory,
             baseSystem,
@@ -300,7 +339,7 @@ fun PostponedArgumentsAnalyzerContext.addSubsystemFromAtom(atom: ConeResolutionA
 
 internal fun FirResolvable.candidate(): Candidate? {
     return when (val callee = this.calleeReference) {
-        is FirNamedReferenceWithCandidate -> return callee.candidate
+        is FirNamedReferenceWithCandidate -> callee.candidate
         else -> null
     }
 }

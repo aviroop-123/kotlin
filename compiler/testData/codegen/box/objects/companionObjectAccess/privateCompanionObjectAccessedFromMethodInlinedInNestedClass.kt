@@ -1,5 +1,4 @@
-// LANGUAGE: +ProperVisibilityForCompanionObjectInstanceField
-
+// FILE: lib.kt
 class Outer {
     private companion object {
         val result = "OK"
@@ -14,4 +13,5 @@ class Outer {
     fun test() = Nested().foo(this)
 }
 
+// FILE: main.kt
 fun box() = Outer().test()

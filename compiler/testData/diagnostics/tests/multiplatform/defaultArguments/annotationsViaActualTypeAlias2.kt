@@ -30,10 +30,7 @@ expect annotation class Anno(
     val e: E = E.E1,
     val a: A = A("1"),
     val stra: Array<String> = ["bu", "zz"],
-    // In FIR, we don't report CLASS_LITERAL_LHS_NOT_A_CLASS on Array<Array<Array<Int>>>::class
-    // because the common code is checked with a JVM session (because the only platform module is JVM).
-    // In Analysis API mode, the common code is checked with a common session, and so we report it.
-    val ka: Array<KClass<*>> = [Double::class, String::class, LongArray::class, <!CLASS_LITERAL_LHS_NOT_A_CLASS!>Array<Array<Array<Int>>>::class<!>, Unit::class],
+    val ka: Array<KClass<*>> = [Double::class, String::class, LongArray::class, Array<Array<Array<Int>>>::class, Unit::class],
     val ea: Array<E> = [E.E2, E.E3],
     val aa: Array<A> = [A("2"), A("3")],
 )
@@ -48,7 +45,7 @@ fun test() {}
 // MODULE: m2-jvm()()(m1-common)
 // FILE: jvm.kt
 
-actual typealias <!ACTUAL_ANNOTATION_CONFLICTING_DEFAULT_ARGUMENT_VALUE, ACTUAL_ANNOTATION_CONFLICTING_DEFAULT_ARGUMENT_VALUE!>Anno<!> = Jnno
+actual typealias Anno = Jnno
 
 // FILE: Jnno.java
 

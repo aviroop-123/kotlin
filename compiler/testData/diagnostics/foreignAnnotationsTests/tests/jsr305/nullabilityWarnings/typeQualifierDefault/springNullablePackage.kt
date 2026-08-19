@@ -1,6 +1,6 @@
-// FIR_IDENTICAL
 // DIAGNOSTICS: -UNUSED_VARIABLE -UNUSED_PARAMETER
 // JSR305_GLOBAL_REPORT: warn
+// FULL_JDK
 
 // FILE: spr/Nullable.java
 package spr;
@@ -65,13 +65,21 @@ public class A {
     public java.util.List<String> baz() {
         return null;
     }
+
+
+    @Nullable
+    public String nBar() {
+        return null;
+    }
+
+    public <T> void takeSupplier(java.util.function.Supplier<T> supplier) {}
 }
 
 // FILE: main.kt
 fun main(a: test.A) {
     a.foo("", null)<!UNNECESSARY_SAFE_CALL!>?.<!>length
     a.foo("", null).length
-    a.foo(<!NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>, "").length
+    a.foo(<!TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>null<!>, "").length
 
     a.bar().length
     a.bar()<!UNNECESSARY_NOT_NULL_ASSERTION!>!!<!>.length
@@ -82,4 +90,6 @@ fun main(a: test.A) {
     <!RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS!>a.baz()<!>.get(0)
     a.baz()!!.get(0).get(0)
     a.baz()!!.get(0)?.get(0)
+
+    a.takeSupplier { a.nBar() }
 }

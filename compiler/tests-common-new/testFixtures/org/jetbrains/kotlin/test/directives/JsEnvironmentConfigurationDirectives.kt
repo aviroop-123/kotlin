@@ -1,20 +1,19 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.test.directives
 
-import org.jetbrains.kotlin.cli.common.arguments.K2JsArgumentConstants
-import org.jetbrains.kotlin.js.config.RuntimeDiagnostic
+import org.jetbrains.kotlin.js.config.ModuleKind
 import org.jetbrains.kotlin.js.config.SourceMapSourceEmbedding
-import org.jetbrains.kotlin.serialization.js.ModuleKind
+import org.jetbrains.kotlin.js.config.TsCompilationStrategy
 import org.jetbrains.kotlin.test.directives.model.DirectiveApplicability
 import org.jetbrains.kotlin.test.directives.model.SimpleDirectivesContainer
 
 // TODO fill up all descriptions
 object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
-    val MODULE_KIND by enumDirective<ModuleKind>(
+    val JS_MODULE_KIND by enumDirective<ModuleKind>(
         description = "Specifies kind of js module",
         applicability = DirectiveApplicability.Module
     )
@@ -32,11 +31,6 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
     val RUN_PLAIN_BOX_FUNCTION by directive(
         description = "",
         applicability = DirectiveApplicability.Global
-    )
-
-    val NO_INLINE by directive(
-        description = "Disable inline in js module",
-        applicability = DirectiveApplicability.Module
     )
 
     val SKIP_NODE_JS by directive(
@@ -95,31 +89,18 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
     )
 
     val SAFE_EXTERNAL_BOOLEAN by directive(
-        description = "",
+        description = "Wrap access to external 'Boolean' properties with an explicit conversion to 'Boolean'",
         applicability = DirectiveApplicability.Global
     )
 
-    val SAFE_EXTERNAL_BOOLEAN_DIAGNOSTIC by enumDirective<RuntimeDiagnostic>(
-        description = "",
+    val SAFE_EXTERNAL_BOOLEAN_DIAGNOSTIC by stringDirective(
+        description = "Enable runtime diagnostics when accessing external 'Boolean' properties.",
         applicability = DirectiveApplicability.Global,
-        additionalParser = {
-            when (it.lowercase()) {
-                K2JsArgumentConstants.RUNTIME_DIAGNOSTIC_LOG -> RuntimeDiagnostic.LOG
-                K2JsArgumentConstants.RUNTIME_DIAGNOSTIC_EXCEPTION -> RuntimeDiagnostic.EXCEPTION
-                else -> null
-            }
-        }
     )
 
     val DONT_RUN_GENERATED_CODE by stringDirective(
         description = "Specify target backend on which generated code will not be run",
         applicability = DirectiveApplicability.Global,
-    )
-
-    val MAIN_ARGS by valueDirective(
-        description = "Specify arguments that will be passes to main fun",
-        applicability = DirectiveApplicability.Global,
-        parser = { it.subSequence(1, it.length - 1).split(",") }
     )
 
     // Next directives are used only inside test system and must not be present in test file
@@ -155,14 +136,33 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
         applicability = DirectiveApplicability.Global
     )
 
-    val GENERATE_DTS by directive(
+    val TS_COMPILATION_STRATEGY by enumDirective<TsCompilationStrategy>(
         description = "Will generate corresponding dts files",
         applicability = DirectiveApplicability.Global
     )
 
-    val UPDATE_REFERENCE_DTS_FILES by directive(
-        description = "",
-        applicability = DirectiveApplicability.Global
+    val TSC_TARGET by stringDirective(
+        description = """
+        The argument for the --target CLI option of the TypeScript compiler.
+        See https://www.typescriptlang.org/tsconfig/#target for supported values.
+        """,
+        applicability = DirectiveApplicability.Global,
+    )
+
+    val TSC_LIB by stringDirective(
+        description = """
+        The argument for the --lib CLI option of the TypeScript compiler.
+        See https://www.typescriptlang.org/tsconfig/#lib for supported values.
+        """,
+        applicability = DirectiveApplicability.Global,
+    )
+
+    val TSC_MODULE by stringDirective(
+        description = """
+        The argument for the --module CLI option of the TypeScript compiler.
+        See https://www.typescriptlang.org/tsconfig/#module for supported values.
+        """,
+        applicability = DirectiveApplicability.Global,
     )
 
     // Directives for IR tests
@@ -192,6 +192,11 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
         applicability = DirectiveApplicability.Global
     )
 
+    val DELEGATE_JS_TRANSPILATION by directive(
+        description = "Enables new transpilation pipeline, where the compiler produces only latest ECMAScript version and the lowering to older versions is on the swc tool",
+        applicability = DirectiveApplicability.Global
+    )
+
     val ES6_MODE by directive(
         description = "Enables the Kotlin/JS compilation with ES-classes",
         applicability = DirectiveApplicability.Global
@@ -207,11 +212,6 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
         applicability = DirectiveApplicability.File
     )
 
-    val PER_MODULE by directive(
-        description = "",
-        applicability = DirectiveApplicability.Global
-    )
-
     val NO_COMMON_FILES by directive(
         """
             Don't added helper files to prevent linking issues.
@@ -220,7 +220,17 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
     )
 
     val KEEP by stringDirective(
-        description = "Keep declarations",
+        description = "List of fully qualified names not to be eliminated by DCE.",
         applicability = DirectiveApplicability.Global
+    )
+
+    val DISABLE_JS_EXPORT_SOURCE_PREPROCESSOR by directive(
+        description = "Disable JsExportSourcePreprocessor",
+        applicability = DirectiveApplicability.Any,
+    )
+
+    val CHECK_OPTIMIZED_JS by directive(
+        description = "Forces EXPECT_GENERATED_JS directive handler to check optimized JS output files instead of dev ones",
+        applicability = DirectiveApplicability.Any,
     )
 }

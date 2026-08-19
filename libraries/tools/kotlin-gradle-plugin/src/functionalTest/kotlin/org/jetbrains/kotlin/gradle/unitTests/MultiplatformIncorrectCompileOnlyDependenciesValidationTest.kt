@@ -31,6 +31,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
 
                 linuxX64()
                 mingwX64()
+                @Suppress("DEPRECATION") // fixme: KT-81704 Cleanup tests after apple x64 family deprecation
                 macosX64()
 
                 js { browser() }
@@ -50,7 +51,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
         val project = setupKmpProject {}
 
         project.runLifecycleAwareTest {
-            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(this)
+            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(path)
 
             diagnostics.assertNoDiagnostics(IncorrectCompileOnlyDependencyWarning)
         }
@@ -76,7 +77,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
         }
 
         project.runLifecycleAwareTest {
-            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(this)
+            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(path)
 
             diagnostics.assertNoDiagnostics(IncorrectCompileOnlyDependencyWarning)
         }
@@ -98,7 +99,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
 
         project.runLifecycleAwareTest {
             val diagnostics = project.kotlinToolingDiagnosticsCollector
-                .getDiagnosticsForProject(project)
+                .getDiagnosticsForProject(project.path)
 
             val actualWarning = diagnostics.assertContainsSingleDiagnostic(IncorrectCompileOnlyDependencyWarning)
 
@@ -139,7 +140,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
         }
 
         project.runLifecycleAwareTest {
-            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(this)
+            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(path)
 
             diagnostics.assertNoDiagnostics(IncorrectCompileOnlyDependencyWarning)
         }
@@ -171,7 +172,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
 
         project.runLifecycleAwareTest {
             val diagnostics = project.kotlinToolingDiagnosticsCollector
-                .getDiagnosticsForProject(project)
+                .getDiagnosticsForProject(project.path)
 
             val actualWarning = diagnostics.assertContainsSingleDiagnostic(IncorrectCompileOnlyDependencyWarning)
 
@@ -206,7 +207,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
         }
 
         project.runLifecycleAwareTest {
-            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(this)
+            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(path)
             diagnostics.assertNoDiagnostics(IncorrectCompileOnlyDependencyWarning)
         }
     }
@@ -240,7 +241,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
         }
 
         project.runLifecycleAwareTest {
-            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(this)
+            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(path)
             diagnostics.assertNoDiagnostics(IncorrectCompileOnlyDependencyWarning)
         }
 
@@ -265,7 +266,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
         }
 
         project.runLifecycleAwareTest {
-            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(this)
+            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(path)
             diagnostics.assertNoDiagnostics(IncorrectCompileOnlyDependencyWarning)
         }
     }
@@ -289,7 +290,7 @@ class MultiplatformIncorrectCompileOnlyDependenciesValidationTest {
         }
 
         project.runLifecycleAwareTest {
-            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(this)
+            val diagnostics = kotlinToolingDiagnosticsCollector.getDiagnosticsForProject(path)
             diagnostics.assertNoDiagnostics(IncorrectCompileOnlyDependencyWarning)
 
             val deprecatedPropertyWarning = diagnostics.filter { it.id == KotlinToolingDiagnostics.DeprecatedWarningGradleProperties.id }

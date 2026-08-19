@@ -2,17 +2,16 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
     api(project(":kotlin-annotations-jvm"))
-    api(project(":core:descriptors"))
-    api(project(":core:deserialization"))
+    implementation(project(":core:descriptors"))
+    implementation(project(":core:deserialization"))
     api(project(":compiler:util"))
     api(project(":compiler:config"))
-    api(project(":compiler:container"))
-    api(project(":compiler:resolution"))
+    implementation(project(":compiler:container"))
+    implementation(project(":compiler:resolution"))
     api(project(":compiler:psi:psi-api"))
     api(project(":compiler:psi:psi-utils"))
     api(project(":compiler:psi:psi-frontend-utils"))
@@ -30,6 +29,8 @@ sourceSets {
     "main" { projectDefault() }
     "test" {}
 }
+
+optInToK1Deprecation()
 
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions.freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")

@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.serialization.deserialization.descriptors
 
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.metadata.ProtoBuf
@@ -38,8 +39,9 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import kotlin.collections.ArrayList
 
+@K1Deprecation
 abstract class DeserializedMemberScope protected constructor(
-    protected val c: DeserializationContext,
+    val c: DeserializationContext,
     functionList: List<ProtoBuf.Function>,
     propertyList: List<ProtoBuf.Property>,
     typeAliasList: List<ProtoBuf.TypeAlias>,

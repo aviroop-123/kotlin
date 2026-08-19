@@ -40,6 +40,12 @@ The following list of general recommendations (that can also be used as a review
 5. Keep the granularity of the change reasonably small, but avoid overdoing it:
     * A few small isolated refactorings can be fused together in a single commit with a bullet list of changes, especially if they are automated or trivial;
     * Rule of thumb: if refactorings are trivial and the reviewer is unlikely to get back to it after taking an initial look, it’s better to squash them before creating an MR – more concise history, easier git annotate/blame, and focus on the actual semantics both in review and history
+6. Ensure that the change is covered with automated tests. Either pre-existing tests should be enough, or new tests should be added in the MR.
+    * We can say that a test covers "X" if reverting "X" makes the test fail.
+    * For example, if you revert your whole change (but not the tests), some tests should be failing.
+    * Same for any non-trivial problem you encountered while developing the change: if a problem made you change the approach or introduce special cases in the implementation, there should be a test that would fail if you didn't.
+    * If the change fixes a regression, there should be a test reflecting this regression.
+    * When making a test covering a fix, it is particularly helpful to first write a test, make sure it fails as expected, and then proceed to fix it.
 
 ### Commit messages and YT tickets
 
@@ -48,9 +54,11 @@ The following list of general recommendations (that can also be used as a review
 3. Please ensure that the commit message is self-descriptive and detailed, explaining not only what’s being done but also how and why it is done this way
     * Rule of thumb: if the MR required a nontrivial discussion, hundreds of lines of production code changed, but the final commit message looks like: “use X instead of Y in Z”, chances that something is wrong with the message are high.
     * This is also a subject of the code review
-4. Even for non-functional changes, it is strongly encouraged to explain *the reasoning* behind the change. Otherwise, it will be lost in time in a few months
+4. If a commit mentions a YT ticket, it serves as an additional context. It is therefore allowed to omit the commit message parts that are already covered by the issue summary or description if the connection is clear.
+    * In other words, after reading the commit message and the issue summary and description, the reader should be able to understand "what", "how" and "why this way".
+5. Even for non-functional changes, it is strongly encouraged to explain *the reasoning* behind the change. Otherwise, it will be lost in time in a few months
     * Rule of thumb: prefer `Make X lazy: \n it’s a non-trivial computation that is frequently unused in the context of X` over `Make X lazy` or `Add X.toString(), used for a debugging purpose` over `Add X.toString()`
-5. Avoid “fixup!” commits in the main branch: either squash such commits manually or ensure it is properly [autosquashable](https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt---autosquash)
+6. Avoid “fixup!” commits in the main branch: either squash such commits manually or ensure it is properly [autosquashable](https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt---autosquash)
 
 
 ### Git
@@ -60,6 +68,7 @@ With the recommended practices, the history should already be compact and descri
 A few specifics apply:
 
 * Avoid force-pushes except for rebase; in that case, let the reviewers know nothing reviewed was overwritten
+    * In particular, if you need to rebase and add some changes, do this in two pushes: one force-push just for rebase and one regular push for the actual changes.
 * When merging, the choice between a squash and rebase is left to the author
     * When squashing, ensure that none of the intermediate commit messages (except for fixups) or YT references are lost.
 

@@ -1,23 +1,22 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.low.level.api.fir
 
+import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.analysis.low.level.api.fir.AbstractFirLazyDeclarationResolveTestCase.Directives.RESOLVE_REPL_SNIPPET_CLASS
+import org.jetbrains.kotlin.analysis.low.level.api.fir.AbstractFirLazyDeclarationResolveTestCase.Directives.RESOLVE_SCRIPT
+import org.jetbrains.kotlin.analysis.api.impl.base.util.requireIsInstance
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.resolveToFirSymbol
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirResolvableModuleSession
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.FirElementFinder
 import org.jetbrains.kotlin.analysis.test.framework.base.AbstractAnalysisApiBasedTest
 import org.jetbrains.kotlin.analysis.test.framework.services.expressionMarkerProvider
-import org.jetbrains.kotlin.analysis.utils.errors.requireIsInstance
 import org.jetbrains.kotlin.fir.FirElementWithResolveState
-import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
-import org.jetbrains.kotlin.fir.declarations.FirClass
-import org.jetbrains.kotlin.fir.declarations.FirDanglingModifierList
-import org.jetbrains.kotlin.fir.declarations.FirFile
-import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
+import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.renderer.FirDeclarationRendererWithFilteredAttributes
 import org.jetbrains.kotlin.fir.renderer.FirErrorExpressionExtendedRenderer
 import org.jetbrains.kotlin.fir.renderer.FirRenderer
@@ -29,6 +28,7 @@ import org.jetbrains.kotlin.fir.scopes.unsubstitutedScope
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirReplSnippetSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirScriptSymbol
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseRecursively
@@ -36,7 +36,6 @@ import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseWithCallableMembers
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.test.directives.model.*
-import org.jetbrains.kotlin.test.services.TestModuleStructure
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.moduleStructure
 
@@ -49,43 +48,52 @@ abstract class AbstractFirLazyDeclarationResolveTestCase : AbstractAnalysisApiBa
         ktFile: KtFile,
         testServices: TestServices,
         resolutionFacade: LLResolutionFacade,
-    ): Pair<FirElementWithResolveState, ((FirResolvePhase) -> Unit)> = when {
-        Directives.RESOLVE_FILE in testServices.moduleStructure.allDirectives -> {
-            val session = resolutionFacade.useSiteFirSession as LLFirResolvableModuleSession
-            val file = session.moduleComponents.firFileBuilder.buildRawFirFileWithCaching(ktFile)
-            file to fun(phase: FirResolvePhase) {
-                file.lazyResolveToPhaseByDirective(phase, testServices)
+        fileWithCaret: KtFile = ktFile,
+    ): Pair<FirElementWithResolveState, ((FirResolvePhase) -> Unit)> {
+        val allDirectives = testServices.moduleStructure.allDirectives
+        return when {
+            Directives.RESOLVE_FILE in allDirectives -> {
+                val session = resolutionFacade.useSiteFirSession as LLFirResolvableModuleSession
+                val file = session.moduleComponents.firFileBuilder.buildRawFirFileWithCaching(ktFile)
+                file to fun(phase: FirResolvePhase) {
+                    file.lazyResolveToPhaseByDirective(phase, testServices)
+                }
             }
-        }
-        Directives.RESOLVE_DANGLING_MODIFIER in testServices.moduleStructure.allDirectives -> {
-            val session = resolutionFacade.useSiteFirSession as LLFirResolvableModuleSession
-            val file = session.moduleComponents.firFileBuilder.buildRawFirFileWithCaching(ktFile)
-            val danglingModifier = file.declarations.last() as FirDanglingModifierList
-            danglingModifier to fun(phase: FirResolvePhase) {
-                danglingModifier.lazyResolveToPhaseByDirective(phase, testServices)
+            Directives.RESOLVE_DANGLING_MODIFIER in allDirectives -> {
+                val session = resolutionFacade.useSiteFirSession as LLFirResolvableModuleSession
+                val file = session.moduleComponents.firFileBuilder.buildRawFirFileWithCaching(ktFile)
+                val danglingModifier = file.declarations.last() as FirDanglingModifierList
+                danglingModifier to fun(phase: FirResolvePhase) {
+                    danglingModifier.lazyResolveToPhaseByDirective(phase, testServices)
+                }
             }
-        }
-        else -> {
-            val ktDeclaration = if (Directives.RESOLVE_SCRIPT in testServices.moduleStructure.allDirectives) {
-                ktFile.script!!
-            } else {
-                testServices.expressionMarkerProvider.getBottommostElementOfTypeAtCaret<KtDeclaration>(ktFile)
-            }
+            else -> {
+                val ktDeclaration = if (RESOLVE_SCRIPT in allDirectives || RESOLVE_REPL_SNIPPET_CLASS in allDirectives) {
+                    ktFile.script!!
+                } else {
+                    testServices.expressionMarkerProvider.getBottommostElementOfTypeAtCaret<KtDeclaration>(fileWithCaret).let {
+                        if (ktFile === fileWithCaret) {
+                            it
+                        } else {
+                            PsiTreeUtil.findSameElementInCopy(it, ktFile)
+                        }
+                    }
+                }
 
-            val declarationSymbol = ktDeclaration.resolveToFirSymbol(resolutionFacade)
-            val firDeclaration = chooseMemberDeclarationIfNeeded(declarationSymbol, testServices.moduleStructure, resolutionFacade).fir
-            firDeclaration to fun(phase: FirResolvePhase) {
-                firDeclaration.lazyResolveToPhaseByDirective(phase, testServices)
+                val declarationSymbol = ktDeclaration.resolveToFirSymbol(resolutionFacade)
+                val firDeclaration = chooseMemberDeclarationIfNeeded(declarationSymbol, allDirectives, resolutionFacade).fir
+                firDeclaration to fun(phase: FirResolvePhase) {
+                    firDeclaration.lazyResolveToPhaseByDirective(phase, testServices)
+                }
             }
         }
     }
 
     protected fun chooseMemberDeclarationIfNeeded(
         symbol: FirBasedSymbol<*>,
-        moduleStructure: TestModuleStructure,
+        directives: RegisteredDirectives,
         resolutionFacade: LLResolutionFacade,
     ): FirBasedSymbol<*> {
-        val directives = moduleStructure.allDirectives
         val memberSymbol = chooseMemberDeclarationIfNeeded(symbol, resolutionFacade, directives)
         val propertyPart = directives.singleOrZeroValue(Directives.RESOLVE_PROPERTY_PART) ?: return memberSymbol
         requireIsInstance<FirPropertySymbol>(memberSymbol)
@@ -102,12 +110,18 @@ abstract class AbstractFirLazyDeclarationResolveTestCase : AbstractAnalysisApiBa
         resolutionFacade: LLResolutionFacade,
         directives: RegisteredDirectives,
     ): FirBasedSymbol<*> {
+        val symbol = if (RESOLVE_REPL_SNIPPET_CLASS in directives) {
+            (symbol as FirReplSnippetSymbol).snippetClassSymbol
+        } else {
+            symbol
+        }
+
         val memberClassFilters = listOfNotNull(
             directives.singleOrZeroValue(Directives.MEMBER_CLASS_FILTER),
             directives.singleOrZeroValue(Directives.MEMBER_NAME_FILTER),
         ).ifEmpty { return symbol }
 
-        val (classSymbol, declarations) = when (symbol) {
+        val [classSymbol, declarations] = when (symbol) {
             is FirClassSymbol -> symbol to symbol.declarationSymbols
             is FirScriptSymbol -> {
                 symbol to symbol.fir.let { it.parameters + it.declarations }.map { it.symbol }
@@ -195,6 +209,7 @@ abstract class AbstractFirLazyDeclarationResolveTestCase : AbstractAnalysisApiBa
 
         val RESOLVE_PROPERTY_PART by enumDirective<PropertyPart>("Choose getter/setter/backing field in the case of property")
         val RESOLVE_SCRIPT by directive("Resolve script instead of declaration at caret")
+        val RESOLVE_REPL_SNIPPET_CLASS by directive("Resolve a REPL snippet class instead of declaration at caret")
         val RESOLVE_FILE by directive("Resolve file instead of declaration at caret")
         val RESOLVE_DANGLING_MODIFIER by directive("Resolve a file dangling modifier list instead of declaration at caret")
 
@@ -247,7 +262,7 @@ abstract class AbstractFirLazyDeclarationResolveTestCase : AbstractAnalysisApiBa
     }
 }
 
-internal fun lazyResolveRenderer(builder: StringBuilder): FirRenderer = FirRenderer(
+fun lazyResolveRenderer(builder: StringBuilder): FirRenderer = FirRenderer(
     builder = builder,
     declarationRenderer = FirDeclarationRendererWithFilteredAttributes(),
     resolvePhaseRenderer = FirResolvePhaseRenderer(),

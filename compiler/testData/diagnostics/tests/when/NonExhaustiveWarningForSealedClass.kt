@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// LANGUAGE: +WarnAboutNonExhaustiveWhenOnAlgebraicTypes
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
  *
@@ -26,7 +25,7 @@ fun use(s: String) = s
 fun foo(s: S) {
     <!NO_ELSE_IN_WHEN!>when<!> (s) {
         First -> {}
-        is Derived -> use(<!DEBUG_INFO_SMARTCAST!>s<!>.s)
+        is Derived -> use(s.s)
     }
 }
 

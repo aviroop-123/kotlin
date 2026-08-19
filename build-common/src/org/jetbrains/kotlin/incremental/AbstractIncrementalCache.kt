@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.incremental
 
+import org.jetbrains.kotlin.incremental.components.SubtypeTracker
 import org.jetbrains.kotlin.incremental.storage.*
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.Flags
@@ -51,6 +52,7 @@ interface IncrementalCacheCommon {
 abstract class AbstractIncrementalCache<ClassName>(
     workingDir: File,
     protected val icContext: IncrementalCompilationContext,
+    private val subtypeTracker: SubtypeTracker = SubtypeTracker.DoNothing,
 ) : BasicMapsOwner(workingDir), IncrementalCacheCommon {
     companion object {
         private const val CLASS_ATTRIBUTES = "class-attributes"
@@ -151,6 +153,16 @@ abstract class AbstractIncrementalCache<ClassName>(
      */
     protected fun addToClassStorage(classProtoData: ClassProtoData, srcFile: File?, useCompilerMapsOnly: Boolean = false) {
         val (proto, nameResolver) = classProtoData
+        recordClassHierarchyData(classProtoData)
+        val child = nameResolver.getClassId(proto.fqName).asSingleFqName()
+        if (!useCompilerMapsOnly) {
+            srcFile?.let { classFqNameToSourceMap[child] = it }
+            classAttributesMap[child] = ICClassesAttributes(ProtoBuf.Modality.SEALED == Flags.MODALITY.get(proto.flags))
+        }
+    }
+
+    protected fun recordClassHierarchyData(classProtoData: ClassProtoData) {
+        val (proto, nameResolver) = classProtoData
 
         val supertypes = proto.supertypes(TypeTable(proto.typeTable))
         val parents = supertypes.map { nameResolver.getClassId(it.className).asSingleFqName() }
@@ -158,16 +170,16 @@ abstract class AbstractIncrementalCache<ClassName>(
             .toSet()
         val child = nameResolver.getClassId(proto.fqName).asSingleFqName()
 
-        parents.forEach { subtypesMap.append(it, child) }
+        parents.forEach {
+            subtypesMap.append(it, child)
+            // TODO add related tests
+            subtypeTracker.report(it, child)
+        }
 
         val removedSupertypes = supertypesMap[child].orEmpty().filter { it !in parents }
         removedSupertypes.forEach { subtypesMap.removeValues(it, setOf(child)) }
 
         supertypesMap[child] = parents
-        if (!useCompilerMapsOnly) {
-            srcFile?.let { classFqNameToSourceMap[child] = it }
-            classAttributesMap[child] = ICClassesAttributes(ProtoBuf.Modality.SEALED == Flags.MODALITY.get(proto.flags))
-        }
     }
 
     protected fun removeAllFromClassStorage(
@@ -349,14 +361,14 @@ abstract class AbstractIncrementalCache<ClassName>(
         }
 
         val actualToExpect = hashMapOf<File, MutableSet<File>>()
-        for ((expect, actuals) in expectActualTracker.expectToActualMap) {
+        for ([expect, actuals] in expectActualTracker.expectToActualMap) {
             for (actual in actuals) {
                 actualToExpect.getOrPut(actual) { hashSetOf() }.add(expect)
             }
             complementaryFilesMap[expect] = actuals.union(complementaryFilesMap[expect].orEmpty())
         }
 
-        for ((actual, expects) in actualToExpect) {
+        for ([actual, expects] in actualToExpect) {
             complementaryFilesMap[actual] = expects.union(complementaryFilesMap[actual].orEmpty())
         }
 

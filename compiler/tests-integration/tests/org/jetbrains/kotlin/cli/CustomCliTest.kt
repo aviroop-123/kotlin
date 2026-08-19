@@ -136,7 +136,7 @@ class CustomCliTest : TestCaseWithTmpdir() {
     }
 
     private fun makeCompilerArgs(sourceFiles: List<File>, jarFile: File): List<String> {
-        return listOf(K2JVMCompilerArguments::includeRuntime.cliArgument, CommonCompilerArguments::contextParameters.cliArgument, K2JVMCompilerArguments::destination.cliArgument, jarFile.absolutePath) + sourceFiles.map { it.absolutePath }
+        return listOf(K2JVMCompilerArguments::includeRuntime.cliArgument, K2JVMCompilerArguments::destination.cliArgument, jarFile.absolutePath) + sourceFiles.map { it.absolutePath }
     }
 
     private fun compileAndCheckMainClass(sourceFiles: List<File>, expectedMainClass: String?, messageRenderer: MessageRenderer? = null) {
@@ -204,8 +204,8 @@ class CustomCliTest : TestCaseWithTmpdir() {
         require(diagnostics.size == 1) { "Expected 1 diagnostic, but found ${diagnostics.size}:\n${diagnostics.joinToString("\n")}" }
         val diagnostic = diagnostics.single()
         assertEquals(2, diagnostic.location?.line)
-        assertEquals(18, diagnostic.location?.column)
-        assertEquals(6, diagnostic.location?.lineEnd)
-        assertEquals(8, diagnostic.location?.columnEnd)
+        assertEquals(16, diagnostic.location?.column)
+        assertEquals(2, diagnostic.location?.lineEnd)
+        assertEquals(17, diagnostic.location?.columnEnd)
     }
 }

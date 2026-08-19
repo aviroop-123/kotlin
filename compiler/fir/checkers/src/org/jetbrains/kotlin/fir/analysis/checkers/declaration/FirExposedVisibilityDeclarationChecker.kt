@@ -15,10 +15,10 @@ import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactory4
 import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
-import org.jetbrains.kotlin.fir.analysis.checkers.PermissivenessWithMigration
+import org.jetbrains.kotlin.fir.analysis.checkers.PermissivenessForExposedVisibility
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
-import org.jetbrains.kotlin.fir.analysis.checkers.relationWithMigration
+import org.jetbrains.kotlin.fir.analysis.checkers.relationForExposedVisibility
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.correspondingProperty
 import org.jetbrains.kotlin.fir.declarations.*
@@ -29,11 +29,13 @@ import org.jetbrains.kotlin.fir.declarations.utils.isFromSealedClass
 import org.jetbrains.kotlin.fir.declarations.utils.isScriptTopLevelDeclaration
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.extensions.scriptResolutionHacksComponent
+import org.jetbrains.kotlin.fir.isDisabled
 import org.jetbrains.kotlin.fir.isEnabled
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
 import org.jetbrains.kotlin.fir.types.*
@@ -107,7 +109,7 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
         for (parameter in declaration.typeParameters) {
             for (bound in parameter.symbol.resolvedBounds) {
                 // If there's an exposure due to a private type, let it overtake the exposure due to an internal type.
-                val (symbolWithRelation, diagnostic) =
+                val [symbolWithRelation, diagnostic] =
                     bound.findVisibilityExposure(ignoreInternalExposure = true)?.to(diagnosticForNonInternalBounds)
                         ?: bound.findVisibilityExposure(ignoreInternalExposure = false)?.to(diagnosticForInternalBounds)
                         ?: continue
@@ -167,8 +169,8 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
     context(reporter: DiagnosticReporter, context: CheckerContext)
     private fun checkProperty(declaration: FirProperty) {
         if (declaration.fromPrimaryConstructor == true) return
-        if (declaration.isLocal) return
-        if (declaration.source?.kind == KtFakeSourceElementKind.EnumGeneratedDeclaration) return
+        if (declaration.symbol is FirLocalPropertySymbol) return
+        if (declaration.source?.kind is KtFakeSourceElementKind.EnumGeneratedDeclaration) return
         val propertyVisibility = declaration.effectiveVisibility
 
         if (propertyVisibility == EffectiveVisibility.Local
@@ -207,7 +209,7 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
         }
 
         val property = correspondingProperty ?: return
-        if (property.isLocal) return
+        if (property.symbol is FirLocalPropertySymbol) return
         val propertyVisibility = property.effectiveVisibility
 
         if (propertyVisibility == EffectiveVisibility.Local) return
@@ -257,25 +259,25 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
         }
 
         if (effectiveVisibility != null) {
-            when (val permissiveness = effectiveVisibility.relationWithMigration(base)) {
-                PermissivenessWithMigration.LESS,
-                PermissivenessWithMigration.UNKNOWN,
-                PermissivenessWithMigration.UNKNOW_WITH_MIGRATION,
+            when (val permissiveness = effectiveVisibility.relationForExposedVisibility(base)) {
+                PermissivenessForExposedVisibility.LESS,
+                PermissivenessForExposedVisibility.UNKNOWN,
+                PermissivenessForExposedVisibility.PACKAGE_PRIVATE_FROM_INTERNAL,
                     -> return symbolWithRelation(
                     symbol = classSymbol,
                     symbolVisibility = effectiveVisibility,
                     baseVisibility = base,
                     fromTypeArgument = visitedTypes.size > 1,
-                    isMigration = permissiveness == PermissivenessWithMigration.UNKNOW_WITH_MIGRATION,
+                    permissiveness = permissiveness,
                 )
-                PermissivenessWithMigration.SAME,
-                PermissivenessWithMigration.MORE,
+                PermissivenessForExposedVisibility.SAME,
+                PermissivenessForExposedVisibility.MORE,
                     -> {
                 }
             }
         }
 
-        for ((index, it) in type.typeArguments.withIndex()) {
+        for ([index, it] in type.typeArguments.withIndex()) {
             when (it) {
                 is ConeClassLikeType -> it.findVisibilityExposure(base, ignoreInternalExposure, visitedTypes)
                     ?.let { return it }
@@ -298,7 +300,7 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
         symbolVisibility: EffectiveVisibility,
         baseVisibility: EffectiveVisibility,
         fromTypeArgument: Boolean,
-        isMigration: Boolean,
+        permissiveness: PermissivenessForExposedVisibility,
     ): SymbolWithRelation {
         val visibility = symbolVisibility.toVisibility()
         var lowestVisibility = symbol.visibility
@@ -319,7 +321,7 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
             lowestRepresentative,
             symbolVisibility,
             if (lowestRepresentative !== symbol) defaultRelation.containerRelation() else defaultRelation,
-            isMigration,
+            permissiveness,
             baseVisibility,
         )
     }
@@ -328,7 +330,7 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
         val symbol: FirClassLikeSymbol<*>,
         val symbolVisibility: EffectiveVisibility,
         val relation: RelationToType,
-        val isMigration: Boolean,
+        val permissiveness: PermissivenessForExposedVisibility,
         val baseVisibility: EffectiveVisibility,
     ) {
         context(c: CheckerContext, reporter: DiagnosticReporter)
@@ -336,9 +338,12 @@ object FirExposedVisibilityDeclarationChecker : FirBasicDeclarationChecker(MppCh
             factory: KtDiagnosticFactory4<EffectiveVisibility, FirClassLikeSymbol<*>, RelationToType, EffectiveVisibility>,
             source: KtSourceElement?,
         ) {
+            val isPackagePrivateFromInternal = permissiveness == PermissivenessForExposedVisibility.PACKAGE_PRIVATE_FROM_INTERNAL
+            if (isPackagePrivateFromInternal && LanguageFeature.ForbidExposingPackagePrivateInInternal.isDisabled()) return
+
             reporter.reportOn(
                 source,
-                if (isMigration) FirErrors.EXPOSED_PACKAGE_PRIVATE_TYPE_FROM_INTERNAL_WARNING else factory,
+                if (isPackagePrivateFromInternal) FirErrors.EXPOSED_PACKAGE_PRIVATE_TYPE_FROM_INTERNAL_WARNING else factory,
                 baseVisibility,
                 symbol,
                 relation,

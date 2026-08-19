@@ -1,6 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// FIR_IDENTICAL
-// SKIP_TXT
 // FILE: JavaClass.java
 import org.jetbrains.annotations.NotNull;
 public class JavaClass {

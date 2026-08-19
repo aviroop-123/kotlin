@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.fir.types.typeContext
 import org.jetbrains.kotlin.fir.types.withNullability
 import org.jetbrains.kotlin.utils.mapToSetOrEmpty
 import org.jetbrains.kotlinx.dataframe.plugin.extensions.KotlinTypeFacade
-import org.jetbrains.kotlinx.dataframe.plugin.extensions.Marker
+import org.jetbrains.kotlinx.dataframe.plugin.extensions.ColumnType
 import org.jetbrains.kotlinx.dataframe.plugin.impl.*
 
 class DropNulls0 : AbstractSchemaModificationInterpreter() {
@@ -17,7 +17,7 @@ class DropNulls0 : AbstractSchemaModificationInterpreter() {
         if (whereAllNull) return receiver
         return PluginDataFrameSchema(
             fillNullsImpl(
-                receiver.columns(),
+                receiver.columns(impliedColumnsResolver = columns),
                 columns.resolve(receiver).mapTo(mutableSetOf()) { it.path.path },
                 emptyList()
             )
@@ -50,8 +50,24 @@ class DropNa0 : AbstractSchemaModificationInterpreter() {
         if (whereAllNA) return receiver
         return PluginDataFrameSchema(
             fillNullsImpl(
-                receiver.columns(),
+                receiver.columns(impliedColumnsResolver = columns),
                 columns.resolve(receiver).mapTo(mutableSetOf()) { it.path.path },
+                emptyList()
+            )
+        )
+    }
+}
+
+class DropNa1 : AbstractSchemaModificationInterpreter() {
+    val Arguments.receiver: PluginDataFrameSchema by dataFrame()
+    val Arguments.whereAllNA: Boolean by arg(defaultValue = Present(false))
+
+    override fun Arguments.interpret(): PluginDataFrameSchema {
+        if (whereAllNA) return receiver
+        return PluginDataFrameSchema(
+            fillNullsImpl(
+                receiver.columns(),
+                receiver.columns().mapToSetOrEmpty { listOf(it.name) },
                 emptyList()
             )
         )
@@ -66,10 +82,10 @@ fun KotlinTypeFacade.fillNullsImpl(
     return columns.map {
         // else report?
         if (p + it.name() in paths && it is SimpleDataColumn) {
-            val coneType = it.type.type as? ConeSimpleKotlinType
+            val coneType = it.type.coneType as? ConeSimpleKotlinType
             if (coneType != null) {
                 val type = coneType.withNullability(nullable = false, session.typeContext)
-                it.changeType(Marker.invoke(type))
+                it.changeType(ColumnType(type))
             } else {
                 // report?
                 it

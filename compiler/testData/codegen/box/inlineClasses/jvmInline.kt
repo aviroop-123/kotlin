@@ -1,15 +1,6 @@
 // WITH_STDLIB
-// IGNORE_BACKEND: ANDROID
 // WORKS_WHEN_VALUE_CLASS
-// LANGUAGE: +ValueClasses
-
-// FILE: 1.kt
-
-package kotlin.jvm
-
-annotation class JvmInline
-
-// FILE: 2.kt
+// LANGUAGE: +JvmInlineMultiFieldValueClasses
 
 import kotlin.jvm.JvmInline
 import kotlin.coroutines.*

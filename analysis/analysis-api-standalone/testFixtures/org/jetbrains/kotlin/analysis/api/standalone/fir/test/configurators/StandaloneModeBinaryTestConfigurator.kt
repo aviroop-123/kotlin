@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.analysis.api.standalone.StandaloneSessionServiceRegi
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.AnalysisApiServiceRegistrar
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.FirStandaloneServiceRegistrar
 import org.jetbrains.kotlin.analysis.low.level.api.fir.test.base.AnalysisApiFirTestServiceRegistrar
+import org.jetbrains.kotlin.analysis.low.level.api.fir.test.base.configureFirConsistencyChecks
 import org.jetbrains.kotlin.analysis.low.level.api.fir.test.base.configureOptionalTestCompilerPlugin
 import org.jetbrains.kotlin.analysis.test.framework.projectStructure.*
 import org.jetbrains.kotlin.analysis.test.framework.services.configuration.AnalysisApiJvmEnvironmentConfigurator
@@ -19,6 +20,7 @@ import org.jetbrains.kotlin.analysis.test.framework.services.libraries.Dispatchi
 import org.jetbrains.kotlin.analysis.test.framework.services.libraries.TestModuleCompiler
 import org.jetbrains.kotlin.analysis.test.framework.services.libraries.TestModuleDecompiler
 import org.jetbrains.kotlin.analysis.test.framework.services.libraries.TestModuleDecompilerJar
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.model.DependencyKind
 import org.jetbrains.kotlin.test.preprocessors.ExternalAnnotationsSourcePreprocessor
@@ -43,6 +45,8 @@ abstract class StandaloneModeBinaryTestConfigurator : StandaloneModeConfigurator
             useAdditionalService<TestModuleDecompiler> { TestModuleDecompilerJar() }
 
             this.defaultsProviderBuilder.dependencyKind = DependencyKind.Binary
+
+            configureFirConsistencyChecks()
         }
     }
 
@@ -64,10 +68,12 @@ abstract class StandaloneModeBinaryTestConfigurator : StandaloneModeConfigurator
     }
 }
 
-object StandaloneModeLibraryBinaryTestConfigurator : StandaloneModeBinaryTestConfigurator() {
+class StandaloneModeLibraryBinaryTestConfigurator(override val defaultTargetPlatform: TargetPlatform) :
+    StandaloneModeBinaryTestConfigurator() {
     override val testModuleFactory: KtTestModuleFactory get() = KtLibraryBinaryTestModuleFactory
 }
 
-object StandaloneModeLibraryBinaryDecompiledTestConfigurator : StandaloneModeBinaryTestConfigurator() {
+class StandaloneModeLibraryBinaryDecompiledTestConfigurator(override val defaultTargetPlatform: TargetPlatform) :
+    StandaloneModeBinaryTestConfigurator() {
     override val testModuleFactory: KtTestModuleFactory get() = KtLibraryBinaryDecompiledTestModuleFactory
 }

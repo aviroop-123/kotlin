@@ -1,5 +1,7 @@
 // TARGET_BACKEND: WASM
+// ^^ KT-83093
 // WASM_NO_JS_TAG
+// WASM_IGNORE_FOR: mode=single-module
 
 // KT-71691
 

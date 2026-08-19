@@ -5,16 +5,19 @@
 
 package org.jetbrains.kotlin.code
 
-import junit.framework.TestCase
 import org.eclipse.jgit.ignore.FastIgnoreRule
 import org.eclipse.jgit.ignore.IgnoreNode
+import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.fail
 
-class SpaceCodeOwnersTest : TestCase() {
+class SpaceCodeOwnersTest {
     private val ownersFile = File(System.getProperty("codeOwnersTest.spaceCodeOwnersFile"))
     private val owners = parseCodeOwners(ownersFile)
 
+    @Test
     fun testOwnerListNoDuplicates() {
         val duplicatedOwnerListEntries = owners.permittedOwners.groupBy { it.name }
             .filterValues { occurrences -> occurrences.size > 1 }
@@ -32,6 +35,7 @@ class SpaceCodeOwnersTest : TestCase() {
         }
     }
 
+    @Test
     fun testOwnersAreAddedByTeamsOrEmailAddress() {
         val invalidOwners = owners.permittedOwners
             .filterNot { it.name.first() == '"' && it.name.last() == '"' }
@@ -48,6 +52,47 @@ class SpaceCodeOwnersTest : TestCase() {
         )
     }
 
+    @Test
+    fun testUserOwnersHaveGitHubUsername() {
+        val userOwnersWithoutGitHubUsername = owners.userOwners
+            .filter { it.githubUsername.isBlank() }
+
+        if (userOwnersWithoutGitHubUsername.isEmpty()) return
+
+        fail(
+            buildString {
+                appendLine("The following USER_OWNER entries are missing GitHub usernames:")
+                for (entry in userOwnersWithoutGitHubUsername) {
+                    appendLine("  $entry")
+                }
+            }
+        )
+    }
+
+    @Test
+    fun testIndividualOwnersAreDefinedAsUserOwners() {
+        val emailOwners = owners.permittedOwners
+            .filter { it.name.contains('@') }
+            .map { it.name }
+            .toSet()
+
+        val userOwnerEmails = owners.userOwners.map { it.email }.toSet()
+
+        val missingUserOwners = emailOwners - userOwnerEmails
+
+        if (missingUserOwners.isEmpty()) return
+
+        fail(
+            buildString {
+                appendLine("The following email owners must be defined using USER_OWNER directive with their GitHub username:")
+                for (email in missingUserOwners) {
+                    appendLine("  $email")
+                }
+            }
+        )
+    }
+
+    @Test
     fun testAllOwnersInOwnerList() {
         val permittedOwnerNames = owners.permittedOwners.map { it.name }.toSet()
         val problems = mutableListOf<String>()
@@ -55,7 +100,7 @@ class SpaceCodeOwnersTest : TestCase() {
             if (pattern !is OwnershipPattern.Pattern) continue
             for (owner in pattern.owners) {
                 if (owner !in permittedOwnerNames) {
-                    problems += "Owner ${owner.quoteIfContainsSpaces()} not listed in OWNER_LIST of $ownersFile, but used in $pattern"
+                    problems += "Owner ${owner.quoteIfContainsSpaces()} not listed in $ownersFile, but used in $pattern"
                 }
             }
         }
@@ -64,12 +109,30 @@ class SpaceCodeOwnersTest : TestCase() {
         }
     }
 
+    @Test
+    fun testBranchRulesHaveValidOwners() {
+        val permittedOwnerNames = owners.permittedOwners.map { it.name }.toSet()
+        val problems = mutableListOf<String>()
+        for (rule in owners.branchRules) {
+            for (owner in rule.owners) {
+                if (owner !in permittedOwnerNames) {
+                    problems += "Owner ${owner.quoteIfContainsSpaces()} not listed in $ownersFile, but used in $rule"
+                }
+            }
+        }
+        if (problems.isNotEmpty()) {
+            fail(problems.joinToString("\n"))
+        }
+    }
+
+    @Test
     fun testFallbackRuleMatchEverything() {
         val fallbackRule = owners.patterns.first()
-        assertEquals("Fallback rule must be '*', while it is $fallbackRule", "*", fallbackRule.pattern)
+        assertEquals("*", fallbackRule.pattern, "Fallback rule must be '*', while it is $fallbackRule")
         assertIs<OwnershipPattern.Pattern>(fallbackRule, "Fallback rule must not be UNKNOWN, but it is $fallbackRule")
     }
 
+    @Test
     fun testPatterns() {
         val checker = FileOwnershipChecker(
             owners,
@@ -110,7 +173,7 @@ class SpaceCodeOwnersTest : TestCase() {
 
         val fallbackMatcher = matchers.last()
 
-        val fileMatchers = matchers.filterNot { (_, rule) -> rule.dirOnly() }
+        val fileMatchers = matchers.filterNot { (val _ = item, val rule) -> rule.dirOnly() }
 
         val ignoreTracker = GitIgnoreTracker()
 
@@ -226,12 +289,33 @@ private class GitIgnoreTracker {
 
 private data class CodeOwners(
     val permittedOwners: List<OwnerListEntry>,
-    val patterns: List<OwnershipPattern>
+    val userOwners: List<UserOwnerEntry>,
+    val githubOwners: List<GitHubOwnerEntry>,
+    val patterns: List<OwnershipPattern>,
+    val branchRules: List<BranchRule> = emptyList()
 ) {
     data class OwnerListEntry(val name: String, val line: Int) {
         override fun toString(): String {
-            return "line $line |# $OWNER_LIST_DIRECTIVE: $name"
+            return "line $line |# $SPACE_OWNER_DIRECTIVE: $name"
         }
+    }
+
+    data class UserOwnerEntry(val email: String, val githubUsername: String, val line: Int) {
+        override fun toString(): String {
+            return "line $line |# $USER_OWNER_DIRECTIVE: $email $githubUsername"
+        }
+    }
+
+    data class GitHubOwnerEntry(val teamName: String, val usernames: List<String>, val line: Int) {
+        override fun toString(): String {
+            return "line $line |# $SPACE_TO_GITHUB_OWNER_DIRECTIVE: $teamName ${usernames.joinToString(" ")}"
+        }
+    }
+}
+
+private data class BranchRule(val branchPattern: String, val pathPattern: String, val owners: List<String>, val line: Int) {
+    override fun toString(): String {
+        return "line $line |# $BRANCH_RULE_DIRECTIVE: $branchPattern $pathPattern ${owners.joinToString(" ") { it.quoteIfContainsSpaces() }}"
     }
 }
 
@@ -274,12 +358,15 @@ private fun parseCodeOwners(file: File): CodeOwners {
     }
 
     val permittedOwners = mutableListOf<CodeOwners.OwnerListEntry>()
+    val userOwners = mutableListOf<CodeOwners.UserOwnerEntry>()
+    val githubOwners = mutableListOf<CodeOwners.GitHubOwnerEntry>()
     val patterns = mutableListOf<OwnershipPattern>()
     val excludedPatterns = mutableListOf<OwnershipPattern.NoOwnerPattern>()
+    val branchRules = mutableListOf<BranchRule>()
 
     file.useLines { lines ->
 
-        for ((index, line) in lines.withIndex()) {
+        for ([index, line] in lines.withIndex()) {
             val lineNumber = index + 1
 
             if (line.startsWith("#")) {
@@ -289,16 +376,49 @@ private fun parseCodeOwners(file: File): CodeOwners {
                     continue
                 }
 
-                val ownerListDirective = parseDirective(line, OWNER_LIST_DIRECTIVE)
-                if (ownerListDirective != null) {
-                    parseOwnerNames(ownerListDirective).mapTo(permittedOwners) { owner ->
+                val spaceOwnerDirective = parseDirective(line, SPACE_OWNER_DIRECTIVE)
+                if (spaceOwnerDirective != null) {
+                    parseOwnerNames(spaceOwnerDirective).mapTo(permittedOwners) { owner ->
                         CodeOwners.OwnerListEntry(owner, lineNumber)
+                    }
+                }
+
+                val userOwnerDirective = parseDirective(line, USER_OWNER_DIRECTIVE)
+                if (userOwnerDirective != null) {
+                    val parts = userOwnerDirective.trim().split("\\s+".toRegex(), limit = 2)
+                    if (parts.size == 2) {
+                        val [email, githubUsername] = parts
+                        userOwners += CodeOwners.UserOwnerEntry(email, githubUsername, lineNumber)
+                        permittedOwners += CodeOwners.OwnerListEntry(email, lineNumber)
+                    }
+                }
+
+                val githubOwnerDirective = parseDirective(line, SPACE_TO_GITHUB_OWNER_DIRECTIVE)
+                if (githubOwnerDirective != null) {
+                    val parsed = parseOwnerNames(githubOwnerDirective)
+                    if (parsed.isNotEmpty()) {
+                        val teamName = parsed.first()
+                        val usernames = parsed.drop(1)
+                        githubOwners += CodeOwners.GitHubOwnerEntry(teamName, usernames, lineNumber)
+                        // Also add the team to permitted owners (no need for separate SPACE_OWNER)
+                        permittedOwners += CodeOwners.OwnerListEntry(teamName, lineNumber)
                     }
                 }
 
                 val noOwnerDirective = parseDirective(line, NO_OWNER_DIRECTIVE)
                 if (noOwnerDirective != null) {
                     excludedPatterns += OwnershipPattern.NoOwnerPattern(noOwnerDirective.trim(), lineNumber)
+                }
+
+                val branchRuleDirective = parseDirective(line, BRANCH_RULE_DIRECTIVE)
+                if (branchRuleDirective != null) {
+                    val parts = branchRuleDirective.trim().split(' ', limit = 3)
+                    if (parts.size >= 3) {
+                        val branchPattern = parts[0]
+                        val pathPattern = parts[1]
+                        val ruleOwners = parseOwnerNames(parts[2])
+                        branchRules += BranchRule(branchPattern, pathPattern, ruleOwners, lineNumber)
+                    }
                 }
             } else if (line.isNotBlank() && line !in excludedPatterns.map { it.pattern }) {
                 // Note: Space CODEOWNERS grammar is ambiguous, as it is impossible to distinguish between file pattern with spaces
@@ -309,15 +429,18 @@ private fun parseCodeOwners(file: File): CodeOwners {
                 // ```
                 // In such pattern it is impossible to distinguish between file ".../Read Me.md" or file ".../Read" owned by "Me.md"
                 // See SPACE-17772
-                val (pattern, owners) = line.split(' ', limit = 2)
+                val [pattern, owners] = line.split(' ', limit = 2)
                 patterns += OwnershipPattern.Pattern(pattern, parseOwnerNames(owners), lineNumber)
             }
         }
     }
 
-    return CodeOwners(permittedOwners, patterns)
+    return CodeOwners(permittedOwners, userOwners, githubOwners, patterns, branchRules)
 }
 
-private const val OWNER_LIST_DIRECTIVE = "OWNER_LIST"
+private const val SPACE_OWNER_DIRECTIVE = "SPACE_OWNER"
+private const val USER_OWNER_DIRECTIVE = "USER_OWNER"
+private const val SPACE_TO_GITHUB_OWNER_DIRECTIVE = "SPACE_TO_GITHUB_OWNER"
 private const val UNKNOWN_DIRECTIVE = "UNKNOWN"
 private const val NO_OWNER_DIRECTIVE = "NO_OWNER"
+private const val BRANCH_RULE_DIRECTIVE = "GITHUB_BRANCH_RULE"

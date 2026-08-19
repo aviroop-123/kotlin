@@ -7,10 +7,8 @@ package org.jetbrains.kotlin.backend.konan.lower
 
 import org.jetbrains.kotlin.backend.common.serialization.SerializedIrFileFingerprint
 import org.jetbrains.kotlin.backend.common.serialization.SerializedKlibFingerprint
-import org.jetbrains.kotlin.backend.konan.DECLARATION_ORIGIN_FUNCTION_CLASS
 import org.jetbrains.kotlin.backend.konan.KonanFqNames
 import org.jetbrains.kotlin.backend.konan.NativeGenerationState
-import org.jetbrains.kotlin.backend.konan.isFunctionInterfaceFile
 import org.jetbrains.kotlin.backend.konan.serialization.InlineFunctionSerializer
 import org.jetbrains.kotlin.backend.konan.isCalledFromExportedInlineFunction
 import org.jetbrains.kotlin.backend.konan.isConstructedFromExportedInlineFunctions
@@ -18,7 +16,10 @@ import org.jetbrains.kotlin.backend.konan.serialization.KonanManglerIr
 import org.jetbrains.kotlin.backend.konan.serialization.KonanPartialModuleDeserializer
 import org.jetbrains.kotlin.backend.konan.serialization.SerializedEagerInitializedFile
 import org.jetbrains.kotlin.backend.konan.serialization.SerializedFileReference
+import org.jetbrains.kotlin.backend.konan.serialization.SerializedTrivialGetter
 import org.jetbrains.kotlin.backend.konan.serialization.buildSerializedClassFields
+import org.jetbrains.kotlin.ir.IrAbstractFunctionFactory
+import org.jetbrains.kotlin.ir.IrBasedFunctionFactory.Companion.isFunctionInterfaceFile
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
@@ -48,7 +49,7 @@ internal class CacheInfoBuilder(
                     declaration.acceptChildrenVoid(this)
 
                     if (!declaration.isInterface && !declaration.isOriginallyLocal
-                            && declaration.isExported && declaration.origin != DECLARATION_ORIGIN_FUNCTION_CLASS
+                            && declaration.isExported && declaration.origin != IrAbstractFunctionFactory.classOrigin
                     ) {
                         val declaredFields = generationState.context.getLayoutBuilder(declaration).getDeclaredFields(generationState.llvm)
                         generationState.classFields.add(buildSerializedClassFields(declaration, declaredFields, moduleDeserializer))
@@ -73,6 +74,24 @@ internal class CacheInfoBuilder(
                             && declaration.hasAnnotation(KonanFqNames.eagerInitialization)
                     ) {
                         hasEagerlyInitializedProperties = true
+                    }
+
+                    // Record trivial getters of val properties so dependent compilations can rely on this fact
+                    // without re-inspecting our IR (which may be bodiless for cached dependencies).
+                    if (!declaration.isVar) {
+                        val getter = declaration.getter
+                        if (getter != null
+                                && !getter.isFakeOverride
+                                && getter.isExported
+                                && getter.isTrivialGetter
+                        ) {
+                            val signature = getter.symbol.signature
+                            if (signature != null) {
+                                generationState.trivialGetters.add(
+                                        SerializedTrivialGetter(SerializedFileReference(irFile), signature)
+                                )
+                            }
+                        }
                     }
                 }
             })

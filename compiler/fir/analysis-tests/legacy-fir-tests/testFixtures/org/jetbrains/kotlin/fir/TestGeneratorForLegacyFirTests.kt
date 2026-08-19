@@ -8,19 +8,20 @@ package org.jetbrains.kotlin.fir
 import org.jetbrains.kotlin.fir.java.AbstractFirOldFrontendLightClassesTest
 import org.jetbrains.kotlin.fir.java.AbstractFirTypeEnhancementTest
 import org.jetbrains.kotlin.fir.java.AbstractOwnFirTypeEnhancementTest
-import org.jetbrains.kotlin.generators.impl.generateTestGroupSuite
+import org.jetbrains.kotlin.generators.dsl.junit4.generateTestGroupSuiteWithJUnit4
 import org.jetbrains.kotlin.generators.util.TestGeneratorUtil
 
 fun main(args: Array<String>) {
     val mainClassName = TestGeneratorUtil.getMainClassName()
-    generateTestGroupSuite(args, mainClassName) {
-        testGroup("compiler/fir/analysis-tests/legacy-fir-tests/tests-gen", "compiler/testData") {
+    val testsRoot = args[0]
+    generateTestGroupSuiteWithJUnit4(args, mainClassName) {
+        testGroup(testsRoot, "compiler/testData") {
             testClass<AbstractFirTypeEnhancementTest> {
                 model("loadJava/compiledJava", extension = "java")
             }
         }
 
-        testGroup("compiler/fir/analysis-tests/legacy-fir-tests/tests-gen", "compiler/fir/analysis-tests/testData") {
+        testGroup(testsRoot, "compiler/fir/analysis-tests/legacy-fir-tests/testData") {
             testClass<AbstractOwnFirTypeEnhancementTest> {
                 model("enhancement", extension = "java")
             }

@@ -1,6 +1,5 @@
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
 }
 
 dependencies {
@@ -14,6 +13,8 @@ dependencies {
     implementation(project(":analysis:symbol-light-classes"))
     implementation(project(":analysis:analysis-api-standalone:analysis-api-standalone-base"))
     implementation(project(":analysis:analysis-internal-utils"))
+    implementation(project(":analysis:decompiled:decompiler-to-psi"))
+    implementation(project(":analysis:decompiled:decompiler-native"))
 }
 
 sourceSets {

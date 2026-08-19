@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -12,7 +12,8 @@ import org.jetbrains.kotlin.fir.deserialization.ModuleDataProvider
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 import org.jetbrains.kotlin.fir.session.FirSessionConfigurator
 import org.jetbrains.kotlin.fir.session.FirWasmSessionFactory
-import org.jetbrains.kotlin.ir.backend.js.loadWebKlibsInTestPipeline
+import org.jetbrains.kotlin.fir.session.KmpModuleKind
+import org.jetbrains.kotlin.ir.backend.js.loadWebKlibs
 import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.library.loader.KlibPlatformChecker
 import org.jetbrains.kotlin.name.Name
@@ -34,15 +35,16 @@ object TestFirWasmSessionFactory {
         configuration: CompilerConfiguration,
         extensionRegistrars: List<FirExtensionRegistrar>,
     ): FirSession {
-        val libraries = loadWasmLibraries(module, testServices, configuration)
+        val libraries = loadWasmLibraries(configuration)
+        val factory = FirWasmSessionFactory.of(configuration.wasmTarget)
 
-        val sharedLibrarySession = FirWasmSessionFactory.createSharedLibrarySession(
+        val sharedLibrarySession = factory.createSharedLibrarySession(
             mainModuleName,
             configuration,
             extensionRegistrars
         )
 
-        return FirWasmSessionFactory.createLibrarySession(
+        return factory.createLibrarySession(
             libraries,
             sharedLibrarySession,
             moduleDataProvider,
@@ -56,25 +58,24 @@ object TestFirWasmSessionFactory {
         extensionRegistrars: List<FirExtensionRegistrar>,
         configuration: CompilerConfiguration,
         sessionConfigurator: FirSessionConfigurator.() -> Unit,
-    ): FirSession =
-        FirWasmSessionFactory.createSourceSession(
+    ): FirSession {
+        val factory = FirWasmSessionFactory.of(configuration.wasmTarget)
+        return factory.createSourceSession(
             mainModuleData,
             extensionRegistrars,
             configuration,
-            isForLeafHmppModule = false,
+            kmpModuleKind = KmpModuleKind.SingleModule,
             icData = null,
             init = sessionConfigurator
         )
+    }
 }
 
 fun loadWasmLibraries(
-    module: TestModule,
-    testServices: TestServices,
     configuration: CompilerConfiguration,
 ): List<KotlinLibrary> {
-    return loadWebKlibsInTestPipeline(
+    return loadWebKlibs(
         configuration = configuration,
-        libraryPaths = getAllWasmDependenciesPaths(module, testServices, configuration.wasmTarget),
         platformChecker = KlibPlatformChecker.Wasm(configuration.wasmTarget.alias),
     ).all
 }
@@ -84,7 +85,7 @@ fun getAllWasmDependenciesPaths(
     testServices: TestServices,
     target: WasmTarget,
 ): List<String> {
-    val (runtimeKlibsPaths, transitiveLibraries, friendLibraries) = getWasmDependencies(module, testServices, target)
+    val [runtimeKlibsPaths, transitiveLibraries, friendLibraries] = getWasmDependencies(module, testServices, target)
     return runtimeKlibsPaths + transitiveLibraries.map { it.path } + friendLibraries.map { it.path }
 }
 
@@ -93,7 +94,7 @@ fun getWasmDependencies(
     testServices: TestServices,
     target: WasmTarget,
 ): Triple<List<String>, List<File>, List<File>> {
-    val runtimeKlibsPaths = WasmEnvironmentConfigurator.getRuntimePathsForModule(target)
+    val runtimeKlibsPaths = WasmEnvironmentConfigurator.getRuntimePathsForModule(target, testServices)
     val transitiveLibraries = getKlibDependencies(module, testServices, DependencyRelation.RegularDependency)
     val friendLibraries = getKlibDependencies(module, testServices, DependencyRelation.FriendDependency)
     return Triple(runtimeKlibsPaths, transitiveLibraries, friendLibraries)

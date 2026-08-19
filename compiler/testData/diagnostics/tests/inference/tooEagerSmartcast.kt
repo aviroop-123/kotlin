@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// SKIP_TXT
 // DIAGNOSTICS: -UNUSED_VARIABLE
 
 interface OutBase<out E>
@@ -20,7 +19,7 @@ fun <X> InvBase<X>.myLastInv(): X = TODO()
 
 fun <T> fooInv(x: InvBase<T>) {
     if (x is InvDerived<*>) {
-        val l: T = <!TYPE_MISMATCH!>x.<!TYPE_MISMATCH!>myLastInv()<!><!> // required T, found Cap(*). Only in NI
+        val l: T = x.myLastInv() // required T, found Cap(*). Only in NI
     }
 }
 

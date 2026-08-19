@@ -6,16 +6,16 @@
 package org.jetbrains.kotlin.konan.test.blackbox
 
 import com.intellij.testFramework.TestDataFile
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.konan.test.blackbox.support.*
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationFactory
 import org.jetbrains.kotlin.konan.test.blackbox.support.compilation.TestCompilationResult.Companion.assertSuccess
 import org.jetbrains.kotlin.konan.test.blackbox.support.runner.TestRunChecks
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.BinaryLibraryKind
 import org.jetbrains.kotlin.konan.test.blackbox.support.settings.Timeouts
-import org.jetbrains.kotlin.test.KotlinTestUtils
+import org.jetbrains.kotlin.test.TestDataAssertions
 import org.junit.jupiter.api.Tag
 import java.nio.file.Path
-import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.nameWithoutExtension
 
@@ -25,7 +25,7 @@ abstract class AbstractNativeCExportInterfaceV1HeaderTest() : AbstractNativeSimp
     private val testCompilationFactory = TestCompilationFactory()
 
     protected fun runTest(@TestDataFile testFile: String) {
-        val path = Path(testFile)
+        val path = ForTestCompileRuntime.transformTestDataPath(testFile).toPath()
         val goldenDataHeaderFile = resolveTargetSpecificGoldenDataFile(path)
 
         val moduleName: String = path.nameWithoutExtension
@@ -42,7 +42,6 @@ abstract class AbstractNativeCExportInterfaceV1HeaderTest() : AbstractNativeSimp
                 "-opt-in", "kotlin.native.internal.InternalForKotlinNative",
                 "-opt-in", "kotlin.experimental.ExperimentalObjCRefinement",
                 "-Xbinary=cInterfaceMode=v1",
-                "-Xcontext-parameters",
             )),
             nominalPackageName = PackageName(moduleName),
             checks = TestRunChecks.Default(testRunSettings.get<Timeouts>().executionTimeout),
@@ -59,7 +58,7 @@ abstract class AbstractNativeCExportInterfaceV1HeaderTest() : AbstractNativeSimp
         val headerFile = binaryLibrary.headerFile
             ?: error("No header file found for ${moduleName}")
 
-        KotlinTestUtils.assertEqualsToFile(goldenDataHeaderFile.toFile(), headerFile.readText())
+        TestDataAssertions.assertEqualsToFile(goldenDataHeaderFile.toFile(), headerFile.readText())
     }
 
     private fun resolveTargetSpecificGoldenDataFile(pathToTestFile: Path): Path {

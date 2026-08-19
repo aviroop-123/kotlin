@@ -1,3 +1,0 @@
-KtNameReferenceExpression(45,46): 'T'
-  KtSimpleNameReference:
-    (in <local>: functionWithLambda) reified T

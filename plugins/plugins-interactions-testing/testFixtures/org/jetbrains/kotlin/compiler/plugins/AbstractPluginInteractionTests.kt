@@ -9,10 +9,15 @@ import org.jetbrains.kotlin.assignment.plugin.AssignmentPluginEnvironmentConfigu
 import org.jetbrains.kotlin.lombok.LombokAdditionalSourceFileProvider
 import org.jetbrains.kotlin.lombok.LombokEnvironmentConfigurator
 import org.jetbrains.kotlin.lombok.LombokRuntimeClassPathProvider
+import org.jetbrains.kotlin.noarg.NoArgEnvironmentConfigurator
 import org.jetbrains.kotlin.parcelize.test.services.ParcelizeEnvironmentConfigurator
 import org.jetbrains.kotlin.parcelize.test.services.ParcelizeMainClassProvider
 import org.jetbrains.kotlin.parcelize.test.services.ParcelizeRuntimeClasspathProvider
 import org.jetbrains.kotlin.parcelize.test.services.ParcelizeUtilSourcesProvider
+import org.jetbrains.kotlin.plugin.sandbox.ExtensionRegistrarConfigurator
+import org.jetbrains.kotlin.plugin.sandbox.PluginAnnotationsProvider
+import org.jetbrains.kotlin.plugin.sandbox.PluginRuntimeAnnotationsProvider
+import org.jetbrains.kotlin.powerassert.PowerAssertEnvironmentConfigurator
 import org.jetbrains.kotlin.test.TargetBackend
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.runners.codegen.AbstractFirLightTreeBlackBoxCodegenTest
@@ -42,18 +47,23 @@ fun TestConfigurationBuilder.enablePlugins() {
         ::AssignmentPluginEnvironmentConfigurator,
         ::SerializationEnvironmentConfigurator.bind(/*noLibraries = */false),
         ::LombokEnvironmentConfigurator,
-        ::ParcelizeEnvironmentConfigurator
+        ::NoArgEnvironmentConfigurator,
+        ::ParcelizeEnvironmentConfigurator,
+        ::PowerAssertEnvironmentConfigurator,
+        // Plugin sandbox configurators.
+        ::ExtensionRegistrarConfigurator, ::PluginAnnotationsProvider,
     )
 
     enableSerializationRuntimeProviders(defaultsProviderBuilder.targetBackend ?: TargetBackend.JVM_IR)
     useCustomRuntimeClasspathProviders(
         ::LombokRuntimeClassPathProvider,
-        ::ParcelizeRuntimeClasspathProvider
+        ::ParcelizeRuntimeClasspathProvider,
+        ::PluginRuntimeAnnotationsProvider,
     )
 
     useAdditionalSourceProviders(
         ::LombokAdditionalSourceFileProvider,
-        ::ParcelizeUtilSourcesProvider
+        ::ParcelizeUtilSourcesProvider,
     )
 
     useAdditionalServices(service<JvmBoxMainClassProvider>(::ParcelizeMainClassProvider))

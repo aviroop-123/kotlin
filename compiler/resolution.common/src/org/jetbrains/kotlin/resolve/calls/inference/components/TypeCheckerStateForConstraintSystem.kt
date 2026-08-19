@@ -8,21 +8,22 @@ package org.jetbrains.kotlin.resolve.calls.inference.components
 import org.jetbrains.kotlin.builtins.functions.AllowedToUsedOnlyInK1
 import org.jetbrains.kotlin.config.LanguageFeature.InferenceEnhancementsIn21
 import org.jetbrains.kotlin.config.LanguageVersionSettings
-import org.jetbrains.kotlin.types.*
+import org.jetbrains.kotlin.types.AbstractNullabilityChecker
+import org.jetbrains.kotlin.types.AbstractTypeChecker
+import org.jetbrains.kotlin.types.TypeCheckerState
 import org.jetbrains.kotlin.types.model.*
 
 abstract class TypeCheckerStateForConstraintSystem(
     val extensionTypeContext: TypeSystemInferenceExtensionContext,
-    kotlinTypePreparator: AbstractTypePreparator,
-    kotlinTypeRefiner: AbstractTypeRefiner
+    baseTypeCheckerState: TypeCheckerState,
 ) : TypeCheckerState(
     isErrorTypeEqualsToAnything = true,
     isStubTypeEqualsToAnything = true,
     isDnnTypesEqualToFlexible = false,
     allowedTypeVariable = false,
     typeSystemContext = extensionTypeContext,
-    kotlinTypePreparator,
-    kotlinTypeRefiner
+    baseTypeCheckerState.kotlinTypePreparator,
+    baseTypeCheckerState.kotlinTypeRefiner,
 ) {
     abstract val languageVersionSettings: LanguageVersionSettings
 
@@ -318,14 +319,16 @@ abstract class TypeCheckerStateForConstraintSystem(
                 when (subType) {
                     is RigidTypeMarker ->
                         when {
+                            // TODO: consider dropping this branch in 2.5 timeframe (KT-84664)
                             usePreciseSimplificationToFlexibleLowerConstraint() ->
                                 // Foo <: T! -- (Foo!! .. Foo) <: T
                                 // Foo? <: T! -- (Foo!! .. Foo?) <: T
                                 createTrivialFlexibleTypeOrSelf(
                                     subType.makeDefinitelyNotNullOrNotNull(),
                                 )
-                            // Obsolete behavior in 2.2 and earlier versions
+                            // Foo <: T! -- Foo! <: T
                             !subType.isMarkedNullable() -> createTrivialFlexibleTypeOrSelf(subType)
+                            // Foo? <: T! -- Foo? <: T
                             else -> subType
                         }
 
@@ -408,8 +411,11 @@ abstract class TypeCheckerStateForConstraintSystem(
         }
     }
 
+    private val simplifyFlexibleUpperConstraintWithDnnBoundToNullable: Boolean =
+        extensionTypeContext.simplifyFlexibleUpperConstraintWithDnnBoundToNullable()
+
     /**
-     * T! <: Foo <=> T <: Foo & Any..Foo?
+     * T! <: Foo <=> T <: Foo!
      * T? <: Foo <=> T <: Foo && Nothing? <: Foo
      * T  <: Foo -- leave as is
      * T & Any <: Foo <=> T <: Foo?
@@ -421,15 +427,19 @@ abstract class TypeCheckerStateForConstraintSystem(
     ): Boolean = with(extensionTypeContext) {
         val typeVariableLowerBound = typeVariable.lowerBoundIfFlexible()
 
-        val simplifiedSuperType = when {
-            typeVariableLowerBound.isDefinitelyNotNullType() -> {
+        val simplifiedSuperType = if (typeVariable.isFlexible()) {
+            if (typeVariableLowerBound.isDefinitelyNotNullType() && simplifyFlexibleUpperConstraintWithDnnBoundToNullable) {
+                // This is the legacy behavior typically disabled in K2 because the LF is turned off and has no sinceVersion.
                 superType.withNullability(true)
-            }
-
-            typeVariable.isFlexible() && superType is RigidTypeMarker ->
+            } else if (superType.isRigidType()) {
                 createTrivialFlexibleTypeOrSelf(superType)
-
-            else -> superType
+            } else {
+                superType
+            }
+        } else if (typeVariableLowerBound.isDefinitelyNotNullType()) {
+            superType.withNullability(true)
+        } else {
+            superType
         }
 
         addUpperConstraint(typeVariableLowerBound.typeConstructor(), simplifiedSuperType, isNoInfer)
@@ -449,8 +459,6 @@ abstract class TypeCheckerStateForConstraintSystem(
             val subType = subType.lowerBoundIfFlexible()
 
             if (!subType.typeConstructor().isIntersection()) return null
-
-            assert(!subType.isMarkedNullable()) { "Intersection type should not be marked nullable!: $subType" }
 
             // TODO: may be we lose flexibility here
             val subIntersectionTypes = (subType.typeConstructor().supertypes()).map { it.lowerBoundIfFlexible() }

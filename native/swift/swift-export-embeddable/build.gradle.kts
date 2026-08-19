@@ -1,9 +1,12 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import java.util.zip.ZipFile
 
 plugins {
     java
     kotlin("jvm")
+    id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 description = "Runner for Swift Export (for embedding purpose)"
@@ -31,9 +34,14 @@ dependencies {
     embedded(project(":analysis:analysis-api-standalone")) { isTransitive = false }
     embedded(project(":analysis:analysis-api-standalone:analysis-api-fir-standalone-base")) { isTransitive = false }
     embedded(project(":analysis:analysis-api-standalone:analysis-api-standalone-base")) { isTransitive = false }
-    embedded(project(":analysis:analysis-internal-utils")) { isTransitive = false }
     embedded(project(lowLevelApiFir)) { isTransitive = false }
     embedded(project(":analysis:symbol-light-classes")) { isTransitive = false }
+    embedded(project(":analysis:analysis-internal-utils")) { isTransitive = false }
+    embedded(project(":analysis:decompiled:decompiler-native")) { isTransitive = false }
+    embedded(project(":analysis:decompiled:decompiler-to-psi")) { isTransitive = false }
+    embedded(project(":analysis:decompiled:light-classes-for-decompiled")) { isTransitive = false }
+    embedded(project(":analysis:decompiled:decompiler-to-stubs")) { isTransitive = false }
+    embedded(project(":analysis:decompiled:decompiler-to-file-stubs")) { isTransitive = false }
 
     val projectsToInheritDependenciesFrom = configurations.runtimeClasspath.get().copy()
     projectsToInheritDependenciesFrom.dependencies.clear()
@@ -94,11 +102,12 @@ fun registerSwiftExportEmbeddableValidationTasks(swiftExportEmbeddableJarTask: T
 }
 
 sourceSets {
-    "main" {}
-    "test" {}
+    "main" { none() }
 }
 
-val swiftExportEmbeddableJar = runtimeJar(rewriteDefaultJarDepsToShadedCompiler())
+val swiftExportEmbeddableJar = runtimeJarWithRelocation {
+    configureEmbeddableCompilerRelocation()
+}
 registerSwiftExportEmbeddableValidationTasks(swiftExportEmbeddableJar)
 
 sourcesJar { exclude("**") } // empty Jar, no public sources
@@ -114,25 +123,25 @@ javadocJar { exclude("**") } // empty Jar, no public javadocs
  * carefully after understanding the sources of breakage
  *
  * Make sure to run these tests against ProGuarded kotlin-compiler-embeddable e.g.:
- * ./gradlew :native:swift:swift-export-embeddable:testSwiftExportStandaloneWithEmbeddable --info -Pkotlin.native.enabled=true -Pteamcity=true
+ * ./gradlew :native:swift:swift-export-embeddable:test --info -Pkotlin.native.enabled=true -Pteamcity=true
  */
 
-val swiftExportStandaloneSimpleIT = configurations.detachedConfiguration().apply {
-    isTransitive = false
-    // Don't add dependencies here
-    dependencies.add(project.dependencies.projectTests(":native:swift:swift-export-standalone-integration-tests:simple"))
+dependencies {
+    testFixturesImplementation(testFixtures(project(":native:swift:swift-export-standalone-integration-tests:simple")))
+    testFixturesImplementation(testFixtures(project(":native:swift:swift-export-standalone-integration-tests:coroutines")))
+    testFixturesImplementation(testFixtures(project(":generators:test-generator")))
+
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(testFixtures(project(":native:swift:swift-export-standalone-integration-tests")))
+    testImplementation(testFixtures(project(":native:swift:swift-export-standalone-integration-tests:external")))
+    testImplementation(testFixtures(project(":compiler:tests-common")))
+    testImplementation(testFixtures(project(":compiler:tests-common-new")))
 }
 
-val swiftExportStandaloneExternalIT = configurations.detachedConfiguration().apply {
-    isTransitive = false
-    // Don't add dependencies here
-    dependencies.add(project.dependencies.projectTests(":native:swift:swift-export-standalone-integration-tests:external"))
-}
-
-val swiftExportStandaloneCoroutinesIT = configurations.detachedConfiguration().apply {
-    isTransitive = false
-    // Don't add dependencies here
-    dependencies.add(project.dependencies.projectTests(":native:swift:swift-export-standalone-integration-tests:coroutines"))
+sourceSets {
+    "test" { projectDefault() }
+    "testFixtures" { projectDefault() }
 }
 
 val intransitiveTestDependenciesJars = configurations.detachedConfiguration().apply {
@@ -144,7 +153,7 @@ val intransitiveTestDependenciesJars = configurations.detachedConfiguration().ap
     isTransitive = false
     // gson is actually also shadowed and embedded in KGP. In these tests it is used in XcRunRuntimeUtils
     dependencies.add(project.dependencies.create(commonDependency("com.google.code.gson:gson")))
-    dependencies.add(project.dependencies.create(commonDependency("commons-lang:commons-lang")))
+    dependencies.add(project.dependencies.create(commonDependency("org.apache.commons:commons-lang3")))
     dependencies.add(project.dependencies.project(":native:executors"))
     dependencies.add(project.dependencies.project(":kotlin-compiler-runner-unshaded"))
     dependencies.add(project.dependencies.project(":kotlin-test"))
@@ -156,97 +165,59 @@ val intransitiveTestDependenciesJars = configurations.detachedConfiguration().ap
     dependencies.add(project.dependencies.testFixtures(project(":compiler:tests-common-new")))
     dependencies.add(project.dependencies.testFixtures(project(":compiler:test-infrastructure")))
     dependencies.add(project.dependencies.testFixtures(project(":compiler:test-infrastructure-utils")))
+    dependencies.add(project.dependencies.testFixtures(project(":compiler:test-infrastructure-utils.common")))
 
-    dependencies.add(project.dependencies.project(":native:swift:swift-export-standalone-integration-tests"))
+    dependencies.add(project.dependencies.testFixtures(project(":native:swift:swift-export-standalone-integration-tests")))
 }
 
-val shadedIntransitiveTestDependenciesJar = rewriteDepsToShadedJar(
-    files(
-        intransitiveTestDependenciesJars,
-        swiftExportStandaloneSimpleIT,
-        swiftExportStandaloneExternalIT,
-        swiftExportStandaloneCoroutinesIT,
-    ),
-    embeddableCompilerDummyForDependenciesRewriting("shadedTestDependencies") {
-        destinationDirectory.set(project.layout.buildDirectory.dir("testDependenciesShaded"))
-    }
-).apply {
-    configure {
-        // ShadowJar doesn't handle duplicates from embedded jars
-        // duplicatesStrategy = DuplicatesStrategy.FAIL
-        val intransitiveTestDependenciesJarFiles = files(intransitiveTestDependenciesJars)
-        doFirst {
-            val permittedDuplicates = setOf(
-                "META-INF/MANIFEST.MF",
-                "META-INF/versions/9/module-info.class",
-                "com/intellij/testFramework/TestDataPath.class",
-            )
-            val duplicates = intransitiveTestDependenciesJarFiles.flatMap { jar ->
-                ZipFile(jar).use { zip ->
-                    zip.entries().asSequence().filterNot { it.isDirectory || it.name in permittedDuplicates }.map { it.name }.toList()
-                }.map { path ->
-                    path to jar
-                }
-            }.groupBy({ it.first }, { it.second }).filterValues { it.size > 1 }
-            if (duplicates.isNotEmpty()) {
-                error(duplicates.map { "${it.key}:\n${it.value.joinToString("\n") { "  ${it}" }}" }.joinToString("\n\n"))
+val shadedIntransitiveTestDependenciesJar = tasks.register<ShadowJar>("shadedTestDependencies") {
+    destinationDirectory.set(project.layout.buildDirectory.dir("testDependenciesShaded"))
+    configurations.add(intransitiveTestDependenciesJars)
+    from(testSourceSet.output)
+    configureEmbeddableCompilerRelocation()
+    // ShadowJar doesn't handle duplicates from embedded jars
+    // duplicatesStrategy = DuplicatesStrategy.FAIL
+    val intransitiveTestDependenciesJarFiles = files(intransitiveTestDependenciesJars)
+    doFirst {
+        val permittedDuplicates = setOf(
+            "META-INF/MANIFEST.MF",
+            "META-INF/versions/9/module-info.class",
+            "com/intellij/testFramework/TestDataPath.class",
+        )
+        val duplicates = intransitiveTestDependenciesJarFiles.flatMap { jar ->
+            ZipFile(jar).use { zip ->
+                zip.entries().asSequence().filterNot { it.isDirectory || it.name in permittedDuplicates }.map { it.name }.toList()
+            }.map { path ->
+                path to jar
             }
+        }.groupBy({ it.first }, { it.second }).filterValues { it.size > 1 }
+        if (duplicates.isNotEmpty()) {
+            error(duplicates.map { "${it.key}:\n${it.value.joinToString("\n") { "  ${it}" }}" }.joinToString("\n\n"))
         }
     }
 }
 
 val transitiveTestRuntimeClasspath = configurations.detachedConfiguration().apply {
     dependencies.add(libs.junit.jupiter.engine.get())
-}
-
-val unarchivedStandaloneSimpleITClasses = tasks.register<Sync>("unarchivedStandaloneSimpleITClasses") {
-    dependsOn(swiftExportStandaloneSimpleIT)
-    from(zipTree(provider { swiftExportStandaloneSimpleIT.singleFile }))
-    into(layout.buildDirectory.dir("unarchivedStandaloneSimpleITClasses"))
-}
-
-val unarchivedStandaloneExternalITClasses = tasks.register<Sync>("unarchivedStandaloneExternalITClasses") {
-    dependsOn(swiftExportStandaloneExternalIT)
-    from(zipTree(provider { swiftExportStandaloneExternalIT.singleFile }))
-    into(layout.buildDirectory.dir("unarchivedStandaloneExternalITClasses"))
-}
-
-val unarchivedStandaloneCoroutinesITClasses = tasks.register<Sync>("unarchivedStandaloneCoroutinesITClasses") {
-    dependsOn(swiftExportStandaloneCoroutinesIT)
-    from(zipTree(provider { swiftExportStandaloneCoroutinesIT.singleFile }))
-    into(layout.buildDirectory.dir("unarchivedStandaloneCoroutinesITClasses"))
+    dependencies.add(libs.junit.platform.launcher.get())
 }
 
 projectTests {
-    nativeTestTask("testSimpleITWithEmbeddable", null) {
-        classpath = files(
-            // swift-export-embeddable and its runtime dependencies is what KGP will see in SwiftExportAction
-            swiftExportEmbeddableJar,
-            configurations.runtimeClasspath,
-            // These dependencies are used by the test classes
-            shadedIntransitiveTestDependenciesJar,
-            transitiveTestRuntimeClasspath,
-        )
-        testClassesDirs = files(
-            unarchivedStandaloneSimpleITClasses,
-        )
-    }
+    testData(project(":native:swift:swift-export-standalone-integration-tests:simple").isolated, "testData")
+    testData(project(":native:swift:swift-export-standalone-integration-tests:external").isolated, "testData")
+    testData(project(":native:swift:swift-export-standalone-integration-tests:coroutines").isolated, "testData")
+    testData(rootProject.isolated, "native/native.tests/testData/framework")
 
-    nativeTestTaskWithExternalDependencies("testExternalITWithEmbeddable", requirePlatformLibs = true) {
-        classpath = files(
-            // swift-export-embeddable and its runtime dependencies is what KGP will see in SwiftExportAction
-            swiftExportEmbeddableJar,
-            configurations.runtimeClasspath,
-            // These dependencies are used by the test classes
-            shadedIntransitiveTestDependenciesJar,
-            transitiveTestRuntimeClasspath,
-        )
-        testClassesDirs = files(
-            unarchivedStandaloneExternalITClasses,
-        )
-    }
+    testGenerator(
+        "org.jetbrains.kotlin.swiftexport.standalone.embeddable.TestGeneratorKt",
+        generateTestsInBuildDirectory = true,
+    )
 
-    nativeTestTaskWithExternalDependencies("testCoroutinesITWithEmbeddable", requirePlatformLibs = true) {
+    nativeTestTaskWithExternalDependencies(
+        "test",
+        requirePlatformLibs = true,
+        allowUnsafe = true, // KT-85212
+    ) {
         classpath = files(
             // swift-export-embeddable and its runtime dependencies is what KGP will see in SwiftExportAction
             swiftExportEmbeddableJar,
@@ -254,9 +225,11 @@ projectTests {
             // These dependencies are used by the test classes
             shadedIntransitiveTestDependenciesJar,
             transitiveTestRuntimeClasspath,
+            configurations.testRuntimeClasspath, // Includes KotlinSecurityManager from test-inputs-check
         )
-        testClassesDirs = files(
-            unarchivedStandaloneCoroutinesITClasses,
-        )
+        testClassesDirs = testSourceSet.output.classesDirs
+        extensions.configure<TestInputsCheckExtension>("testInputsCheck") {
+            allowFlightRecorder.set(true)
+        }
     }
 }

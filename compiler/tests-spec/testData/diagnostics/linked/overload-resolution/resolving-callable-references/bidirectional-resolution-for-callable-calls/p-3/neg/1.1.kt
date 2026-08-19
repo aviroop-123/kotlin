@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -25,7 +24,7 @@ class Case1() {
     }
 
     fun case() {
-        Companion(::<!CALLABLE_REFERENCE_RESOLUTION_AMBIGUITY!>x<!>)
+        Companion(::<!NONE_APPLICABLE!>x<!>)
     }
 
     val x = ""
@@ -41,7 +40,7 @@ class Case2() {
     }
 
     fun case() {
-        Companion(::<!CALLABLE_REFERENCE_RESOLUTION_AMBIGUITY!>x<!>)
+        Companion(::<!NONE_APPLICABLE!>x<!>)
     }
 
     val x = C()
@@ -68,8 +67,8 @@ class Case3() : I {
     fun x() = "" as CharSequence
 
     fun case() {
-        I.<!OVERLOAD_RESOLUTION_AMBIGUITY!>invoke<!>(::<!DEBUG_INFO_MISSING_UNRESOLVED!>x<!>)
-        <!OVERLOAD_RESOLUTION_AMBIGUITY!>I<!>(::<!DEBUG_INFO_MISSING_UNRESOLVED!>x<!>)
-        <!OVERLOAD_RESOLUTION_AMBIGUITY!>Case3<!>(::<!DEBUG_INFO_MISSING_UNRESOLVED!>x<!>)
+        I.<!OVERLOAD_RESOLUTION_AMBIGUITY!>invoke<!>(::<!OVERLOAD_RESOLUTION_AMBIGUITY!>x<!>)
+        <!OVERLOAD_RESOLUTION_AMBIGUITY!>I<!>(::<!OVERLOAD_RESOLUTION_AMBIGUITY!>x<!>)
+        <!OVERLOAD_RESOLUTION_AMBIGUITY!>Case3<!>(::<!OVERLOAD_RESOLUTION_AMBIGUITY!>x<!>)
     }
 }

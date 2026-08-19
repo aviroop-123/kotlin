@@ -5,10 +5,11 @@
 
 package org.jetbrains.kotlin.analysis.api.standalone.base.services
 
+import com.intellij.psi.util.parentsOfType
+import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.services.LLFirElementByPsiElementChooser
-import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.createEmptySession
+import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.cache.createEmptySession
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
-import org.jetbrains.kotlin.analysis.utils.printer.parentsOfType
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.builder.BodyBuildingMode
@@ -35,6 +36,7 @@ import org.jetbrains.kotlin.utils.addIfNotNull
  *
  * TODO: We might be able to remove this service if KT-65836 is viable (using stub-based deserialized symbol providers in Standalone mode).
  */
+@OptIn(KaImplementationDetail::class)
 class LLStandaloneFirElementByPsiElementChooser : LLFirElementByPsiElementChooser() {
     override fun isMatchingValueParameter(psi: KtParameter, fir: FirValueParameter): Boolean {
         if (fir.realPsi != null) return fir.realPsi === psi
@@ -148,18 +150,18 @@ class LLStandaloneFirElementByPsiElementChooser : LLFirElementByPsiElementChoose
     }
 
     private fun contextParametersMatch(psiCallable: KtCallableDeclaration, firCallable: FirCallableDeclaration): Boolean {
-        val contextReceiverList = psiCallable.modifierList?.contextReceiverList
+        val contextParameterList = psiCallable.modifierList?.contextParameterList
         val firContextParameters = firCallable.contextParameters
         return when {
-            contextReceiverList == null -> firContextParameters.isEmpty()
+            contextParameterList == null -> firContextParameters.isEmpty()
             firContextParameters.isEmpty() -> false
             else -> {
-                val contextParameters = contextReceiverList.contextParameters()
+                val contextParameters = contextParameterList.contextParameters
                 if (contextParameters.isNotEmpty()) {
                     return parametersMatch(firContextParameters, contextParameters)
                 }
 
-                val contextReceivers = contextReceiverList.contextReceivers()
+                val contextReceivers = contextParameterList.contextReceivers()
                 if (firContextParameters.size != contextReceivers.size) {
                     return false
                 }
@@ -226,10 +228,10 @@ class LLStandaloneFirElementByPsiElementChooser : LLFirElementByPsiElementChoose
     }
 
     private val arrayClassIdByElementType: Map<String, String> = buildList<Pair<String, String>> {
-        StandardClassIds.primitiveArrayTypeByElementType.mapTo(this) { (classId, arrayClassId) ->
+        StandardClassIds.primitiveArrayTypeByElementType.mapTo(this) { [classId, arrayClassId] ->
             classId.asString().replace('/', '.') to arrayClassId.asString().replace('/', '.')
         }
-        StandardClassIds.unsignedArrayTypeByElementType.mapTo(this) { (classId, arrayClassId) ->
+        StandardClassIds.unsignedArrayTypeByElementType.mapTo(this) { [classId, arrayClassId] ->
             classId.asString().replace('/', '.') to arrayClassId.asString().replace('/', '.')
         }
     }.toMap()

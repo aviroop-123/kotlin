@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -15,6 +15,15 @@ import org.jetbrains.kotlin.KtStubBasedElementTypes;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.stubs.KotlinPlaceHolderStub;
 
+/**
+ * Represents a string literal, including simple strings and string templates with interpolation.
+ *
+ * <h3>Example:</h3>
+ * <pre>{@code
+ * val greeting = "Hello, $name!"
+ * //             ^_____________^
+ * }</pre>
+ */
 public class KtStringTemplateExpression extends KtElementImplStub<KotlinPlaceHolderStub<KtStringTemplateExpression>>
         implements KtExpression, PsiLanguageInjectionHost, ContributedReferenceHost {
     private static final TokenSet CLOSE_QUOTE_TOKEN_SET = TokenSet.create(KtTokens.CLOSING_QUOTE);
@@ -29,7 +38,7 @@ public class KtStringTemplateExpression extends KtElementImplStub<KotlinPlaceHol
 
     @Override
     public PsiElement replace(@NotNull PsiElement newElement) throws IncorrectOperationException {
-        return KtExpressionImpl.Companion.replaceExpression(this, newElement, true, super::replace);
+        return KtPsiMutationService.getInstance().replaceExpression(this, newElement, true, super::replace);
     }
 
     @Override
@@ -50,6 +59,7 @@ public class KtStringTemplateExpression extends KtElementImplStub<KotlinPlaceHol
      * @see KtStringInterpolationPrefix
      */
     @Nullable
+    @SuppressWarnings("deprecation") // KT-78356
     public KtStringInterpolationPrefix getInterpolationPrefix() {
         return getStubOrPsiChild(KtStubBasedElementTypes.STRING_INTERPOLATION_PREFIX);
     }
@@ -66,9 +76,7 @@ public class KtStringTemplateExpression extends KtElementImplStub<KotlinPlaceHol
 
     @Override
     public PsiLanguageInjectionHost updateText(@NotNull String text) {
-        KtExpression newExpression = new KtPsiFactory(getProject()).createExpressionIfPossible(text);
-        if (newExpression instanceof KtStringTemplateExpression) return (KtStringTemplateExpression) replace(newExpression);
-        return ElementManipulators.handleContentChange(this, text);
+        return KtPsiMutationService.getInstance().updateStringTemplateText(this, text);
     }
 
     @NotNull

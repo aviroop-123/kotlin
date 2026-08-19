@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: BACKEND
-// SKIP_TXT
 // FILE: Foo.java
 public abstract class Foo<K extends Bar<? extends Foo<K>>> {
     abstract String getTest();
@@ -57,9 +56,9 @@ fun box(foo: Foo<*>) {
     // Z has two supertypes --> (Bar<out Foo<Z>>, Bar<Y>)
     // ... went into recursion
 
-    foo.<!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>bar<!>()
+    foo.bar()
 
-    foo.<!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>test<!>
+    foo.test
 }
 
 /* GENERATED_FIR_TAGS: capturedType, flexibleType, funWithExtensionReceiver, functionDeclaration, javaProperty, javaType,

@@ -1,5 +1,3 @@
-// DO_NOT_CHECK_SYMBOL_RESTORE_K2
-
 // FILE: Base.kt
 abstract class Base {
     fun getFoo(): String {

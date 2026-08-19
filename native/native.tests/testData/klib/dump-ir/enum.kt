@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 package test
 
 enum class Color(val rgb: Int) {

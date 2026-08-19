@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,8 +8,11 @@ package org.jetbrains.kotlin.analysis.api.resolve.extensions
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.KaSpi
+import org.jetbrains.kotlin.analysis.api.KaSpiExtensionPoint
 import org.jetbrains.kotlin.psi.KtElement
 
+@KaSpi
 @KaExperimentalApi
 public abstract class KaResolveExtensionNavigationTargetsProvider {
     /**
@@ -23,5 +26,6 @@ public abstract class KaResolveExtensionNavigationTargetsProvider {
      * While [getNavigationTargets] usually returns a single result, it may return an empty collection if there is no navigation target, or
      * multiple targets in case of an ambiguity.
      */
+    @KaSpiExtensionPoint
     public abstract fun KaSession.getNavigationTargets(element: KtElement): Collection<PsiElement>
 }

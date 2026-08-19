@@ -7,11 +7,11 @@ package org.jetbrains.kotlin.fir.serialization
 
 import com.intellij.lang.LighterASTNode
 import com.intellij.openapi.util.Ref
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.providers.FirProvider
-import org.jetbrains.kotlin.fir.serialization.constant.ConstValueProvider
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
 import org.jetbrains.kotlin.fir.types.ConeFlexibleType
@@ -29,10 +29,9 @@ class FirKLibSerializerExtension(
     override val scopeSession: ScopeSession,
     private val firProvider: FirProvider,
     override val metadataVersion: BinaryVersion,
-    override val constValueProvider: ConstValueProvider?,
     private val exportKDoc: Boolean,
     override val additionalMetadataProvider: FirAdditionalMetadataProvider?
-) : FirSerializerExtensionBase(KlibMetadataSerializerProtocol) {
+) : FirSerializerExtensionBase(KlibMetadataSerializerProtocol, LanguageFeature.KlibAnnotationsInMetadata) {
     override fun shouldUseTypeTable(): Boolean = true
 
     override fun serializeFlexibleType(type: ConeFlexibleType, lowerProto: ProtoBuf.Type.Builder, upperProto: ProtoBuf.Type.Builder) {

@@ -1,4 +1,4 @@
-// FIR_IDENTICAL
+// RUN_PIPELINE_TILL: BACKEND
 // MODULE: lib1
 // FILE: A.kt
 const val constFromOtherModule = "constFromOtherModule"

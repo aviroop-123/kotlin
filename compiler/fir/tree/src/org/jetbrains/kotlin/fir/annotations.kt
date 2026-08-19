@@ -46,3 +46,12 @@ annotation class SessionConfiguration
  */
 @RequiresOptIn
 annotation class OnlyForDefaultLanguageFeatureDisabled(val languageFeature: LanguageFeature)
+
+/**
+ * Declaration is only relevant for old (pre-CL) resolution of array literals for annotations.
+ */
+@RequiresOptIn
+annotation class ArrayLiteralResolution
+
+@RequiresOptIn
+annotation class FirIdeOnly

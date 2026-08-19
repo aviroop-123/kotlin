@@ -115,7 +115,7 @@ abstract class NamedCompilerPhase<in Context : LoggingContext, Input, Output>(
 
     abstract fun outputIfNotEnabled(phaseConfig: PhaseConfig, phaserState: PhaserState, context: Context, input: Input): Output
 
-    private fun runBefore(phaseConfig: PhaseConfig, phaserState: PhaserState, context: Context, input: Input) {
+    fun runBefore(phaseConfig: PhaseConfig, phaserState: PhaserState, context: Context, input: Input) {
         val state = ActionState(phaseConfig, this, phaserState.phaseCount, BeforeOrAfter.BEFORE)
         for (action in preactions) action(state, input, context)
 
@@ -124,7 +124,7 @@ abstract class NamedCompilerPhase<in Context : LoggingContext, Input, Output>(
         }
     }
 
-    private fun runAfter(phaseConfig: PhaseConfig, phaserState: PhaserState, context: Context, input: Input, output: Output) {
+    fun runAfter(phaseConfig: PhaseConfig, phaserState: PhaserState, context: Context, input: Input, output: Output) {
         val state = ActionState(phaseConfig, this, phaserState.phaseCount, BeforeOrAfter.AFTER)
         for (action in postactions) action(state, input to output, context)
 

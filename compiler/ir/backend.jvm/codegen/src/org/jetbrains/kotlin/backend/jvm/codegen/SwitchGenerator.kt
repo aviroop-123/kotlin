@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm.codegen
 
 import org.jetbrains.kotlin.backend.common.IrWhenUtils
-import org.jetbrains.kotlin.codegen.`when`.SwitchCodegen.Companion.preferLookupOverSwitch
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.hasAnnotation
@@ -289,11 +288,19 @@ class SwitchGenerator(private val expression: IrWhen, private val data: BlockInf
             }
         }
 
+        // In modern JVM implementations it shouldn't matter very much for runtime performance
+        // whether to choose lookupswitch or tableswitch.
+        // The only metric that really matters is bytecode size and here we can estimate:
+        // - lookupswitch: ~ 2 * labelsNumber
+        // - tableswitch: ~ rangeLength
+        private fun preferLookupOverSwitch(labelsNumber: Int, rangeLength: Long): Boolean =
+            rangeLength > 2L * labelsNumber || rangeLength > Int.MAX_VALUE
+
         private fun genBranchTargets(): PromisedValue {
             with(codegen) {
                 val endLabel = Label()
 
-                for ((thenExpression, label) in expressionToLabels) {
+                for ((val thenExpression = expression, val label) in expressionToLabels) {
                     mv.visitLabel(label)
                     thenExpression.accept(this, data).also {
                         if (elseExpression != null) {
@@ -463,9 +470,9 @@ class SwitchGenerator(private val expression: IrWhen, private val data: BlockInf
 
                 // Multiple strings can be hashed into the same bucket.
                 // Generate an if cascade to resolve that for each bucket.
-                for ((hash, switchLabel) in hashAndSwitchLabels) {
+                for ((val hash = value, val switchLabel = label) in hashAndSwitchLabels) {
                     mv.visitLabel(switchLabel)
-                    for ((string, label) in hashToStringAndExprLabels[hash]!!) {
+                    for ((val string = value, val label) in hashToStringAndExprLabels[hash]!!) {
                         noLineNumberScope {
                             subject.accept(this, data).materialize()
                         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -10,17 +10,22 @@ import java.io.File
 // Prefixes are chosen such that LL FIR test data cannot be mistaken for FIR test data.
 private const val FIR_PREFIX = ".fir"
 private const val LATEST_LV_PREFIX = ".latestLV"
+private const val LF_DISABLED_PREFIX = ".disabled"
 private const val LL_FIR_PREFIX = ".ll"
 private const val REVERSED_PREFIX = ".reversed"
 private const val PARTIAL_BODY_PREFIX = ".partialBody"
+private const val REPL_SUFFIX = ".repl.kts"
 
-const val CUSTOM_TEST_DATA_EXTENSION_PATTERN = "^(.+)\\.(reversed|partialBody|fir|ll|latestLV)\\.kts?\$"
+const val CUSTOM_TEST_DATA_EXTENSION_PATTERN = "^(.+)\\.(reversed|partialBody|fir|ll|latestLV|disabled)(\\.repl)?\\.kts?\$"
 
 val File.isFirTestData: Boolean
     get() = isCustomTestDataWithPrefix(FIR_PREFIX)
 
 val File.isLatestLVTestData: Boolean
     get() = isCustomTestDataWithPrefix(LATEST_LV_PREFIX)
+
+val File.isLfDisabledTestData: Boolean
+    get() = isCustomTestDataWithPrefix(LF_DISABLED_PREFIX)
 
 /**
  * @see File.llFirTestDataFile
@@ -32,7 +37,7 @@ val File.isLLFirSpecializedTestData: Boolean
     get() = isCustomTestDataWithPrefix(REVERSED_PREFIX) || isCustomTestDataWithPrefix(PARTIAL_BODY_PREFIX)
 
 val File.isCustomTestData: Boolean
-    get() = isFirTestData || isLLFirTestData || isLatestLVTestData
+    get() = isFirTestData || isLLFirTestData || isLatestLVTestData || isLfDisabledTestData
 
 private fun File.isCustomTestDataWithPrefix(prefix: String): Boolean = name.endsWith("$prefix$extensionWithDot")
 
@@ -41,6 +46,9 @@ val File.firTestDataFile: File
 
 val File.latestLVTestDataFile: File
     get() = getCustomTestDataFileWithPrefix(LATEST_LV_PREFIX)
+
+val File.lfDisabledTestDataFile: File
+    get() = getCustomTestDataFileWithPrefix(LF_DISABLED_PREFIX)
 
 val File.reversedTestDataFile: File
     get() = getCustomTestDataFileWithPrefix(REVERSED_PREFIX)
@@ -79,6 +87,7 @@ val File.originalTestDataFileName: String
             isLLFirTestData -> LL_FIR_PREFIX
             isFirTestData -> FIR_PREFIX
             isLatestLVTestData -> LATEST_LV_PREFIX
+            isLfDisabledTestData -> LF_DISABLED_PREFIX
             else -> return name
         }
         return getOriginalTestDataFileNameFromPrefix(prefix)
@@ -89,4 +98,9 @@ private fun File.getOriginalTestDataFileNameFromPrefix(prefix: String): String {
     return "${name.removeSuffix("$prefix$extension")}$extension"
 }
 
-private val File.extensionWithDot: String get() = ".$extension"
+private val File.extensionWithDot: String
+    get() = if (name.endsWith(REPL_SUFFIX)) {
+        REPL_SUFFIX
+    } else {
+        ".$extension"
+    }

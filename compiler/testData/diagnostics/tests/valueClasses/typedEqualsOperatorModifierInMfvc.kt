@@ -1,8 +1,7 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 // WITH_STDLIB
 // DIAGNOSTICS: -DEBUG_INFO_SMARTCAST
-// LANGUAGE: +CustomEqualsInValueClasses, +ValueClasses
+// LANGUAGE: +CustomEqualsInValueClasses, +JvmInlineMultiFieldValueClasses
 
 
 @JvmInline

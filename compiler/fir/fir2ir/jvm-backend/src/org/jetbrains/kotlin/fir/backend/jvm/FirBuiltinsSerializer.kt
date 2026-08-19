@@ -22,7 +22,6 @@ import org.jetbrains.kotlin.fir.serialization.FirAdditionalMetadataProvider
 import org.jetbrains.kotlin.fir.serialization.FirElementSerializer
 import org.jetbrains.kotlin.fir.serialization.FirSerializerExtensionBase
 import org.jetbrains.kotlin.fir.serialization.TypeApproximatorForMetadataSerializer
-import org.jetbrains.kotlin.fir.serialization.constant.ConstValueProvider
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.ir.declarations.MetadataSource
 import org.jetbrains.kotlin.metadata.ProtoBuf
@@ -62,7 +61,7 @@ class FirBuiltInsSerializer(val session: FirSession, val scopeSession: ScopeSess
                 .getClassLikeSymbolByClassId(StandardClassIds.Cloneable)!!.fir as FirRegularClass
 
         return contentPerPackage.map { packageWithContent ->
-            val (packageFqName, content) = packageWithContent
+            val [packageFqName, content] = packageWithContent
             val serializer = PackageSerializer(packageFqName, content.classes, content.members, session, scopeSession)
             Pair(packageFqName, serializer.serialize())
         }.toList()
@@ -123,7 +122,7 @@ class FirBuiltInsSerializer(val session: FirSession, val scopeSession: ScopeSess
         }
 
         private fun serializeStringTable() {
-            val (strings, qualifiedNames) = extension.stringTable.buildProto()
+            val [strings, qualifiedNames] = extension.stringTable.buildProto()
             proto.strings = strings
             proto.qualifiedNames = qualifiedNames
         }
@@ -146,8 +145,6 @@ class FirBuiltInsSerializer(val session: FirSession, val scopeSession: ScopeSess
     ) : FirSerializerExtensionBase(BuiltInSerializerProtocol) {
         override val metadataVersion: BinaryVersion
             get() = BuiltInsBinaryVersion.INSTANCE
-        override val constValueProvider: ConstValueProvider?
-            get() = null
         override val additionalMetadataProvider: FirAdditionalMetadataProvider?
             get() = null
 

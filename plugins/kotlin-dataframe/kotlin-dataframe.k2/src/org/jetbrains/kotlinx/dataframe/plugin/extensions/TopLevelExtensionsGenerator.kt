@@ -5,10 +5,8 @@ import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.builder.buildTypeParameter
 import org.jetbrains.kotlin.fir.declarations.declaredProperties
-import org.jetbrains.kotlin.fir.declarations.getAnnotationByClassId
 import org.jetbrains.kotlin.fir.declarations.hasAnnotation
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
-import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
 import org.jetbrains.kotlin.fir.extensions.*
 import org.jetbrains.kotlin.fir.extensions.predicate.LookupPredicate
 import org.jetbrains.kotlin.fir.moduleData
@@ -27,16 +25,11 @@ import org.jetbrains.kotlin.name.packageName
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlinx.dataframe.annotations.DataSchema
 import org.jetbrains.kotlinx.dataframe.plugin.DataFramePlugin
-import org.jetbrains.kotlinx.dataframe.plugin.extensions.impl.PropertyName
-import org.jetbrains.kotlinx.dataframe.plugin.utils.CallableIdOrSymbol
-import org.jetbrains.kotlinx.dataframe.plugin.utils.Names
-import org.jetbrains.kotlinx.dataframe.plugin.utils.generateExtensionProperty
-import org.jetbrains.kotlinx.dataframe.plugin.utils.isDataRow
-import org.jetbrains.kotlinx.dataframe.plugin.utils.projectOverDataColumnType
+import org.jetbrains.kotlinx.dataframe.plugin.utils.*
 
 /**
  * extensions inside scope classes are generated here:
- * @see TokenGenerator
+ * @see TokenContentGenerator
  */
 class TopLevelExtensionsGenerator(session: FirSession) : FirDeclarationGenerationExtension(session) {
     private companion object {
@@ -45,7 +38,9 @@ class TopLevelExtensionsGenerator(session: FirSession) : FirDeclarationGeneratio
 
     private val predicateBasedProvider = session.predicateBasedProvider
     private val matchedClasses by lazy {
-        predicateBasedProvider.getSymbolsByPredicate(predicate).filterIsInstance<FirRegularClassSymbol>()
+        predicateBasedProvider.getSymbolsByPredicate(predicate)
+            .filterIsInstance<FirRegularClassSymbol>()
+            .filter { !it.isLocal }
     }
 
     private val predicate: LookupPredicate = LookupPredicate.BuilderContext.annotated(dataSchema)
@@ -54,8 +49,16 @@ class TopLevelExtensionsGenerator(session: FirSession) : FirDeclarationGeneratio
         register(predicate)
     }
 
+    private val fieldNames by lazy {
+        matchedClasses.flatMapTo(mutableSetOf()) { classSymbol ->
+            classSymbol.declaredProperties(session, FirResolvePhase.RAW_FIR).map {
+                CallableId(packageName = it.callableId.packageName, className = null, callableName = it.name)
+            }
+        }
+    }
+
     private val fields by lazy {
-        matchedClasses.filterNot { it.isLocal }.flatMap { classSymbol ->
+        matchedClasses.flatMap { classSymbol ->
             classSymbol.declaredProperties(session).map { propertySymbol ->
                 DataSchemaField(
                     classSymbol,
@@ -74,27 +77,24 @@ class TopLevelExtensionsGenerator(session: FirSession) : FirDeclarationGeneratio
 
     @OptIn(ExperimentalTopLevelDeclarationsGenerationApi::class)
     override fun getTopLevelCallableIds(): Set<CallableId> {
-        return buildSet {
-            fields.mapTo(this) { it.callableId }
-        }
+        return fieldNames
     }
 
     override fun generateProperties(callableId: CallableId, context: MemberGenerationContext?): List<FirPropertySymbol> {
         // type parameters, every type that refers to them and property symbol should be unique for each property:
         // codegen for the 2nd property will fail with "type parameter symbol is already bound to property"
         // so let's call this function twice, generate only 1 property at the time
-        fun generate(mode: Receiver) = fields.filter { it.callableId == callableId }.map { (owner, property, callableId) ->
-            buildExtensionPropertiesApi(
-                callableId,
-                owner,
-                mode,
-                property.resolvedReturnType,
-                property.getAnnotationByClassId(Names.COLUMN_NAME_ANNOTATION, this@TopLevelExtensionsGenerator.session)?.let { annotation ->
-                    (annotation.argumentMapping.mapping[Names.COLUMN_NAME_ARGUMENT] as? FirLiteralExpression)?.value as? String?
-                },
-                property.name
-            )
-        }
+        fun generate(mode: Receiver) = fields
+            .filter { it.callableId == callableId }
+            .map { (val owner = classSymbol, val property = propertySymbol, val callableId) ->
+                buildExtensionPropertiesApi(
+                    callableId,
+                    owner,
+                    mode,
+                    property.resolvedReturnType,
+                    property.name
+                )
+            }
 
         val owner = context?.owner
         return when (owner) {
@@ -111,12 +111,9 @@ fun FirDeclarationGenerationExtension.buildExtensionPropertiesApi(
     owner: FirRegularClassSymbol,
     mode: TopLevelExtensionsGenerator.Receiver,
     resolvedReturnType: ConeKotlinType,
-    columnName: String?,
     name: Name
 ): FirPropertySymbol {
     var resolvedReturnType = resolvedReturnType
-    val columnName = columnName
-
     val firPropertySymbol = FirRegularPropertySymbol(callableId)
 
     val typeParameters = owner.typeParameterSymbols.map {
@@ -141,7 +138,8 @@ fun FirDeclarationGenerationExtension.buildExtensionPropertiesApi(
     val marker = owner.constructType(
         typeParameters.map { it.toConeType() }.toTypedArray(),
         isMarkedNullable = false
-    ).toTypeProjection(Variance.INVARIANT)
+    )
+    val markerProjection = marker.toTypeProjection(Variance.INVARIANT)
 
     val columnGroupProjection: ConeTypeProjection? = if (resolvedReturnType.isDataRow(session)) {
         resolvedReturnType.typeArguments[0]
@@ -179,24 +177,32 @@ fun FirDeclarationGenerationExtension.buildExtensionPropertiesApi(
         TopLevelExtensionsGenerator.Receiver.DATA_ROW -> generateExtensionProperty(
             callableIdOrSymbol = CallableIdOrSymbol.Symbol(firPropertySymbol),
             receiverType = Names.DATA_ROW_CLASS_ID.constructClassLikeType(
-                typeArguments = arrayOf(marker),
+                typeArguments = arrayOf(markerProjection),
                 isMarkedNullable = false
             ),
-            propertyName = PropertyName.of(name, columnName?.let { PropertyName.buildAnnotation(it) }),
-            returnType = resolvedReturnType,
+            marker = marker,
+            propertyName = name,
+            returnType = if (resolvedReturnType.toClassLikeSymbol(session)?.hasAnnotation(Names.DATA_SCHEMA_CLASS_ID, session) == true) {
+                resolvedReturnType.projectOverDataRowType()
+            } else {
+                resolvedReturnType
+            },
             source = owner.source,
             typeParameters = typeParameters,
+            generateJvmName = true
         )
         TopLevelExtensionsGenerator.Receiver.COLUMNS_CONTAINER -> generateExtensionProperty(
             callableIdOrSymbol = CallableIdOrSymbol.Symbol(firPropertySymbol),
             receiverType = Names.COLUMNS_CONTAINER_CLASS_ID.constructClassLikeType(
-                typeArguments = arrayOf(marker),
+                typeArguments = arrayOf(markerProjection),
                 isMarkedNullable = false
             ),
-            propertyName = PropertyName.of(name, columnName?.let { PropertyName.buildAnnotation(it) }),
+            marker = marker,
+            propertyName = name,
             returnType = columnReturnType,
             source = owner.source,
             typeParameters = typeParameters,
+            generateJvmName = true
         )
     }
     return extension.symbol

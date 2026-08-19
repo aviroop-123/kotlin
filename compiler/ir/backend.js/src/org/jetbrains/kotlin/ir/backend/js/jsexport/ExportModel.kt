@@ -9,7 +9,17 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 
-sealed class ExportedDeclaration
+sealed class ExportedDeclaration {
+    val attributes: MutableSet<ExportedAttribute> = mutableSetOf()
+}
+
+sealed interface ExportedMember {
+    val isStatic: Boolean
+}
+
+sealed class ExportedAttribute {
+    object DefaultExport : ExportedAttribute()
+}
 
 data class ExportedModule(
     val name: String,
@@ -23,16 +33,17 @@ class ExportedNamespace(
 
 data class ExportedFunction(
     val name: String,
-    val isStatic: Boolean = false,
+    override val isStatic: Boolean = false,
     val ir: IrSimpleFunction
-) : ExportedDeclaration()
+) : ExportedDeclaration(), ExportedMember
 
 data class ExportedProperty(
     val name: String,
-    val isStatic: Boolean = false,
+    override val isStatic: Boolean = false,
     val irGetter: IrFunction? = null,
     val irSetter: IrFunction? = null,
-) : ExportedDeclaration()
+    val isDefaultImplementation: Boolean = false
+) : ExportedDeclaration(), ExportedMember
 
 sealed class ExportedClass : ExportedDeclaration() {
     abstract val name: String

@@ -14,7 +14,6 @@ package org.jetbrains.kotlin.config
 
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.config.phaser.PhaseConfig
-import org.jetbrains.kotlin.constant.EvaluatedConstTracker
 import org.jetbrains.kotlin.incremental.components.EnumWhenTracker
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.incremental.components.ICFileMappingTracker
@@ -22,103 +21,120 @@ import org.jetbrains.kotlin.incremental.components.ImportTracker
 import org.jetbrains.kotlin.incremental.components.InlineConstTracker
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
+import org.jetbrains.kotlin.platform.TargetPlatform
+import org.jetbrains.kotlin.util.PerformanceManager
 
 object CommonConfigurationKeys {
     @JvmField
-    val LANGUAGE_VERSION_SETTINGS = CompilerConfigurationKey.create<LanguageVersionSettings>("language version settings")
+    val LANGUAGE_VERSION_SETTINGS = CompilerConfigurationKey.create<LanguageVersionSettings>("LANGUAGE_VERSION_SETTINGS")
 
     @JvmField
-    val DISABLE_INLINE = CompilerConfigurationKey.create<Boolean>("disable inline")
+    val DISABLE_INLINE = CompilerConfigurationKey.create<Boolean>("DISABLE_INLINE")
 
     @JvmField
-    val MODULE_NAME = CompilerConfigurationKey.create<String>("module name")
+    val MODULE_NAME = CompilerConfigurationKey.create<String>("MODULE_NAME")
 
     @JvmField
-    val REPORT_OUTPUT_FILES = CompilerConfigurationKey.create<Boolean>("report output files")
+    val REPORT_OUTPUT_FILES = CompilerConfigurationKey.create<Boolean>("REPORT_OUTPUT_FILES")
 
     @JvmField
-    val LOOKUP_TRACKER = CompilerConfigurationKey.create<LookupTracker>("lookup tracker")
+    val LOOKUP_TRACKER = CompilerConfigurationKey.create<LookupTracker>("LOOKUP_TRACKER")
 
     @JvmField
-    val EXPECT_ACTUAL_TRACKER = CompilerConfigurationKey.create<ExpectActualTracker>("expect actual tracker")
+    val EXPECT_ACTUAL_TRACKER = CompilerConfigurationKey.create<ExpectActualTracker>("EXPECT_ACTUAL_TRACKER")
 
     @JvmField
-    val INLINE_CONST_TRACKER = CompilerConfigurationKey.create<InlineConstTracker>("inline constant tracker")
+    val INLINE_CONST_TRACKER = CompilerConfigurationKey.create<InlineConstTracker>("INLINE_CONST_TRACKER")
 
     @JvmField
-    val FILE_MAPPING_TRACKER = CompilerConfigurationKey.create<ICFileMappingTracker>("file mapping tracker")
+    val FILE_MAPPING_TRACKER = CompilerConfigurationKey.create<ICFileMappingTracker>("FILE_MAPPING_TRACKER")
 
     @JvmField
-    val ENUM_WHEN_TRACKER = CompilerConfigurationKey.create<EnumWhenTracker>("enum when tracker")
+    val ENUM_WHEN_TRACKER = CompilerConfigurationKey.create<EnumWhenTracker>("ENUM_WHEN_TRACKER")
 
     @JvmField
-    val IMPORT_TRACKER = CompilerConfigurationKey.create<ImportTracker>("import tracker")
+    val IMPORT_TRACKER = CompilerConfigurationKey.create<ImportTracker>("IMPORT_TRACKER")
 
     @JvmField
-    val METADATA_VERSION = CompilerConfigurationKey.create<BinaryVersion>("metadata version")
+    val METADATA_VERSION = CompilerConfigurationKey.create<BinaryVersion>("METADATA_VERSION")
 
     @JvmField
-    val USE_FIR = CompilerConfigurationKey.create<Boolean>("front-end IR")
+    val USE_FIR = CompilerConfigurationKey.create<Boolean>("USE_FIR")
 
     @JvmField
-    val USE_LIGHT_TREE = CompilerConfigurationKey.create<Boolean>("light tree")
+    val USE_LIGHT_TREE = CompilerConfigurationKey.create<Boolean>("USE_LIGHT_TREE")
 
     @JvmField
-    val HMPP_MODULE_STRUCTURE = CompilerConfigurationKey.create<HmppCliModuleStructure>("HMPP module structure")
+    val HMPP_MODULE_STRUCTURE = CompilerConfigurationKey.create<HmppCliModuleStructure>("HMPP_MODULE_STRUCTURE")
 
     @JvmField
-    val METADATA_KLIB = CompilerConfigurationKey.create<Boolean>("Produce metadata klib")
+    val METADATA_KLIB = CompilerConfigurationKey.create<Boolean>("METADATA_KLIB")
 
     @JvmField
-    val USE_FIR_EXTRA_CHECKERS = CompilerConfigurationKey.create<Boolean>("fir extra checkers")
+    val USE_FIR_EXTRA_CHECKERS = CompilerConfigurationKey.create<Boolean>("USE_FIR_EXTRA_CHECKERS")
+
+    // Enables FIR experimental (not ready for public use) checkers.
+    @JvmField
+    val USE_FIR_EXPERIMENTAL_CHECKERS = CompilerConfigurationKey.create<Boolean>("USE_FIR_EXPERIMENTAL_CHECKERS")
 
     @JvmField
-    val USE_FIR_EXPERIMENTAL_CHECKERS = CompilerConfigurationKey.create<Boolean>("fir not-public-ready checkers")
+    val DUMP_INFERENCE_LOGS = CompilerConfigurationKey.create<Boolean>("DUMP_INFERENCE_LOGS")
+
+    // Runs the codegen phase in parallel with N threads.
+    @JvmField
+    val PARALLEL_BACKEND_THREADS = CompilerConfigurationKey.create<Int>("PARALLEL_BACKEND_THREADS")
 
     @JvmField
-    val DUMP_INFERENCE_LOGS = CompilerConfigurationKey.create<Boolean>("render the inference constraints dump file")
+    val DUMP_MODEL = CompilerConfigurationKey.create<String>("DUMP_MODEL")
 
     @JvmField
-    val PARALLEL_BACKEND_THREADS = CompilerConfigurationKey.create<Int>("Run codegen phase in parallel with N threads")
+    val INCREMENTAL_COMPILATION = CompilerConfigurationKey.create<Boolean>("INCREMENTAL_COMPILATION")
 
     @JvmField
-    val INCREMENTAL_COMPILATION = CompilerConfigurationKey.create<Boolean>("Enable incremental compilation")
+    val ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS = CompilerConfigurationKey.create<Boolean>("ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS")
 
     @JvmField
-    val ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS = CompilerConfigurationKey.create<Boolean>("Allow to compile any scripts along with regular Kotlin sources")
+    val IGNORE_CONST_OPTIMIZATION_ERRORS = CompilerConfigurationKey.create<Boolean>("IGNORE_CONST_OPTIMIZATION_ERRORS")
 
     @JvmField
-    val IGNORE_CONST_OPTIMIZATION_ERRORS = CompilerConfigurationKey.create<Boolean>("Ignore errors from IrConstTransformer")
+    @MessageCollectorAccess
+    val MESSAGE_COLLECTOR_KEY = CompilerConfigurationKey.create<MessageCollector>("MESSAGE_COLLECTOR_KEY")
 
     @JvmField
-    val EVALUATED_CONST_TRACKER = CompilerConfigurationKey.create<EvaluatedConstTracker>("Keeps track of all evaluated by IrInterpreter constants")
+    val VERIFY_IR = CompilerConfigurationKey.create<IrVerificationMode>("VERIFY_IR")
+
+    // Disable specific IR checkers by simple class name or group tag
+    @JvmField
+    val DISABLE_IR_CHECKERS = CompilerConfigurationKey.create<List<String>>("DISABLE_IR_CHECKERS")
+
+    // Enable optional IR checkers by simple class name or group tag
+    @JvmField
+    val ADDITIONAL_IR_CHECKERS = CompilerConfigurationKey.create<List<String>>("ADDITIONAL_IR_CHECKERS")
 
     @JvmField
-    val MESSAGE_COLLECTOR_KEY = CompilerConfigurationKey.create<MessageCollector>("message collector")
+    val PHASE_CONFIG = CompilerConfigurationKey.create<PhaseConfig>("PHASE_CONFIG")
+
+    // Should be used only in tests, impossible to set via compiler arguments.
+    @JvmField
+    val DONT_CREATE_SEPARATE_SESSION_FOR_SCRIPTS = CompilerConfigurationKey.create<Boolean>("DONT_CREATE_SEPARATE_SESSION_FOR_SCRIPTS")
 
     @JvmField
-    val VERIFY_IR = CompilerConfigurationKey.create<IrVerificationMode>("IR verification mode")
+    val DONT_SORT_SOURCE_FILES = CompilerConfigurationKey.create<Boolean>("DONT_SORT_SOURCE_FILES")
+
+    // Internal for passing configuration in the scripting pipeline, impossible to set via compiler arguments.
+    @JvmField
+    val SCRIPTING_HOST_CONFIGURATION = CompilerConfigurationKey.create<Any>("SCRIPTING_HOST_CONFIGURATION")
+
+    // A helper that can be used to measure performance (compiler phases, JIT and GC info) or collect stats (e.g. number of lines in a project). It might be inaccurate if use in multithreading mode.
+    @JvmField
+    val PERF_MANAGER = CompilerConfigurationKey.create<PerformanceManager>("PERF_MANAGER")
+
+    // Enables detailed performance stats that might slow down the general compiler performance. See the description of `-Xdetailed-perf` for more details.
+    @JvmField
+    val DETAILED_PERF = CompilerConfigurationKey.create<Boolean>("DETAILED_PERF")
 
     @JvmField
-    val ENABLE_IR_VISIBILITY_CHECKS = CompilerConfigurationKey.create<Boolean>("Check pre-lowering IR for visibility violations")
-
-    @JvmField
-    val ENABLE_IR_VARARG_TYPES_CHECKS = CompilerConfigurationKey.create<Boolean>("Check IR for vararg types mismatches")
-
-    @JvmField
-    val PHASE_CONFIG = CompilerConfigurationKey.create<PhaseConfig>("phase configuration")
-
-    // Should be used only in tests, impossible to set via compiler arguments
-    @JvmField
-    val DONT_CREATE_SEPARATE_SESSION_FOR_SCRIPTS = CompilerConfigurationKey.create<Boolean>("don't create separate session for scripts")
-
-    // Should be used only in tests, impossible to set via compiler arguments
-    @JvmField
-    val DONT_SORT_SOURCE_FILES = CompilerConfigurationKey.create<Boolean>("don't sort source files in FS order")
-
-    // Internal for passing configuration in the scripting pipeline, impossible to set via compiler arguments
-    @JvmField
-    val SCRIPTING_HOST_CONFIGURATION = CompilerConfigurationKey.create<Any>("scripting host configuration")
+    val TARGET_PLATFORM = CompilerConfigurationKey.create<TargetPlatform>("TARGET_PLATFORM")
 
 }
 
@@ -198,6 +214,10 @@ var CompilerConfiguration.parallelBackendThreads: Int?
     get() = get(CommonConfigurationKeys.PARALLEL_BACKEND_THREADS)
     set(value) { put(CommonConfigurationKeys.PARALLEL_BACKEND_THREADS, requireNotNull(value) { "nullable values are not allowed" }) }
 
+var CompilerConfiguration.dumpModel: String?
+    get() = get(CommonConfigurationKeys.DUMP_MODEL)
+    set(value) { put(CommonConfigurationKeys.DUMP_MODEL, requireNotNull(value) { "nullable values are not allowed" }) }
+
 var CompilerConfiguration.incrementalCompilation: Boolean
     get() = getBoolean(CommonConfigurationKeys.INCREMENTAL_COMPILATION)
     set(value) { put(CommonConfigurationKeys.INCREMENTAL_COMPILATION, value) }
@@ -210,10 +230,7 @@ var CompilerConfiguration.ignoreConstOptimizationErrors: Boolean
     get() = getBoolean(CommonConfigurationKeys.IGNORE_CONST_OPTIMIZATION_ERRORS)
     set(value) { put(CommonConfigurationKeys.IGNORE_CONST_OPTIMIZATION_ERRORS, value) }
 
-var CompilerConfiguration.evaluatedConstTracker: EvaluatedConstTracker?
-    get() = get(CommonConfigurationKeys.EVALUATED_CONST_TRACKER)
-    set(value) { put(CommonConfigurationKeys.EVALUATED_CONST_TRACKER, requireNotNull(value) { "nullable values are not allowed" }) }
-
+@MessageCollectorAccess
 var CompilerConfiguration.messageCollector: MessageCollector
     get() = get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
     set(value) { put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, value) }
@@ -222,13 +239,13 @@ var CompilerConfiguration.verifyIr: IrVerificationMode?
     get() = get(CommonConfigurationKeys.VERIFY_IR)
     set(value) { put(CommonConfigurationKeys.VERIFY_IR, requireNotNull(value) { "nullable values are not allowed" }) }
 
-var CompilerConfiguration.enableIrVisibilityChecks: Boolean
-    get() = getBoolean(CommonConfigurationKeys.ENABLE_IR_VISIBILITY_CHECKS)
-    set(value) { put(CommonConfigurationKeys.ENABLE_IR_VISIBILITY_CHECKS, value) }
+var CompilerConfiguration.disableIrCheckers: List<String>
+    get() = getList(CommonConfigurationKeys.DISABLE_IR_CHECKERS)
+    set(value) { put(CommonConfigurationKeys.DISABLE_IR_CHECKERS, value) }
 
-var CompilerConfiguration.enableIrVarargTypesChecks: Boolean
-    get() = getBoolean(CommonConfigurationKeys.ENABLE_IR_VARARG_TYPES_CHECKS)
-    set(value) { put(CommonConfigurationKeys.ENABLE_IR_VARARG_TYPES_CHECKS, value) }
+var CompilerConfiguration.additionalIrCheckers: List<String>
+    get() = getList(CommonConfigurationKeys.ADDITIONAL_IR_CHECKERS)
+    set(value) { put(CommonConfigurationKeys.ADDITIONAL_IR_CHECKERS, value) }
 
 var CompilerConfiguration.phaseConfig: PhaseConfig?
     get() = get(CommonConfigurationKeys.PHASE_CONFIG)
@@ -245,4 +262,16 @@ var CompilerConfiguration.dontSortSourceFiles: Boolean
 var CompilerConfiguration.scriptingHostConfiguration: Any?
     get() = get(CommonConfigurationKeys.SCRIPTING_HOST_CONFIGURATION)
     set(value) { put(CommonConfigurationKeys.SCRIPTING_HOST_CONFIGURATION, requireNotNull(value) { "nullable values are not allowed" }) }
+
+var CompilerConfiguration.perfManager: PerformanceManager?
+    get() = get(CommonConfigurationKeys.PERF_MANAGER)
+    set(value) { put(CommonConfigurationKeys.PERF_MANAGER, requireNotNull(value) { "nullable values are not allowed" }) }
+
+var CompilerConfiguration.detailedPerf: Boolean
+    get() = getBoolean(CommonConfigurationKeys.DETAILED_PERF)
+    set(value) { put(CommonConfigurationKeys.DETAILED_PERF, value) }
+
+var CompilerConfiguration.targetPlatform: TargetPlatform?
+    get() = get(CommonConfigurationKeys.TARGET_PLATFORM)
+    set(value) { put(CommonConfigurationKeys.TARGET_PLATFORM, requireNotNull(value) { "nullable values are not allowed" }) }
 

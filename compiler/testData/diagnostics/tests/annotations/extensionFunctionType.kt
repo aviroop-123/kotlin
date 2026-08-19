@@ -1,6 +1,5 @@
 // RUN_PIPELINE_TILL: FRONTEND
 // WITH_STDLIB
-// LANGUAGE: +ForbidExtensionFunctionTypeOnNonFunctionTypes
 // This test checks that annotations on extension function types are preserved. See the corresponding .txt file
 
 @Target(AnnotationTarget.TYPE)
@@ -15,7 +14,7 @@ interface Some {
     fun f5(): <!WRONG_EXTENSION_FUNCTION_TYPE!>@ExtensionFunctionType<!> () -> Int
 
     fun f6(x: <!WRONG_EXTENSION_FUNCTION_TYPE!>@ExtensionFunctionType<!> () -> Int) {
-        println(x <!UNRESOLVED_REFERENCE_WRONG_RECEIVER!>+<!> 2)
+        println(x <!UNRESOLVED_REFERENCE!>+<!> 2)
     }
 
     fun f7(x: <!WRONG_EXTENSION_FUNCTION_TYPE!>@ExtensionFunctionType<!> Function0<Int>)

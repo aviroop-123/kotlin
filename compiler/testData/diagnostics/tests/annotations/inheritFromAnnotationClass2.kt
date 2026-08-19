@@ -1,12 +1,12 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// FIR_IDENTICAL
 // DIAGNOSTICS: -SUPERTYPES_FOR_ANNOTATION_CLASS -VIRTUAL_MEMBER_HIDDEN -FINAL_SUPERTYPE -MISSING_DEPENDENCY_SUPERCLASS
 // These errors need to be suppressed to cause light class generation
+// LANGUAGE: +ProhibitExtendingAnnotationClasses
 // FILE: test.kt
 
-annotation class Ann : Target()
+annotation class Ann : <!EXTENDING_AN_ANNOTATION_CLASS_ERROR!>Target<!>()
 
-annotation class Ann2(vararg val allowedTargets: AnnotationTarget) : Target()
+annotation class Ann2(vararg val allowedTargets: AnnotationTarget) : <!EXTENDING_AN_ANNOTATION_CLASS_ERROR!>Target<!>()
 
 interface I : J {
     override fun foo(): List<String> = throw Exception()

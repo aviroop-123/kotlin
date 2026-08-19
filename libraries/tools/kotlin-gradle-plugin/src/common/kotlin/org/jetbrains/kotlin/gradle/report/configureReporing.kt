@@ -8,8 +8,7 @@ package org.jetbrains.kotlin.gradle.report
 import org.gradle.api.Project
 import org.jetbrains.kotlin.build.report.FileReportSettings
 import org.jetbrains.kotlin.build.report.HttpReportSettings
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.getAllMetrics
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.PropertyNames.KOTLIN_BUILD_REPORT_FILE_DIR
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.PropertyNames.KOTLIN_BUILD_REPORT_SINGLE_FILE
@@ -19,7 +18,7 @@ import org.jetbrains.kotlin.gradle.plugin.internal.isProjectIsolationEnabled
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toUpperCaseAsciiOnly
 import java.io.File
 
-private val availableMetrics = GradleBuildTime.values().map { it.name } + GradleBuildPerformanceMetric.values().map { it.name }
+private val availableMetrics = getAllMetrics().map { it.name }.toSet()
 
 internal fun reportingSettings(project: Project): ReportingSettings {
     val properties = PropertiesProvider(project)
@@ -37,16 +36,20 @@ internal fun reportingSettings(project: Project): ReportingSettings {
             buildReportOutputTypes.isEmpty() -> BuildReportMode.NONE
             else -> BuildReportMode.VERBOSE
         }
+
+    val defaultReportDir = if (project.isProjectIsolationEnabled) {
+        // TODO: it's a workaround for KT-52963, should be reworked – KT-55763
+        project.rootDir.resolve("build")
+    } else {
+        project.rootProject.layout.buildDirectory.asFile.get()
+    }.resolve("reports/kotlin-build")
+
     val fileReportSettings = if (buildReportOutputTypes.contains(BuildReportType.FILE)) {
         val buildReportDir = properties.buildReportFileOutputDir?.let {
             validateFileName(it, KOTLIN_BUILD_REPORT_FILE_DIR)
             File(it)
-        } ?: (if (project.isProjectIsolationEnabled) {
-            // TODO: it's a workaround for KT-52963, should be reworked – KT-55763
-            project.rootDir.resolve("build")
-        } else {
-            project.rootProject.layout.buildDirectory.asFile.get()
-        }).resolve("reports/kotlin-build")
+        } ?: defaultReportDir
+
         val includeMetricsInReport = properties.buildReportMetrics || buildReportMode == BuildReportMode.VERBOSE
         FileReportSettings(
             buildReportDir = buildReportDir,
@@ -90,8 +93,8 @@ internal fun reportingSettings(project: Project): ReportingSettings {
     val jsonReportDir = if (buildReportOutputTypes.contains(BuildReportType.JSON)) {
         properties.buildReportJsonDir?.let {
             validateFileName(it, KOTLIN_BUILD_REPORT_JSON_DIR)
-            File(it)
-        } ?: throw IllegalStateException("Can't configure json report: '$KOTLIN_BUILD_REPORT_JSON_DIR' property is mandatory")
+            project.rootDir.resolve(it)
+        } ?: defaultReportDir
     } else null
 
     return ReportingSettings(

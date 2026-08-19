@@ -7,7 +7,6 @@ package org.jetbrains.kotlinx.serialization.matrix;
 
 import com.intellij.testFramework.TestDataPath;
 import org.jetbrains.kotlin.test.util.KtTestUtil;
-import org.jetbrains.kotlin.test.TargetBackend;
 import org.jetbrains.kotlin.test.TestMetadata;
 import org.junit.jupiter.api.Test;
 
@@ -19,14 +18,18 @@ import java.util.regex.Pattern;
 @TestMetadata("plugins/kotlinx-serialization/testData/matrix")
 @TestDataPath("$PROJECT_ROOT")
 public class FirTestMatrixGenerated extends AbstractFirTestMatrix {
+  private void run(String fileName) {
+    runTest("plugins/kotlinx-serialization/testData/matrix/" + fileName);
+  }
+
   @Test
   public void testAllFilesPresentInMatrix() {
-    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/kotlinx-serialization/testData/matrix"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.JVM_IR, true);
+    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/kotlinx-serialization/testData/matrix"), Pattern.compile("^(.+)\\.kt$"), null, true);
   }
 
   @Test
   @TestMetadata("enums.kt")
   public void testEnums() {
-    runTest("plugins/kotlinx-serialization/testData/matrix/enums.kt");
+    run("enums.kt");
   }
 }

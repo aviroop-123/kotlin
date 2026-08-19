@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.incremental.classpathDiff
 
 import com.intellij.util.containers.Interner
 import com.intellij.util.io.DataExternalizer
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
+import org.jetbrains.kotlin.build.report.metrics.*
 import org.jetbrains.kotlin.incremental.KotlinClassInfo
 import org.jetbrains.kotlin.incremental.storage.*
 import org.jetbrains.kotlin.load.kotlin.header.KotlinClassHeader
@@ -21,13 +21,17 @@ import java.io.File
 /** Utility to serialize a [ClasspathSnapshot]. */
 object CachedClasspathSnapshotSerializer {
 
-    // Note: This cache is shared across builds, so we need to be careful if the snapshot file's path hasn't changed but its contents have
-    // changed. Luckily, each snapshot file is currently the output of a Gradle (non-incremental) transform, so that case will not happen.
-    // TODO: Make this code safer (not relying on how the snapshot files are produced and whether Gradle maintains the above guarantee). For
-    // example, if the transform is incremental, the above case may happen (the output directory of an incremental transform is unchanged
-    // even though its inputs/outputs have changed). Potential solutions: Write the file's content hash in the file's name or to another
-    // file next to it, or check that its timestamp and size haven't changed (we'll need to deal with directories too).
-    private val cache = InMemoryCacheWithEviction<File, ClasspathEntrySnapshot>(
+    // Cache key includes last-modified time and file size so that an overwritten snapshot file (same path,
+    // different content) is detected as a cache miss without relying on the caller to use a content-derived filename.
+    // `lastModified` alone is not reliable because some filesystems have coarse timestamp resolution (e.g. 1-2 seconds),
+    // so a file overwritten within the same window may keep the same timestamp; `size` acts as an additional
+    // discriminator for that case. The remaining edge case — same size and same timestamp — is unlikely in practice
+    // but would require a content hash to detect, which is expensive to compute on every cache lookup.
+    private data class FileKey(val file: File, val lastModified: Long, val size: Long)
+
+    private fun File.toFileKey() = FileKey(this, lastModified(), length())
+
+    private val cache = InMemoryCacheWithEviction<FileKey, ClasspathEntrySnapshot>(
         maxTimePeriodsToKeepStrongReferences = 20,
         maxTimePeriodsToKeepSoftReferences = 1000,
         maxMemoryUsageRatioToKeepStrongReferences = 0.8
@@ -38,16 +42,16 @@ object CachedClasspathSnapshotSerializer {
 
         var cacheMisses = 0L
         val classpathSnapshot = ClasspathSnapshot(classpathEntrySnapshotFiles.map { snapshotFile ->
-            cache.computeIfAbsent(snapshotFile) {
+            cache.computeIfAbsent(snapshotFile.toFileKey()) {
                 cacheMisses++
-                ClasspathEntrySnapshotExternalizer.loadFromFile(it)
+                ClasspathEntrySnapshotExternalizer.loadFromFile(it.file)
             }
         })
 
         cache.evictEntries()
-        reporter.addMetric(GradleBuildPerformanceMetric.LOAD_CLASSPATH_SNAPSHOT_EXECUTION_COUNT, 1)
-        reporter.addMetric(GradleBuildPerformanceMetric.LOAD_CLASSPATH_ENTRY_SNAPSHOT_CACHE_HITS, classpathEntrySnapshotFiles.size - cacheMisses)
-        reporter.addMetric(GradleBuildPerformanceMetric.LOAD_CLASSPATH_ENTRY_SNAPSHOT_CACHE_MISSES, cacheMisses)
+        reporter.addMetric(LOAD_CLASSPATH_SNAPSHOT_EXECUTION_COUNT, 1)
+        reporter.addMetric(LOAD_CLASSPATH_ENTRY_SNAPSHOT_CACHE_HITS, classpathEntrySnapshotFiles.size - cacheMisses)
+        reporter.addMetric(LOAD_CLASSPATH_ENTRY_SNAPSHOT_CACHE_MISSES, cacheMisses)
 
         return classpathSnapshot
     }

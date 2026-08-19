@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -27,8 +27,8 @@ import java.util.*;
 
 import static org.jetbrains.kotlin.diagnostics.Errors.*;
 import static org.jetbrains.kotlin.diagnostics.rendering.CommonRenderers.*;
-import static org.jetbrains.kotlin.diagnostics.rendering.Renderers.NAME;
 import static org.jetbrains.kotlin.diagnostics.rendering.Renderers.*;
+import static org.jetbrains.kotlin.diagnostics.rendering.Renderers.NAME;
 import static org.jetbrains.kotlin.diagnostics.rendering.RenderingContext.of;
 
 public class DefaultErrorMessages {
@@ -42,9 +42,7 @@ public class DefaultErrorMessages {
 
     private static final List<String> RENDERER_PLATFORM_EXTENSIONS = CollectionsKt.listOf(
             "org.jetbrains.kotlin.resolve.jvm.diagnostics.DefaultErrorMessagesJvm",
-            "org.jetbrains.kotlin.js.resolve.diagnostics.DefaultErrorMessagesJs",
-            "org.jetbrains.kotlin.resolve.konan.diagnostics.DefaultErrorMessagesNative",
-            "org.jetbrains.kotlin.wasm.resolve.diagnostics.DefaultErrorMessagesWasm"
+            "org.jetbrains.kotlin.resolve.konan.diagnostics.DefaultErrorMessagesNative"
     );
 
     private static final List<DiagnosticFactoryToRendererMap> RENDERER_MAPS;
@@ -784,6 +782,7 @@ public class DefaultErrorMessages {
         MAP.put(DIVISION_BY_ZERO, "Division by zero");
         MAP.put(INTEGER_OVERFLOW, "This operation has led to an overflow");
         MAP.put(INT_LITERAL_OUT_OF_RANGE, "The value is out of range");
+        MAP.put(INT_LITERAL_WITH_LEADING_ZEROS, "Leading zeros are not allowed in integer literals.");
         MAP.put(WRONG_LONG_SUFFIX, "Use 'L' instead of 'l'");
         MAP.put(FLOAT_LITERAL_OUT_OF_RANGE, "The value is out of range");
         MAP.put(FLOAT_LITERAL_CONFORMS_INFINITY, "Floating point number conforms to infinity");

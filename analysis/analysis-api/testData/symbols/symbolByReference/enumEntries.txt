@@ -12,8 +12,10 @@ KaKotlinPropertySymbol:
     contextReceivers: []
     hasStableParameterNames: true
     isActual: false
+    isCompanion: false
     isExpect: false
     isExtension: false
+    isExternal: false
     isInline: false
     isNotDefault: false
     isOverride: false
@@ -36,13 +38,15 @@ KaKotlinPropertySymbol:
     getContainingJvmClassName: MyKotlinEnum
     getContainingModule: KaSourceModule "Sources of main"
     deprecationStatus: null
+    importableFqName: null
   hasBackingField: false
   hasGetter: true
   hasSetter: false
   initializer: null
   isActual: false
+  isCompanion: true
   isConst: false
-  isDelegatedProperty: false
+  isDelegated: false
   isExpect: false
   isExtension: false
   isExternal: false
@@ -72,8 +76,7 @@ KaKotlinPropertySymbol:
   getContainingJvmClassName: MyKotlinEnum
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
-  getterDeprecationStatus: null
   javaGetterName: getEntries
   javaSetterName: null
-  setterDeprecationStatus: null
   isInline: false
+  importableFqName: MyKotlinEnum.entries

@@ -5,14 +5,15 @@
 
 package org.jetbrains.kotlin.gradle.report
 
+import com.gradle.develocity.agent.gradle.adapters.BuildScanAdapter
 import org.gradle.api.Project
 import org.gradle.api.logging.Logging
 import org.gradle.tooling.events.task.TaskFinishEvent
 import org.jetbrains.kotlin.build.report.metrics.ValueType
+import org.jetbrains.kotlin.build.report.metrics.getAllMetrics
 import org.jetbrains.kotlin.build.report.statistics.*
 import org.jetbrains.kotlin.build.report.statistics.file.ReadableFileReportData
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-import org.jetbrains.kotlin.gradle.internal.report.BuildScanApi
 import org.jetbrains.kotlin.gradle.plugin.statistics.GradleFileReportService
 import org.jetbrains.kotlin.gradle.report.data.BuildExecutionData
 import org.jetbrains.kotlin.gradle.report.data.BuildOperationRecord
@@ -51,6 +52,7 @@ class BuildReportsService {
         parameters: BuildReportParameters,
     ) {
         val buildData = BuildExecutionData(
+            metrics = getAllMetrics(),
             startParameters = parameters.startParameters,
             failureMessages = failureMessages,
             buildOperationRecord = buildOperationRecords.sortedBy { it.startTimeMs }
@@ -193,7 +195,7 @@ class BuildReportsService {
         event: TaskFinishEvent,
         buildOperationRecord: BuildOperationRecord,
         parameters: BuildReportParameters,
-        buildScan: BuildScanApi,
+        buildScan: BuildScanAdapter,
     ) {
         val buildScanSettings = parameters.reportingSettings.buildScanReportSettings ?: return
 
@@ -216,7 +218,7 @@ class BuildReportsService {
     internal fun addBuildScanReport(
         buildOperationRecords: Collection<BuildOperationRecord>,
         parameters: BuildReportParameters,
-        buildScan: BuildScanApi,
+        buildScan: BuildScanAdapter,
     ) {
         val buildScanSettings = parameters.reportingSettings.buildScanReportSettings ?: return
 
@@ -235,7 +237,7 @@ class BuildReportsService {
         }
     }
 
-    private fun addBuildScanReport(data: GradleCompileStatisticsData, customValuesLimit: Int, buildScan: BuildScanApi) {
+    private fun addBuildScanReport(data: GradleCompileStatisticsData, customValuesLimit: Int, buildScan: BuildScanAdapter) {
         val elapsedTime = measureTimeMillis {
             tags.addAll(data.getTags())
             if (customValues < customValuesLimit) {
@@ -258,7 +260,7 @@ class BuildReportsService {
     }
 
     private fun addBuildScanValue(
-        buildScan: BuildScanApi,
+        buildScan: BuildScanAdapter,
         data: GradleCompileStatisticsData,
         customValue: String,
     ) {
@@ -314,12 +316,12 @@ class BuildReportsService {
 
         val timeData =
             data.getBuildTimesMetrics()
-                .map { (key, value) -> "${key.getReadableString()}: ${value}ms" } //sometimes it is better to have separate variable to be able debug
+                .map { (key, value) -> "${key.readableString}: ${value}ms" } //sometimes it is better to have separate variable to be able debug
         val perfData = data.getPerformanceMetrics().map { (key, value) ->
-            when (key.getType()) {
-                ValueType.BYTES -> "${key.getReadableString()}: ${formatSize(value)}"
+            when (key.type) {
+                ValueType.BYTES -> "${key.readableString}: ${formatSize(value)}"
                 ValueType.MILLISECONDS -> DATE_FORMATTER.format(value)
-                else -> "${key.getReadableString()}: $value"
+                else -> "${key.readableString}: $value"
             }
         }
         timeData.union(perfData).joinTo(readableString, ",", "Performance: [", "]")
@@ -347,14 +349,14 @@ class BuildReportsService {
         return splattedString
     }
 
-    internal fun initBuildScanTags(buildScan: BuildScanApi, label: String?) {
+    internal fun initBuildScanTags(buildScan: BuildScanAdapter, label: String?) {
         buildScan.tag(buildUuid)
         label?.also {
             buildScan.tag(it)
         }
     }
 
-    internal fun addCollectedTags(buildScan: BuildScanApi) {
+    internal fun addCollectedTags(buildScan: BuildScanAdapter) {
         replaceWithCombinedTag(
             StatTag.KOTLIN_1,
             StatTag.KOTLIN_2,

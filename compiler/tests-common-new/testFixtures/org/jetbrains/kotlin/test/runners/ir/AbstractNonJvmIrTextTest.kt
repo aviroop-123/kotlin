@@ -14,9 +14,10 @@ import org.jetbrains.kotlin.test.backend.ir.IrBackendInput
 import org.jetbrains.kotlin.test.backend.ir.IrDiagnosticsHandler
 import org.jetbrains.kotlin.test.backend.ir.KlibFacades
 import org.jetbrains.kotlin.test.builders.*
+import org.jetbrains.kotlin.test.configuration.commonFirHandlersForCodegenTest
+import org.jetbrains.kotlin.test.configuration.commonIrHandlersForCodegenTest
 import org.jetbrains.kotlin.test.configuration.setupDefaultDirectivesForIrTextTest
 import org.jetbrains.kotlin.test.configuration.setupIrTextDumpHandlers
-import org.jetbrains.kotlin.test.frontend.classic.handlers.ClassicDiagnosticsHandler
 import org.jetbrains.kotlin.test.frontend.fir.handlers.FirDiagnosticsHandler
 import org.jetbrains.kotlin.test.model.*
 import org.jetbrains.kotlin.test.runners.AbstractKotlinCompilerWithTargetBackendTest
@@ -62,28 +63,22 @@ abstract class AbstractNonJvmIrTextTest<FrontendOutput : ResultingArtifact.Front
         )
 
         facadeStep(frontendFacade)
-        classicFrontendHandlersStep {
-            useHandlers(
-                ::NoCompilationErrorsHandler,
-                ::ClassicDiagnosticsHandler
-            )
-        }
         firHandlersStep {
+            commonFirHandlersForCodegenTest()
             useHandlers(
-                ::NoFirCompilationErrorsHandler,
                 ::FirDiagnosticsHandler
             )
         }
 
         setupDefaultDirectivesForIrTextTest()
-        useAfterAnalysisCheckers(
+        useFailureSuppressors(
             ::BlackBoxCodegenSuppressor,
-            ::FirIrDumpIdenticalChecker,
             ::PhasedPipelineChecker.bind(TestPhase.BACKEND)
         )
         enableMetaInfoHandler()
         facadeStep(converter)
         irHandlersStep {
+            commonIrHandlersForCodegenTest()
             setupIrTextDumpHandlers()
             klibAbiDumpBeforeInliningSavingHandler?.let {
                 useHandlers(it)

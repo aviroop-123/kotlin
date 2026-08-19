@@ -1,0 +1,8 @@
+KtOperationReferenceExpression(68,70): '+='
+  isImplicitReferenceToCompanion: false
+  usesContextSensitiveResolution: false
+  KaSymbolResolutionSuccess:
+    symbols = [
+      /plus(<extension receiver>: R, other: P): R,
+      kotlin/collections/MutableList.set(<dispatch receiver>: kotlin.collections.MutableList<E>, index: kotlin.Int, element: E): E
+    ]

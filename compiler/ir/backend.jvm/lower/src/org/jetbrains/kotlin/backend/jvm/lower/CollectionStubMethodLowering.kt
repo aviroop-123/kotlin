@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.ClassLoweringPass
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.caches.StubsForCollectionClass
 import org.jetbrains.kotlin.backend.jvm.ir.isJvmInterface
@@ -44,7 +43,6 @@ import org.jetbrains.kotlin.types.TypeCheckerState
  * In the bytecode, `C` will have implementations of all mutating methods (`add`, `remove`, `clear`, ...) which throw
  * `java.lang.UnsupportedOperationException` with the message "Operation is not supported for read-only collection".
  */
-@PhaseDescription(name = "CollectionStubMethod")
 internal class CollectionStubMethodLowering(val context: JvmBackendContext) : ClassLoweringPass {
     private val collectionStubComputer = context.collectionStubComputer
 
@@ -68,7 +66,7 @@ internal class CollectionStubMethodLowering(val context: JvmBackendContext) : Cl
         // We don't need to generate stub for existing methods, but for FAKE_OVERRIDE methods with ABSTRACT modality,
         // it means an abstract function in superclass that is not implemented yet,
         // stub generation is still needed to avoid invocation error.
-        val (abstractMethods, nonAbstractMethods) = irClass.functions.partition { it.modality == Modality.ABSTRACT && it.isFakeOverride }
+        val [abstractMethods, nonAbstractMethods] = irClass.functions.partition { it.modality == Modality.ABSTRACT && it.isFakeOverride }
         val nonAbstractMethodsByNameAndArity = nonAbstractMethods.groupBy { it.nameAndArity }
         val abstractMethodsByNameAndArity = abstractMethods.groupBy { it.nameAndArity }
 
@@ -199,9 +197,9 @@ internal class CollectionStubMethodLowering(val context: JvmBackendContext) : Cl
 
     private fun liftStubMethodReturnType(function: IrSimpleFunction): IrType {
         val klass = when (function.name.asString()) {
-            "iterator" -> context.symbols.iterator
-            "listIterator" -> context.symbols.listIterator
-            "subList" -> context.symbols.list
+            "iterator" -> context.irBuiltIns.iteratorClass
+            "listIterator" -> context.irBuiltIns.listIteratorClass
+            "subList" -> context.irBuiltIns.listClass
             else -> return function.returnType
         }
         return klass.typeWithArguments((function.returnType as IrSimpleType).arguments)
@@ -250,9 +248,9 @@ internal class CollectionStubMethodLowering(val context: JvmBackendContext) : Cl
         typeChecker: TypeCheckerState
     ): Boolean =
         overrideFun.typeParameters.zip(parentFun.typeParameters)
-            .all { (typeParameter1, typeParameter2) ->
+            .all { [typeParameter1, typeParameter2] ->
                 typeParameter1.superTypes.zip(typeParameter2.superTypes)
-                    .all { (supertype1, supertype2) ->
+                    .all { [supertype1, supertype2] ->
                         AbstractTypeChecker.equalTypes(typeChecker, supertype1, supertype2)
                     }
             }
@@ -263,7 +261,7 @@ internal class CollectionStubMethodLowering(val context: JvmBackendContext) : Cl
         typeChecker: TypeCheckerState
     ): Boolean =
         overrideFun.nonDispatchParameters.zip(parentFun.nonDispatchParameters)
-            .all { (valueParameter1, valueParameter2) ->
+            .all { [valueParameter1, valueParameter2] ->
                 AbstractTypeChecker.equalTypes(typeChecker, valueParameter1.type, valueParameter2.type)
             }
 

@@ -1,4 +1,3 @@
-// FIR_IDENTICAL
 package test
 @Retention(AnnotationRetention.SOURCE)
 annotation class AnnoClass

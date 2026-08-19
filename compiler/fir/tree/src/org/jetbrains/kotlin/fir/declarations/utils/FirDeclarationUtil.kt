@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -9,22 +9,16 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.expressions.FirComponentCall
 import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression
+import org.jetbrains.kotlin.fir.expressions.FirReplExpressionReference
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirFileSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.hasContextParameters
+import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.coneTypeSafe
 import org.jetbrains.kotlin.fir.types.isNullableAny
 import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.isLocal
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
@@ -52,21 +46,35 @@ inline val FirDeclaration.isPrecompiled: Boolean
 inline val FirDeclaration.isSynthetic: Boolean
     get() = origin is FirDeclarationOrigin.Synthetic
 
-// NB: This function checks transitive localness. That is,
-// if a declaration `isNonLocal`, then its parent also `isNonLocal`.
-val FirDeclaration.isNonLocal: Boolean
-    get() = symbol.isNonLocal
-
-val FirBasedSymbol<*>.isNonLocal: Boolean
+/**
+ * An extension to determine locality for a general [FirDeclaration].
+ *
+ * A FIR declaration is non-local iff all its parents are non-local, or it's a [FirFile].
+ */
+val FirDeclaration.isLocal: Boolean
     get() = when (this) {
-        is FirFileSymbol -> true
-        is FirCallableSymbol -> !callableId.isLocal
-        is FirClassLikeSymbol -> !isLocal
-        else -> false
+        is FirFile -> false
+        is FirMemberDeclaration -> isLocal
+        else -> true
     }
 
+/**
+ * `true` when [FirCallableDeclaration.receiverParameter] is not `null`.
+ *
+ * Use [isInstanceExtension] to check for extensions excluding companion extensions
+ * or [isCompanionExtension] to check for companion extensions.
+ */
 val FirCallableDeclaration.isExtension: Boolean get() = receiverParameter != null
-val FirCallableSymbol<*>.isExtension: Boolean get() = fir.isExtension
+
+/**
+ * `true` when [FirCallableDeclaration.receiverParameter] is not `null` and the declaration is not static,
+ * meaning it's not a companion extension.
+ *
+ * As of writing this, companion block members cannot be extensions.
+ *
+ * @see isCompanionExtension
+ */
+val FirCallableDeclaration.isInstanceExtension: Boolean get() = isExtension && !isStatic
 
 val FirBasedSymbol<*>.isMemberDeclaration: Boolean
     // Accessing `fir` is ok, because we don't really use it
@@ -126,5 +134,14 @@ fun FirCallableDeclaration.contextParametersForFunctionOrContainingProperty(): L
  * The function assumes that the body is not lazy.
  */
 fun FirPropertyAccessor.hasGeneratedDelegateBody(): Boolean {
-    return body?.statements?.firstOrNull()?.source?.kind == KtFakeSourceElementKind.DelegatedPropertyAccessor
+    return body?.statements?.firstOrNull()?.source?.kind is KtFakeSourceElementKind.DelegatedPropertyAccessor
 }
+
+/**
+ * A [FirReplExpressionReference] ([FirProperty.initializer]/[FirProperty.delegate]) of moved property inside a REPL snippet declaration
+ */
+val FirProperty.replExpressionReference: FirReplExpressionReference?
+    get() = when {
+        symbol !is FirRegularPropertySymbol || isReplSnippetDeclaration != true -> null
+        else -> initializer as? FirReplExpressionReference ?: delegate as? FirReplExpressionReference
+    }

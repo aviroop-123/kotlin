@@ -1,5 +1,4 @@
 // RUN_PIPELINE_TILL: FRONTEND
-// SKIP_TXT
 // FIR_DUMP
 // ISSUE: KT-38895, KT-50996, KT-51000
 
@@ -21,14 +20,14 @@ fun takeA(a: A) {}
 fun takeB(b: B) {}
 
 fun test_constants() {
-    takeByte(<!INTEGER_OPERATOR_RESOLVE_WILL_CHANGE!>1 + 1<!>) // error
+    takeByte(<!ARGUMENT_TYPE_MISMATCH!>1 + 1<!>) // error
     takeInt(1 + 1 + 1) // OK
     takeNullableInt(1 + 1 + 1) // OK
     takeLong(1 + 1 + 1) // will be OK with implicit widening conversion
     takeNullableLong(1 + 1 + 1) // will be OK with implicit widening conversion
-    val x = takeOverloaded(<!INTEGER_OVERFLOW!>2147483648 - 1 + 1<!>) // now resolved to (1), will be resolved to (2)
-    takeA(x)
-    takeB(<!TYPE_MISMATCH!>x<!>)
+    val x = takeOverloaded(2147483648 - 1 + 1) // now resolved to (1), will be resolved to (2)
+    takeA(<!ARGUMENT_TYPE_MISMATCH!>x<!>)
+    takeB(x)
 }
 
 val topLevelIntProperty: Int = 1 + 1 + 1
@@ -44,8 +43,8 @@ fun testTopLevelProperties() {
     takeLong(topLevelImplicitLongProperty)
 
     // no conversion for properties
-    takeLong(<!TYPE_MISMATCH!>topLevelIntProperty<!>)
-    takeLong(<!TYPE_MISMATCH!>topLevelImplicitIntProperty<!>)
+    takeLong(<!ARGUMENT_TYPE_MISMATCH!>topLevelIntProperty<!>)
+    takeLong(<!ARGUMENT_TYPE_MISMATCH!>topLevelImplicitIntProperty<!>)
 }
 
 fun testLocalProperties() {
@@ -61,8 +60,8 @@ fun testLocalProperties() {
     takeLong(localImplicitLongProperty)
 
     // no conversion for properties
-    takeLong(<!TYPE_MISMATCH!>localIntProperty<!>)
-    takeLong(<!TYPE_MISMATCH!>localImplicitIntProperty<!>)
+    takeLong(<!ARGUMENT_TYPE_MISMATCH!>localIntProperty<!>)
+    takeLong(<!ARGUMENT_TYPE_MISMATCH!>localImplicitIntProperty<!>)
 }
 
 /* GENERATED_FIR_TAGS: additiveExpression, checkNotNullCall, functionDeclaration, integerLiteral, interfaceDeclaration,

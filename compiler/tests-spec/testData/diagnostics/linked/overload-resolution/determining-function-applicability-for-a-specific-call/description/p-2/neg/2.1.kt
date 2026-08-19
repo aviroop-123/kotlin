@@ -1,5 +1,4 @@
 // DIAGNOSTICS: -UNUSED_VARIABLE -ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE -UNUSED_VALUE -UNUSED_PARAMETER -UNUSED_EXPRESSION
-// SKIP_TXT
 
 /*
  * KOTLIN DIAGNOSTICS SPEC TEST (NEGATIVE)
@@ -22,7 +21,7 @@ import LibPackCase1.a.boo
 import LibPackCase1.b.*
 
 fun case1 (b: B?){
-    b.boo({ <!TYPE_MISMATCH, TYPE_MISMATCH!>C()<!> })
+    b.boo({ <!RETURN_TYPE_MISMATCH!>C()<!> })
     b.boo({1})
 }
 

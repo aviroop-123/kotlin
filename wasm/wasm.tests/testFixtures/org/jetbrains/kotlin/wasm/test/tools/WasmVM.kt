@@ -14,11 +14,12 @@ import kotlin.test.fail
 private val toolLogsEnabled: Boolean = getBoolean("kotlin.js.test.verbose")
 
 internal sealed class WasmVM(
-    val shortName: String,
     val property: String,
     val entryPointIsJsFile: Boolean
 ) {
     protected val tool = ExternalTool(System.getProperty(property))
+    val vmName: String
+        get() = javaClass.simpleName
 
     abstract fun run(
         entryFile: String,
@@ -28,7 +29,7 @@ internal sealed class WasmVM(
         toolArgs: List<String> = emptyList(),
     ): String
 
-    object V8 : WasmVM(shortName = "V8", property = "javascript.engine.path.V8", entryPointIsJsFile = true) {
+    object V8 : WasmVM(property = "javascript.engine.path.V8", entryPointIsJsFile = true) {
         override fun run(
             entryFile: String,
             jsFiles: List<String>,
@@ -40,13 +41,13 @@ internal sealed class WasmVM(
                 *toolArgs.toTypedArray(),
                 *jsFiles.toTypedArray(),
                 "--module",
-                *if (useNewExceptionHandling) arrayOf("--no-experimental-wasm-legacy-eh", "--experimental-wasm-exnref") else emptyArray(),
+                *if (useNewExceptionHandling) arrayOf("--no-experimental-wasm-legacy-eh") else emptyArray(),
                 entryFile,
                 workingDirectory = workingDirectory,
             )
     }
 
-    object SpiderMonkey : WasmVM(shortName = "SM", property = "javascript.engine.path.SpiderMonkey", entryPointIsJsFile = true) {
+    object SpiderMonkey : WasmVM(property = "javascript.engine.path.SpiderMonkey", entryPointIsJsFile = true) {
         override fun run(
             entryFile: String,
             jsFiles: List<String>,
@@ -63,7 +64,7 @@ internal sealed class WasmVM(
             )
     }
 
-    private object JavaScriptCore : WasmVM(shortName = "JSC", property = propertyWithPathToJavaScriptCore, entryPointIsJsFile = true) {
+    object JavaScriptCore : WasmVM(property = "javascript.engine.path.JavaScriptCore", entryPointIsJsFile = true) {
         override fun run(
             entryFile: String,
             jsFiles: List<String>,
@@ -79,7 +80,7 @@ internal sealed class WasmVM(
             )
     }
 
-    object WasmEdge : WasmVM(shortName = "WasmEdge", property = "wasm.engine.path.WasmEdge", entryPointIsJsFile = false) {
+    object WasmEdge : WasmVM(property = "wasm.engine.path.WasmEdge", entryPointIsJsFile = false) {
         override fun run(
             entryFile: String,
             jsFiles: List<String>,
@@ -89,15 +90,32 @@ internal sealed class WasmVM(
         ) =
             tool.run(
                 *toolArgs.toTypedArray(),
-                "--enable-gc",
-                "--enable-exception-handling",
                 entryFile,
                 "startTest",
                 workingDirectory = workingDirectory,
             )
     }
 
-    object NodeJs : WasmVM(shortName = "NodeJs", property = "javascript.engine.path.NodeJs", entryPointIsJsFile = true) {
+    object Wasmtime : WasmVM(property = "wasm.engine.path.Wasmtime", entryPointIsJsFile = false) {
+        override fun run(
+            entryFile: String,
+            jsFiles: List<String>,
+            workingDirectory: File?,
+            useNewExceptionHandling: Boolean,
+            toolArgs: List<String>,
+        ) =
+            tool.run(
+                *toolArgs.toTypedArray(),
+                "-W",
+                "gc,function-references,exceptions",
+                "--invoke",
+                "startTest",
+                entryFile,
+                workingDirectory = workingDirectory,
+            )
+    }
+
+    object NodeJs : WasmVM(property = "wasm.javascript.engine.path.NodeJs", entryPointIsJsFile = true) {
         override fun run(
             entryFile: String,
             jsFiles: List<String>,
@@ -108,17 +126,10 @@ internal sealed class WasmVM(
             tool.run(
                 *toolArgs.toTypedArray(),
                 *if (useNewExceptionHandling) arrayOf("--no-experimental-wasm-legacy-eh", "--experimental-wasm-exnref") else emptyArray(),
-                *jsFiles.flatMap { listOf("-f", it) }.toTypedArray(),
+                *jsFiles.toTypedArray(),
                 entryFile,
                 workingDirectory = workingDirectory
             )
-    }
-
-    companion object {
-        // TODO remove .local
-        private const val propertyWithPathToJavaScriptCore = "javascript.engine.path.JavaScriptCore.local"
-
-        val JavaScriptCoreOrNull: WasmVM? get() = if (System.getProperty(propertyWithPathToJavaScriptCore) != null) JavaScriptCore else null
     }
 }
 
@@ -152,12 +163,11 @@ internal class ExternalTool(val path: String) {
         while (true) {
             val line = bufferedStdout.readLine() ?: break
             stdout.appendLine(line)
-            println(line)
         }
 
         val exitValue = process.waitFor()
         if (exitValue != 0) {
-            fail("Command \"$commandString\" terminated with exit code $exitValue in working dir \"$workingDirectory\"")
+            fail("Command \"$commandString\" terminated with exit code $exitValue in working dir \"$workingDirectory\"\nOUTPUT:\n$stdout\n---")
         }
 
         return stdout.toString()

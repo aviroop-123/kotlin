@@ -10,13 +10,16 @@ import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.pop
 import org.jetbrains.kotlin.backend.common.push
 import org.jetbrains.kotlin.backend.jvm.*
-import org.jetbrains.kotlin.backend.jvm.ir.isBoxedInlineClassType
+import org.jetbrains.kotlin.backend.jvm.ir.getJvmNameFromJvmExposeBoxedAnnotation
 import org.jetbrains.kotlin.backend.jvm.ir.isInlineClassType
 import org.jetbrains.kotlin.backend.jvm.ir.shouldBeExposedByAnnotationOrFlag
+import org.jetbrains.kotlin.backend.jvm.ir.upperBound
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.transformStatement
+import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.isKotlinResult
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.name.Name
@@ -47,15 +50,6 @@ internal abstract class JvmValueClassAbstractLowering(
                 if (constructorReplacement != null) {
                     addBindingsFor(function, constructorReplacement)
                     return transformFlattenedConstructor(function, constructorReplacement)
-                } else if (function.shouldBeExposed()) {
-                    val constructorWithPotentialMarker = if (function.areAllParamsBoxedInlineClasses()) {
-                        // no replacement -> return listOf(function),
-                        // but `transformFunctionFlat` accepts null as initial fun as well for optimization reasons
-                        function.withAddedMarkerParameterToNonExposedConstructor() ?: return null
-                    } else {
-                        function
-                    }
-                    return listOfNotNull(constructorWithPotentialMarker, createExposedConstructor(constructorWithPotentialMarker))
                 }
             }
             function.transformChildrenVoid()
@@ -70,6 +64,24 @@ internal abstract class JvmValueClassAbstractLowering(
                 function.overriddenSymbols = replacements.replaceOverriddenSymbols(function)
             }
             return null
+        } else if (replacement is IrConstructor) {
+            require(function is IrConstructor) {
+                "Expected ${replacement.render()} to be a replacement of constructor, but got ${function.render()}"
+            }
+            addBindingsFor(function, replacement)
+            val declarations = transformFlattenedConstructor(function, replacement)
+            return declarations + if (function.shouldBeExposed()) {
+                listOfNotNull(
+                    createExposedConstructor(replacement, function),
+                    createExposedNoArgConstructor(replacement, function),
+                )
+            } else {
+                emptyList()
+            }
+        }
+
+        require(replacement is IrSimpleFunction) {
+            "Expected ${function.render()} to be replaced by simple function, but got ${replacement.render()}"
         }
 
         if (function is IrSimpleFunction && function.overriddenSymbols.any { it.owner.parentAsClass.isFun }) {
@@ -88,22 +100,15 @@ internal abstract class JvmValueClassAbstractLowering(
         }
     }
 
-    private fun IrConstructor.areAllParamsBoxedInlineClasses(): Boolean {
-        // If all inline class parameters are boxes in non-exposed constructor, we need to add an additional
-        // parameter to non-exposed constructor to distinguish it from exposed one
-        val inlineClassParams = parameters.filter { it.type.isInlineClassType() }
-        return inlineClassParams.isNotEmpty() && inlineClassParams.all { it.type.isBoxedInlineClassType() }
-    }
-
     // Returns true if not just an annotation exists, but if it is also applicable to the constructor
     private fun IrConstructor.shouldBeExposed(): Boolean =
-        shouldBeExposedByAnnotationOrFlag(context.config.languageVersionSettings) &&
+        shouldBeExposedByAnnotationOrFlag(context) &&
                 parameters.any { it.type.isInlineClassType() } &&
                 !constructedClass.isSpecificLoweringLogicApplicable()
 
-    abstract fun IrConstructor.withAddedMarkerParameterToNonExposedConstructor(): IrConstructor?
+    abstract fun createExposedConstructor(constructor: IrConstructor, original: IrConstructor): IrConstructor?
 
-    abstract fun createExposedConstructor(constructor: IrConstructor): IrConstructor?
+    abstract fun createExposedNoArgConstructor(constructor: IrConstructor, original: IrConstructor): IrConstructor?
 
     private fun transformFlattenedConstructor(function: IrConstructor, replacement: IrConstructor): List<IrDeclaration> {
         replacement.parameters.forEach {
@@ -144,13 +149,39 @@ internal abstract class JvmValueClassAbstractLowering(
         replacement.copyAttributes(function)
 
         // Don't create a wrapper for functions which are only used in an unboxed context
-        if (!(function.shouldBeExposedByAnnotationOrFlag(context.config.languageVersionSettings) && !function.isFakeOverride) &&
+        if (!(function.shouldBeExposedByAnnotationOrFlag(context) && !function.isFakeOverride) &&
             (function.overriddenSymbols.isEmpty() || replacement.dispatchReceiverParameter != null)
-        ) return listOf(replacement)
+        ) {
+            return listOf(replacement)
+        } else if (function.shouldBeExposedByAnnotationOrFlag(context) &&
+            function.acceptsNullableResultWithoutRenaming()
+        ) {
+            // Propagate @JvmExposeBoxed annotation
+            replacement.annotations = replacement.annotations.withJvmExposeBoxedAnnotation(replacement, context)
+            return listOf(replacement)
+        }
 
         val bridgeFunction = createBridgeFunction(function, replacement)
 
         return listOf(replacement, bridgeFunction)
+    }
+
+    // There is only one special case with `kotlin.Result` class - when the type is nullable.
+    // If it is not nullable, there is no clash between non-exposed and exposed methods.
+    // One accepts `java/lang/Object`, while the other - `kotlin/Result`.
+    //
+    // However, when Result is nullable, they both accept `kotlin/Result`, leading to a clash.
+    private fun IrSimpleFunction.acceptsNullableResultWithoutRenaming(): Boolean {
+        if (parameters.none { it.type.isKotlinResult(nullable = true) }) return false
+        // Not-null `Result` does not lead to clash - see comment above.
+        if (hasMangledParameters() || parameters.any { it.type.isKotlinResult(nullable = false) }) return false
+        // Renaming fixes clashing issue
+        return getJvmNameFromJvmExposeBoxedAnnotation() == null
+    }
+
+    private fun IrType.isKotlinResult(nullable: Boolean): Boolean {
+        if (!nullable && isNullable() || nullable && !isNullable()) return false
+        return upperBound.isKotlinResult()
     }
 
     final override fun visitReturn(expression: IrReturn): IrExpression {
@@ -251,7 +282,7 @@ internal abstract class JvmValueClassAbstractLowering(
     }
 
     private fun IrSimpleFunction.signatureRequiresMangling(): Boolean {
-        if (shouldBeExposedByAnnotationOrFlag(context.config.languageVersionSettings)) return false
+        if (shouldBeExposedByAnnotationOrFlag(context)) return false
         val includeInline = specificMangle == SpecificMangle.Inline
         val includeMFVC = specificMangle == SpecificMangle.MultiField
         return nonDispatchParameters.any { it.type.getRequiresMangling(includeInline, includeMFVC) } ||
@@ -312,10 +343,6 @@ internal abstract class JvmValueClassAbstractLowering(
 
     final override fun visitEnumConstructorCall(expression: IrEnumConstructorCall) = super.visitEnumConstructorCall(expression)
     final override fun visitGetClass(expression: IrGetClass) = super.visitGetClass(expression)
-    final override fun visitCallableReference(expression: IrCallableReference<*>) = super.visitCallableReference(expression)
-    final override fun visitPropertyReference(expression: IrPropertyReference) = super.visitPropertyReference(expression)
-    final override fun visitLocalDelegatedPropertyReference(expression: IrLocalDelegatedPropertyReference) =
-        super.visitLocalDelegatedPropertyReference(expression)
 
     final override fun visitRawFunctionReference(expression: IrRawFunctionReference): IrExpression {
         if (expression.needsDummySignature) return super.visitRawFunctionReference(expression)

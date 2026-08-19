@@ -14,8 +14,8 @@ import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirBasicDeclarationChecker
 import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors
+import org.jetbrains.kotlin.fir.analysis.isInlineClassThatRequiresMangling
 import org.jetbrains.kotlin.fir.declarations.*
-import org.jetbrains.kotlin.fir.declarations.utils.isInlineOrValue
 import org.jetbrains.kotlin.fir.declarations.utils.isOverridable
 import org.jetbrains.kotlin.fir.declarations.utils.isOverride
 import org.jetbrains.kotlin.fir.declarations.utils.modality
@@ -27,6 +27,8 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
 
 object FirJvmNameChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
+    override val platformSpecificCheckerEnabledInMetadataCompilation: Boolean
+        get() = true
 
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirDeclaration) {
@@ -43,7 +45,7 @@ object FirJvmNameChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
             reporter.reportOn(jvmName.source, FirJvmErrors.ILLEGAL_JVM_NAME)
         }
 
-        if (declaration is FirFunction && !context.isRenamableFunction(declaration)) {
+        if (declaration is FirFunction && !isRenamableFunction(declaration)) {
             reporter.reportOn(jvmName.source, FirJvmErrors.INAPPLICABLE_JVM_NAME)
         } else if (declaration is FirCallableDeclaration) {
             val containingClass = declaration.getContainingClass()
@@ -51,20 +53,19 @@ object FirJvmNameChecker : FirBasicDeclarationChecker(MppCheckerKind.Common) {
             if (
                 declaration.isOverride ||
                 containingClass != null && containingClass.modality != Modality.FINAL && declaration.isOverridable ||
-                containingClass?.isValueClassThatRequiresMangling() == true
+                containingClass?.symbol?.isInlineClassThatRequiresMangling() == true
             ) {
                 reporter.reportOn(jvmName.source, FirJvmErrors.INAPPLICABLE_JVM_NAME)
             }
         }
     }
 
-    private fun CheckerContext.isRenamableFunction(function: FirFunction): Boolean {
+    private fun isRenamableFunction(function: FirFunction): Boolean {
         val containingClass = function.getContainingClassSymbol()
-        return containingClass != null || !function.symbol.callableId.isLocal
-    }
-
-    private fun FirRegularClass.isValueClassThatRequiresMangling(): Boolean {
-        // value classes have inline modifiers in FIR
-        return isInlineOrValue && name != StandardClassIds.Result.shortClassName
+        return containingClass != null || !function.isLocal ||
+                // An additional check is needed for scripts (currently all properties there have isLocal = true, as well as their accessors)
+                // It's valid, because once declared, a property accessor is always renamable.
+                // Local variables can neither declare an accessor nor use @get:JvmName
+                function is FirPropertyAccessor
     }
 }

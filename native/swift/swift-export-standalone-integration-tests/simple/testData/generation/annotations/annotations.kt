@@ -87,6 +87,9 @@ open class normalT {
     open var removedP: Int
         @Deprecated("Removed", level = DeprecationLevel.HIDDEN) get() = 42
         @Deprecated("Removed", level = DeprecationLevel.HIDDEN) set(new) {}
+
+    @Deprecated("Obsoleted", level = DeprecationLevel.ERROR)
+    operator fun plus(increment: normalT): normalT = TODO()
 }
 
 class normalChildT : normalT() {
@@ -274,6 +277,130 @@ open class hiddenChildT : hiddenT() {
     override val deprecationRestatedV: Unit get() = Unit
 }
 
+fun returnHiddenT(): hiddenT = TODO()
+
+fun acceptHiddenT(arg: hiddenT): Unit = TODO()
+
+fun returnHiddenChildT(): hiddenChildT = TODO()
+
+fun acceptHiddenChildT(arg: hiddenChildT): Unit = TODO()
+
+interface InterfaceWithDeprecatedMembers {
+    fun regularFunction(): Unit = TODO()
+
+    @Deprecated("Deprecated")
+    fun deprecatedWarningFunction(): Unit = TODO()
+
+    @Deprecated("Obsoleted", level = DeprecationLevel.ERROR)
+    fun deprecatedErrorFunction(): Unit = TODO()
+
+    @Deprecated("Removed", level = DeprecationLevel.HIDDEN)
+    fun deprecatedHiddenFunction(): Unit = TODO()
+}
+
+class ClassWithDeprecatedMembersFromInterface: InterfaceWithDeprecatedMembers {
+    override fun regularFunction(): Unit = TODO()
+
+    @Deprecated("Deprecated")
+    override fun deprecatedWarningFunction(): Unit = TODO()
+
+    @Deprecated("Obsoleted", level = DeprecationLevel.ERROR)
+    override fun deprecatedErrorFunction(): Unit = TODO()
+
+    @Deprecated("Removed", level = DeprecationLevel.HIDDEN)
+    override fun deprecatedHiddenFunction(): Unit = TODO()
+}
+
+@Deprecated("Obsoleted", level = DeprecationLevel.ERROR)
+public interface DeprecatedInterface {
+    fun foo(): Unit = TODO()
+}
+
+public interface NonDeprecatedInterface: DeprecatedInterface {
+    fun bar(): Unit = TODO()
+}
+
+@Deprecated("Obsoleted", level = DeprecationLevel.ERROR)
+public interface SubDeprecatedInterface: DeprecatedInterface {
+    fun baz(): Unit = TODO()
+}
+
+public class PublicClassImplDeprecatedInterface: DeprecatedInterface {
+    override fun foo(): Unit = TODO()
+}
+
+@Deprecated("Obsoleted", level = DeprecationLevel.ERROR)
+public class PublicDeprecatedClassImplDeprecatedInterface: DeprecatedInterface {
+    override fun foo(): Unit = TODO()
+}
+
+private class PrivateClassImplDeprecatedInterface: DeprecatedInterface {
+    override fun foo(): Unit = TODO()
+}
+
+var deprecatedInterfaceProperty: DeprecatedInterface
+    get() = TODO()
+    set(value) = TODO()
+
+context(_: normalT)
+var deprecatedInterfacePropertyWithContext: DeprecatedInterface
+    get() = TODO()
+    set(value) = TODO()
+
+fun returnDeprecatedInterface(): DeprecatedInterface = TODO()
+
+fun acceptDeprecatedInterface(arg: DeprecatedInterface): Unit = TODO()
+
+var publicClassImplDeprecatedInterfaceProperty: PublicClassImplDeprecatedInterface
+    get() = TODO()
+    set(value) = TODO()
+
+fun returnPublicClassImplDeprecatedInterface(): PublicClassImplDeprecatedInterface = TODO()
+
+fun acceptPublicClassImplDeprecatedInterface(arg: PublicClassImplDeprecatedInterface): Unit = TODO()
+
+class DeprecatedInterfaceWrapper(val deprecatedInterface: DeprecatedInterface)
+
+@Deprecated("Hidden", level = DeprecationLevel.HIDDEN)
+public interface HiddenInterface {
+    fun foo(): Unit = TODO()
+}
+
+public open class PublicClassImplHiddenInterface: HiddenInterface {
+    override fun foo(): Unit = TODO()
+    open fun bar(): Unit = TODO()
+}
+
+public class PublicSubClassImplHiddenInterface: PublicClassImplHiddenInterface() {
+    override fun foo(): Unit = TODO()
+}
+
+var hiddenInterfaceProperty: HiddenInterface
+    get() = TODO()
+    set(value) = TODO()
+
+fun returnHiddenInterface(): HiddenInterface = TODO()
+
+fun acceptHiddenInterface(arg: HiddenInterface): Unit = TODO()
+
+var publicClassImplHiddenInterfaceProperty: PublicClassImplHiddenInterface
+    get() = TODO()
+    set(value) = TODO()
+
+fun returnPublicClassImplHiddenInterface(): PublicClassImplHiddenInterface = TODO()
+
+fun acceptPublicClassImplHiddenInterface(arg: PublicClassImplHiddenInterface): Unit = TODO()
+
+class HiddenInterfaceWrapper(val hiddenInterface: HiddenInterface)
+
+interface SomeInterface {
+    fun fooA(): obsoletedT
+    fun fooB(): String
+    var barA: obsoletedT
+    var String.barB: obsoletedT
+    var barC: String
+}
+
 // FILE: annotations_replacewith.kt
 
 const val MESSAGE = "message"
@@ -311,3 +438,140 @@ fun renamedQualified(x: Int, y: Float): Nothing = TODO("never")
 
 @Deprecated(message = "", replaceWith = ReplaceWith("something.else(x, y)"))
 fun renamedQualifiedWithArguments(x: Int, y: Float): Nothing = TODO("never")
+
+// FILE: objCName.kt
+@file:OptIn(kotlin.experimental.ExperimentalObjCName::class)
+
+@ObjCName("ObjCClassA", "SwiftClassA")
+class KotlinClassA {
+
+    @ObjCName("objCFunA", "swiftFunA")
+    fun kotlinFunA(@ObjCName("objCParamA", "swiftParamA") kotlinParamA: String): Unit = TODO()
+
+    @ObjCName("objCPropA", "swiftPropA")
+    val kotlinPropA: String get() = TODO()
+
+    @ObjCName("objCPropB", "swiftPropB")
+    var kotlinPropB: String
+        get() = TODO()
+        set(value) = TODO()
+
+    @ObjCName("ObjCSubClassA", "SwiftSubClassA")
+    class KotlinSubClassA
+
+    @ObjCName("ObjCSubClassB", "SwiftSubClassB", true)
+    class KotlinSubClassB
+
+    @ObjCName("ObjCSubClassC")
+    class KotlinSubClassC
+
+    @ObjCName(swiftName = "SwiftSubClassD")
+    class KotlinSubClassD
+}
+
+@ObjCName("ObjCObjectB")
+object KotlinObjectB {
+
+    @ObjCName("objCFunB")
+    fun kotlinFunB(@ObjCName("objCParamB") kotlinParamB: String): Unit = TODO()
+
+    fun kotlinFunC(@ObjCName("objCParamC", "_") kotlinParamC: String): Unit = TODO()
+}
+
+@ObjCName(swiftName = "SwiftInterfaceC")
+interface KotlinInterfaceC {
+
+    @ObjCName(swiftName = "swiftFunD")
+    fun kotlinFunD(@ObjCName(swiftName = "swiftParamD") kotlinParamD: String): Unit
+
+    fun kotlinFunE(@ObjCName(swiftName = "_") kotlinParamE: String): Unit
+}
+
+fun returnClassA(value: KotlinClassA): KotlinClassA = value
+
+fun returnObjectB(value: KotlinObjectB): KotlinObjectB = value
+
+fun returnInterfaceC(value: KotlinInterfaceC): KotlinInterfaceC = value
+
+val classA: KotlinClassA get() = TODO()
+
+val objectB: KotlinObjectB get() = TODO()
+
+val interfaceC: KotlinInterfaceC get() = TODO()
+
+// FILE: optin.kt
+
+@RequiresOptIn(level = RequiresOptIn.Level.ERROR)
+annotation class Foonnotation()
+
+@RequiresOptIn(level = RequiresOptIn.Level.WARNING)
+annotation class Barnnotation()
+
+@RequiresOptIn
+annotation class Baznnotation()
+
+// Class declarations
+@Foonnotation
+open class Foo
+
+@Barnnotation
+@OptIn(Foonnotation::class)
+class Bar : Foo()
+
+// Function declarations
+@Foonnotation
+fun foo() = Foo()
+
+@Barnnotation
+fun bar() = Bar()
+
+// Property declarations
+@Foonnotation
+val fooProperty = Foo()
+
+@Barnnotation
+@OptIn(Foonnotation::class)
+var barProperty = Bar()
+
+// Top-level variable
+@Foonnotation
+val fooVal = "foo"
+
+// Object declarations
+@Foonnotation
+object FooObject {
+    @Barnnotation
+    fun objectMethod() {}
+
+    @OptIn(Barnnotation::class)
+    val objectProperty = "value"
+}
+
+// Companion object
+class WithCompanion {
+    @Foonnotation
+    companion object {
+        @OptIn(Baznnotation::class)
+        fun companionMethod() {}
+    }
+}
+
+// Constructor
+class OptInConstructor @OptIn(Foonnotation::class) constructor(val name: String) {
+    @OptIn(Barnnotation::class)
+    constructor() : this("default")
+}
+
+// Local declaration with opt-in
+fun localDeclarations() {
+    @OptIn(Foonnotation::class)
+    val localVar = Foo()
+
+    @OptIn(Barnnotation::class, Baznnotation::class)
+    fun localFunction() {}
+}
+
+// Expression level opt-in
+fun expressionOptIn() {
+    val result = @OptIn(Foonnotation::class) Foo()
+}

@@ -60,7 +60,7 @@ internal class DeadCodeElimination(private val root: JsStatement) {
         }
 
         private fun visitStatements(statements: MutableList<JsStatement>) {
-            for ((index, statement) in statements.withIndex()) {
+            for ([index, statement] in statements.withIndex()) {
                 accept(statement)
                 if (!canContinue) {
                     val removedStatements = statements.subList(index + 1, statements.size)
@@ -95,8 +95,8 @@ internal class DeadCodeElimination(private val root: JsStatement) {
             visitLoop(x.body) { true }
         }
 
-        override fun visitForIn(x: JsForIn) {
-            EliminationVisitor().accept(x.iterExpression)
+        override fun visitIterableLoop(x: JsIterableLoop) {
+            EliminationVisitor().accept(x.bindingExpression)
             visitLoop(x.body) { true }
         }
 

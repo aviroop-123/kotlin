@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.gradle.plugin.diagnostics
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtensionOrNull
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
-import org.jetbrains.kotlin.gradle.plugin.extraProperties
 import org.jetbrains.kotlin.gradle.plugin.launch
 
 internal fun Project.launchKotlinGradleProjectCheckers() {
@@ -17,7 +16,8 @@ internal fun Project.launchKotlinGradleProjectCheckers() {
     val context = KotlinGradleProjectCheckerContext(
         project,
         project.kotlinPropertiesProvider,
-        project.multiplatformExtensionOrNull
+        project.multiplatformExtensionOrNull,
+        project.toolingDiagnosticsContext,
     )
     val collector = project.kotlinToolingDiagnosticsCollector
 

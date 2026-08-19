@@ -12,17 +12,20 @@ Tower Data Context:
     Element 5
         Scope: FirExplicitSimpleImportingScope
     Element 6
+        Static scope owner symbol: FirRegularClassSymbol public final class Foo : R|kotlin/Any|
+    Element 7
         Implicit receiver:
             FirRegularClassSymbol public final class Foo : R|kotlin/Any|
                 Type: Foo
-    Element 7
-        Scope: FirLocalScope
     Element 8
         Scope: FirLocalScope
     Element 9
         Scope: FirLocalScope
+    Element 10
+        Scope: FirLocalScope
             Properties:
                 FirLocalPropertySymbol lval localProperty: R|kotlin/Int|
+Expression Stability: STABLE_VALUE
 
 FILE: [ResolvedTo(IMPORTS)] errorProperty.kt
     public final [ResolvedTo(STATUS)] class Foo : R|kotlin/Any| {
@@ -36,9 +39,8 @@ FILE: [ResolvedTo(IMPORTS)] errorProperty.kt
         }
         )
 
-
     }
-    public final [ResolvedTo(CONTRACTS)] fun <[ResolvedTo(CONTRACTS)] T> transformation([ResolvedTo(CONTRACTS)] body: R|() -> T|): R|T| { LAZY_BLOCK }
+    public final [ResolvedTo(STATUS)] fun <[ResolvedTo(STATUS)] T> transformation([ResolvedTo(STATUS)] body: R|() -> T|): R|T| { LAZY_BLOCK }
     public final data [ResolvedTo(STATUS)] class MyPair : R|kotlin/Any| {
         public [ResolvedTo(STATUS)] constructor([ResolvedTo(STATUS)] l: R|kotlin/Int|, [ResolvedTo(STATUS)] r: R|kotlin/String|): R|MyPair| {
             LAZY_super<R|kotlin/Any|>

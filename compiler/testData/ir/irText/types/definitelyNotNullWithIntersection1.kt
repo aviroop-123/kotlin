@@ -1,6 +1,5 @@
-// LANGUAGE: +DefinitelyNonNullableTypes
+// LANGUAGE: -ProhibitIntersectionReifiedTypeParameter
 // SKIP_KT_DUMP
-// FIR_IDENTICAL
 
 class In<in I>
 

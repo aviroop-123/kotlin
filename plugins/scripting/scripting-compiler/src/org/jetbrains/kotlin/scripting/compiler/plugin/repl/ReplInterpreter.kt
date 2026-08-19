@@ -15,16 +15,18 @@ import org.jetbrains.kotlin.cli.common.repl.ReplClassLoader
 import org.jetbrains.kotlin.cli.common.repl.ReplEvalResult
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
-import org.jetbrains.kotlin.cli.jvm.compiler.messageCollector
 import org.jetbrains.kotlin.cli.jvm.config.JvmClasspathRoot
 import org.jetbrains.kotlin.cli.jvm.config.JvmModulePathRoot
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.MessageCollectorAccess
+import org.jetbrains.kotlin.config.messageCollector
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.KJvmReplCompilerBase
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.ReplCompilationState
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.ScriptDiagnosticsMessageCollector
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.createCompilationContextFromEnvironment
 import org.jetbrains.kotlin.scripting.compiler.plugin.repl.configuration.ReplConfiguration
-import org.jetbrains.kotlin.scripting.definitions.*
+import org.jetbrains.kotlin.scripting.definitions.ScriptCompilationConfigurationFromLegacyTemplate
+import org.jetbrains.kotlin.scripting.definitions.ScriptEvaluationConfigurationFromHostConfiguration
 import java.io.PrintWriter
 import java.net.URLClassLoader
 import java.util.concurrent.atomic.AtomicInteger
@@ -39,20 +41,13 @@ import kotlin.script.experimental.jvm.util.renderError
 class ReplInterpreter(
     projectEnvironment: JavaCoreProjectEnvironment,
     private val configuration: CompilerConfiguration,
-    private val replConfiguration: ReplConfiguration
+    private val replConfiguration: ReplConfiguration,
 ) {
     private val hostConfiguration: ScriptingHostConfiguration
     private val compilationConfiguration: ScriptCompilationConfiguration
     private val evaluationConfiguration: ScriptEvaluationConfiguration
 
     private val replState: JvmReplCompilerState<*>
-
-    companion object {
-        private val REPL_LINE_AS_SCRIPT_DEFINITION = object : KotlinScriptDefinition(Any::class) {
-            override val name = "Kotlin REPL"
-        }
-
-    }
 
     init {
         hostConfiguration = defaultJvmScriptingHostConfiguration
@@ -65,11 +60,17 @@ class ReplInterpreter(
                 projectEnvironment.parentDisposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES
             )
 
+        @OptIn(MessageCollectorAccess::class) // TODO(KT-84516)
         val context =
             createCompilationContextFromEnvironment(
-                ScriptCompilationConfigurationFromDefinition(hostConfiguration, REPL_LINE_AS_SCRIPT_DEFINITION),
+                ScriptCompilationConfigurationFromLegacyTemplate(
+                    defaultJvmScriptingHostConfiguration,
+                    Any::class
+                ).with {
+                    displayName("Kotlin REPL")
+                },
                 environment,
-                ScriptDiagnosticsMessageCollector(environment.messageCollector)
+                ScriptDiagnosticsMessageCollector(environment.configuration.messageCollector)
             )
 
         compilationConfiguration = context.baseScriptCompilationConfiguration
@@ -192,7 +193,12 @@ class ReplInterpreter(
                             is ResultWithDiagnostics.Success -> {
                                 when (val evalValue = evalResult.value.get().result) {
                                     is ResultValue.Unit -> ReplEvalResult.UnitResult()
-                                    is ResultValue.Value -> ReplEvalResult.ValueResult(evalValue.name, evalValue.value, evalValue.type, evalValue.scriptInstance)
+                                    is ResultValue.Value -> ReplEvalResult.ValueResult(
+                                        evalValue.name,
+                                        evalValue.value,
+                                        evalValue.type,
+                                        evalValue.scriptInstance
+                                    )
                                     is ResultValue.Error -> ReplEvalResult.Error.Runtime(evalValue.renderError())
                                     else -> ReplEvalResult.Error.Runtime("Error: snippet is not evaluated")
                                 }

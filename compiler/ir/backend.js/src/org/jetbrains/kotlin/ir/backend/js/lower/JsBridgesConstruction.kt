@@ -5,9 +5,12 @@
 
 package org.jetbrains.kotlin.ir.backend.js.lower
 
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.JsLoweredDeclarationOrigin
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrArithBuilder
+import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.JsSuspendFunctionWithGeneratorsLowering
+import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.JsSuspendFunctionsLowering
 import org.jetbrains.kotlin.ir.backend.js.utils.hasStableJsName
 import org.jetbrains.kotlin.ir.backend.js.utils.jsFunctionSignature
 import org.jetbrains.kotlin.ir.backend.js.utils.realOverrideTarget
@@ -22,18 +25,19 @@ import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
 import org.jetbrains.kotlin.ir.util.isVararg
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 
+@PhasePrerequisites(JsSuspendFunctionsLowering::class, JsSuspendFunctionWithGeneratorsLowering::class)
 class JsBridgesConstruction(val context: JsIrBackendContext) : BridgesConstruction(context) {
 
     private val calculator = JsIrArithBuilder(context)
 
-    private val jsArguments = context.intrinsics.jsArguments
-    private val jsArrayGet = context.intrinsics.jsArrayGet
-    private val jsArrayLength = context.intrinsics.jsArrayLength
-    private val jsArrayLike2Array = context.intrinsics.jsArrayLike2Array
-    private val jsSliceArrayLikeFromIndex = context.intrinsics.jsSliceArrayLikeFromIndex
-    private val jsSliceArrayLikeFromIndexToIndex = context.intrinsics.jsSliceArrayLikeFromIndexToIndex
-    private val primitiveArrays = context.intrinsics.primitiveArrays
-    private val primitiveToLiteralConstructor = context.intrinsics.primitiveToLiteralConstructor
+    private val jsArguments = context.symbols.jsArguments
+    private val jsArrayGet = context.symbols.jsArrayGet
+    private val jsArrayLength = context.symbols.jsArrayLength
+    private val jsArrayLike2Array = context.symbols.jsArrayLike2Array
+    private val jsSliceArrayLikeFromIndex = context.symbols.jsSliceArrayLikeFromIndex
+    private val jsSliceArrayLikeFromIndexToIndex = context.symbols.jsSliceArrayLikeFromIndexToIndex
+    private val primitiveArrays = context.irBuiltIns.primitiveArraysToPrimitiveTypes
+    private val primitiveToLiteralConstructor = context.symbols.primitiveToLiteralConstructor
 
     override fun getFunctionSignature(function: IrSimpleFunction) =
         jsFunctionSignature(
