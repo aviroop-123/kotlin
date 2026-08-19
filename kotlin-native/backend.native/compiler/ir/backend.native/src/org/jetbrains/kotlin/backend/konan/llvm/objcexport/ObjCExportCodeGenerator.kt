@@ -476,6 +476,16 @@ internal class ObjCExportCodeGenerator(
         if (earlyNaming && generationState.config.produce == CompilerOutputKind.FRAMEWORK) {
             emitSortedAdaptersTables()
             generateTypeAdapters(filterOutCachedTypes(spec))
+            spec?.types?.forEach { type ->
+                if (type is ObjCClassForKotlinClass) {
+                    var currentSuper: ObjCClassForKotlinClass? = type.superClassNotAny
+                    while (currentSuper != null) {
+                        val superClass = currentSuper.superClassNotAny ?: objCClassForAny
+                        dataGenerator.emitEmptyClass(currentSuper.binaryName, superClass.binaryName)
+                        currentSuper = currentSuper.superClassNotAny
+                    }
+                }
+            }
         } else {
             generateTypeAdapters(spec)
         }
